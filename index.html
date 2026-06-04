@@ -165,7 +165,7 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-label">Clientes</span>
     </div>
     <div class="nav-section">Gestão</div>
-    <div class="nav-item" onclick="switchPage('financeiro',this)">
+    <div class="nav-item" onclick="switchPage('financeiro',this)" style="display:none">
       <span class="nav-icon">💰</span>
       <span class="nav-label">Financeiro</span>
     </div>
@@ -331,16 +331,7 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
 
     <!-- ===== FINANCEIRO PAGE ===== -->
-  <div class="page" id="page-financeiro">
-    <div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:12px;color:#b5a898;">
-      <span style="font-size:48px;">💰</span>
-      <span style="font-size:14px;font-weight:500;color:#9a8c7e;">Em breve</span>
-      <span style="font-size:12px;">Esta seção será configurada em breve</span>
-    </div>
-  </div>
-
-  <!-- ===== LEADS PAGE ===== -->
-    <div class="page" id="page-leads">
+  <div claid="page-leads">
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome, telefone ou origem..." id="leads-search" oninput="filterLeadsTable()">
         <select class="filter-select" id="leads-origem-filter" onchange="filterLeadsTable()">
@@ -423,7 +414,7 @@ tbody tr:hover td{background:#faf7f3;}
 </div>
 
 <script>
-const META_TOKEN='EAASruBtHjI0BRlLDcNFXe4xQUV0UNPj97tWgfPkKsWIyZB3L0n1G7O7Q2asZBSigzkpThwANe3hyMZBlAi0zDTh4aoUk8ZAiZC7scOs4CLp9vNNZAKA6srleNxFdW6CiEZB90n9o7Ag3rlZCj2jD947Ch0gCySSqgFJg3DWsj76UHvzFAxRidLPfPi6xQiLt6WAZB1IFSfcnOds7f5i5n';
+const META_TOKEN='EAASruBtHjI0BRqydWJVPJkLbZCeWP9iVbeXCdT0bxynTtEiafbQJtVQFv4j0ZCSQkNuSPU5YgezK9ZCZChq0P3fJ69NSGIbsWHsivGrR73i3uL0eYwNhbZCzHowQ17ZAT0AXMtdRwZCweSa9fvnNPIzBN2zf6b2QhMngbaU2UChTQpt07p00rmPc2GEGWupsBra7DieQ9eFdpLAsxxwQrehwbx1Tj7op06zZCxJ7qvES3veXdKy7XWJnnwZDZD';
 const META_ACCOUNT='act_830126674734657';
 const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
 const SS_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
