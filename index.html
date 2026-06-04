@@ -143,7 +143,6 @@ tbody tr:hover td{background:#faf7f3;}
 </style>
 </head>
 <body>
-<div id="app-root" style="display:none;width:100%;min-height:100vh;">
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -179,7 +178,7 @@ tbody tr:hover td{background:#faf7f3;}
   <!-- TOPBAR -->
   <div class="topbar">
     <span class="topbar-title" id="topbar-title">Dashboard</span>
-    <div class="topbar-right"><span id="user-display" style="font-size:12px;color:#8a7a6a;margin-right:8px;"></span><button onclick="doLogout()" style="background:#fdecea;color:#c0392b;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;margin-right:8px;">Sair</button>
+    <div class="topbar-right">
       <span class="last-update" id="last-update"></span>
       <button class="btn-top" onclick="reloadCurrent()">↻ Atualizar</button>
     </div>
@@ -389,8 +388,8 @@ tbody tr:hover td{background:#faf7f3;}
   <button onclick="toggleFiltros()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;">🔍 Filtros</button>
   <input class="search-input" type="text" placeholder="Buscar por nome, telefone..." id="clientes-search" oninput="filterClientesTable()" style="flex:1;min-width:200px;">
   <span class="count-badge" id="clientes-count"></span>
-  <button onclick="exportarCRM()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;" class="admin-only">💾 Exportar</button>
-  <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;" class="admin-only">📂 Importar</button>
+  <button onclick="exportarCRM()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">💾 Exportar</button>
+  <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">📂 Importar</button>
   <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
 </div>
 <div id="filtros-avancados" style="display:none;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:16px;">
@@ -442,7 +441,6 @@ tbody tr:hover td{background:#faf7f3;}
   </div>
 </div>
 >
-</div>
 
 <!-- CLIENTE CARD (CRM) -->
 <div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
@@ -903,8 +901,7 @@ function filterClientesTable(){
   var trat=(document.getElementById('clientes-trat-filter')||{value:''}).value;
   var aval=(document.getElementById('clientes-aval-filter')||{value:''}).value;
   var filtered=clientesData.filter(function(r){
-    var nm=(r.name||'').toLowerCase();
-    var ph=(r.phone||'');
+    var nm=(r.name||'').toLowerCase();var ph=(r.phone||'');
     var nameMatch=!q&&!fnome||nm.includes(q)||ph.includes(q)||nm.includes(fnome);
     var telMatch=!ftel||ph.includes(ftel);
     var faseMatch=!fase||r.stage===fase;
@@ -913,21 +910,12 @@ function filterClientesTable(){
     var sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     var phn=ph.replace(/[^0-9]/g,'');
     var d=_ccData[phn]||{orcamentos:[],atividades:[]};
-    var orcs=d.orcamentos||[];
-    var tratMatch=!trat||orcs.some(function(o){return o.tratamento===trat;});
-    var avalMatch=!aval||orcs.some(function(o){return o.avaliador===aval;});
+    var tratMatch=!trat||(d.orcamentos||[]).some(function(o){return o.tratamento===trat;});
+    var avalMatch=!aval||(d.orcamentos||[]).some(function(o){return o.avaliador===aval;});
     var dataMatch=true;
-    if(fdataMin||fdataMax){
-      var dt=new Date(r.created_at||r.timestamp||0);
-      if(fdataMin&&dt<new Date(fdataMin))dataMatch=false;
-      if(fdataMax&&dt>new Date(fdataMax+'T23:59:59'))dataMatch=false;
-    }
+    if(fdataMin||fdataMax){var dt=new Date(r.created_at||r.timestamp||0);if(fdataMin&&dt<new Date(fdataMin))dataMatch=false;if(fdataMax&&dt>new Date(fdataMax+'T23:59:59'))dataMatch=false;}
     var proxMatch=true;
-    if(fproxMin||fproxMax){
-      var prx=d.atividades&&d.atividades.find(function(a){return a.proximo;});
-      if(!prx){proxMatch=false;}
-      else{var dp=new Date(prx.proximo);if(fproxMin&&dp<new Date(fproxMin))proxMatch=false;if(fproxMax&&dp>new Date(fproxMax))proxMatch=false;}
-    }
+    if(fproxMin||fproxMax){var prx=d.atividades&&d.atividades.find(function(a){return a.proximo;});if(!prx){proxMatch=false;}else{var dp=new Date(prx.proximo);if(fproxMin&&dp<new Date(fproxMin))proxMatch=false;if(fproxMax&&dp>new Date(fproxMax))proxMatch=false;}}
     return nameMatch&&telMatch&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dataMatch&&proxMatch;
   });
   var taberto=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
@@ -936,10 +924,7 @@ function filterClientesTable(){
   clientesData.forEach(function(r){
     var phn=String(r.phone||'').replace(/[^0-9]/g,'');
     var d=_ccData[phn]||{orcamentos:[]};
-    (d.orcamentos||[]).forEach(function(o){
-      vOrc+=Number(o.valor)||0;
-      var fs=o.fechamentos||[];if(fs.length>0)vFech+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));
-    });
+    (d.orcamentos||[]).forEach(function(o){vOrc+=Number(o.valor)||0;var fs=o.fechamentos||[];if(fs.length>0)vFech+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));});
   });
   var e1=document.getElementById('cli-total-aberto');if(e1)e1.textContent=taberto;
   var e2=document.getElementById('cli-total-fechado');if(e2)e2.textContent=tfech;
@@ -974,54 +959,6 @@ function limparFiltros(){
   filterClientesTable();
 }
 function fmtBRL(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
-</script>
-
-<!-- TELA DE LOGIN -->
-<div id="login-screen" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f3f0;z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
-    <div style="text-align:center;margin-bottom:32px;">
-      <div style="font-size:28px;font-weight:800;color:#2a2520;">Bulhões</div>
-      <div style="font-size:13px;color:#8a7a6a;margin-top:4px;">Odontologia · Dashboard</div>
-    </div>
-    <div style="margin-bottom:16px;"><label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Usuário</label>
-      <input id="login-user" type="text" placeholder="Seu usuário" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <div style="margin-bottom:24px;"><label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Senha</label>
-      <input id="login-pass" type="password" placeholder="Sua senha" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button onclick="doLogin()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">Entrar</button>
-    <div id="login-error" style="display:none;color:#c0392b;font-size:12px;text-align:center;margin-top:12px;">Usuário ou senha incorretos</div>
-    <div style="text-align:center;margin-top:20px;font-size:11px;color:#aaa;">Acesso restrito · contate o administrador</div>
-  </div>
-</div>
-<script>
-var USERS=[
-  {user:'lucas',pass:'bulhoes2024',role:'admin',nome:'Lucas Bulhões'},
-  {user:'victoria',pass:'victoria123',role:'viewer',nome:'Dra Victoria Mota'},
-  {user:'larissa',pass:'larissa123',role:'viewer',nome:'Dra Larissa Bulhões'},
-  {user:'gabriela',pass:'gabriela123',role:'viewer',nome:'Dra Gabriela Vera'}
-];
-var _currentUser=null;
-function doLogin(){
-  var u=document.getElementById('login-user').value.trim().toLowerCase();
-  var p=document.getElementById('login-pass').value;
-  var found=USERS.find(function(x){return x.user===u&&x.pass===p;});
-  if(found){
-    _currentUser=found;
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-root').style.display='block';
-    var el=document.getElementById('user-display');if(el)el.textContent=found.nome;
-    if(found.role!=='admin'){document.querySelectorAll('.admin-only').forEach(function(e){e.style.display='none';});}
-    loadTrafego();
-  } else {
-    document.getElementById('login-error').style.display='block';
-  }
-}
-function doLogout(){
-  _currentUser=null;
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('app-root').style.display='none';
-  document.getElementById('login-user').value='';
-  document.getElementById('login-pass').value='';
-}
 </script>
 
 </body>
