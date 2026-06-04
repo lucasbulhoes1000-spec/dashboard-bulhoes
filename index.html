@@ -922,7 +922,7 @@ function filterClientesTable(){
     const fechou=isFechou(r.stage);
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
-    return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
+    return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx==-1?0:idx})">
       <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.timestamp)}</td>
       <td>${r.phone||'—'}</td>
@@ -1250,8 +1250,10 @@ function fmtBRL(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimu
 
 // ── OPEN CARD ──────────────────────────────────────────────────
 function openClienteCard(idx) {
-  const r = clientesData[idx];
+  let r = clientesData[idx];
+  if(!r) r = clientesData[0]; // fallback
   if(!r) return;
+  idx = clientesData.indexOf(r);
   _currentClienteIdx = idx;
   const d = ccGet(r);
 
