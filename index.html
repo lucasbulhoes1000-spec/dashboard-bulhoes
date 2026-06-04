@@ -1284,7 +1284,7 @@ function openClienteCard(idx) {
   refreshAnotacoes(d);
   switchCCTab('orcamentos', document.querySelector('.cc-tab'));
   // hide sub-forms
-  ['cc-orc-form','cc-fech-form','cc-atv-form'].forEach(id=>document.getElementById(id).style.display='none');
+  ['cc-orc-form','cc-fech-form','cc-atv-form'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   document.getElementById('cliente-card-overlay').style.display='block';
 }
 
