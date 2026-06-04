@@ -1175,13 +1175,9 @@ function showCloudiaModal(title, rows, headers) {
 }
 </script>
 
-
-
-
 <!-- CLIENTE CARD (CRM) -->
-<div id="cliente-card-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;" onclick="closeClienteCard(event)">
-  <div id="cliente-card-panel" style="position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;isolation:isolate;">
-
+<div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
+  <div id="cliente-card-panel" style="position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;">
     <!-- Header -->
     <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -1189,162 +1185,221 @@ function showCloudiaModal(title, rows, headers) {
           <div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
           <div id="cc-phone" style="font-size:12px;color:#8a7a6a;margin-top:2px;"></div>
         </div>
-        <button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;line-height:1;">✕</button>
+        <button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
       </div>
-      <!-- Resumo financeiro -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
         <div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total acordado</div>
+          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total acordado</div>
           <div id="cc-total-acordado" style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:2px;">R$ 0,00</div>
         </div>
         <div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total fechado</div>
+          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total fechado</div>
           <div id="cc-total-fechado" style="font-size:14px;font-weight:700;color:#5a8a6a;margin-top:2px;">R$ 0,00</div>
         </div>
         <div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total entradas</div>
+          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total entradas</div>
           <div id="cc-total-entrada" style="font-size:14px;font-weight:700;color:#4a7a9a;margin-top:2px;">R$ 0,00</div>
         </div>
         <div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Último contato</div>
+          <div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Último contato</div>
           <div id="cc-ultimo-contato" style="font-size:13px;font-weight:600;color:#2a2520;margin-top:2px;">—</div>
         </div>
       </div>
-      <!-- Tags -->
       <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
         <span id="cc-stage-tag" style="background:#A18B6C;color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;"></span>
         <span id="cc-origin-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
         <span id="cc-date-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
       </div>
     </div>
-
     <!-- Tabs -->
     <div style="display:flex;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
-      <button class="cc-tab active-tab" onclick="switchCCTab('orcamentos',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">💰 Orçamentos</button>
+      <button class="cc-tab" onclick="switchCCTab('orcamentos',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">💰 Orçamentos</button>
       <button class="cc-tab" onclick="switchCCTab('atividades',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📋 Atividades</button>
       <button class="cc-tab" onclick="switchCCTab('anotacoes',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📝 Anotações</button>
     </div>
-
-    <!-- Body scrollável -->
+    <!-- Body -->
     <div style="flex:1;overflow-y:auto;padding:16px;">
-
-      <!-- ABA ORÇAMENTOS -->
       <div id="cc-tab-orcamentos">
-        <button onclick="openOrcForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Novo orçamento</button>
+        <button onclick="openOrcForm(null)" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Novo orçamento</button>
         <div id="cc-orc-list"></div>
       </div>
-
-      <!-- ABA ATIVIDADES -->
       <div id="cc-tab-atividades" style="display:none;">
         <button onclick="openAtvForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Registrar atividade</button>
         <div id="cc-atv-list"></div>
       </div>
-
-      <!-- ABA ANOTAÇÕES -->
       <div id="cc-tab-anotacoes" style="display:none;">
-        <textarea id="cc-anot-input" placeholder="Digite uma anotação..." style="width:100%;min-height:100px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:13px;color:#2a2520;background:#fff;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+        <textarea id="cc-anot-input" placeholder="Digite uma anotação..." style="width:100%;min-height:100px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
         <button onclick="salvarAnotacao()" style="margin-top:6px;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;">Salvar</button>
-        <div id="cc-anot-list" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="cc-anot-list" style="margin-top:14px;"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- FORM ORÇAMENTO -->
+<div id="cc-orc-form" style="display:none;position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#fff;z-index:700;box-shadow:-4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding:22px;box-sizing:border-box;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+    <div id="cc-orc-form-title" style="font-size:15px;font-weight:700;color:#2a2520;">Adicionar Orçamento</div>
+    <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+  </div>
+  <input type="hidden" id="orc-edit-idx" value="">
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
+    <select id="orc-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+      <option value="">Selecione...</option><option>Em aberto</option><option>Aprovado</option><option>Reprovado</option><option>Cancelado</option>
+    </select></div>
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
+    <select id="orc-avaliador" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+      <option value="">Selecione...</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
+    </select></div>
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tratamento</label>
+    <select id="orc-tratamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+      <option value="">Selecione...</option>
+      <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option>
+      <option>#Clareamento inferior Conjugado</option><option>#Clínico</option><option>#Endodontia</option>
+      <option>#Extração</option><option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option>
+      <option>#Lentes em Porcelana</option><option>#Lentes em Resina</option><option>#Lentes inferiores</option>
+      <option>#Lentes unitárias</option><option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option>
+      <option>#Reabilitação Oral</option><option>#Retrabalho</option>
+    </select></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pagamento</label>
+      <select id="orc-pagamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
+      </select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Parcelamento</label>
+      <select id="orc-parcelas" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <option value="">Selecione...</option><option>À vista</option><option>2x</option><option>3x</option><option>4x</option><option>5x</option><option>6x</option><option>7x</option><option>8x</option><option>9x</option><option>10x</option><option>11x</option><option>12x</option>
+      </select></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do orçamento</label>
+      <input id="orc-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor orçado (R$)</label>
+      <input id="orc-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:11px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor entrada (R$)</label>
+      <input id="orc-entrada" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data entrada</label>
+      <input id="orc-entrada-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pgto entrada</label>
+      <select id="orc-entrada-pgto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
+      </select></div>
+  </div>
+  <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
+    <textarea id="orc-obs" placeholder="Observação..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
+  <div style="display:flex;gap:10px;">
+    <button onclick="salvarOrcamento()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
+    <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+  </div>
+</div>
+
+<!-- FORM ATIVIDADE -->
+<div id="cc-atv-form" style="display:none;position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#fff;z-index:700;box-shadow:-4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding:22px;box-sizing:border-box;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+    <div style="font-size:15px;font-weight:700;color:#2a2520;">Registro de atividades</div>
+    <button onclick="document.getElementById('cc-atv-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data</label>
+      <input id="atv-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora (opcional)</label>
+      <input id="atv-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+  </div>
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Fase atual</label>
+    <select id="atv-fase" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+      <option value="">Selecione...</option>
+      <option>1° contato - Vídeo de agradecimento</option><option>2° contato - Antes/Depois + lembrei de você</option>
+      <option>3° contato - depoimento + lembrei de você</option><option>4° contato - Pergunta sincera</option>
+      <option>5° contato nova proposta</option><option>6° contato - Conseguiu ver?</option>
+      <option>7° contato - mensagem de despedida</option><option>Agendou retorno</option>
+      <option>Aguardando 1° contato</option><option>Aguardando entrada</option>
+      <option>Aguardando posição do decisor</option><option>Avaliação comercial</option>
+      <option>Cadencia mensal</option><option>Contato perdido</option><option>Contato resgatado</option>
+      <option>Fechamento por telefone e WhatsApp</option><option>Fechou</option>
+      <option>Pós venda</option><option>Sem resposta</option><option>Última mensagem despedida</option>
+    </select></div>
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Probabilidade de fechamento (0-10)</label>
+    <input id="atv-prob" type="number" min="0" max="10" placeholder="Ex: 7" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próximo contato</label>
+    <input id="atv-proximo" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+  <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observações</label>
+    <textarea id="atv-obs" placeholder="Observações..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
+  <div style="display:flex;gap:10px;">
+    <button onclick="salvarAtividade()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Criar</button>
+    <button onclick="document.getElementById('cc-atv-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+  </div>
 </div>
 
 <script>
-let _ccData = {}; // { phone: { orcamentos:[], atividades:[], anotacoes:[] } }
-let _currentClienteIdx = -1;
+// ── CRM STATE ──────────────────────────────────────────────
+var _ccData = {};
+var _currentClienteIdx = -1;
 
-function ccKey(r){ const ph=String(r.phone||'').replace(/\D/g,''); return ph.length>6?ph:(r.name||'unknown'); }
-function ccGet(r){ const k=ccKey(r); if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]}; return _ccData[k]; }
-// Persistência via Google Apps Script
-function ccSave(){
-  if(typeof google!=='undefined'&&google.script){
-    google.script.run.saveCRM(window._ccData);
-  }
-}
-function ccLoad(){
-  if(typeof google!=='undefined'&&google.script){
-    google.script.run.withSuccessHandler(function(data){
-      if(data&&typeof data==='object'){
-        window._ccData=data;
-        updateEntradas();
-        if(typeof filterClientesTable==='function')filterClientesTable();
-      }
-    }).loadCRM();
-  }
-}
-// Carrega ao iniciar (quando hospedado no Apps Script)
-document.addEventListener('DOMContentLoaded', function(){ setTimeout(ccLoad, 1500); });
-
+function ccKey(r){ var ph=String(r.phone||'').replace(/\D/g,''); return ph.length>6?ph:(r.name||'unknown'); }
+function ccGet(r){ var k=ccKey(r); if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]}; return _ccData[k]; }
 function fmtBRL(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-// ── OPEN CARD ──────────────────────────────────────────────────
-function openClienteCard(idx) {
-  let r = clientesData[idx];
-  if(!r) r = clientesData[0]; // fallback
-  if(!r) return;
-  idx = clientesData.indexOf(r);
-  _currentClienteIdx = idx;
-  const d = ccGet(r);
-
-  document.getElementById('cc-name').textContent = r.name||'—';
-  document.getElementById('cc-phone').textContent = r.phone||'—';
-  document.getElementById('cc-stage-tag').textContent = r.stage||'—';
-  document.getElementById('cc-origin-tag').textContent = r.origin||'—';
-  document.getElementById('cc-date-tag').textContent = fmtDate(r.created_at||r.timestamp);
-
-  setTimeout(updateEntradas, 200);
-  // Pré-popula orçamento com valor da planilha se ainda não tiver nenhum manual
-  const val = parseFloat(r.value||0);
-  if(val > 0 && d.orcamentos.length === 0) {
+// ── OPEN CARD ──────────────────────────────────────────────
+function openClienteCard(idx){
+  var r=clientesData[idx]; if(!r)return;
+  _currentClienteIdx=idx;
+  var d=ccGet(r);
+  document.getElementById('cc-name').textContent=r.name||'—';
+  document.getElementById('cc-phone').textContent=r.phone||'—';
+  document.getElementById('cc-stage-tag').textContent=r.stage||'—';
+  document.getElementById('cc-origin-tag').textContent=r.origin||'—';
+  document.getElementById('cc-date-tag').textContent=fmtDate(r.created_at||r.timestamp);
+  // Pré-popula orçamento do Cloudia se não tiver nenhum manual
+  var val=parseFloat(r.value||0);
+  if(val>0&&d.orcamentos.length===0){
     d.orcamentos.push({
-      status: isFechou(r.stage) ? 'Aprovado' : 'Em aberto',
-      avaliador: '',
-      tratamento: '',
-      inicio: '',
-      data: (r.created_at||r.timestamp||'').substring(0,10),
-      valor: val,
-      obs: 'Importado automaticamente do Cloudia',
-      fechamentos: (isFechou(r.stage) && val>0) ? [{data:(r.timestamp||'').substring(0,10), valor:val, desconto:'', entrada:''}] : []
+      status:isFechou(r.stage)?'Aprovado':'Em aberto',
+      avaliador:'',tratamento:'',pagamento:'',parcelas:'',
+      data:(r.created_at||r.timestamp||'').substring(0,10),
+      valor:val,obs:'Importado do Cloudia',entrada:0,entradaData:'',entradaPgto:'',
+      fechamentos:isFechou(r.stage)&&val>0?[{data:(r.timestamp||'').substring(0,10),valor:val}]:[]
     });
   }
-
   refreshOrcamentos(d);
-  refreshAtividades(r, d);
+  refreshAtividades(r,d);
   refreshAnotacoes(d);
-  switchCCTab('orcamentos', document.querySelector('.cc-tab'));
-  // hide sub-forms
-  ['cc-orc-form','cc-fech-form','cc-atv-form'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  switchCCTab('orcamentos',document.querySelector('.cc-tab'));
+  document.getElementById('cc-orc-form').style.display='none';
+  document.getElementById('cc-atv-form').style.display='none';
   document.getElementById('cliente-card-overlay').style.display='block';
+  setTimeout(updateEntradas,200);
 }
-
 function closeClienteCard(e){
   if(e.target===document.getElementById('cliente-card-overlay'))
     document.getElementById('cliente-card-overlay').style.display='none';
 }
-
 function switchCCTab(tab,btn){
-  ['orcamentos','atividades','anotacoes'].forEach(t=>{
+  ['orcamentos','atividades','anotacoes'].forEach(function(t){
     document.getElementById('cc-tab-'+t).style.display=t===tab?'block':'none';
   });
-  document.querySelectorAll('.cc-tab').forEach(b=>{b.style.color='#8a7a6a';b.style.borderBottomColor='transparent';b.style.fontWeight='400';});
+  document.querySelectorAll('.cc-tab').forEach(function(b){
+    b.style.color='#8a7a6a';b.style.borderBottomColor='transparent';b.style.fontWeight='400';
+  });
   if(btn){btn.style.color='#A18B6C';btn.style.borderBottomColor='#A18B6C';btn.style.fontWeight='600';}
 }
 
-// ── ORÇAMENTOS ────────────────────────────────────────────────
+// ── ORÇAMENTOS ────────────────────────────────────────────
 function openOrcForm(editIdx){
-  const d = ccGet(clientesData[_currentClienteIdx]);
-  document.getElementById('cc-orc-form-title').textContent = editIdx!=null ? 'Editar Orçamento' : 'Adicionar Orçamento';
-  document.getElementById('orc-edit-idx').value = editIdx!=null ? editIdx : '';
-  const today = new Date().toISOString().split('T')[0];
+  var d=ccGet(clientesData[_currentClienteIdx]);
+  document.getElementById('cc-orc-form-title').textContent=editIdx!=null?'Editar Orçamento':'Adicionar Orçamento';
+  document.getElementById('orc-edit-idx').value=editIdx!=null?editIdx:'';
+  var today=new Date().toISOString().split('T')[0];
   if(editIdx!=null){
-    const o=d.orcamentos[editIdx];
+    var o=d.orcamentos[editIdx];
     document.getElementById('orc-status').value=o.status||'';
     document.getElementById('orc-avaliador').value=o.avaliador||'';
     document.getElementById('orc-tratamento').value=o.tratamento||'';
-    document.getElementById('orc-data').value=o.data||today;
-    document.getElementById('orc-valor').value=o.valor||'';
     document.getElementById('orc-pagamento').value=o.pagamento||'';
     document.getElementById('orc-parcelas').value=o.parcelas||'';
+    document.getElementById('orc-data').value=o.data||today;
+    document.getElementById('orc-valor').value=o.valor||'';
     document.getElementById('orc-entrada').value=o.entrada||'';
     document.getElementById('orc-entrada-data').value=o.entradaData||'';
     document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
@@ -1353,10 +1408,10 @@ function openOrcForm(editIdx){
     document.getElementById('orc-status').value='Em aberto';
     document.getElementById('orc-avaliador').value='';
     document.getElementById('orc-tratamento').value='';
-    document.getElementById('orc-data').value=today;
-    document.getElementById('orc-valor').value='';
     document.getElementById('orc-pagamento').value='';
     document.getElementById('orc-parcelas').value='';
+    document.getElementById('orc-data').value=today;
+    document.getElementById('orc-valor').value='';
     document.getElementById('orc-entrada').value='';
     document.getElementById('orc-entrada-data').value='';
     document.getElementById('orc-entrada-pgto').value='';
@@ -1366,111 +1421,80 @@ function openOrcForm(editIdx){
 }
 
 function salvarOrcamento(){
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
-  const editIdx=document.getElementById('orc-edit-idx').value;
-  const orc={
+  var r=clientesData[_currentClienteIdx];
+  var d=ccGet(r);
+  var editIdx=document.getElementById('orc-edit-idx').value;
+  var orc={
     status:document.getElementById('orc-status').value,
     avaliador:document.getElementById('orc-avaliador').value,
     tratamento:document.getElementById('orc-tratamento').value,
-    data:document.getElementById('orc-data').value,
-    valor:parseFloat(document.getElementById('orc-valor').value||0),
-    obs:document.getElementById('orc-obs').value,
     pagamento:document.getElementById('orc-pagamento').value,
     parcelas:document.getElementById('orc-parcelas').value,
-    entrada:Number(document.getElementById('orc-entrada').value)||0,
+    data:document.getElementById('orc-data').value,
+    valor:parseFloat(document.getElementById('orc-valor').value)||0,
+    entrada:parseFloat(document.getElementById('orc-entrada').value)||0,
     entradaData:document.getElementById('orc-entrada-data').value,
     entradaPgto:document.getElementById('orc-entrada-pgto').value,
-    fechamentos:editIdx!==''?(d.orcamentos[editIdx]?.fechamentos||[]):[]
+    obs:document.getElementById('orc-obs').value,
+    fechamentos:editIdx!==''?(d.orcamentos[parseInt(editIdx)]?d.orcamentos[parseInt(editIdx)].fechamentos||[]:[]): []
   };
-  if(editIdx!=='') d.orcamentos[editIdx]=orc;
+  if(editIdx!=='')d.orcamentos[parseInt(editIdx)]=orc;
   else d.orcamentos.unshift(orc);
   document.getElementById('cc-orc-form').style.display='none';
   refreshOrcamentos(d);
-  if(typeof filterClientesTable==='function')filterClientesTable();
   updateEntradas();
+  if(typeof filterClientesTable==='function')filterClientesTable();
 }
 
 function excluirOrcamento(idx){
   if(!confirm('Excluir este orçamento?'))return;
-  const d=ccGet(clientesData[_currentClienteIdx]);
+  var d=ccGet(clientesData[_currentClienteIdx]);
   d.orcamentos.splice(idx,1);
   refreshOrcamentos(d);
-  ccSave();
-}
-
-function openFechForm(orcIdx){
-  const d=ccGet(clientesData[_currentClienteIdx]);
-  const o=d.orcamentos[orcIdx];
-  document.getElementById('fech-orc-idx').value=orcIdx;
-  document.getElementById('fech-orc-info').textContent='Tratamento: '+(o.tratamento||'—')+' · Valor orçado: '+fmtBRL(o.valor);
-  document.getElementById('fech-data').value=new Date().toISOString().split('T')[0];
-  document.getElementById('fech-valor').value=o.valor||'';
-  document.getElementById('fech-desconto').value='';
-  document.getElementById('fech-entrada').value='';
-  document.getElementById('cc-fech-form').style.display='block';
-}
-
-function salvarFechamento(){
-  const d=ccGet(clientesData[_currentClienteIdx]);
-  const orcIdx=parseInt(document.getElementById('fech-orc-idx').value);
-  if(!d.orcamentos[orcIdx].fechamentos)d.orcamentos[orcIdx].fechamentos=[];
-  d.orcamentos[orcIdx].fechamentos.push({
-    data:document.getElementById('fech-data').value,
-    valor:parseFloat(document.getElementById('fech-valor').value||0),
-    desconto:document.getElementById('fech-desconto').value,
-    entrada:document.getElementById('fech-entrada').value
-  });
-  d.orcamentos[orcIdx].status='Aprovado';
-  document.getElementById('cc-fech-form').style.display='none';
-  refreshOrcamentos(d);
-  ccSave();
   updateEntradas();
 }
 
 function refreshOrcamentos(d){
-  const orcs=d.orcamentos||[];
-  let totalAcordado=0, totalFechado=0, totalEntradas=0;
-  orcs.forEach(o=>{
+  var orcs=d.orcamentos||[];
+  var totalAcordado=0,totalFechado=0,totalEntradas=0;
+  orcs.forEach(function(o){
     totalAcordado+=Number(o.valor)||0;
     totalEntradas+=Number(o.entrada)||0;
-    const fechs=o.fechamentos||[];
-    if(fechs.length>0)totalFechado+=Math.max(...fechs.map(f=>Number(f.valor)||0));
+    var fechs=o.fechamentos||[];
+    if(fechs.length>0)totalFechado+=Math.max.apply(null,fechs.map(function(f){return Number(f.valor)||0;}));
   });
   document.getElementById('cc-total-acordado').textContent=fmtBRL(totalAcordado);
   document.getElementById('cc-total-fechado').textContent=fmtBRL(totalFechado);
-  const entEl=document.getElementById('cc-total-entrada');
+  var entEl=document.getElementById('cc-total-entrada');
   if(entEl)entEl.textContent=fmtBRL(totalEntradas);
 
   document.getElementById('cc-orc-list').innerHTML=orcs.length===0
     ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhum orçamento registrado</div>'
-    :orcs.map((o,i)=>{
-      const statusColor=o.status==='Aprovado'?'#5a8a6a':o.status==='Reprovado'?'#b5856a':'#A18B6C';
-      const fechsHtml=(o.fechamentos||[]).map(f=>`
-        <div style="background:#f5f3f0;border-radius:6px;padding:8px 10px;font-size:12px;color:#6a5a4a;margin-top:6px;">
-          ✓ Fechamento em ${f.data?new Date(f.data+'T12:00').toLocaleDateString('pt-BR'):'—'} · ${fmtBRL(f.valor)}${f.desconto==='Sim'?' · com desconto':''}${f.entrada==='Sim'?' · com entrada':''}
-        </div>`).join('');
-      return`<div style="background:#fff;border:1px solid #e0d9d0;border-radius:10px;padding:14px;margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div style="font-size:13px;font-weight:700;color:#2a2520;">${o.tratamento||'Sem tratamento'}</div>
-          <span style="background:${statusColor}22;color:${statusColor};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${o.status||'Em aberto'}</span>
-        </div>
-        ${o.avaliador?`<div style="font-size:12px;color:#8a7a6a;">Avaliador: ${o.avaliador}</div>`:''}
-        ${o.inicio?`<div style="font-size:12px;color:#8a7a6a;">Início: ${o.inicio}</div>`:''}
-        ${o.data?`<div style="font-size:12px;color:#8a7a6a;">Orçado em: ${new Date(o.data+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
-        <div style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:6px;">${fmtBRL(o.valor)}</div>
-        ${o.pagamento?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">💳 ${o.pagamento}${o.parcelas?' · '+o.parcelas:''}</div>`:''}${o.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">${o.obs}</div>`:''}
-        ${o.entrada>0?`<div style="font-size:12px;color:#5a8a6a;margin-top:4px;">💵 Entrada: ${fmtBRL(o.entrada)}${o.entradaData?' em '+new Date(o.entradaData+'T12:00').toLocaleDateString('pt-BR'):''}</div>`:''}
-        ${fechsHtml}
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button onclick="openFechForm(${i})" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">+ Fechamento</button>
-          <button onclick="openOrcForm(${i})" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">✏ Editar</button>
-          <button onclick="excluirOrcamento(${i})" style="background:#fdecea;color:#c0392b;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">🗑 Excluir</button>
-        </div>
-      </div>`;
+    :orcs.map(function(o,i){
+      var sc=o.status==='Aprovado'?'#5a8a6a':o.status==='Reprovado'?'#b5856a':'#A18B6C';
+      var fhtml=(o.fechamentos||[]).map(function(f){
+        return '<div style="background:#f5f3f0;border-radius:6px;padding:8px 10px;font-size:12px;color:#6a5a4a;margin-top:6px;">✓ Fechamento em '+(f.data?new Date(f.data+'T12:00').toLocaleDateString('pt-BR'):'—')+' · '+fmtBRL(f.valor)+'</div>';
+      }).join('');
+      return '<div style="background:#fff;border:1px solid #e0d9d0;border-radius:10px;padding:14px;margin-bottom:10px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+        +'<div style="font-size:13px;font-weight:700;color:#2a2520;">'+(o.tratamento||'Sem tratamento')+'</div>'
+        +'<span style="background:'+sc+'22;color:'+sc+';padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">'+(o.status||'Em aberto')+'</span>'
+        +'</div>'
+        +(o.avaliador?'<div style="font-size:12px;color:#8a7a6a;">Avaliador: '+o.avaliador+'</div>':'')
+        +(o.data?'<div style="font-size:12px;color:#8a7a6a;">Orçado em: '+new Date(o.data+'T12:00').toLocaleDateString('pt-BR')+'</div>':'')
+        +'<div style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:6px;">'+fmtBRL(o.valor)+'</div>'
+        +(o.pagamento?'<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">💳 '+o.pagamento+(o.parcelas?' · '+o.parcelas:'')+'</div>':'')
+        +(o.obs?'<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">'+o.obs+'</div>':'')
+        +(o.entrada>0?'<div style="font-size:12px;color:#5a8a6a;margin-top:4px;">💵 Entrada: '+fmtBRL(o.entrada)+(o.entradaData?' em '+new Date(o.entradaData+'T12:00').toLocaleDateString('pt-BR'):'')+'</div>':'')
+        +fhtml
+        +'<div style="display:flex;gap:8px;margin-top:10px;">'
+        +'<button onclick="openOrcForm('+i+')" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">✏ Editar</button>'
+        +'<button onclick="excluirOrcamento('+i+')" style="background:#fdecea;color:#c0392b;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">🗑 Excluir</button>'
+        +'</div></div>';
     }).join('');
 }
 
-// ── ATIVIDADES ────────────────────────────────────────────────
+// ── ATIVIDADES ────────────────────────────────────────────
 function openAtvForm(){
   document.getElementById('atv-data').value=new Date().toISOString().split('T')[0];
   document.getElementById('atv-hora').value='';
@@ -1480,13 +1504,13 @@ function openAtvForm(){
   document.getElementById('atv-obs').value='';
   document.getElementById('cc-atv-form').style.display='block';
 }
-
 function salvarAtividade(){
-  const fase=document.getElementById('atv-fase').value;
+  var fase=document.getElementById('atv-fase').value;
   if(!fase){alert('Selecione a fase atual');return;}
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
+  var r=clientesData[_currentClienteIdx];
+  var d=ccGet(r);
   d.atividades.unshift({
-    fase,
+    fase:fase,
     data:document.getElementById('atv-data').value,
     hora:document.getElementById('atv-hora').value,
     prob:document.getElementById('atv-prob').value,
@@ -1494,232 +1518,106 @@ function salvarAtividade(){
     obs:document.getElementById('atv-obs').value
   });
   document.getElementById('cc-atv-form').style.display='none';
-  ccSave();
   refreshAtividades(r,d);
   switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
 }
-
 function refreshAtividades(r,d){
-  const auto=[];
+  var auto=[];
   auto.push({fase:'Lead capturado via '+(r.origin||'—'),data:fmtDate(r.created_at||r.timestamp),auto:true});
   if(isAgend(r.stage)||isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Consulta agendada',data:'—',auto:true});
   if(isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Paciente compareceu',data:fmtDate(r.timestamp),auto:true});
   if(isFechou(r.stage))auto.push({fase:'Contrato fechado',data:fmtDate(r.timestamp),auto:true});
-  const all=[...(d.atividades||[]).map(a=>({...a,auto:false})),...auto];
-  const ul=document.getElementById('cc-atv-list');
-
-  // próximo contato
-  const prox=(d.atividades||[]).find(a=>a.proximo);
+  var manual=(d.atividades||[]);
+  var prox=manual.find(function(a){return a.proximo;});
   document.getElementById('cc-ultimo-contato').textContent=prox?new Date(prox.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
-
-  ul.innerHTML=all.length===0
+  var all=manual.concat(auto);
+  document.getElementById('cc-atv-list').innerHTML=all.length===0
     ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhuma atividade</div>'
-    :all.map(a=>`
-      <div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
-        <span style="font-size:16px;">${a.auto?'🔵':'📋'}</span>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.fase}</div>
-          ${a.prob?`<div style="font-size:11px;color:#A18B6C;">Probabilidade: ${a.prob}/10</div>`:''}
-          ${a.proximo?`<div style="font-size:11px;color:#5a8a6a;">Próx. contato: ${new Date(a.proximo+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
-          ${a.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:2px;">${a.obs}</div>`:''}
-          <div style="font-size:11px;color:#aaa;margin-top:3px;">${a.data||''}${a.hora?' '+a.hora:''}</div>
-        </div>
-      </div>`).join('');
+    :all.map(function(a){
+      return '<div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;margin-bottom:8px;">'
+        +'<span style="font-size:16px;">'+(a.auto?'🔵':'📋')+'</span>'
+        +'<div style="flex:1;">'
+        +'<div style="font-size:13px;font-weight:600;color:#2a2520;">'+a.fase+'</div>'
+        +(a.prob?'<div style="font-size:11px;color:#A18B6C;">Probabilidade: '+a.prob+'/10</div>':'')
+        +(a.proximo?'<div style="font-size:11px;color:#5a8a6a;">Próx. contato: '+new Date(a.proximo+'T12:00').toLocaleDateString('pt-BR')+'</div>':'')
+        +(a.obs?'<div style="font-size:12px;color:#8a7a6a;margin-top:2px;">'+a.obs+'</div>':'')
+        +'<div style="font-size:11px;color:#aaa;margin-top:3px;">'+(a.data||'')+(a.hora?' '+a.hora:'')+'</div>'
+        +'</div></div>';
+    }).join('');
 }
 
-// ── UPDATE ENTRADAS (chamada em múltiplos pontos) ───────────
-function updateEntradas(){
-  let te=0;
-  Object.values(window._ccData||{}).forEach(dd=>{
-    (dd.orcamentos||[]).forEach(o=>te+=Number(o.entrada)||0);
-  });
-  const el=document.getElementById('t-entradas');
-  if(el)el.textContent=te>0?fmt(te):'—';
-  return te;
-}
-// Atualiza a cada 3 segundos automaticamente
-setInterval(updateEntradas, 3000);
-
-// ── EXPORT / IMPORT CRM ──────────────────────────────────────
-function exportarCRM(){
-  const data=JSON.stringify(window._ccData||{},null,2);
-  const blob=new Blob([data],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='bulhoes_crm_'+new Date().toISOString().split('T')[0]+'.json';
-  a.click();
-}
-function importarCRM(){document.getElementById('crm-import-input').click();}
-function loadCRMFile(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    try{
-      window._ccData=JSON.parse(ev.target.result);
-      alert('✅ CRM importado com sucesso!\n'+Object.keys(window._ccData).length+' clientes carregados.');
-      if(typeof filterClientesTable==='function')filterClientesTable();
-    }catch(err){alert('Erro ao importar: '+err.message);}
-  };
-  reader.readAsText(file);
-}
-
-// ── ANOTAÇÕES ─────────────────────────────────────────────────
+// ── ANOTAÇÕES ─────────────────────────────────────────────
 function salvarAnotacao(){
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
-  const text=document.getElementById('cc-anot-input').value.trim();
+  var r=clientesData[_currentClienteIdx];
+  var d=ccGet(r);
+  var text=document.getElementById('cc-anot-input').value.trim();
   if(!text)return;
-  d.anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
+  d.anotacoes.unshift({text:text,date:new Date().toLocaleString('pt-BR')});
   document.getElementById('cc-anot-input').value='';
-  ccSave();
   refreshAnotacoes(d);
 }
-
 function refreshAnotacoes(d){
-  document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(a=>`
-    <div style="background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
-      <div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">${a.date}</div>
-      <div style="font-size:13px;color:#2a2520;">${a.text}</div>
-    </div>`).join('')||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
+  document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(function(a){
+    return '<div style="background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;margin-bottom:8px;">'
+      +'<div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">'+a.date+'</div>'
+      +'<div style="font-size:13px;color:#2a2520;">'+a.text+'</div></div>';
+  }).join('')||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
+}
+
+// ── UPDATE ENTRADAS ───────────────────────────────────────
+function updateEntradas(){
+  var te=0;
+  Object.values(_ccData).forEach(function(dd){
+    (dd.orcamentos||[]).forEach(function(o){te+=Number(o.entrada)||0;});
+  });
+  var el=document.getElementById('t-entradas');
+  if(el)el.textContent=te>0?fmt(te):'—';
+}
+setInterval(updateEntradas,3000);
+
+// ── FILTRO CLIENTES COM TRATAMENTO E AVALIADOR ────────────
+function filterClientesTable(){
+  var q=document.getElementById('clientes-search').value.toLowerCase();
+  var fase=(document.getElementById('clientes-fase-filter')||{}).value||'';
+  var orig=(document.getElementById('clientes-origem-filter')||{}).value||'';
+  var sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
+  var trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
+  var aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
+  var filtered=clientesData.filter(function(r){
+    var match=!q||(r.name||'').toLowerCase().includes(q)||(r.phone||'').includes(q);
+    var faseMatch=!fase||r.stage===fase;
+    var origMatch=!orig||(r.origin||'')===orig;
+    var fechou=isFechou(r.stage);
+    var sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
+    var ph=String(r.phone||'').replace(/\D/g,'');
+    var d=_ccData[ph]||{orcamentos:[]};
+    var orcs=d.orcamentos||[];
+    var tratMatch=!trat||orcs.some(function(o){return o.tratamento===trat;});
+    var avalMatch=!aval||orcs.some(function(o){return o.avaliador===aval;});
+    return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch;
+  });
+  document.getElementById('clientes-count').textContent=filtered.length+' clientes';
+  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(function(r,fi){
+    var fechou=isFechou(r.stage);
+    var val=parseFloat(r.value||0);
+    var idx=clientesData.indexOf(r);
+    if(idx<0)idx=fi;
+    var ph=String(r.phone||'').replace(/\D/g,'');
+    var d=_ccData[ph]||{orcamentos:[]};
+    var orc0=d.orcamentos&&d.orcamentos[0];
+    return '<tr style="cursor:pointer;" onclick="openClienteCard('+idx+')">'
+      +'<td><strong style="color:#2a2520;">'+(r.name||'—')+'</strong></td>'
+      +'<td class="tm">'+fmtDate(r.timestamp)+'</td>'
+      +'<td>'+(r.phone||'—')+'</td>'
+      +'<td>'+(r.stage||'—')+'</td>'
+      +'<td><span class="status-pill '+(fechou?'status-fechado':'status-aberto')+'">'+(fechou?'Fechado':'Em aberto')+'</span></td>'
+      +'<td style="font-size:12px;">'+(orc0&&orc0.tratamento?orc0.tratamento:'—')+'</td>'
+      +'<td style="font-size:12px;">'+(orc0&&orc0.avaliador?orc0.avaliador:'—')+'</td>'
+      +'<td style="text-align:right" class="tm">'+(val>0?fmt(val):'—')+'</td>'
+      +'<td style="text-align:right" class="tg">'+(fechou&&val>0?fmt(val):'—')+'</td>'
+      +'</tr>';
+  }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
 </script>
-
-</html
-
-
-
-
-</html
-
-
-
-</html
-
-
-
-
-</html
-    <!-- FORM ORÇAMENTO (slide-in) -->
-    <div id="cc-orc-form" style="display:none;position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#fff;z-index:700;box-shadow:-4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding:22px;box-sizing:border-box;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-        <div style="font-size:15px;font-weight:700;color:#2a2520;" id="cc-orc-form-title">Adicionar Orçamento</div>
-        <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-      </div>
-      <input type="hidden" id="orc-edit-idx" value="">
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-        <select id="orc-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-          <option value="">Selecione...</option><option>Em aberto</option><option>Aprovado</option><option>Reprovado</option><option>Cancelado</option>
-        </select></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
-        <select id="orc-avaliador" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;"><option value="">Selecione...</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option></select></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tratamento</label>
-        <select id="orc-tratamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-          <option value="">Selecione...</option>
-          <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option>
-          <option>#Clareamento inferior Conjugado</option><option>#Clínico</option><option>#Endodontia</option>
-          <option>#Extração</option><option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option>
-          <option>#Lentes em Porcelana</option><option>#Lentes em Resina</option><option>#Lentes inferiores</option>
-          <option>#Lentes unitárias</option><option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option>
-          <option>#Reabilitação Oral</option><option>#Retrabalho</option>
-        </select></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pagamento do procedimento</label>
-          <select id="orc-pagamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-            <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
-          </select></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Parcelamento</label>
-          <select id="orc-parcelas" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-            <option value="">Selecione...</option><option>À vista</option><option>2x</option><option>3x</option><option>4x</option><option>5x</option><option>6x</option><option>7x</option><option>8x</option><option>9x</option><option>10x</option><option>11x</option><option>12x</option>
-          </select></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do orçamento</label>
-          <input id="orc-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor orçado (R$)</label>
-          <input id="orc-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:11px;">
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor de entrada (R$)</label>
-          <input id="orc-entrada" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data da entrada</label>
-          <input id="orc-entrada-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pgto da entrada</label>
-          <select id="orc-entrada-pgto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-            <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
-          </select></div>
-      </div>
-      <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
-        <textarea id="orc-obs" placeholder="Observação..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="salvarOrcamento()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
-        <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-      </div>
-    </div>
-
-    <!-- FORM FECHAMENTO -->
-    <div id="cc-fech-form" style="display:none;position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#fff;z-index:710;box-shadow:-4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding:22px;box-sizing:border-box;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-        <div style="font-size:15px;font-weight:700;color:#2a2520;">Novo fechamento</div>
-        <button onclick="document.getElementById('cc-fech-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-      </div>
-      <input type="hidden" id="fech-orc-idx" value="">
-      <div id="fech-orc-info" style="background:#f0ebe3;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#6a5a4a;"></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Fechado em</label>
-        <input id="fech-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor (R$)</label>
-        <input id="fech-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Possui desconto?</label>
-          <select id="fech-desconto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;"><option value="">Selecione...</option><option>Não</option><option>Sim</option></select></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Possui entrada?</label>
-          <select id="fech-entrada" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;"><option value="">Selecione...</option><option>Não</option><option>Sim</option></select></div>
-      </div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="salvarFechamento()" style="background:#5a8a6a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Confirmar</button>
-        <button onclick="document.getElementById('cc-fech-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-      </div>
-    </div>
-
-    <!-- FORM ATIVIDADE -->
-    <div id="cc-atv-form" style="display:none;position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#fff;z-index:700;box-shadow:-4px 0 24px rgba(0,0,0,.2);overflow-y:auto;padding:22px;box-sizing:border-box;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-        <div style="font-size:15px;font-weight:700;color:#2a2520;">Registro de atividades</div>
-        <button onclick="document.getElementById('cc-atv-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data de registro</label>
-          <input id="atv-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora (opcional)</label>
-          <input id="atv-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Fase atual</label>
-        <select id="atv-fase" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-          <option value="">Selecione...</option>
-          <option>1° contato - Vídeo de agradecimento</option><option>2° contato - Antes/Depois + lembrei de você</option>
-          <option>3° contato - depoimento + lembrei de você</option><option>4° contato - Pergunta sincera</option>
-          <option>5° contato nova proposta</option><option>6° contato - Conseguiu ver?</option>
-          <option>7° contato - mensagem de despedida</option><option>Agendou retorno</option>
-          <option>Aguardando 1° contato</option><option>Aguardando entrada</option>
-          <option>Aguardando posição do decisor</option><option>Avaliação comercial</option>
-          <option>Cadencia mensal</option><option>Contato perdido</option><option>Contato resgatado</option>
-          <option>Fechamento por telefone e WhatsApp</option><option>Fechou</option>
-          <option>Pós venda</option><option>Sem resposta</option><option>Última mensagem despedida</option>
-        </select></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Probabilidade de fechamento (0-10)</label>
-        <input id="atv-prob" type="number" min="0" max="10" placeholder="Ex: 7" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próximo contato</label>
-        <input id="atv-proximo" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observações</label>
-        <textarea id="atv-obs" placeholder="Observações..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
-      <div style="display:flex;gap:10px;">
-        <button onclick="salvarAtividade()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Criar</button>
-        <button onclick="document.getElementById('cc-atv-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-
->
-
 </body>
 </html>
