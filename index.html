@@ -1,5 +1,8 @@
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Bulhões Odontologia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -138,7 +141,8 @@ tbody tr:hover td{background:#faf7f3;}
 .lupa{background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:13px;padding:0 0 0 6px;vertical-align:middle;transition:color .2s;}
 .lupa:hover{color:#A18B6C;}
 </style>
-
+</head>
+<body>
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -403,7 +407,427 @@ tbody tr:hover td{background:#faf7f3;}
 </div>
 </div>
 </div>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+<div class="modal-box">
+<div class="modal-header">
+<span class="modal-title" id="modal-title">Leads</span>
+<span class="modal-close" onclick="closeModal()">✕</span>
+</div>
+<div class="modal-body">
+<table class="modal-table">
+<thead><tr id="modal-thead"></tr></thead>
+<tbody id="modal-tbody"></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- CLIENTE CARD (CRM) -->
+<div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
+<div id="cliente-card-panel" style="position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;isolation:isolate;">
+<!-- Header -->
+<div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;">
+<div>
+<div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
+<div id="cc-phone" style="font-size:12px;color:#8a7a6a;margin-top:2px;"></div>
+</div>
+<button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;line-height:1;">✕</button>
+</div>
+<!-- Resumo financeiro -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
+<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total acordado</div>
+<div id="cc-total-acordado" style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:2px;">R$ 0,00</div>
+</div>
+<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
+<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total fechado</div>
+<div id="cc-total-fechado" style="font-size:14px;font-weight:700;color:#5a8a6a;margin-top:2px;">R$ 0,00</div>
+</div>
+<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
+<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total entradas</div>
+<div id="cc-total-entrada" style="font-size:14px;font-weight:700;color:#4a7a9a;margin-top:2px;">R$ 0,00</div>
+</div>
+<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
+<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Último contato</div>
+<div id="cc-ultimo-contato" style="font-size:13px;font-weight:600;color:#2a2520;margin-top:2px;">—</div>
+</div>
+</div>
+<!-- Tags -->
+<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+<span id="cc-stage-tag" style="background:#A18B6C;color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;"></span>
+<span id="cc-origin-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
+<span id="cc-date-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
+</div>
+</div>
+<!-- Tabs -->
+<div style="display:flex;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
+<button class="cc-tab active-tab" onclick="switchCCTab('orcamentos',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">💰 Orçamentos</button>
+<button class="cc-tab" onclick="switchCCTab('atividades',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📋 Atividades</button>
+<button class="cc-tab" onclick="switchCCTab('anotacoes',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📝 Anotações</button>
+</div>
+<!-- Body scrollável -->
+<div style="flex:1;overflow-y:auto;padding:16px;">
+<!-- ABA ORÇAMENTOS -->
+<div id="cc-tab-orcamentos">
+<button onclick="openOrcForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Novo orçamento</button>
+<div id="cc-orc-list"></div>
+</div>
+<!-- ABA ATIVIDADES -->
+<div id="cc-tab-atividades" style="display:none;">
+<button onclick="openAtvForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Registrar atividade</button>
+<div id="cc-atv-list"></div>
+</div>
+<!-- ABA ANOTAÇÕES -->
+<div id="cc-tab-anotacoes" style="display:none;">
+<textarea id="cc-anot-input" placeholder="Digite uma anotação..." style="width:100%;min-height:100px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:13px;color:#2a2520;background:#fff;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+<button onclick="salvarAnotacao()" style="margin-top:6px;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;">Salvar</button>
+<div id="cc-anot-list" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+</div>
 <script>
+
+
+
+
+
+
+let _ccData = {}; // { phone: { orcamentos:[], atividades:[], anotacoes:[] } }
+let _currentClienteIdx = -1;
+
+function ccKey(r){ const ph=String(r.phone||'').replace(/\D/g,''); return ph.length&gt;6?ph:(r.name||'unknown'); }
+function ccGet(r){ const k=ccKey(r); if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]}; return _ccData[k]; }
+// Persistência via Google Apps Script
+function ccSave(){
+  if(typeof google!=='undefined'&amp;&amp;google.script){
+    google.script.run.saveCRM(window._ccData);
+  }
+}
+function ccLoad(){
+  if(typeof google!=='undefined'&amp;&amp;google.script){
+    google.script.run.withSuccessHandler(function(data){
+      if(data&amp;&amp;typeof data==='object'){
+        window._ccData=data;
+        updateEntradas();
+        if(typeof filterClientesTable==='function')filterClientesTable();
+      }
+    }).loadCRM();
+  }
+}
+// Carrega ao iniciar (quando hospedado no Apps Script)
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(ccLoad, 1500); });
+
+function fmtBRL(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+// ── OPEN CARD ──────────────────────────────────────────────────
+function openClienteCard(idx) {
+  let r = clientesData[idx];
+  if(!r) r = clientesData[0]; // fallback
+  if(!r) return;
+  idx = clientesData.indexOf(r);
+  _currentClienteIdx = idx;
+  const d = ccGet(r);
+
+  document.getElementById('cc-name').textContent = r.name||'—';
+  document.getElementById('cc-phone').textContent = r.phone||'—';
+  document.getElementById('cc-stage-tag').textContent = r.stage||'—';
+  document.getElementById('cc-origin-tag').textContent = r.origin||'—';
+  document.getElementById('cc-date-tag').textContent = fmtDate(r.created_at||r.timestamp);
+
+  setTimeout(updateEntradas, 200);
+  // Pré-popula orçamento com valor da planilha se ainda não tiver nenhum manual
+  const val = parseFloat(r.value||0);
+  if(val &gt; 0 &amp;&amp; d.orcamentos.length === 0) {
+    d.orcamentos.push({
+      status: isFechou(r.stage) ? 'Aprovado' : 'Em aberto',
+      avaliador: '',
+      tratamento: '',
+      inicio: '',
+      data: (r.created_at||r.timestamp||'').substring(0,10),
+      valor: val,
+      obs: 'Importado automaticamente do Cloudia',
+      fechamentos: (isFechou(r.stage) &amp;&amp; val&gt;0) ? [{data:(r.timestamp||'').substring(0,10), valor:val, desconto:'', entrada:''}] : []
+    });
+  }
+
+  refreshOrcamentos(d);
+  refreshAtividades(r, d);
+  refreshAnotacoes(d);
+  switchCCTab('orcamentos', document.querySelector('.cc-tab'));
+  // hide sub-forms
+  ['cc-orc-form','cc-fech-form','cc-atv-form'].forEach(id=&gt;{const el=document.getElementById(id);if(el)el.style.display='none';});
+  document.getElementById('cliente-card-overlay').style.display='block';
+}
+
+function closeClienteCard(e){
+  if(e.target===document.getElementById('cliente-card-overlay'))
+    document.getElementById('cliente-card-overlay').style.display='none';
+}
+
+function switchCCTab(tab,btn){
+  ['orcamentos','atividades','anotacoes'].forEach(t=&gt;{
+    document.getElementById('cc-tab-'+t).style.display=t===tab?'block':'none';
+  });
+  document.querySelectorAll('.cc-tab').forEach(b=&gt;{b.style.color='#8a7a6a';b.style.borderBottomColor='transparent';b.style.fontWeight='400';});
+  if(btn){btn.style.color='#A18B6C';btn.style.borderBottomColor='#A18B6C';btn.style.fontWeight='600';}
+}
+
+// ── ORÇAMENTOS ────────────────────────────────────────────────
+function openOrcForm(editIdx){
+  const d = ccGet(clientesData[_currentClienteIdx]);
+  document.getElementById('cc-orc-form-title').textContent = editIdx!=null ? 'Editar Orçamento' : 'Adicionar Orçamento';
+  document.getElementById('orc-edit-idx').value = editIdx!=null ? editIdx : '';
+  const today = new Date().toISOString().split('T')[0];
+  if(editIdx!=null){
+    const o=d.orcamentos[editIdx];
+    document.getElementById('orc-status').value=o.status||'';
+    document.getElementById('orc-avaliador').value=o.avaliador||'';
+    document.getElementById('orc-tratamento').value=o.tratamento||'';
+    document.getElementById('orc-data').value=o.data||today;
+    document.getElementById('orc-valor').value=o.valor||'';
+    document.getElementById('orc-pagamento').value=o.pagamento||'';
+    document.getElementById('orc-parcelas').value=o.parcelas||'';
+    document.getElementById('orc-entrada').value=o.entrada||'';
+    document.getElementById('orc-entrada-data').value=o.entradaData||'';
+    document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
+    document.getElementById('orc-obs').value=o.obs||'';
+  } else {
+    document.getElementById('orc-status').value='Em aberto';
+    document.getElementById('orc-avaliador').value='';
+    document.getElementById('orc-tratamento').value='';
+    document.getElementById('orc-data').value=today;
+    document.getElementById('orc-valor').value='';
+    document.getElementById('orc-pagamento').value='';
+    document.getElementById('orc-parcelas').value='';
+    document.getElementById('orc-entrada').value='';
+    document.getElementById('orc-entrada-data').value='';
+    document.getElementById('orc-entrada-pgto').value='';
+    document.getElementById('orc-obs').value='';
+  }
+  document.getElementById('cc-orc-form').style.display='block';
+}
+
+function salvarOrcamento(){
+  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
+  const editIdx=document.getElementById('orc-edit-idx').value;
+  const orc={
+    status:document.getElementById('orc-status').value,
+    avaliador:document.getElementById('orc-avaliador').value,
+    tratamento:document.getElementById('orc-tratamento').value,
+    data:document.getElementById('orc-data').value,
+    valor:parseFloat(document.getElementById('orc-valor').value||0),
+    obs:document.getElementById('orc-obs').value,
+    pagamento:document.getElementById('orc-pagamento').value,
+    parcelas:document.getElementById('orc-parcelas').value,
+    entrada:Number(document.getElementById('orc-entrada').value)||0,
+    entradaData:document.getElementById('orc-entrada-data').value,
+    entradaPgto:document.getElementById('orc-entrada-pgto').value,
+    fechamentos:editIdx!==''?(d.orcamentos[editIdx]?.fechamentos||[]):[]
+  };
+  if(editIdx!=='') d.orcamentos[editIdx]=orc;
+  else d.orcamentos.unshift(orc);
+  document.getElementById('cc-orc-form').style.display='none';
+  refreshOrcamentos(d);
+  if(typeof filterClientesTable==='function')filterClientesTable();
+  updateEntradas();
+}
+
+function excluirOrcamento(idx){
+  if(!confirm('Excluir este orçamento?'))return;
+  const d=ccGet(clientesData[_currentClienteIdx]);
+  d.orcamentos.splice(idx,1);
+  refreshOrcamentos(d);
+  ccSave();
+}
+
+function openFechForm(orcIdx){
+  const d=ccGet(clientesData[_currentClienteIdx]);
+  const o=d.orcamentos[orcIdx];
+  document.getElementById('fech-orc-idx').value=orcIdx;
+  document.getElementById('fech-orc-info').textContent='Tratamento: '+(o.tratamento||'—')+' · Valor orçado: '+fmtBRL(o.valor);
+  document.getElementById('fech-data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('fech-valor').value=o.valor||'';
+  document.getElementById('fech-desconto').value='';
+  document.getElementById('fech-entrada').value='';
+  document.getElementById('cc-fech-form').style.display='block';
+}
+
+function salvarFechamento(){
+  const d=ccGet(clientesData[_currentClienteIdx]);
+  const orcIdx=parseInt(document.getElementById('fech-orc-idx').value);
+  if(!d.orcamentos[orcIdx].fechamentos)d.orcamentos[orcIdx].fechamentos=[];
+  d.orcamentos[orcIdx].fechamentos.push({
+    data:document.getElementById('fech-data').value,
+    valor:parseFloat(document.getElementById('fech-valor').value||0),
+    desconto:document.getElementById('fech-desconto').value,
+    entrada:document.getElementById('fech-entrada').value
+  });
+  d.orcamentos[orcIdx].status='Aprovado';
+  document.getElementById('cc-fech-form').style.display='none';
+  refreshOrcamentos(d);
+  ccSave();
+  updateEntradas();
+}
+
+function refreshOrcamentos(d){
+  const orcs=d.orcamentos||[];
+  let totalAcordado=0, totalFechado=0, totalEntradas=0;
+  orcs.forEach(o=&gt;{
+    totalAcordado+=Number(o.valor)||0;
+    totalEntradas+=Number(o.entrada)||0;
+    const fechs=o.fechamentos||[];
+    if(fechs.length&gt;0)totalFechado+=Math.max(...fechs.map(f=&gt;Number(f.valor)||0));
+  });
+  document.getElementById('cc-total-acordado').textContent=fmtBRL(totalAcordado);
+  document.getElementById('cc-total-fechado').textContent=fmtBRL(totalFechado);
+  const entEl=document.getElementById('cc-total-entrada');
+  if(entEl)entEl.textContent=fmtBRL(totalEntradas);
+
+  document.getElementById('cc-orc-list').innerHTML=orcs.length===0
+    ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhum orçamento registrado</div>'
+    :orcs.map((o,i)=&gt;{
+      const statusColor=o.status==='Aprovado'?'#5a8a6a':o.status==='Reprovado'?'#b5856a':'#A18B6C';
+      const fechsHtml=(o.fechamentos||[]).map(f=&gt;`
+        <div style="background:#f5f3f0;border-radius:6px;padding:8px 10px;font-size:12px;color:#6a5a4a;margin-top:6px;">
+          ✓ Fechamento em ${f.data?new Date(f.data+'T12:00').toLocaleDateString('pt-BR'):'—'} · ${fmtBRL(f.valor)}${f.desconto==='Sim'?' · com desconto':''}${f.entrada==='Sim'?' · com entrada':''}
+        </div>`).join('');
+      return`<div style="background:#fff;border:1px solid #e0d9d0;border-radius:10px;padding:14px;margin-bottom:10px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+<div style="font-size:13px;font-weight:700;color:#2a2520;">${o.tratamento||'Sem tratamento'}</div>
+<span style="background:${statusColor}22;color:${statusColor};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${o.status||'Em aberto'}</span>
+</div>
+        ${o.avaliador?`<div style="font-size:12px;color:#8a7a6a;">Avaliador: ${o.avaliador}</div>`:''}
+        ${o.inicio?`<div style="font-size:12px;color:#8a7a6a;">Início: ${o.inicio}</div>`:''}
+        ${o.data?`<div style="font-size:12px;color:#8a7a6a;">Orçado em: ${new Date(o.data+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
+        <div style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:6px;">${fmtBRL(o.valor)}</div>
+        ${o.pagamento?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">💳 ${o.pagamento}${o.parcelas?' · '+o.parcelas:''}</div>`:''}${o.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">${o.obs}</div>`:''}
+        ${o.entrada&gt;0?`<div style="font-size:12px;color:#5a8a6a;margin-top:4px;">💵 Entrada: ${fmtBRL(o.entrada)}${o.entradaData?' em '+new Date(o.entradaData+'T12:00').toLocaleDateString('pt-BR'):''}</div>`:''}
+        ${fechsHtml}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+<button onclick="openFechForm(${i})" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">+ Fechamento</button>
+<button onclick="openOrcForm(${i})" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">✏ Editar</button>
+<button onclick="excluirOrcamento(${i})" style="background:#fdecea;color:#c0392b;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">🗑 Excluir</button>
+</div>
+</div>`;
+    }).join('');
+}
+
+// ── ATIVIDADES ────────────────────────────────────────────────
+function openAtvForm(){
+  document.getElementById('atv-data').value=new Date().toISOString().split('T')[0];
+  document.getElementById('atv-hora').value='';
+  document.getElementById('atv-fase').value='';
+  document.getElementById('atv-prob').value='';
+  document.getElementById('atv-proximo').value='';
+  document.getElementById('atv-obs').value='';
+  document.getElementById('cc-atv-form').style.display='block';
+}
+
+function salvarAtividade(){
+  const fase=document.getElementById('atv-fase').value;
+  if(!fase){alert('Selecione a fase atual');return;}
+  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
+  d.atividades.unshift({
+    fase,
+    data:document.getElementById('atv-data').value,
+    hora:document.getElementById('atv-hora').value,
+    prob:document.getElementById('atv-prob').value,
+    proximo:document.getElementById('atv-proximo').value,
+    obs:document.getElementById('atv-obs').value
+  });
+  document.getElementById('cc-atv-form').style.display='none';
+  ccSave();
+  refreshAtividades(r,d);
+  switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
+}
+
+function refreshAtividades(r,d){
+  const auto=[];
+  auto.push({fase:'Lead capturado via '+(r.origin||'—'),data:fmtDate(r.created_at||r.timestamp),auto:true});
+  if(isAgend(r.stage)||isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Consulta agendada',data:'—',auto:true});
+  if(isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Paciente compareceu',data:fmtDate(r.timestamp),auto:true});
+  if(isFechou(r.stage))auto.push({fase:'Contrato fechado',data:fmtDate(r.timestamp),auto:true});
+  const all=[...(d.atividades||[]).map(a=&gt;({...a,auto:false})),...auto];
+  const ul=document.getElementById('cc-atv-list');
+
+  // próximo contato
+  const prox=(d.atividades||[]).find(a=&gt;a.proximo);
+  document.getElementById('cc-ultimo-contato').textContent=prox?new Date(prox.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
+
+  ul.innerHTML=all.length===0
+    ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhuma atividade</div>'
+    :all.map(a=&gt;`
+      <div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
+<span style="font-size:16px;">${a.auto?'🔵':'📋'}</span>
+<div style="flex:1;">
+<div style="font-size:13px;font-weight:600;color:#2a2520;">${a.fase}</div>
+          ${a.prob?`<div style="font-size:11px;color:#A18B6C;">Probabilidade: ${a.prob}/10</div>`:''}
+          ${a.proximo?`<div style="font-size:11px;color:#5a8a6a;">Próx. contato: ${new Date(a.proximo+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
+          ${a.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:2px;">${a.obs}</div>`:''}
+          <div style="font-size:11px;color:#aaa;margin-top:3px;">${a.data||''}${a.hora?' '+a.hora:''}</div>
+</div>
+</div>`).join('');
+}
+
+// ── UPDATE ENTRADAS (chamada em múltiplos pontos) ───────────
+function updateEntradas(){
+  let te=0;
+  Object.values(window._ccData||{}).forEach(dd=&gt;{
+    (dd.orcamentos||[]).forEach(o=&gt;te+=Number(o.entrada)||0);
+  });
+  const el=document.getElementById('t-entradas');
+  if(el)el.textContent=te&gt;0?fmt(te):'—';
+  return te;
+}
+// Atualiza a cada 3 segundos automaticamente
+setInterval(updateEntradas, 3000);
+
+// ── EXPORT / IMPORT CRM ──────────────────────────────────────
+function exportarCRM(){
+  const data=JSON.stringify(window._ccData||{},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bulhoes_crm_'+new Date().toISOString().split('T')[0]+'.json';
+  a.click();
+}
+function importarCRM(){document.getElementById('crm-import-input').click();}
+function loadCRMFile(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      window._ccData=JSON.parse(ev.target.result);
+      alert('✅ CRM importado com sucesso!\n'+Object.keys(window._ccData).length+' clientes carregados.');
+      if(typeof filterClientesTable==='function')filterClientesTable();
+    }catch(err){alert('Erro ao importar: '+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+// ── ANOTAÇÕES ─────────────────────────────────────────────────
+function salvarAnotacao(){
+  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
+  const text=document.getElementById('cc-anot-input').value.trim();
+  if(!text)return;
+  d.anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
+  document.getElementById('cc-anot-input').value='';
+  ccSave();
+  refreshAnotacoes(d);
+}
+
+function refreshAnotacoes(d){
+  document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(a=&gt;`
+    <div style="background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
+<div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">${a.date}</div>
+<div style="font-size:13px;color:#2a2520;">${a.text}</div>
+</div>`).join('')||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
+}
+
+</div></div>
+<script>
+
 const META_TOKEN='EAASruBtHjI0BRlLDcNFXe4xQUV0UNPj97tWgfPkKsWIyZB3L0n1G7O7Q2asZBSigzkpThwANe3hyMZBlAi0zDTh4aoUk8ZAiZC7scOs4CLp9vNNZAKA6srleNxFdW6CiEZB90n9o7Ag3rlZCj2jD947Ch0gCySSqgFJg3DWsj76UHvzFAxRidLPfPi6xQiLt6WAZB1IFSfcnOds7f5i5n';
 const META_ACCOUNT='act_830126674734657';
 const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
@@ -1115,22 +1539,10 @@ function renderFinanceiro() {
 
 // INIT
 loadTrafego();
+
 </script>
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
-<div class="modal-box">
-<div class="modal-header">
-<span class="modal-title" id="modal-title">Leads</span>
-<span class="modal-close" onclick="closeModal()">✕</span>
-</div>
-<div class="modal-body">
-<table class="modal-table">
-<thead><tr id="modal-thead"></tr></thead>
-<tbody id="modal-tbody"></tbody>
-</table>
-</div>
-</div>
-</div>
 <script>
+
 function openModal(title, headers, rows) {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-thead').innerHTML = headers.map(h => `<th>${h}</th>`).join('');
@@ -1155,71 +1567,10 @@ function showLeadsModal(metaAds) {
 function showCloudiaModal(title, rows, headers) {
   openModal(title, headers, rows);
 }
+
 </script>
-<!-- CLIENTE CARD (CRM) -->
-<div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
-<div id="cliente-card-panel" style="position:fixed;top:0;right:0;width:560px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;isolation:isolate;">
-<!-- Header -->
-<div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
-<div style="display:flex;justify-content:space-between;align-items:flex-start;">
-<div>
-<div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
-<div id="cc-phone" style="font-size:12px;color:#8a7a6a;margin-top:2px;"></div>
-</div>
-<button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;line-height:1;">✕</button>
-</div>
-<!-- Resumo financeiro -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
-<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total acordado</div>
-<div id="cc-total-acordado" style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:2px;">R$ 0,00</div>
-</div>
-<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total fechado</div>
-<div id="cc-total-fechado" style="font-size:14px;font-weight:700;color:#5a8a6a;margin-top:2px;">R$ 0,00</div>
-</div>
-<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Total entradas</div>
-<div id="cc-total-entrada" style="font-size:14px;font-weight:700;color:#4a7a9a;margin-top:2px;">R$ 0,00</div>
-</div>
-<div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
-<div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;letter-spacing:.4px;">Último contato</div>
-<div id="cc-ultimo-contato" style="font-size:13px;font-weight:600;color:#2a2520;margin-top:2px;">—</div>
-</div>
-</div>
-<!-- Tags -->
-<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-<span id="cc-stage-tag" style="background:#A18B6C;color:#fff;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600;"></span>
-<span id="cc-origin-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
-<span id="cc-date-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
-</div>
-</div>
-<!-- Tabs -->
-<div style="display:flex;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
-<button class="cc-tab active-tab" onclick="switchCCTab('orcamentos',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">💰 Orçamentos</button>
-<button class="cc-tab" onclick="switchCCTab('atividades',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📋 Atividades</button>
-<button class="cc-tab" onclick="switchCCTab('anotacoes',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;color:#8a7a6a;border-bottom:2px solid transparent;">📝 Anotações</button>
-</div>
-<!-- Body scrollável -->
-<div style="flex:1;overflow-y:auto;padding:16px;">
-<!-- ABA ORÇAMENTOS -->
-<div id="cc-tab-orcamentos">
-<button onclick="openOrcForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Novo orçamento</button>
-<div id="cc-orc-list"></div>
-</div>
-<!-- ABA ATIVIDADES -->
-<div id="cc-tab-atividades" style="display:none;">
-<button onclick="openAtvForm()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Registrar atividade</button>
-<div id="cc-atv-list"></div>
-</div>
-<!-- ABA ANOTAÇÕES -->
-<div id="cc-tab-anotacoes" style="display:none;">
-<textarea id="cc-anot-input" placeholder="Digite uma anotação..." style="width:100%;min-height:100px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:13px;color:#2a2520;background:#fff;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
-<button onclick="salvarAnotacao()" style="margin-top:6px;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;">Salvar</button>
-<div id="cc-anot-list" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;"></div>
-</div>
-</div>
 <script>
+
 // ── STATE ──────────────────────────────────────────────────────
 let _ccData = {}; // { phone: { orcamentos:[], atividades:[], anotacoes:[] } }
 let _currentClienteIdx = -1;
@@ -1552,342 +1903,8 @@ function refreshAnotacoes(d){
       <div style="font-size:13px;color:#2a2520;">${a.text}</div>
     </div>`).join('')||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
 }
+
 </script>
-
-
-
-
-
-let _ccData = {}; // { phone: { orcamentos:[], atividades:[], anotacoes:[] } }
-let _currentClienteIdx = -1;
-
-function ccKey(r){ const ph=String(r.phone||'').replace(/\D/g,''); return ph.length&gt;6?ph:(r.name||'unknown'); }
-function ccGet(r){ const k=ccKey(r); if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]}; return _ccData[k]; }
-// Persistência via Google Apps Script
-function ccSave(){
-  if(typeof google!=='undefined'&amp;&amp;google.script){
-    google.script.run.saveCRM(window._ccData);
-  }
-}
-function ccLoad(){
-  if(typeof google!=='undefined'&amp;&amp;google.script){
-    google.script.run.withSuccessHandler(function(data){
-      if(data&amp;&amp;typeof data==='object'){
-        window._ccData=data;
-        updateEntradas();
-        if(typeof filterClientesTable==='function')filterClientesTable();
-      }
-    }).loadCRM();
-  }
-}
-// Carrega ao iniciar (quando hospedado no Apps Script)
-document.addEventListener('DOMContentLoaded', function(){ setTimeout(ccLoad, 1500); });
-
-function fmtBRL(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-
-// ── OPEN CARD ──────────────────────────────────────────────────
-function openClienteCard(idx) {
-  let r = clientesData[idx];
-  if(!r) r = clientesData[0]; // fallback
-  if(!r) return;
-  idx = clientesData.indexOf(r);
-  _currentClienteIdx = idx;
-  const d = ccGet(r);
-
-  document.getElementById('cc-name').textContent = r.name||'—';
-  document.getElementById('cc-phone').textContent = r.phone||'—';
-  document.getElementById('cc-stage-tag').textContent = r.stage||'—';
-  document.getElementById('cc-origin-tag').textContent = r.origin||'—';
-  document.getElementById('cc-date-tag').textContent = fmtDate(r.created_at||r.timestamp);
-
-  setTimeout(updateEntradas, 200);
-  // Pré-popula orçamento com valor da planilha se ainda não tiver nenhum manual
-  const val = parseFloat(r.value||0);
-  if(val &gt; 0 &amp;&amp; d.orcamentos.length === 0) {
-    d.orcamentos.push({
-      status: isFechou(r.stage) ? 'Aprovado' : 'Em aberto',
-      avaliador: '',
-      tratamento: '',
-      inicio: '',
-      data: (r.created_at||r.timestamp||'').substring(0,10),
-      valor: val,
-      obs: 'Importado automaticamente do Cloudia',
-      fechamentos: (isFechou(r.stage) &amp;&amp; val&gt;0) ? [{data:(r.timestamp||'').substring(0,10), valor:val, desconto:'', entrada:''}] : []
-    });
-  }
-
-  refreshOrcamentos(d);
-  refreshAtividades(r, d);
-  refreshAnotacoes(d);
-  switchCCTab('orcamentos', document.querySelector('.cc-tab'));
-  // hide sub-forms
-  ['cc-orc-form','cc-fech-form','cc-atv-form'].forEach(id=&gt;{const el=document.getElementById(id);if(el)el.style.display='none';});
-  document.getElementById('cliente-card-overlay').style.display='block';
-}
-
-function closeClienteCard(e){
-  if(e.target===document.getElementById('cliente-card-overlay'))
-    document.getElementById('cliente-card-overlay').style.display='none';
-}
-
-function switchCCTab(tab,btn){
-  ['orcamentos','atividades','anotacoes'].forEach(t=&gt;{
-    document.getElementById('cc-tab-'+t).style.display=t===tab?'block':'none';
-  });
-  document.querySelectorAll('.cc-tab').forEach(b=&gt;{b.style.color='#8a7a6a';b.style.borderBottomColor='transparent';b.style.fontWeight='400';});
-  if(btn){btn.style.color='#A18B6C';btn.style.borderBottomColor='#A18B6C';btn.style.fontWeight='600';}
-}
-
-// ── ORÇAMENTOS ────────────────────────────────────────────────
-function openOrcForm(editIdx){
-  const d = ccGet(clientesData[_currentClienteIdx]);
-  document.getElementById('cc-orc-form-title').textContent = editIdx!=null ? 'Editar Orçamento' : 'Adicionar Orçamento';
-  document.getElementById('orc-edit-idx').value = editIdx!=null ? editIdx : '';
-  const today = new Date().toISOString().split('T')[0];
-  if(editIdx!=null){
-    const o=d.orcamentos[editIdx];
-    document.getElementById('orc-status').value=o.status||'';
-    document.getElementById('orc-avaliador').value=o.avaliador||'';
-    document.getElementById('orc-tratamento').value=o.tratamento||'';
-    document.getElementById('orc-data').value=o.data||today;
-    document.getElementById('orc-valor').value=o.valor||'';
-    document.getElementById('orc-pagamento').value=o.pagamento||'';
-    document.getElementById('orc-parcelas').value=o.parcelas||'';
-    document.getElementById('orc-entrada').value=o.entrada||'';
-    document.getElementById('orc-entrada-data').value=o.entradaData||'';
-    document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
-    document.getElementById('orc-obs').value=o.obs||'';
-  } else {
-    document.getElementById('orc-status').value='Em aberto';
-    document.getElementById('orc-avaliador').value='';
-    document.getElementById('orc-tratamento').value='';
-    document.getElementById('orc-data').value=today;
-    document.getElementById('orc-valor').value='';
-    document.getElementById('orc-pagamento').value='';
-    document.getElementById('orc-parcelas').value='';
-    document.getElementById('orc-entrada').value='';
-    document.getElementById('orc-entrada-data').value='';
-    document.getElementById('orc-entrada-pgto').value='';
-    document.getElementById('orc-obs').value='';
-  }
-  document.getElementById('cc-orc-form').style.display='block';
-}
-
-function salvarOrcamento(){
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
-  const editIdx=document.getElementById('orc-edit-idx').value;
-  const orc={
-    status:document.getElementById('orc-status').value,
-    avaliador:document.getElementById('orc-avaliador').value,
-    tratamento:document.getElementById('orc-tratamento').value,
-    data:document.getElementById('orc-data').value,
-    valor:parseFloat(document.getElementById('orc-valor').value||0),
-    obs:document.getElementById('orc-obs').value,
-    pagamento:document.getElementById('orc-pagamento').value,
-    parcelas:document.getElementById('orc-parcelas').value,
-    entrada:Number(document.getElementById('orc-entrada').value)||0,
-    entradaData:document.getElementById('orc-entrada-data').value,
-    entradaPgto:document.getElementById('orc-entrada-pgto').value,
-    fechamentos:editIdx!==''?(d.orcamentos[editIdx]?.fechamentos||[]):[]
-  };
-  if(editIdx!=='') d.orcamentos[editIdx]=orc;
-  else d.orcamentos.unshift(orc);
-  document.getElementById('cc-orc-form').style.display='none';
-  refreshOrcamentos(d);
-  if(typeof filterClientesTable==='function')filterClientesTable();
-  updateEntradas();
-}
-
-function excluirOrcamento(idx){
-  if(!confirm('Excluir este orçamento?'))return;
-  const d=ccGet(clientesData[_currentClienteIdx]);
-  d.orcamentos.splice(idx,1);
-  refreshOrcamentos(d);
-  ccSave();
-}
-
-function openFechForm(orcIdx){
-  const d=ccGet(clientesData[_currentClienteIdx]);
-  const o=d.orcamentos[orcIdx];
-  document.getElementById('fech-orc-idx').value=orcIdx;
-  document.getElementById('fech-orc-info').textContent='Tratamento: '+(o.tratamento||'—')+' · Valor orçado: '+fmtBRL(o.valor);
-  document.getElementById('fech-data').value=new Date().toISOString().split('T')[0];
-  document.getElementById('fech-valor').value=o.valor||'';
-  document.getElementById('fech-desconto').value='';
-  document.getElementById('fech-entrada').value='';
-  document.getElementById('cc-fech-form').style.display='block';
-}
-
-function salvarFechamento(){
-  const d=ccGet(clientesData[_currentClienteIdx]);
-  const orcIdx=parseInt(document.getElementById('fech-orc-idx').value);
-  if(!d.orcamentos[orcIdx].fechamentos)d.orcamentos[orcIdx].fechamentos=[];
-  d.orcamentos[orcIdx].fechamentos.push({
-    data:document.getElementById('fech-data').value,
-    valor:parseFloat(document.getElementById('fech-valor').value||0),
-    desconto:document.getElementById('fech-desconto').value,
-    entrada:document.getElementById('fech-entrada').value
-  });
-  d.orcamentos[orcIdx].status='Aprovado';
-  document.getElementById('cc-fech-form').style.display='none';
-  refreshOrcamentos(d);
-  ccSave();
-  updateEntradas();
-}
-
-function refreshOrcamentos(d){
-  const orcs=d.orcamentos||[];
-  let totalAcordado=0, totalFechado=0, totalEntradas=0;
-  orcs.forEach(o=&gt;{
-    totalAcordado+=Number(o.valor)||0;
-    totalEntradas+=Number(o.entrada)||0;
-    const fechs=o.fechamentos||[];
-    if(fechs.length&gt;0)totalFechado+=Math.max(...fechs.map(f=&gt;Number(f.valor)||0));
-  });
-  document.getElementById('cc-total-acordado').textContent=fmtBRL(totalAcordado);
-  document.getElementById('cc-total-fechado').textContent=fmtBRL(totalFechado);
-  const entEl=document.getElementById('cc-total-entrada');
-  if(entEl)entEl.textContent=fmtBRL(totalEntradas);
-
-  document.getElementById('cc-orc-list').innerHTML=orcs.length===0
-    ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhum orçamento registrado</div>'
-    :orcs.map((o,i)=&gt;{
-      const statusColor=o.status==='Aprovado'?'#5a8a6a':o.status==='Reprovado'?'#b5856a':'#A18B6C';
-      const fechsHtml=(o.fechamentos||[]).map(f=&gt;`
-        <div style="background:#f5f3f0;border-radius:6px;padding:8px 10px;font-size:12px;color:#6a5a4a;margin-top:6px;">
-          ✓ Fechamento em ${f.data?new Date(f.data+'T12:00').toLocaleDateString('pt-BR'):'—'} · ${fmtBRL(f.valor)}${f.desconto==='Sim'?' · com desconto':''}${f.entrada==='Sim'?' · com entrada':''}
-        </div>`).join('');
-      return`<div style="background:#fff;border:1px solid #e0d9d0;border-radius:10px;padding:14px;margin-bottom:10px;">
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-<div style="font-size:13px;font-weight:700;color:#2a2520;">${o.tratamento||'Sem tratamento'}</div>
-<span style="background:${statusColor}22;color:${statusColor};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${o.status||'Em aberto'}</span>
-</div>
-        ${o.avaliador?`<div style="font-size:12px;color:#8a7a6a;">Avaliador: ${o.avaliador}</div>`:''}
-        ${o.inicio?`<div style="font-size:12px;color:#8a7a6a;">Início: ${o.inicio}</div>`:''}
-        ${o.data?`<div style="font-size:12px;color:#8a7a6a;">Orçado em: ${new Date(o.data+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
-        <div style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:6px;">${fmtBRL(o.valor)}</div>
-        ${o.pagamento?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">💳 ${o.pagamento}${o.parcelas?' · '+o.parcelas:''}</div>`:''}${o.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:4px;">${o.obs}</div>`:''}
-        ${o.entrada&gt;0?`<div style="font-size:12px;color:#5a8a6a;margin-top:4px;">💵 Entrada: ${fmtBRL(o.entrada)}${o.entradaData?' em '+new Date(o.entradaData+'T12:00').toLocaleDateString('pt-BR'):''}</div>`:''}
-        ${fechsHtml}
-        <div style="display:flex;gap:8px;margin-top:10px;">
-<button onclick="openFechForm(${i})" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">+ Fechamento</button>
-<button onclick="openOrcForm(${i})" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">✏ Editar</button>
-<button onclick="excluirOrcamento(${i})" style="background:#fdecea;color:#c0392b;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">🗑 Excluir</button>
-</div>
-</div>`;
-    }).join('');
-}
-
-// ── ATIVIDADES ────────────────────────────────────────────────
-function openAtvForm(){
-  document.getElementById('atv-data').value=new Date().toISOString().split('T')[0];
-  document.getElementById('atv-hora').value='';
-  document.getElementById('atv-fase').value='';
-  document.getElementById('atv-prob').value='';
-  document.getElementById('atv-proximo').value='';
-  document.getElementById('atv-obs').value='';
-  document.getElementById('cc-atv-form').style.display='block';
-}
-
-function salvarAtividade(){
-  const fase=document.getElementById('atv-fase').value;
-  if(!fase){alert('Selecione a fase atual');return;}
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
-  d.atividades.unshift({
-    fase,
-    data:document.getElementById('atv-data').value,
-    hora:document.getElementById('atv-hora').value,
-    prob:document.getElementById('atv-prob').value,
-    proximo:document.getElementById('atv-proximo').value,
-    obs:document.getElementById('atv-obs').value
-  });
-  document.getElementById('cc-atv-form').style.display='none';
-  ccSave();
-  refreshAtividades(r,d);
-  switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
-}
-
-function refreshAtividades(r,d){
-  const auto=[];
-  auto.push({fase:'Lead capturado via '+(r.origin||'—'),data:fmtDate(r.created_at||r.timestamp),auto:true});
-  if(isAgend(r.stage)||isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Consulta agendada',data:'—',auto:true});
-  if(isComp(r.stage)||isFechou(r.stage))auto.push({fase:'Paciente compareceu',data:fmtDate(r.timestamp),auto:true});
-  if(isFechou(r.stage))auto.push({fase:'Contrato fechado',data:fmtDate(r.timestamp),auto:true});
-  const all=[...(d.atividades||[]).map(a=&gt;({...a,auto:false})),...auto];
-  const ul=document.getElementById('cc-atv-list');
-
-  // próximo contato
-  const prox=(d.atividades||[]).find(a=&gt;a.proximo);
-  document.getElementById('cc-ultimo-contato').textContent=prox?new Date(prox.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
-
-  ul.innerHTML=all.length===0
-    ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhuma atividade</div>'
-    :all.map(a=&gt;`
-      <div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
-<span style="font-size:16px;">${a.auto?'🔵':'📋'}</span>
-<div style="flex:1;">
-<div style="font-size:13px;font-weight:600;color:#2a2520;">${a.fase}</div>
-          ${a.prob?`<div style="font-size:11px;color:#A18B6C;">Probabilidade: ${a.prob}/10</div>`:''}
-          ${a.proximo?`<div style="font-size:11px;color:#5a8a6a;">Próx. contato: ${new Date(a.proximo+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
-          ${a.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:2px;">${a.obs}</div>`:''}
-          <div style="font-size:11px;color:#aaa;margin-top:3px;">${a.data||''}${a.hora?' '+a.hora:''}</div>
-</div>
-</div>`).join('');
-}
-
-// ── UPDATE ENTRADAS (chamada em múltiplos pontos) ───────────
-function updateEntradas(){
-  let te=0;
-  Object.values(window._ccData||{}).forEach(dd=&gt;{
-    (dd.orcamentos||[]).forEach(o=&gt;te+=Number(o.entrada)||0);
-  });
-  const el=document.getElementById('t-entradas');
-  if(el)el.textContent=te&gt;0?fmt(te):'—';
-  return te;
-}
-// Atualiza a cada 3 segundos automaticamente
-setInterval(updateEntradas, 3000);
-
-// ── EXPORT / IMPORT CRM ──────────────────────────────────────
-function exportarCRM(){
-  const data=JSON.stringify(window._ccData||{},null,2);
-  const blob=new Blob([data],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='bulhoes_crm_'+new Date().toISOString().split('T')[0]+'.json';
-  a.click();
-}
-function importarCRM(){document.getElementById('crm-import-input').click();}
-function loadCRMFile(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    try{
-      window._ccData=JSON.parse(ev.target.result);
-      alert('✅ CRM importado com sucesso!\n'+Object.keys(window._ccData).length+' clientes carregados.');
-      if(typeof filterClientesTable==='function')filterClientesTable();
-    }catch(err){alert('Erro ao importar: '+err.message);}
-  };
-  reader.readAsText(file);
-}
-
-// ── ANOTAÇÕES ─────────────────────────────────────────────────
-function salvarAnotacao(){
-  const r=clientesData[_currentClienteIdx]; const d=ccGet(r);
-  const text=document.getElementById('cc-anot-input').value.trim();
-  if(!text)return;
-  d.anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
-  document.getElementById('cc-anot-input').value='';
-  ccSave();
-  refreshAnotacoes(d);
-}
-
-function refreshAnotacoes(d){
-  document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(a=&gt;`
-    <div style="background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;">
-<div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">${a.date}</div>
-<div style="font-size:13px;color:#2a2520;">${a.text}</div>
-</div>`).join('')||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
-}
-
-</div></div>
+</script>
+</body>
+</html>
