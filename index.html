@@ -165,6 +165,10 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-label">Clientes</span>
     </div>
     <div class="nav-section">Gestão</div>
+    <div class="nav-item" onclick="switchPage('gerenciar',this); if(typeof renderLista==='function')renderLista('origens');">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Gerenciar</span>
+    </div>
     <div class="nav-item" onclick="switchPage('financeiro',this)" style="display:none">
       <span class="nav-icon">💰</span>
       <span class="nav-label">Financeiro</span>
@@ -331,7 +335,112 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
 
     <!-- ===== FINANCEIRO PAGE ===== -->
-  <div claid="page-leads">
+  <div class="page<div class="page" id="page-gerenciar">
+  <div style="margin-bottom:20px;">
+    <div style="display:flex;gap:8px;border-bottom:1px solid #e8e2da;margin-bottom:20px;">
+      <button class="tab-btn active" onclick="switchListaTab('origens',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">Origens</button>
+      <button class="tab-btn" onclick="switchListaTab('status',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;color:#8a7a6a;border-bottom:2px solid transparent;">Status</button>
+      <button class="tab-btn" onclick="switchListaTab('tratamentos',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;color:#8a7a6a;border-bottom:2px solid transparent;">Tratamentos</button>
+      <button class="tab-btn" onclick="switchListaTab('fases',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;color:#8a7a6a;border-bottom:2px solid transparent;">Fases</button>
+      <button class="tab-btn" onclick="switchListaTab('avaliadores',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;color:#8a7a6a;border-bottom:2px solid transparent;">Avaliadores</button>
+    </div>
+
+    <div id="lista-origens">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:12px;">Padrões</div>
+          <div id="origens-padroes"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#5a8a6a;text-transform:uppercase;">Ativos</div>
+            <button onclick="novoItem('origens')" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">+ Novo</button>
+          </div>
+          <div id="origens-ativos"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;opacity:.7;">
+          <div style="font-size:12px;font-weight:700;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Desativados</div>
+          <div id="origens-desativos"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lista-status" style="display:none;">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#5a8a6a;text-transform:uppercase;">Ativos</div>
+            <button onclick="novoItem('status')" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">+ Novo</button>
+          </div>
+          <div id="status-ativos"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;opacity:.7;">
+          <div style="font-size:12px;font-weight:700;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Desativados</div>
+          <div id="status-desativos"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lista-tratamentos" style="display:none;">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#5a8a6a;text-transform:uppercase;">Ativos</div>
+            <button onclick="novoItem('tratamentos')" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">+ Novo</button>
+          </div>
+          <div id="tratamentos-ativos"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;opacity:.7;">
+          <div style="font-size:12px;font-weight:700;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Desativados</div>
+          <div id="tratamentos-desativos"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lista-fases" style="display:none;">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#5a8a6a;text-transform:uppercase;">Ativos</div>
+            <button onclick="novoItem('fases')" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">+ Novo</button>
+          </div>
+          <div id="fases-ativos"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;opacity:.7;">
+          <div style="font-size:12px;font-weight:700;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Desativados</div>
+          <div id="fases-desativos"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lista-avaliadores" style="display:none;">
+      <div style="display:flex;gap:12px;">
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:12px;font-weight:700;color:#5a8a6a;text-transform:uppercase;">Ativos</div>
+            <button onclick="novoItem('avaliadores')" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;">+ Novo</button>
+          </div>
+          <div id="avaliadores-ativos"></div>
+        </div>
+        <div style="flex:2;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;opacity:.7;">
+          <div style="font-size:12px;font-weight:700;color:#c0392b;text-transform:uppercase;margin-bottom:12px;">Desativados</div>
+          <div id="avaliadores-desativos"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+" id="page-financeiro">
+    <div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:12px;color:#b5a898;">
+      <span style="font-size:48px;">💰</span>
+      <span style="font-size:14px;font-weight:500;color:#9a8c7e;">Em breve</span>
+      <span style="font-size:12px;">Esta seção será configurada em breve</span>
+    </div>
+  </div>
+
+  <!-- ===== LEADS PAGE ===== -->
+    <div class="page" id="page-leads">
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome, telefone ou origem..." id="leads-search" oninput="filterLeadsTable()">
         <select class="filter-select" id="leads-origem-filter" onchange="filterLeadsTable()">
@@ -356,40 +465,37 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== CLIENTES PAGE ===== -->
     <div class="page" id="page-clientes">
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Não fechados</div><div id="cli-total-aberto" style="font-size:22px;font-weight:700;color:#2a2520;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#fdecea;border-radius:8px;display:flex;align-items:center;justify-content:center;">📋</div></div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Fechados</div><div id="cli-total-fechado" style="font-size:22px;font-weight:700;color:#5a8a6a;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">✅</div></div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total orçado</div><div id="cli-val-orcado" style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#fff8e1;border-radius:8px;display:flex;align-items:center;justify-content:center;">💰</div></div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total fechado</div><div id="cli-val-fechado" style="font-size:14px;font-weight:700;color:#5a8a6a;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">💵</div></div>
-</div>
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-  <button onclick="toggleFiltros()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:600;">🔍 Filtros</button>
-  <input class="search-input" type="text" placeholder="Buscar por nome, telefone..." id="clientes-search" oninput="filterClientesTable()" style="flex:1;min-width:180px;">
-  <span class="count-badge" id="clientes-count"></span>
-  <button onclick="exportarCRM()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;">💾 Exportar</button>
-  <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;">📂 Importar</button>
-  <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
-</div>
-<div id="filtros-avancados" style="display:none;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;margin-bottom:12px;">
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Nome</label><input id="f-nome" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Telefone</label><input id="f-tel" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Data min</label><input id="f-data-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Data max</label><input id="f-data-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Fase</label><select id="clientes-fase-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option>Compareceu</option><option>Ganho</option><option>Faltou/desmarcou</option><option>Perdido</option></select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Situação</label><select id="clientes-sit-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option value="fechado">Fechou</option><option value="aberto">Não fechou</option></select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Origem</label><select id="clientes-origem-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option>#Instagram ADS</option><option>Instagram Orgânico</option><option>WhatsApp Direto</option></select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Tratamento</label><select id="clientes-trat-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todos</option><option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option><option>#Endodontia</option><option>#Extração</option><option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option><option>#Lentes em Porcelana</option><option>#Lentes em Resina</option><option>#Lentes inferiores</option><option>#Lentes unitárias</option><option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option><option>#Retrabalho</option></select></div>
-  </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Avaliador</label><select id="clientes-aval-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todos</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option></select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Próx. contato min</label><input id="f-prox-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Próx. contato max</label><input id="f-prox-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
-    <div style="display:flex;align-items:flex-end;"><button onclick="limparFiltros()" style="width:100%;background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:12px;">Limpar</button></div>
-  </div>
-</div>
+      <div class="search-bar">
+        <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
+        <span class="count-badge" id="clientes-count"></span>
+        <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">💾 Exportar CRM</button>
+        <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">📂 Importar CRM</button>
+        <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+          <select class="filter-select" id="clientes-origem-filter" onchange="filterClientesTable()"><option value="">Todas as origens</option></select>
+          <select class="filter-select" id="clientes-fase-filter" onchange="filterClientesTable()"><option value="">Todas as fases</option></select>
+          <select class="filter-select" id="clientes-sit-filter" onchange="filterClientesTable()">
+            <option value="">Todas as situações</option>
+            <option value="fechado">Fechou tratamento</option>
+            <option value="aberto">Não fechou</option>
+          </select>
+          <select class="filter-select" id="clientes-trat-filter" onchange="filterClientesTable()">
+            <option value="">Todos os tratamentos</option>
+            <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option>
+            <option>#Clareamento Conjugado</option><option>#Clareamento inferior Conjugado</option>
+            <option>#Clínico</option><option>#Endodontia</option><option>#Extração</option>
+            <option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option>
+            <option>#Lentes em Porcelana</option><option>#Lentes em Resina</option>
+            <option>#Lentes inferiores</option><option>#Lentes unitárias</option>
+            <option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option>
+            <option>#Reabilitação Oral</option><option>#Retrabalho</option>
+          </select>
+          <select class="filter-select" id="clientes-aval-filter" onchange="filterClientesTable()">
+            <option value="">Todos os avaliadores</option>
+            <option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
+          </select>
+        </div>
+      </div>
       <div class="table-card">
         <div class="tw">
           <table>
@@ -400,7 +506,7 @@ tbody tr:hover td{background:#faf7f3;}
               <th>Fase</th>
               <th>Situação</th>
               <th>Tratamento</th>
-              <th>Avaliador</th><th>Próx. Contato</th>
+              <th>Avaliador</th>
               <th style="text-align:right">Valor orçado</th>
               <th style="text-align:right">Valor fechado</th>
             </tr></thead>
@@ -414,7 +520,7 @@ tbody tr:hover td{background:#faf7f3;}
 </div>
 
 <script>
-const META_TOKEN='EAASruBtHjI0BRqydWJVPJkLbZCeWP9iVbeXCdT0bxynTtEiafbQJtVQFv4j0ZCSQkNuSPU5YgezK9ZCZChq0P3fJ69NSGIbsWHsivGrR73i3uL0eYwNhbZCzHowQ17ZAT0AXMtdRwZCweSa9fvnNPIzBN2zf6b2QhMngbaU2UChTQpt07p00rmPc2GEGWupsBra7DieQ9eFdpLAsxxwQrehwbx1Tj7op06zZCxJ7qvES3veXdKy7XWJnnwZDZD';
+const META_TOKEN='EAASruBtHjI0BRlLDcNFXe4xQUV0UNPj97tWgfPkKsWIyZB3L0n1G7O7Q2asZBSigzkpThwANe3hyMZBlAi0zDTh4aoUk8ZAiZC7scOs4CLp9vNNZAKA6srleNxFdW6CiEZB90n9o7Ag3rlZCj2jD947Ch0gCySSqgFJg3DWsj76UHvzFAxRidLPfPi6xQiLt6WAZB1IFSfcnOds7f5i5n';
 const META_ACCOUNT='act_830126674734657';
 const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
 const SS_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
@@ -434,7 +540,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar'};
   document.getElementById('topbar-title').textContent=titles[page];
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -1612,53 +1718,110 @@ function filterClientesTable(){
   }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
 </script>
+
 <script>
-function filterClientesTable(){
-  var q=(document.getElementById('clientes-search')||{value:''}).value.toLowerCase();
-  var fnome=(document.getElementById('f-nome')||{value:''}).value.toLowerCase();
-  var ftel=(document.getElementById('f-tel')||{value:''}).value;
-  var fdMin=(document.getElementById('f-data-min')||{value:''}).value;
-  var fdMax=(document.getElementById('f-data-max')||{value:''}).value;
-  var fpMin=(document.getElementById('f-prox-min')||{value:''}).value;
-  var fpMax=(document.getElementById('f-prox-max')||{value:''}).value;
-  var fase=(document.getElementById('clientes-fase-filter')||{value:''}).value;
-  var orig=(document.getElementById('clientes-origem-filter')||{value:''}).value;
-  var sit=(document.getElementById('clientes-sit-filter')||{value:''}).value;
-  var trat=(document.getElementById('clientes-trat-filter')||{value:''}).value;
-  var aval=(document.getElementById('clientes-aval-filter')||{value:''}).value;
-  var filtered=clientesData.filter(function(r){
-    var nm=(r.name||'').toLowerCase(),ph=(r.phone||'');
-    if(q&&!nm.includes(q)&&!ph.includes(q))return false;
-    if(fnome&&!nm.includes(fnome))return false;
-    if(ftel&&!ph.includes(ftel))return false;
-    if(fase&&r.stage!==fase)return false;
-    if(orig&&(r.origin||'')!==orig)return false;
-    var fechou=isFechou(r.stage);
-    if(sit==='fechado'&&!fechou)return false;
-    if(sit==='aberto'&&fechou)return false;
-    var phn=ph.replace(/[^0-9]/g,'');
-    var d=_ccData[phn]||{orcamentos:[],atividades:[]};
-    if(trat&&!(d.orcamentos||[]).some(function(o){return o.tratamento===trat;}))return false;
-    if(aval&&!(d.orcamentos||[]).some(function(o){return o.avaliador===aval;}))return false;
-    if(fdMin||fdMax){var dt=new Date(r.created_at||r.timestamp||0);if(fdMin&&dt<new Date(fdMin))return false;if(fdMax&&dt>new Date(fdMax+'T23:59:59'))return false;}
-    if(fpMin||fpMax){var prx=(d.atividades||[]).find(function(a){return a.proximo;});if(!prx)return false;var dp=new Date(prx.proximo);if(fpMin&&dp<new Date(fpMin))return false;if(fpMax&&dp>new Date(fpMax))return false;}
-    return true;
+// ── GERENCIAR LISTAS ──────────────────────────────────────
+var _listas = {
+  origens: {
+    padroes: ['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],
+    ativos: ['#Indicação','#Organico','#Instagram ADS','#Social Selling'],
+    desativos: ['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']
+  },
+  status: {
+    ativos: ['Em aberto','Aprovado','Reprovado','Cancelado'],
+    desativos: []
+  },
+  tratamentos: {
+    ativos: ['#Alinhador Ortodontico','#Aparelho Ortodontico','#Clareamento Conjugado','#Clareamento inferior Conjugado','#Clínico','#Endodontia','#Extração','#Gengivoplastia','#HOF','#Implantes','#Lentes em Porcelana','#Lentes em Resina','#Lentes inferiores','#Lentes unitárias','#Paciente modelo','#Protocolo sobre Implantes','#Reabilitação Oral','#Retrabalho'],
+    desativos: []
+  },
+  fases: {
+    ativos: ['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','3° contato - depoimento + lembrei de você','4° contato - Pergunta sincera','5° contato nova proposta','6° contato - Conseguiu ver?','7° contato - mensagem de despedida','Agendou retorno','Aguardando 1° contato','Aguardando entrada','Aguardando posição do decisor','Avaliação comercial','Cadencia mensal','Contato perdido','Contato resgatado','Fechamento por telefone e WhatsApp','Fechou','Pós venda','Sem resposta','Última mensagem despedida'],
+    desativos: []
+  },
+  avaliadores: {
+    ativos: ['Dra Victoria Mota','Dra Larissa Bulhões','Dra Gabriela Vera'],
+    desativos: []
+  }
+};
+
+var _currentListaTab = 'origens';
+
+function switchListaTab(tab, btn){
+  _currentListaTab = tab;
+  ['origens','status','tratamentos','fases','avaliadores'].forEach(function(t){
+    var el=document.getElementById('lista-'+t); if(el)el.style.display=t===tab?'block':'none';
   });
-  var ta=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
-  var tf=clientesData.filter(function(r){return isFechou(r.stage);}).length;
-  var vO=0,vF=0;
-  clientesData.forEach(function(r){var phn=String(r.phone||'').replace(/[^0-9]/g,'');var d=_ccData[phn]||{orcamentos:[]};(d.orcamentos||[]).forEach(function(o){vO+=Number(o.valor)||0;var fs=o.fechamentos||[];if(fs.length>0)vF+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));});});
-  var e;e=document.getElementById('cli-total-aberto');if(e)e.textContent=ta;e=document.getElementById('cli-total-fechado');if(e)e.textContent=tf;e=document.getElementById('cli-val-orcado');if(e)e.textContent=fmtBRL(vO);e=document.getElementById('cli-val-fechado');if(e)e.textContent=fmtBRL(vF);
-  document.getElementById('clientes-count').textContent=filtered.length+' clientes';
-  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(function(r,fi){
-    var fechou=isFechou(r.stage);var val=parseFloat(r.value||0);var idx=clientesData.indexOf(r);if(idx<0)idx=fi;
-    var phn=String(r.phone||'').replace(/[^0-9]/g,'');var d=_ccData[phn]||{orcamentos:[],atividades:[]};var o0=d.orcamentos&&d.orcamentos[0];var px=(d.atividades||[]).find(function(a){return a.proximo;});
-    return '<tr style="cursor:pointer;" onclick="openClienteCard('+idx+')">'+'<td><strong style="color:#2a2520;">'+(r.name||'—')+'</strong></td>'+'<td class="tm">'+fmtDate(r.created_at||r.timestamp)+'</td>'+'<td>'+(r.phone||'—')+'</td>'+'<td>'+(r.stage||'—')+'</td>'+'<td><span class="status-pill '+(fechou?'status-fechado':'status-aberto')+'">'+(fechou?'Fechado':'Em aberto')+'</span></td>'+'<td style="font-size:12px;">'+(o0&&o0.tratamento?o0.tratamento:'—')+'</td>'+'<td style="font-size:12px;">'+(o0&&o0.avaliador?o0.avaliador:'—')+'</td>'+'<td style="font-size:12px;color:#5a8a6a;">'+(px?new Date(px.proximo+'T12:00').toLocaleDateString('pt-BR'):'—')+'</td>'+'<td style="text-align:right" class="tm">'+(o0&&o0.valor>0?fmtBRL(o0.valor):'—')+'</td>'+'<td style="text-align:right" class="tg">'+(fechou&&val>0?fmtBRL(val):'—')+'</td>'+'</tr>';
-  }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
+  document.querySelectorAll('.tab-btn').forEach(function(b){
+    b.style.color='#8a7a6a'; b.style.borderBottomColor='transparent'; b.style.fontWeight='400';
+  });
+  if(btn){btn.style.color='#A18B6C';btn.style.borderBottomColor='#A18B6C';btn.style.fontWeight='600';}
+  renderLista(tab);
 }
-function toggleFiltros(){var el=document.getElementById('filtros-avancados');if(el)el.style.display=el.style.display==='none'?'block':'none';}
-function limparFiltros(){['f-nome','f-tel','f-data-min','f-data-max','f-prox-min','f-prox-max'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});['clientes-fase-filter','clientes-origem-filter','clientes-sit-filter','clientes-trat-filter','clientes-aval-filter'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});filterClientesTable();}
-function fmtBRL(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderLista(tab){
+  var lista = _listas[tab];
+  if(!lista) return;
+  
+  function makeItem(texto, tipo, tab){
+    var div = '<div style="background:#f0ebe3;border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#2a2520;">'
+      + '<span>'+texto+'</span>'
+      + '<div style="display:flex;gap:4px;">';
+    if(tipo==='ativo'){
+      div += '<button onclick="desativarItem(''+tab+'',''+texto+'')" style="background:#fdecea;color:#c0392b;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">Desativar</button>';
+    } else if(tipo==='desativo'){
+      div += '<button onclick="ativarItem(''+tab+'',''+texto+'')" style="background:#e8f5e9;color:#5a8a6a;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">Ativar</button>';
+    }
+    div += '</div></div>';
+    return div;
+  }
+
+  if(tab==='origens'){
+    var p=document.getElementById('origens-padroes');
+    if(p)p.innerHTML=(lista.padroes||[]).map(function(t){return '<div style="background:#e8e2da;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:13px;color:#6a5a4a;">'+t+'</div>';}).join('');
+    var a=document.getElementById('origens-ativos');
+    if(a)a.innerHTML=(lista.ativos||[]).map(function(t){return makeItem(t,'ativo',tab);}).join('');
+    var d=document.getElementById('origens-desativos');
+    if(d)d.innerHTML=(lista.desativos||[]).map(function(t){return makeItem(t,'desativo',tab);}).join('');
+  } else {
+    var aEl=document.getElementById(tab+'-ativos');
+    if(aEl)aEl.innerHTML=(lista.ativos||[]).map(function(t){return makeItem(t,'ativo',tab);}).join('');
+    var dEl=document.getElementById(tab+'-desativos');
+    if(dEl)dEl.innerHTML=(lista.desativos||[]).map(function(t){return makeItem(t,'desativo',tab);}).join('');
+  }
+}
+
+function ativarItem(tab, texto){
+  var lista=_listas[tab];
+  lista.desativos=lista.desativos.filter(function(t){return t!==texto;});
+  lista.ativos.push(texto);
+  renderLista(tab);
+}
+
+function desativarItem(tab, texto){
+  var lista=_listas[tab];
+  lista.ativos=lista.ativos.filter(function(t){return t!==texto;});
+  lista.desativos.push(texto);
+  renderLista(tab);
+}
+
+function novoItem(tab){
+  var nome=prompt('Nome do novo item:');
+  if(!nome||!nome.trim())return;
+  _listas[tab].ativos.push(nome.trim());
+  renderLista(tab);
+}
+
+// Inicializar listas quando entrar na página
+var _origSwitchPage = typeof switchPage === 'function' ? switchPage : null;
+document.addEventListener('DOMContentLoaded', function(){
+  // Render inicial quando acessar gerenciar
+  var origSwitch = window.switchPage;
+  window.switchPage = function(page, el){
+    if(typeof origSwitch === 'function') origSwitch(page, el);
+    if(page === 'gerenciar') renderLista('origens');
+  };
+});
 </script>
 </body>
 </html>
