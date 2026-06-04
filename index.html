@@ -143,6 +143,7 @@ tbody tr:hover td{background:#faf7f3;}
 </style>
 </head>
 <body>
+<div id="app-root" style="display:none;width:100%;min-height:100vh;">
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -398,9 +399,9 @@ tbody tr:hover td{background:#faf7f3;}
       <input id="f-nome" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
     <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
       <input id="f-tel" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data registro (min)</label>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data (min)</label>
       <input id="f-data-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data registro (max)</label>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data (max)</label>
       <input id="f-data-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
   </div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
@@ -414,7 +415,7 @@ tbody tr:hover td{background:#faf7f3;}
       </select></div>
     <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Origem</label>
       <select id="clientes-origem-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todas as origens</option><option>#Instagram ADS</option><option>Instagram Orgânico</option><option>WhatsApp Direto</option>
+        <option value="">Todas</option><option>#Instagram ADS</option><option>Instagram Orgânico</option><option>WhatsApp Direto</option>
       </select></div>
     <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tratamento</label>
       <select id="clientes-trat-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
@@ -431,9 +432,9 @@ tbody tr:hover td{background:#faf7f3;}
       <select id="clientes-aval-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
         <option value="">Todos</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
       </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próximo contato (min)</label>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próx. contato (min)</label>
       <input id="f-prox-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próximo contato (max)</label>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próx. contato (max)</label>
       <input id="f-prox-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
     <div style="display:flex;align-items:flex-end;">
       <button onclick="limparFiltros()" style="width:100%;background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:7px;cursor:pointer;font-size:12px;">Limpar filtros</button>
@@ -441,6 +442,7 @@ tbody tr:hover td{background:#faf7f3;}
   </div>
 </div>
 >
+</div>
 
 <!-- CLIENTE CARD (CRM) -->
 <div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
@@ -901,14 +903,16 @@ function filterClientesTable(){
   var trat=(document.getElementById('clientes-trat-filter')||{value:''}).value;
   var aval=(document.getElementById('clientes-aval-filter')||{value:''}).value;
   var filtered=clientesData.filter(function(r){
-    var nameMatch=!q&&!fnome||(r.name||'').toLowerCase().includes(q)||(r.name||'').toLowerCase().includes(fnome)||(r.phone||'').includes(q);
-    var telMatch=!ftel||(r.phone||'').includes(ftel);
+    var nm=(r.name||'').toLowerCase();
+    var ph=(r.phone||'');
+    var nameMatch=!q&&!fnome||nm.includes(q)||ph.includes(q)||nm.includes(fnome);
+    var telMatch=!ftel||ph.includes(ftel);
     var faseMatch=!fase||r.stage===fase;
     var origMatch=!orig||(r.origin||'')===orig;
     var fechou=isFechou(r.stage);
     var sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
-    var ph=String(r.phone||'').replace(/[^0-9]/g,'');
-    var d=_ccData[ph]||{orcamentos:[],atividades:[]};
+    var phn=ph.replace(/[^0-9]/g,'');
+    var d=_ccData[phn]||{orcamentos:[],atividades:[]};
     var orcs=d.orcamentos||[];
     var tratMatch=!trat||orcs.some(function(o){return o.tratamento===trat;});
     var avalMatch=!aval||orcs.some(function(o){return o.avaliador===aval;});
@@ -920,41 +924,33 @@ function filterClientesTable(){
     }
     var proxMatch=true;
     if(fproxMin||fproxMax){
-      var prox=d.atividades&&d.atividades.find(function(a){return a.proximo;});
-      if(!prox){proxMatch=false;}
-      else{
-        var dp=new Date(prox.proximo);
-        if(fproxMin&&dp<new Date(fproxMin))proxMatch=false;
-        if(fproxMax&&dp>new Date(fproxMax))proxMatch=false;
-      }
+      var prx=d.atividades&&d.atividades.find(function(a){return a.proximo;});
+      if(!prx){proxMatch=false;}
+      else{var dp=new Date(prx.proximo);if(fproxMin&&dp<new Date(fproxMin))proxMatch=false;if(fproxMax&&dp>new Date(fproxMax))proxMatch=false;}
     }
     return nameMatch&&telMatch&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dataMatch&&proxMatch;
   });
-  // Update summary cards
-  var totalAberto=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
-  var totalFech=clientesData.filter(function(r){return isFechou(r.stage);}).length;
-  var valOrc=0,valFech=0;
+  var taberto=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
+  var tfech=clientesData.filter(function(r){return isFechou(r.stage);}).length;
+  var vOrc=0,vFech=0;
   clientesData.forEach(function(r){
-    var ph=String(r.phone||'').replace(/[^0-9]/g,'');
-    var d=_ccData[ph]||{orcamentos:[]};
+    var phn=String(r.phone||'').replace(/[^0-9]/g,'');
+    var d=_ccData[phn]||{orcamentos:[]};
     (d.orcamentos||[]).forEach(function(o){
-      valOrc+=Number(o.valor)||0;
-      var fs=o.fechamentos||[];
-      if(fs.length>0)valFech+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));
+      vOrc+=Number(o.valor)||0;
+      var fs=o.fechamentos||[];if(fs.length>0)vFech+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));
     });
   });
-  var e1=document.getElementById('cli-total-aberto'); if(e1)e1.textContent=totalAberto;
-  var e2=document.getElementById('cli-total-fechado'); if(e2)e2.textContent=totalFech;
-  var e3=document.getElementById('cli-val-orcado'); if(e3)e3.textContent=fmtBRL(valOrc);
-  var e4=document.getElementById('cli-val-fechado'); if(e4)e4.textContent=fmtBRL(valFech);
-  // Update table
+  var e1=document.getElementById('cli-total-aberto');if(e1)e1.textContent=taberto;
+  var e2=document.getElementById('cli-total-fechado');if(e2)e2.textContent=tfech;
+  var e3=document.getElementById('cli-val-orcado');if(e3)e3.textContent=fmtBRL(vOrc);
+  var e4=document.getElementById('cli-val-fechado');if(e4)e4.textContent=fmtBRL(vFech);
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
   document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(function(r,fi){
-    var fechou=isFechou(r.stage);
-    var val=parseFloat(r.value||0);
-    var idx=clientesData.indexOf(r); if(idx<0)idx=fi;
-    var ph=String(r.phone||'').replace(/[^0-9]/g,'');
-    var d=_ccData[ph]||{orcamentos:[],atividades:[]};
+    var fechou=isFechou(r.stage);var val=parseFloat(r.value||0);
+    var idx=clientesData.indexOf(r);if(idx<0)idx=fi;
+    var phn=String(r.phone||'').replace(/[^0-9]/g,'');
+    var d=_ccData[phn]||{orcamentos:[],atividades:[]};
     var o0=d.orcamentos&&d.orcamentos[0];
     var px=d.atividades&&d.atividades.find(function(a){return a.proximo;});
     return '<tr style="cursor:pointer;" onclick="openClienteCard('+idx+')">'
@@ -971,39 +967,39 @@ function filterClientesTable(){
       +'</tr>';
   }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
+function toggleFiltros(){var el=document.getElementById('filtros-avancados');if(el)el.style.display=el.style.display==='none'?'block':'none';}
+function limparFiltros(){
+  ['f-nome','f-tel','f-data-min','f-data-max','f-prox-min','f-prox-max'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['clientes-fase-filter','clientes-origem-filter','clientes-sit-filter','clientes-trat-filter','clientes-aval-filter'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  filterClientesTable();
+}
+function fmtBRL(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 </script>
-
 
 <!-- TELA DE LOGIN -->
 <div id="login-screen" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f3f0;z-index:9999;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
     <div style="text-align:center;margin-bottom:32px;">
-      <div style="font-size:28px;font-weight:800;color:#2a2520;letter-spacing:-1px;">Bulhões</div>
+      <div style="font-size:28px;font-weight:800;color:#2a2520;">Bulhões</div>
       <div style="font-size:13px;color:#8a7a6a;margin-top:4px;">Odontologia · Dashboard</div>
     </div>
-    <div style="margin-bottom:16px;">
-      <label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Usuário</label>
-      <input id="login-user" type="text" placeholder="Seu usuário" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <div style="margin-bottom:24px;">
-      <label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Senha</label>
-      <input id="login-pass" type="password" placeholder="Sua senha" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
+    <div style="margin-bottom:16px;"><label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Usuário</label>
+      <input id="login-user" type="text" placeholder="Seu usuário" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div style="margin-bottom:24px;"><label style="font-size:12px;color:#8a7a6a;display:block;margin-bottom:6px;">Senha</label>
+      <input id="login-pass" type="password" placeholder="Sua senha" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button onclick="doLogin()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">Entrar</button>
     <div id="login-error" style="display:none;color:#c0392b;font-size:12px;text-align:center;margin-top:12px;">Usuário ou senha incorretos</div>
     <div style="text-align:center;margin-top:20px;font-size:11px;color:#aaa;">Acesso restrito · contate o administrador</div>
   </div>
 </div>
-
 <script>
-var USERS = [
-  { user: 'lucas',    pass: 'bulhoes2024',  role: 'admin',  nome: 'Lucas Bulhões' },
-  { user: 'victoria', pass: 'victoria123',  role: 'viewer', nome: 'Dra Victoria Mota' },
-  { user: 'larissa',  pass: 'larissa123',   role: 'viewer', nome: 'Dra Larissa Bulhões' },
-  { user: 'gabriela', pass: 'gabriela123',  role: 'viewer', nome: 'Dra Gabriela Vera' }
+var USERS=[
+  {user:'lucas',pass:'bulhoes2024',role:'admin',nome:'Lucas Bulhões'},
+  {user:'victoria',pass:'victoria123',role:'viewer',nome:'Dra Victoria Mota'},
+  {user:'larissa',pass:'larissa123',role:'viewer',nome:'Dra Larissa Bulhões'},
+  {user:'gabriela',pass:'gabriela123',role:'viewer',nome:'Dra Gabriela Vera'}
 ];
-var _currentUser = null;
-
+var _currentUser=null;
 function doLogin(){
   var u=document.getElementById('login-user').value.trim().toLowerCase();
   var p=document.getElementById('login-pass').value;
@@ -1011,38 +1007,20 @@ function doLogin(){
   if(found){
     _currentUser=found;
     document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-root').style.display='flex';
-    var el=document.getElementById('user-display');
-    if(el)el.textContent=found.nome;
-    if(found.role!=='admin'){
-      document.querySelectorAll('.admin-only').forEach(function(e){e.style.display='none';});
-    }
+    document.getElementById('app-root').style.display='block';
+    var el=document.getElementById('user-display');if(el)el.textContent=found.nome;
+    if(found.role!=='admin'){document.querySelectorAll('.admin-only').forEach(function(e){e.style.display='none';});}
+    loadTrafego();
   } else {
     document.getElementById('login-error').style.display='block';
   }
 }
-
 function doLogout(){
   _currentUser=null;
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-root').style.display='none';
   document.getElementById('login-user').value='';
   document.getElementById('login-pass').value='';
-}
-
-function toggleFiltros(){
-  var el=document.getElementById('filtros-avancados');
-  if(el)el.style.display=el.style.display==='none'?'block':'none';
-}
-
-function limparFiltros(){
-  ['f-nome','f-tel','f-data-min','f-data-max','f-prox-min','f-prox-max'].forEach(function(id){
-    var el=document.getElementById(id);if(el)el.value='';
-  });
-  ['clientes-fase-filter','clientes-origem-filter','clientes-sit-filter','clientes-trat-filter','clientes-aval-filter'].forEach(function(id){
-    var el=document.getElementById(id);if(el)el.value='';
-  });
-  filterClientesTable();
 }
 </script>
 
