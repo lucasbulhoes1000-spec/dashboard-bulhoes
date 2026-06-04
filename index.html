@@ -365,82 +365,817 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== CLIENTES PAGE ===== -->
     <div class="page" id="page-clientes">
-      
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center;">
-    <div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total não fechados</div><div id="cli-total-aberto" style="font-size:24px;font-weight:700;color:#2a2520;margin-top:4px;">0</div></div>
-    <div style="width:44px;height:44px;background:#fdecea;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">📋</div>
-  </div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center;">
-    <div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total fechados</div><div id="cli-total-fechado" style="font-size:24px;font-weight:700;color:#5a8a6a;margin-top:4px;">0</div></div>
-    <div style="width:44px;height:44px;background:#e8f5e9;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">✅</div>
-  </div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center;">
-    <div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Valor total orçado</div><div id="cli-val-orcado" style="font-size:16px;font-weight:700;color:#A18B6C;margin-top:4px;">R$ 0,00</div></div>
-    <div style="width:44px;height:44px;background:#fff8e1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">💰</div>
-  </div>
-  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center;">
-    <div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Valor total fechado</div><div id="cli-val-fechado" style="font-size:16px;font-weight:700;color:#5a8a6a;margin-top:4px;">R$ 0,00</div></div>
-    <div style="width:44px;height:44px;background:#e8f5e9;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;">💵</div>
-  </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Não fechados</div><div id="cli-total-aberto" style="font-size:22px;font-weight:700;color:#2a2520;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#fdecea;border-radius:8px;display:flex;align-items:center;justify-content:center;">📋</div></div>
+  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Fechados</div><div id="cli-total-fechado" style="font-size:22px;font-weight:700;color:#5a8a6a;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">✅</div></div>
+  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total orçado</div><div id="cli-val-orcado" style="font-size:14px;font-weight:700;color:#A18B6C;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#fff8e1;border-radius:8px;display:flex;align-items:center;justify-content:center;">💰</div></div>
+  <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10px;color:#8a7a6a;text-transform:uppercase;">Total fechado</div><div id="cli-val-fechado" style="font-size:14px;font-weight:700;color:#5a8a6a;margin-top:3px;">—</div></div><div style="width:40px;height:40px;background:#e8f5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;">💵</div></div>
 </div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-  <button onclick="toggleFiltros()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;">🔍 Filtros</button>
-  <input class="search-input" type="text" placeholder="Buscar por nome, telefone..." id="clientes-search" oninput="filterClientesTable()" style="flex:1;min-width:200px;">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+  <button onclick="toggleFiltros()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:600;">🔍 Filtros</button>
+  <input class="search-input" type="text" placeholder="Buscar por nome, telefone..." id="clientes-search" oninput="filterClientesTable()" style="flex:1;min-width:180px;">
   <span class="count-badge" id="clientes-count"></span>
-  <button onclick="exportarCRM()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">💾 Exportar</button>
-  <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">📂 Importar</button>
+  <button onclick="exportarCRM()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;">💾 Exportar</button>
+  <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;">📂 Importar</button>
   <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
 </div>
-<div id="filtros-avancados" style="display:none;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:16px;">
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome</label>
-      <input id="f-nome" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
-      <input id="f-tel" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data (min)</label>
-      <input id="f-data-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data (max)</label>
-      <input id="f-data-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
+<div id="filtros-avancados" style="display:none;background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:14px;margin-bottom:12px;">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Nome</label><input id="f-nome" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Telefone</label><input id="f-tel" type="text" oninput="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Data min</label><input id="f-data-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Data max</label><input id="f-data-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Fase</label>
-      <select id="clientes-fase-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todas as fases</option><option>Compareceu</option><option>Ganho</option><option>Faltou/desmarcou</option><option>Perdido</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Situação</label>
-      <select id="clientes-sit-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todas</option><option value="fechado">Fechou tratamento</option><option value="aberto">Não fechou</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Origem</label>
-      <select id="clientes-origem-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todas</option><option>#Instagram ADS</option><option>Instagram Orgânico</option><option>WhatsApp Direto</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tratamento</label>
-      <select id="clientes-trat-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todos</option>
-        <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option>
-        <option>#Endodontia</option><option>#Extração</option><option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option>
-        <option>#Lentes em Porcelana</option><option>#Lentes em Resina</option><option>#Lentes inferiores</option>
-        <option>#Lentes unitárias</option><option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option>
-        <option>#Reabilitação Oral</option><option>#Retrabalho</option>
-      </select></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Fase</label><select id="clientes-fase-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option>Compareceu</option><option>Ganho</option><option>Faltou/desmarcou</option><option>Perdido</option></select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Situação</label><select id="clientes-sit-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option value="fechado">Fechou</option><option value="aberto">Não fechou</option></select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Origem</label><select id="clientes-origem-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todas</option><option>#Instagram ADS</option><option>Instagram Orgânico</option><option>WhatsApp Direto</option></select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Tratamento</label><select id="clientes-trat-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todos</option><option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option><option>#Endodontia</option><option>#Extração</option><option>#Gengivoplastia</option><option>#HOF</option><option>#Implantes</option><option>#Lentes em Porcelana</option><option>#Lentes em Resina</option><option>#Lentes inferiores</option><option>#Lentes unitárias</option><option>#Paciente modelo</option><option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option><option>#Retrabalho</option></select></div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
-      <select id="clientes-aval-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;background:#fff;">
-        <option value="">Todos</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próx. contato (min)</label>
-      <input id="f-prox-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Próx. contato (max)</label>
-      <input id="f-prox-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="display:flex;align-items:flex-end;">
-      <button onclick="limparFiltros()" style="width:100%;background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:7px;cursor:pointer;font-size:12px;">Limpar filtros</button>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Avaliador</label><select id="clientes-aval-filter" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;"><option value="">Todos</option><option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option></select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Próx. contato min</label><input id="f-prox-min" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:2px;">Próx. contato max</label><input id="f-prox-max" type="date" onchange="filterClientesTable()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box;"></div>
+    <div style="display:flex;align-items:flex-end;"><button onclick="limparFiltros()" style="width:100%;background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:12px;">Limpar</button></div>
+  </div>
+</div>
+      <div class="table-card">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Nome</th>
+              <th>Data do registro</th>
+              <th>Telefone</th>
+              <th>Fase</th>
+              <th>Situação</th>
+              <th>Tratamento</th>
+              <th>Avaliador</th><th>Próx. Contato</th>
+              <th style="text-align:right">Valor orçado</th>
+              <th style="text-align:right">Valor fechado</th>
+            </tr></thead>
+            <tbody id="clientes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const META_TOKEN='EAASruBtHjI0BRlLDcNFXe4xQUV0UNPj97tWgfPkKsWIyZB3L0n1G7O7Q2asZBSigzkpThwANe3hyMZBlAi0zDTh4aoUk8ZAiZC7scOs4CLp9vNNZAKA6srleNxFdW6CiEZB90n9o7Ag3rlZCj2jD947Ch0gCySSqgFJg3DWsj76UHvzFAxRidLPfPi6xQiLt6WAZB1IFSfcnOds7f5i5n';
+const META_ACCOUNT='act_830126674734657';
+const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
+const SS_URL='https://script.google.com/macros/s/AKfycbzeG5LTe1C9t8vmlbNcMyL1c89uJdK4aWXvJ5fC_x5g58oBILMruTHvFP7XA82-Byik/exec';
+
+let currentPage='dashboard';
+let currentDashTab='trafego';
+let filters={trafego:'mes',social:'mes'};
+let customDates={trafego:{from:null,to:null},social:{from:null,to:null}};
+let ssChartInstance=null;
+let allCloudiaRows=[];
+let allSSRows=[];
+
+// PAGE NAVIGATION
+function switchPage(page,el){
+  currentPage=page;
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes'};
+  document.getElementById('topbar-title').textContent=titles[page];
+  if(page==='leads') renderLeads();
+  else if(page==='clientes') renderClientes();
+  else if(page==='financeiro') renderFinanceiro();
+  else reloadCurrent();
+}
+
+function switchDashTab(tab,el){
+  currentDashTab=tab;
+  document.querySelectorAll('.dash-tabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.dash-tab-content').forEach(c=>c.style.display='none');
+  document.getElementById('dash-'+tab).style.display='block';
+  reloadCurrent();
+}
+
+function reloadCurrent(){
+  if(currentPage!=='dashboard')return;
+  if(currentDashTab==='trafego')loadTrafego();
+  else loadSocial();
+}
+
+// FILTERS
+function setFilter(tab,f,el){
+  filters[tab]=f;
+  document.getElementById('filters-'+tab).querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(tab+'-dates').style.display=f==='personalizado'?'flex':'none';
+  if(f!=='personalizado')reloadCurrent();
+}
+
+function applyCustom(tab){
+  customDates[tab].from=document.getElementById(tab+'-from').value?new Date(document.getElementById(tab+'-from').value):null;
+  customDates[tab].to=document.getElementById(tab+'-to').value?new Date(document.getElementById(tab+'-to').value+'T23:59:59'):null;
+  if(customDates[tab].from&&customDates[tab].to)reloadCurrent();
+}
+
+function getRange(tab){
+  const now=new Date(),f=filters[tab];
+  if(f==='hoje'){const t=now.toISOString().split('T')[0];return{since:t,until:t};}
+  if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=y.toISOString().split('T')[0];return{since:t,until:t};}
+  if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:s.toISOString().split('T')[0],until:now.toISOString().split('T')[0]};}
+  if(f==='mes')return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
+  if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:fm.toISOString().split('T')[0],until:lm.toISOString().split('T')[0]};}
+  if(f==='personalizado'&&customDates[tab].from&&customDates[tab].to)return{since:customDates[tab].from.toISOString().split('T')[0],until:customDates[tab].to.toISOString().split('T')[0]};
+  return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
+}
+
+function filterByRange(rows,tab){
+  const r=getRange(tab);
+  const s=new Date(r.since),u=new Date(r.until+'T23:59:59');
+  return rows.filter(row=>{const d=new Date(row.timestamp||row.created_at||'');return!isNaN(d)&&d>=s&&d<=u;});
+}
+
+// HELPERS
+function fmt(n){return'R$ '+parseFloat(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtK(n){return n>=1000?'R$ '+(n/1000).toFixed(1)+'k':fmt(n);}
+function fmtN(n){return parseInt(n).toLocaleString('pt-BR');}
+function pct(a,b){return b>0?Math.round(a/b*100)+'%':'—';}
+function isAgend(s){if(!s)return false;const l=s.toLowerCase();return l==='agendou'||l.includes('agendou');}
+function isComp(s){if(!s)return false;const l=s.toLowerCase();return l==='compareceu'||l.includes('compareceu');}
+function isFaltou(s){if(!s)return false;const l=s.toLowerCase();return l==='faltou/desmarcou'||l.includes('faltou')||l.includes('desmarcou');}
+function isFechou(s){if(!s)return false;const l=s.toLowerCase();return l==='ganho'||l.includes('ganho');}
+function isPerdido(s){if(!s)return false;const l=s.toLowerCase();return l==='perdido'||l.includes('perdido');}
+function fmtDate(str){
+  if(!str)return'—';
+  const d=new Date(str);
+  if(isNaN(d))return str;
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+// ===== TRÁFEGO =====
+async function loadTrafego(){
+  document.getElementById('loading-trafego').style.display='flex';
+  document.getElementById('content-trafego').style.display='none';
+  try{
+    const[metaAds,cloudiaRows]=await Promise.all([fetchMeta(),fetchCloudia()]);
+    storeTrafegoData(metaAds,cloudiaRows);
+    _lastMetaAds=metaAds;
+    const filteredByOrigin=filterCloudiaByOrigin(filterByRange(cloudiaRows,'trafego'));
+    updateOrigemCount(filteredByOrigin);
+    renderTrafego(metaAds,filteredByOrigin);
+    document.getElementById('loading-trafego').style.display='none';
+    document.getElementById('content-trafego').style.display='block';
+    document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    document.getElementById('loading-trafego').style.display='none';
+    document.getElementById('content-trafego').style.display='block';
+    document.getElementById('error-trafego').textContent='Erro: '+e.message;
+    document.getElementById('error-trafego').style.display='block';
+  }
+}
+
+async function fetchMeta(){
+  if(typeof google!=='undefined'&&google.script){
+    return new Promise(resolve=>{
+      const range=getRange('trafego');
+      google.script.run
+        .withSuccessHandler(d=>{document.getElementById('badge-meta').textContent='⬤ Meta Ads — conectado';resolve(d||[]);})
+        .withFailureHandler(e=>{document.getElementById('badge-meta').textContent='⬤ Meta Ads — erro';resolve([]);})
+        .fetchMetaAds(range.since,range.until);
+    });
+  }
+  try{
+    const range=getRange('trafego');
+    const tr=encodeURIComponent(JSON.stringify(range));
+    const url=`https://graph.facebook.com/v18.0/${META_ACCOUNT}/insights?fields=ad_id,ad_name,adset_name,spend,impressions,clicks,actions&time_range=${tr}&level=ad&limit=100&access_token=${META_TOKEN}`;
+    const res=await fetch(url);const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+    document.getElementById('badge-meta').textContent='⬤ Meta Ads — conectado';
+    return data.data||[];
+  }catch(e){document.getElementById('badge-meta').textContent='⬤ Meta Ads — '+e.message.substring(0,30);return[];}
+}
+
+async function fetchCloudia(){
+  if(typeof google!=='undefined'&&google.script){
+    return new Promise(resolve=>{
+      google.script.run
+        .withSuccessHandler(raw=>{
+          if(!Array.isArray(raw)||raw.length<2){document.getElementById('badge-cloudia').textContent='⬤ Cloudia — aguardando dados';resolve([]);return;}
+          const h=raw[0];
+          const rows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;}).map(r=>{
+            if(r.ad_name&&String(r.ad_name).trim()!=='')r.origin='#Instagram ADS';
+            if(r.origin&&/^\d+$/.test(String(r.origin).trim())){const m={'4067':'Instagram Orgânico','2557':'WhatsApp Direto'};r.origin=m[String(r.origin).trim()]||'Conexão '+r.origin;}
+            return r;
+          });
+          allCloudiaRows=rows;_lastCloudiaRows=rows;
+          document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
+          resolve(rows);
+        })
+        .withFailureHandler(e=>{document.getElementById('badge-cloudia').textContent='⬤ Cloudia — erro';resolve([]);})
+        .fetchCloudia();
+    });
+  }
+  try{
+    const res=await fetch(CLOUDIA_URL);const raw=await res.json();
+    if(!Array.isArray(raw)||raw.length<2){document.getElementById('badge-cloudia').textContent='⬤ Cloudia — aguardando dados';return[];}
+    const h=raw[0];const rows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;}).map(r=>{
+      // Se veio por anúncio (ad_name preenchido), força origem como #Instagram ADS
+      if(r.ad_name&&r.ad_name.trim()!=='')r.origin='#Instagram ADS';
+      // Mapeia IDs numéricos de conexão para nomes legíveis
+      if(r.origin&&/^\d+$/.test(String(r.origin).trim())){
+        const origemMap={'4067':'Instagram Orgânico','2557':'WhatsApp Direto'};
+        r.origin=origemMap[String(r.origin).trim()]||'Conexão '+r.origin;
+      }
+      return r;
+    });
+    allCloudiaRows=rows;
+    _lastCloudiaRows=rows;
+    document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
+    return rows;
+  }catch(e){document.getElementById('badge-cloudia').textContent='⬤ Cloudia — erro';return[];}
+}
+
+function renderTrafego(metaAds,cloudiaRows){
+  const filtered=filterByRange(cloudiaRows,'trafego');
+  let spend=0,leads=0;const adMap={};
+  metaAds.forEach(ad=>{
+    const s=parseFloat(ad.spend||0);spend+=s;
+    let l=0;if(ad.actions)ad.actions.forEach(a=>{if(a.action_type==='lead'||a.action_type==='onsite_conversion.lead_grouped')l+=parseInt(a.value||0);});
+    leads+=l;
+    const rawKey=String(ad.ad_id||ad.ad_name||'Sem nome');
+    const key=String(parseInt(parseFloat(rawKey))||rawKey).substring(0,13);
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||rawKey,phones:new Set()};
+    adMap[key].spend+=s;
+    // leads contados do Cloudia abaixo, não da Meta
+  });
+  // Conta leads/agendamentos/comparecimentos do Cloudia por ad_id (só período filtrado)
+  filtered.forEach(r=>{
+    const rawAdName=String(r.ad_name||r.ad_id||'');
+    const key=rawAdName.replace(/\.\d+e\+\d+/,s=>String(parseInt(parseFloat(s)))).substring(0,13);
+    if(key&&adMap[key]){
+      if(!adMap[key].phones)adMap[key].phones=new Set();
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      if(ph){
+        adMap[key].phones.add(ph);
+        if(isAgend(r.stage))adMap[key].agend++;
+        if(isComp(r.stage))adMap[key].comp++;
+        if(isFechou(r.stage)){adMap[key].fechou++;adMap[key].vendas+=parseFloat(r.value||0);}
+      }
+    }
+  });
+  Object.values(adMap).forEach(d=>{d.leads=d.phones?d.phones.size:0;});
+  const origens={};
+  // Origens: conta telefones únicos por origem
+  const origenPhonesSeen={};
+  filtered.forEach(r=>{
+    const s=r.stage||'',an=r.ad_id||r.ad_name||'',val=parseFloat(r.value||0),org=r.origin||'—';
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    if(!origenPhonesSeen[org])origenPhonesSeen[org]=new Set();
+    if(ph)origenPhonesSeen[org].add(ph);
+    else origens[org]=(origens[org]||0);
+    if(an&&adMap[an]){if(isAgend(s))adMap[an].agend++;if(isComp(s))adMap[an].comp++;if(isFechou(s)){adMap[an].fechou++;adMap[an].vendas+=val;}}
+  });
+  // Converte Sets de origens em contagens de telefones únicos
+  Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
+  // Conta telefones únicos por etapa (mesma pessoa = 1 no funil)
+  const agendPhones=new Set(filtered.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const agend=agendPhones.size;
+  const compPhones=new Set(filtered.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const comp=compPhones.size;
+  const fechados=filtered.filter(r=>isFechou(r.stage));
+  const fechadosPhones=new Set(fechados.map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const contratos=fechadosPhones.size;
+  // Valor de vendas: máximo por telefone (evita duplicatas)
+  const vendasMap={};
+  fechados.forEach(r=>{const ph=String(r.phone||'').replace(/\D/g,'')||r.name;const v=parseFloat(r.value||0);if(!vendasMap[ph]||v>vendasMap[ph])vendasMap[ph]=v;});
+  const totalVendas=Object.values(vendasMap).reduce((s,v)=>s+v,0);
+  const totalOport=totalVendas; // oportunidades = vendas fechadas
+  const ticket=contratos>0?totalVendas/contratos:0;
+  const trafegoLeads=cloudiaRows.filter(r=>r.ad_name&&r.ad_name.trim()!=='');
+  // Leads únicos = telefones únicos (mesma pessoa pode ter várias etapas)
+  const uniquePhones=new Set(cloudiaRows.map(r=>String(r.phone||'').replace(/\D/g,'')).filter(p=>p));
+  const cloudiaLeadsCount=uniquePhones.size;
+  const uniqueTrafegoPhones=new Set(trafegoLeads.map(r=>String(r.phone||'').replace(/\D/g,'')).filter(p=>p));
+  const trafegoLeadsCount=uniqueTrafegoPhones.size;
+  const cpl=trafegoLeadsCount>0?spend/trafegoLeadsCount:leads>0?spend/leads:0,cpa=agend>0?spend/agend:0,cpcomp=comp>0?spend/comp:0,cpc2=contratos>0?spend/contratos:0;
+
+  document.getElementById('t-spend').textContent=fmt(spend);
+  // Usa leads reais do Cloudia como base principal
+  const leadsBase=cloudiaLeadsCount>0?cloudiaLeadsCount:leads;
+  const cplReal=leadsBase>0?spend/leadsBase:0;
+  document.getElementById('t-cpl').textContent=leadsBase>0?fmt(cplReal):'—';
+  document.getElementById('t-leads').innerHTML=fmtN(leadsBase)+' <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-leads-sub').textContent=cloudiaLeadsCount>0?'no Cloudia CRM':'Meta Ads';
+  document.getElementById('t-agend').innerHTML=(agend||'—')+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
+  document.getElementById('t-comp').innerHTML=(comp||'—')+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-comp-sub').textContent=pct(comp,agend)+' show rate';
+  document.getElementById('t-contratos').innerHTML=(contratos||'—')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
+  document.getElementById('t-conv').textContent=pct(contratos,leadsBase);
+  document.getElementById('t-cpa').textContent=agend>0?fmt(cpa):'—';
+  document.getElementById('t-cpcomp').textContent=comp>0?fmt(cpcomp):'—';
+  document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2):'—';
+  // Total entradas: soma entradas dos orçamentos do _ccData
+  let totalEntradas=0;
+  if(window._ccData){
+    Object.values(window._ccData).forEach(d=>{
+      (d.orcamentos||[]).forEach(o=>totalEntradas+=o.entrada||0);
+    });
+  }
+  document.getElementById('t-oport').textContent=totalOport>0?fmt(totalOport):'—';
+  document.getElementById('t-vendas').textContent=totalVendas>0?fmt(totalVendas):'—';
+  document.getElementById('t-entradas').textContent=totalEntradas>0?fmt(totalEntradas):'—';
+  window._updateDashEntradas=function(){
+    let te=0;Object.values(window._ccData||{}).forEach(dd=>(dd.orcamentos||[]).forEach(o=>te+=o.entrada||0));
+    const el=document.getElementById('t-entradas');if(el)el.textContent=te>0?fmt(te):'—';
+  };
+  document.getElementById('t-ticket').textContent=ticket>0?fmt(ticket):'—';
+
+  const maxF=Math.max(leads,agend,comp,contratos,1);
+  document.getElementById('t-funnel').innerHTML=[
+    {label:'Leads',val:leadsBase,pct:'',color:'#A18B6C'},
+    {label:'Agendamentos',val:agend,pct:pct(agend,leadsBase),color:'#8a7358'},
+    {label:'Comparecimentos',val:comp,pct:pct(comp,agend),color:'#6b5940'},
+    {label:'Contratos',val:contratos,pct:pct(contratos,comp),color:'#4a3d2b'},
+  ].map(f=>`<div class="frow"><span class="fl">${f.label}</span><div class="fw"><div class="fb2" style="width:${Math.max(f.val/maxF*100,f.val>0?4:0)}%;background:${f.color};"><span class="fn">${f.val||0}</span></div></div><span class="fp">${f.pct}</span></div>`).join('');
+
+  const totalO=Object.values(origens).reduce((a,b)=>a+b,0)||1;
+  document.getElementById('t-origem').innerHTML=Object.entries(origens).sort((a,b)=>b[1]-a[1]).map(([o,n])=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="font-size:11px;color:#9a8c7e;width:90px;text-align:right;flex-shrink:0;">${o}</span>
+      <div style="flex:1;background:#ede6dc;border-radius:3px;height:18px;overflow:hidden;">
+        <div style="width:${Math.max(n/totalO*100,4)}%;height:100%;background:#A18B6C;border-radius:3px;display:flex;align-items:center;padding-left:6px;">
+          <span style="font-size:10px;font-weight:500;color:#fff;">${n}</span>
+        </div>
+      </div>
+      <span style="font-size:10px;color:#b5a898;width:32px;text-align:right;">${Math.round(n/totalO*100)}%</span>
+    </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
+
+  // DEBUG TEMPORÁRIO — remove depois
+  const debugEl=document.getElementById('debug-ad');
+  if(debugEl){
+    const metaIds=Object.keys(adMap).slice(0,3).join(' | ');
+    const cloudiaIds=[...new Set(cloudiaRows.map(r=>r.ad_name||'').filter(x=>x))].slice(0,3).join(' | ');
+    debugEl.textContent='Meta IDs: '+metaIds+' /// Cloudia ad_names: '+cloudiaIds;
+  }
+  window._lastAdMap=adMap;
+  const adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
+  document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?adRows.map(([name,d])=>{
+    const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
+    const adCpcomp=d.comp>0?d.spend/d.comp:0,adCpc=d.fechou>0?d.spend/d.fechou:0;
+    const adTicket=d.fechou>0?d.vendas/d.fechou:0;
+    return`<tr>
+      <td><span class="pill">${(d.label||name).substring(0,24)}${(d.label||name).length>24?'...':''}</span></td>
+      <td class="tm">${(d.adset||'').substring(0,20)}${(d.adset||'').length>20?'...':''}</td>
+      <td style="text-align:right" class="ta">${fmtK(d.spend)}</td>
+      <td style="text-align:right" class="ta">${d.leads>0?fmt(adCpl):'—'}</td>
+      <td style="text-align:right">${d.leads>0?d.leads+' <button class="lupa" onclick="lupaAdLeads(\''+name+'\')" title="Ver leads">🔍</button>':'—'}</td>
+      <td style="text-align:right">${d.agend||'—'}</td>
+      <td style="text-align:right" class="ta">${d.agend>0?fmt(adCpa):'—'}</td>
+      <td style="text-align:right">${d.comp||'—'}</td>
+      <td style="text-align:right" class="ta">${d.comp>0?fmt(adCpcomp):'—'}</td>
+      <td style="text-align:right" class="tg">${d.fechou||'—'}</td>
+      <td style="text-align:right" class="ta">${d.fechou>0?fmt(adCpc):'—'}</td>
+      <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas):'—'}</td>
+      <td style="text-align:right" class="tg">${adTicket>0?fmt(adTicket):'—'}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="13" class="empty-state">Aguardando dados dos anúncios...</td></tr>';
+}
+
+// ===== SOCIAL SELLING =====
+async function loadSocial(){
+  document.getElementById('loading-social').style.display='flex';
+  document.getElementById('content-social').style.display='none';
+  try{
+    const res=await fetch(SS_URL);const raw=await res.json();
+    if(!Array.isArray(raw)||raw.length<2){
+      document.getElementById('badge-ss').textContent='⬤ Google Sheets — aguardando dados';
+      allSSRows=[];
+    }else{
+      const h=raw[0];allSSRows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});
+      document.getElementById('badge-ss').textContent='⬤ Google Sheets — '+allSSRows.length+' registros';
+    }
+    renderSocial(allSSRows);
+    document.getElementById('loading-social').style.display='none';
+    document.getElementById('content-social').style.display='block';
+    document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    document.getElementById('loading-social').style.display='none';
+    document.getElementById('content-social').style.display='block';
+    document.getElementById('error-social').textContent='Erro: '+e.message;
+    document.getElementById('error-social').style.display='block';
+  }
+}
+
+function parseDateSS(raw){
+  if(!raw)return null;
+  const s=String(raw).trim();
+  const p=s.split('/');
+  if(p.length===3){const d=new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));return isNaN(d)?null:d;}
+  const d=new Date(s);return isNaN(d)?null:d;
+}
+
+function renderSocial(rows){
+  const metaAgend=parseInt(localStorage.getItem('ssMetaAgend')||'22');
+  const range=getRange('social');
+  const s=new Date(range.since),u=new Date(range.until+'T23:59:59');
+  const filtered=rows.filter(r=>{const d=parseDateSS(r['DATA']||r['data']);return d&&d>=s&&d<=u;});
+  let abord=0,resp=0,follow=0,agend=0,comp=0,vendas=0,desq=0;
+  const tipos={},tipoAgend={},resultados={};
+  filtered.forEach(r=>{
+    abord++;
+    const rs=(r['RESPONDEU?']||'').toString().toUpperCase();
+    const tipo=(r['TIPO']||'').toString().trim();
+    const res=(r['RESULTADO']||'').toString().toUpperCase().trim();
+    const fol=parseFloat(r['Tentativas de Follow']||0);
+    if(rs==='SIM')resp++;follow+=fol;
+    if(res.includes('AGENDADO'))agend++;if(res.includes('COMPARECEU'))comp++;
+    if(res.includes('VENDA'))vendas++;if(res.includes('DESQUALIFICADO'))desq++;
+    if(tipo){tipos[tipo]=(tipos[tipo]||0)+1;if(res.includes('AGENDADO'))tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;}
+    if(res)resultados[res]=(resultados[res]||0)+1;
+  });
+  const txResp=abord>0?Math.round(resp/abord*100):0;
+  const txAgend=resp>0?Math.round(agend/resp*100):0;
+  const showRate=agend>0?Math.round(comp/agend*100):0;
+  const txVenda=comp>0?Math.round(vendas/comp*100):0;
+  const conv=abord>0?(vendas/abord*100).toFixed(1):'0.0';
+  const metaPct=metaAgend>0?Math.min(Math.round(agend/metaAgend*100),100):0;
+  document.getElementById('ss-abord').textContent=abord;
+  document.getElementById('ss-resp').textContent=resp;
+  document.getElementById('ss-resp-sub').textContent=txResp+'% tx. resposta';
+  document.getElementById('ss-follow').textContent=Math.round(follow);
+  document.getElementById('ss-agend').textContent=agend;
+  document.getElementById('ss-agend-sub').textContent=txAgend+'% das resp.';
+  document.getElementById('ss-comp').textContent=comp;
+  document.getElementById('ss-comp-sub').textContent=showRate+'% show rate';
+  document.getElementById('ss-vendas').textContent=vendas;
+  document.getElementById('ss-vendas-sub').textContent=txVenda+'% fechamento';
+  document.getElementById('ss-desq').textContent=desq;
+  document.getElementById('ss-conv').textContent=conv+'%';
+  document.getElementById('ss-meta-numbers').innerHTML=agend+' / '+metaAgend+' <span style="color:#b5a898;font-size:10px;">('+metaPct+'%)</span>';
+  const bar=document.getElementById('ss-meta-bar');bar.style.width=metaPct+'%';
+  bar.className='progress-fill'+(metaPct<30?' danger':metaPct<60?' warn':'');
+  const maxF=abord||1;
+  document.getElementById('ss-funnel').innerHTML=[
+    {label:'Abordagens',val:abord,pct:'',color:'#A18B6C'},
+    {label:'Respostas',val:resp,pct:txResp+'%',color:'#8a7358'},
+    {label:'Agendamentos',val:agend,pct:txAgend+'%',color:'#6b5940'},
+    {label:'Comparecimentos',val:comp,pct:showRate+'%',color:'#CCBCA6'},
+    {label:'Vendas',val:vendas,pct:txVenda+'%',color:'#9a7d5a'},
+  ].map(f=>`<div class="frow"><span class="fl">${f.label}</span><div class="fw"><div class="fb2" style="width:${Math.max(f.val/maxF*100,f.val>0?4:0)}%;background:${f.color};"><span class="fn">${f.val}</span></div></div><span class="fp">${f.pct}</span></div>`).join('');
+  const maxConv=Math.max(...Object.keys(tipos).map(t=>tipos[t]>0?(tipoAgend[t]||0)/tipos[t]*100:0),1);
+  const icons={'Seguidor':'👥','Curtida':'❤️','Comentário':'💬','Enquete/Reação':'📊','Stories':'⭕'};
+  document.getElementById('ss-tipos').innerHTML=Object.entries(tipos).sort((a,b)=>((tipoAgend[b[0]]||0)/b[1])-((tipoAgend[a[0]]||0)/a[1])).map(([t,n])=>{
+    const cv=n>0?Math.round((tipoAgend[t]||0)/n*100):0;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid #ede6dc;">
+      <span style="font-size:11px;color:#5a4e44;width:130px;flex-shrink:0;">${icons[t]||'•'} ${t} <span style="color:#b5a898;font-size:10px;">(${n})</span></span>
+      <div style="flex:1;background:#ede6dc;border-radius:3px;height:14px;overflow:hidden;"><div style="width:${Math.max(cv/maxConv*100,2)}%;height:100%;background:#A18B6C;border-radius:3px;"></div></div>
+      <span style="font-size:11px;font-weight:500;color:#A18B6C;width:34px;text-align:right;">${cv}%</span>
+    </div>`;
+  }).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
+  const resColors={'FOLLOW UP 1':'#CCBCA6','FOLLOW UP 2':'#A18B6C','FOLLOW UP 3':'#8a7358','AGENDADO':'#6b5940','COMPARECEU':'#b0a090','VENDA':'#5a8a6a','DESQUALIFICADO':'#b5856a'};
+  const resEntries=Object.entries(resultados).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('ss-result-legend').innerHTML=resEntries.map(([k,v])=>`<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#9a8c7e;"><span style="width:10px;height:10px;border-radius:2px;background:${resColors[k]||'#888'};flex-shrink:0;display:inline-block;"></span>${k.charAt(0)+k.slice(1).toLowerCase()} (${v})</span>`).join('');
+  if(ssChartInstance)ssChartInstance.destroy();
+  if(resEntries.length>0)ssChartInstance=new Chart(document.getElementById('ss-result-chart'),{type:'doughnut',data:{labels:resEntries.map(([k])=>k),datasets:[{data:resEntries.map(([,v])=>v),backgroundColor:resEntries.map(([k])=>resColors[k]||'#888'),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+}
+
+// ===== LEADS PAGE =====
+let leadsData=[];
+function renderLeads(){
+  if(allCloudiaRows.length===0){
+    fetchCloudia().then(()=>renderLeadsTable());
+  }else{
+    renderLeadsTable();
+  }
+}
+
+function renderLeadsTable(){
+  // Só mostra Lead e Agendou — Compareceu+ vai para Clientes
+  leadsData=[...allCloudiaRows].filter(r=>{
+    const s=(r.stage||'').toLowerCase();
+    return s===''||s==='lead'||s.includes('agendou');
+  }).sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0));
+  const origens=[...new Set(leadsData.map(r=>r.origin||'—').filter(Boolean))].sort();
+  const sel=document.getElementById('leads-origem-filter');
+  sel.innerHTML='<option value="">Todas as origens</option>'+origens.map(o=>`<option value="${o}">${o}</option>`).join('');
+  filterLeadsTable();
+}
+
+function filterLeadsTable(){
+  const q=document.getElementById('leads-search').value.toLowerCase();
+  const orig=document.getElementById('leads-origem-filter').value;
+  const filtered=leadsData.filter(r=>{
+    const match=!q||(r.name||'').toLowerCase().includes(q)||(r.phone||'').includes(q)||(r.origin||'').toLowerCase().includes(q);
+    const origMatch=!orig||(r.origin||'')=== orig;
+    return match&&origMatch;
+  });
+  document.getElementById('leads-count').textContent=filtered.length+' leads';
+  document.getElementById('leads-tbody').innerHTML=filtered.length>0?filtered.map(r=>`
+    <tr>
+      <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
+      <td class="tm">${fmtDate(r.timestamp||r.created_at)}</td>
+      <td>${r.phone||'—'}</td>
+      <td><span class="origem-pill">${r.origin||'—'}</span></td>
+    </tr>`).join(''):'<tr><td colspan="4" class="empty-state">Nenhum lead encontrado</td></tr>';
+}
+
+// ===== CLIENTES PAGE =====
+let clientesData=[];
+function renderClientes(){
+  if(allCloudiaRows.length===0){
+    fetchCloudia().then(()=>renderClientesTable());
+  }else{
+    renderClientesTable();
+  }
+}
+
+function renderClientesTable(){
+  const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;if(l.includes('lead'))return 1;return 0;};
+  // Atualiza filtros
+  const fasesSel=document.getElementById('clientes-fase-filter');
+  if(fasesSel){fasesSel.innerHTML='<option value="">Todas as fases</option>';[...new Set(clientesData.map(r=>r.stage||'').filter(Boolean))].sort().forEach(f=>fasesSel.add(new Option(f,f)));}
+  const origSel=document.getElementById('clientes-origem-filter');
+  if(origSel){origSel.innerHTML='<option value="">Todas as origens</option>';[...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));}
+  // Deduplicar por telefone: mantém stage mais avançado, soma valores
+  const phoneMap={};
+  allCloudiaRows.filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name||Math.random();
+    if(!phoneMap[ph]||stageRank(r.stage)>stageRank(phoneMap[ph].stage)){
+      phoneMap[ph]={...r};
+    }
+    // Acumula valor máximo (não soma duplicatas)
+    const v=parseFloat(r.value||0);
+    if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
+  });
+  clientesData=Object.values(phoneMap).sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
+  filterClientesTable();
+}
+
+function filterClientesTable(){
+  const q=document.getElementById('clientes-search').value.toLowerCase();
+  const fase=document.getElementById('clientes-fase-filter').value;
+  const orig=(document.getElementById('clientes-origem-filter')||{}).value||'';
+  const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
+  const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
+  const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
+  const filtered=clientesData.filter(r=>{
+    const match=!q||(r.name||'').toLowerCase().includes(q)||(r.phone||'').includes(q);
+    const faseMatch=!fase||r.stage===fase;
+    const origMatch=!orig||(r.origin||'')===orig;
+    const fechou=isFechou(r.stage);
+    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=window._ccData&&window._ccData[ph];
+    const orcs=d?d.orcamentos||[]:[];
+    const tratMatch=!trat||orcs.some(o=>o.tratamento===trat);
+    const avalMatch=!aval||orcs.some(o=>(o.avaliador||'').includes(aval.split(' ').pop()));
+    return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch;
+  });
+  document.getElementById('clientes-count').textContent=filtered.length+' clientes';
+  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map((r,fi)=>{
+    const fechou=isFechou(r.stage);
+    const val=parseFloat(r.value||0);
+    const idx=clientesData.indexOf(r);
+    return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx>=0?idx:fi})">
+      <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
+      <td class="tm">${fmtDate(r.timestamp)}</td>
+      <td>${r.phone||'—'}</td>
+      <td>${r.stage||'—'}</td>
+      <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
+      <td style="font-size:12px;">${(()=>{const ph=String(r.phone||'').replace(/\D/g,'');const d=window._ccData&&window._ccData[ph];const o=(d&&d.orcamentos&&d.orcamentos[0]);return o&&o.tratamento?o.tratamento:'—';})()}</td>
+      <td style="font-size:12px;">${(()=>{const ph=String(r.phone||'').replace(/\D/g,'');const d=window._ccData&&window._ccData[ph];const o=(d&&d.orcamentos&&d.orcamentos[0]);return o&&o.avaliador?o.avaliador:'—';})()}</td>
+      <td style="text-align:right" class="tm">${val>0?fmt(val):'—'}</td>
+      <td style="text-align:right" class="tg">${fechou&&val>0?fmt(val):'—'}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="9" class="empty-state">Nenhum cliente encontrado</td></tr>';
+}
+
+
+// LUPA FUNCTIONS
+let _lastMetaAds = [];
+let _lastCloudiaFiltered = [];
+
+// Store data for lupas without overriding renderTrafego
+function storeTrafegoData(metaAds, cloudiaRows) {
+  _lastMetaAds = metaAds;
+  _lastCloudiaFiltered = filterByRange(cloudiaRows, 'trafego');
+}
+
+function lupaAdLeads(adKey) {
+  const adInfo = _lastAdMap && _lastAdMap[adKey];
+  const label = adInfo ? (adInfo.label||adKey) : adKey;
+  const rows = _lastCloudiaFiltered
+    .filter(r => {
+      const rawAdName=String(r.ad_name||r.ad_id||'');
+      const key=rawAdName.replace(/\.\d+e\+\d+/,s=>String(parseInt(parseFloat(s)))).substring(0,13);
+      return key===adKey;
+    })
+    .map(r => [fmtDate(r.created_at||r.timestamp), r.name||'—', r.phone||'—', r.stage||'—'])
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  openModal('Leads — '+label.substring(0,30), ['Data','Nome','Telefone','Etapa'], rows);
+}
+
+function lupaLeads() {
+  const headers = ['Data de cadastro','Nome','Telefone','Origem'];
+  const rows = _lastCloudiaFiltered
+    .map(r => [fmtDate(r.created_at||r.timestamp), r.name||'—', r.phone||'—', r.origin||'—'])
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  openModal('Leads — '+rows.length+' registros', headers, rows);
+}
+
+function getStatusAgend(stage) {
+  if(!stage) return '—';
+  const s = stage.toLowerCase();
+  if(s==='compareceu'||s.includes('compareceu')) return '<span style="color:#5a8a6a;font-weight:500;">✓ Compareceu</span>';
+  if(s==='faltou/desmarcou'||s.includes('faltou')||s.includes('desmarcou')) return '<span style="color:#b5856a;font-weight:500;">✗ Faltou/Desmarcou</span>';
+  if(s==='agendou'||s.includes('agendou')) return '<span style="color:#A18B6C;font-weight:500;">⏳ Agendado</span>';
+  if(s==='ganho'||s.includes('ganho')) return '<span style="color:#5a8a6a;font-weight:500;">✓ Ganho</span>';
+  if(s==='perdido'||s.includes('perdido')) return '<span style="color:#b5856a;font-weight:500;">✗ Perdido</span>';
+  return stage;
+}
+
+function lupaAgend() {
+  const rows = _lastCloudiaFiltered
+    .filter(r => isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage))
+    .map(r => [fmtDate(r.created_at||r.timestamp), r.name||'—', r.phone||'—', r.origin||'—', getStatusAgend(r.stage)])
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  openModal('Agendamentos — '+rows.length+' registros', ['Data de cadastro','Nome','Telefone','Origem','Status'], rows);
+}
+
+function lupaComp() {
+  // Comparecimentos / Oportunidades: Data cadastro, Nome, Telefone, Origem, Data da consulta
+  const rows = _lastCloudiaFiltered
+    .filter(r => isComp(r.stage)||isFechou(r.stage))
+    .map(r => [fmtDate(r.created_at||r.timestamp), r.name||'—', r.phone||'—', r.origin||'—', fmtDate(r.timestamp)])
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  openModal('Oportunidades — '+rows.length+' registros', ['Data de cadastro','Nome','Telefone','Origem','Data da consulta'], rows);
+}
+
+function lupaContratos() {
+  // Fechamentos: Data cadastro, Nome, Telefone, Origem, Valor orçado, Valor fechado
+  const rows = _lastCloudiaFiltered
+    .filter(r => isFechou(r.stage))
+    .map(r => {
+      const val = parseFloat(r.value||0);
+      return [fmtDate(r.created_at||r.timestamp), r.name||'—', r.phone||'—', r.origin||'—', val>0?fmt(val):'—', val>0?fmt(val):'—'];
+    })
+    .sort((a,b) => new Date(b[0]) - new Date(a[0]));
+  openModal('Fechamentos — '+rows.length+' registros', ['Data de cadastro','Nome','Telefone','Origem','Valor orçado','Valor fechado'], rows);
+}
+
+
+// ORIGIN FILTER
+let _origemFilter = '';
+function applyOrigemFilter() {
+  _origemFilter = document.getElementById('origem-filter').value.toLowerCase();
+  if(_lastCloudiaRows.length > 0 || _lastMetaAds.length > 0) {
+    const filtered = filterCloudiaByOrigin(filterByRange(_lastCloudiaRows, 'trafego'));
+    renderTrafego(_lastMetaAds, filtered);
+    updateOrigemCount(filtered);
+  }
+}
+
+function filterCloudiaByOrigin(rows) {
+  if(!_origemFilter) return rows;
+  return rows.filter(r => {
+    const org = (r.origin||r.acquisitionOrigin||'').toLowerCase();
+    if(_origemFilter === 'instagram ads') return org.includes('instagram');
+    if(_origemFilter === 'organico') return org.includes('organ') || org === '#orgânico' || org === 'organico';
+    if(_origemFilter === 'facebook ads') return org.includes('facebook');
+    if(_origemFilter === 'social selling') return org.includes('social');
+    return true;
+  });
+}
+
+function updateOrigemCount(rows) {
+  const el = document.getElementById('origem-count');
+  if(el) el.textContent = _origemFilter ? rows.length + ' leads filtrados' : '';
+}
+
+let _lastCloudiaRows = [];
+let _lastMetaAds2 = [];
+
+// FINANCEIRO
+function renderFinanceiro() {
+  const now = new Date();
+  const months = [];
+  for(let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: d.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}),
+      since: new Date(d.getFullYear(), d.getMonth(), 1),
+      until: new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59)
+    });
+  }
+
+  // Use last loaded meta and cloudia data
+  let totalSpend = 0, totalLeads = 0;
+  _lastMetaAds.forEach(ad => {
+    totalSpend += parseFloat(ad.spend||0);
+    if(ad.actions) ad.actions.forEach(a => {
+      if(a.action_type==='lead'||a.action_type==='onsite_conversion.lead_grouped') totalLeads += parseInt(a.value||0);
+    });
+  });
+
+  const allCloudia = _lastCloudiaRows;
+  const fechados = allCloudia.filter(r => isFechou(r.stage));
+  const agendados = allCloudia.filter(r => isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage));
+  const comparecidos = allCloudia.filter(r => isComp(r.stage)||isFechou(r.stage));
+  let totalVendas = 0;
+  fechados.forEach(r => totalVendas += parseFloat(r.value||0));
+
+  const roas = totalSpend > 0 ? (totalVendas/totalSpend).toFixed(1)+'x' : '—';
+  const cpl = totalLeads > 0 ? fmt(totalSpend/totalLeads) : '—';
+  const cpa = agendados.length > 0 ? fmt(totalSpend/agendados.length) : '—';
+  const cpc = fechados.length > 0 ? fmt(totalSpend/fechados.length) : '—';
+  const ticket = fechados.length > 0 ? fmt(totalVendas/fechados.length) : '—';
+  const totalOport = allCloudia.reduce((s,r) => s+parseFloat(r.value||0), 0);
+
+  document.getElementById('fin-invest').textContent = fmtK(totalSpend);
+  document.getElementById('fin-vendas').textContent = totalVendas > 0 ? fmtK(totalVendas) : '—';
+  document.getElementById('fin-roas').textContent = roas;
+  document.getElementById('fin-cpl').textContent = cpl;
+  document.getElementById('fin-leads-sub').textContent = totalLeads + ' leads gerados';
+  document.getElementById('fin-cpa').textContent = cpa;
+  document.getElementById('fin-cpc').textContent = cpc;
+  document.getElementById('fin-ticket').textContent = ticket;
+  document.getElementById('fin-oport').textContent = totalOport > 0 ? fmtK(totalOport) : '—';
+  document.getElementById('fin-contratos').textContent = fechados.length || '—';
+  document.getElementById('fin-contratos-sub').textContent = comparecidos.length > 0 ? pct(fechados.length, comparecidos.length)+' de fechamento' : 'de fechamento';
+
+  // Monthly table
+  document.getElementById('fin-monthly-tbody').innerHTML = months.map(m => {
+    const mRows = allCloudia.filter(r => {
+      const d = new Date(r.created_at||r.timestamp||'');
+      return !isNaN(d) && d >= m.since && d <= m.until;
+    });
+    const mFechou = mRows.filter(r => isFechou(r.stage));
+    const mAgend = mRows.filter(r => isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage));
+    const mComp = mRows.filter(r => isComp(r.stage)||isFechou(r.stage));
+    let mVendas = 0; mFechou.forEach(r => mVendas += parseFloat(r.value||0));
+    return `<tr>
+      <td style="font-weight:500;">${m.label}</td>
+      <td style="text-align:right" class="ta">—</td>
+      <td style="text-align:right">—</td>
+      <td style="text-align:right" class="ta">—</td>
+      <td style="text-align:right">${mAgend.length||'—'}</td>
+      <td style="text-align:right">${mComp.length||'—'}</td>
+      <td style="text-align:right" class="tg">${mFechou.length||'—'}</td>
+      <td style="text-align:right" class="tg">${mVendas>0?fmtK(mVendas):'—'}</td>
+      <td style="text-align:right">${mVendas>0&&totalSpend>0?(mVendas/totalSpend*months.length).toFixed(1)+'x':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// INIT - carregado após login
+</script>
+
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Leads</span>
+      <span class="modal-close" onclick="closeModal()">✕</span>
+    </div>
+    <div class="modal-body">
+      <table class="modal-table">
+        <thead><tr id="modal-thead"></tr></thead>
+        <tbody id="modal-tbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
->
+
+<script>
+function openModal(title, headers, rows) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-thead').innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+  document.getElementById('modal-tbody').innerHTML = rows.length > 0
+    ? rows.map(r => `<tr>${r.map(c => `<td>${c||'—'}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="${headers.length}" class="modal-empty">Nenhum registro encontrado</td></tr>`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalOutside(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+
+function showLeadsModal(metaAds) {
+  const headers = ['Anúncio', 'Leads', 'Investimento', 'CPL'];
+  const rows = metaAds.map(ad => {
+    let l=0; if(ad.actions) ad.actions.forEach(a=>{if(a.action_type==='lead'||a.action_type==='onsite_conversion.lead_grouped')l+=parseInt(a.value||0);});
+    const s=parseFloat(ad.spend||0);
+    return [ad.ad_name||'—', l, 'R$ '+s.toFixed(2), l>0?'R$ '+(s/l).toFixed(2):'—'];
+  }).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1]);
+  openModal('Leads por anúncio', headers, rows);
+}
+
+function showCloudiaModal(title, rows, headers) {
+  openModal(title, headers, rows);
+}
+</script>
 
 <!-- CLIENTE CARD (CRM) -->
 <div id="cliente-card-overlay" onclick="closeClienteCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
@@ -891,75 +1626,48 @@ function filterClientesTable(){
   var q=(document.getElementById('clientes-search')||{value:''}).value.toLowerCase();
   var fnome=(document.getElementById('f-nome')||{value:''}).value.toLowerCase();
   var ftel=(document.getElementById('f-tel')||{value:''}).value;
-  var fdataMin=(document.getElementById('f-data-min')||{value:''}).value;
-  var fdataMax=(document.getElementById('f-data-max')||{value:''}).value;
-  var fproxMin=(document.getElementById('f-prox-min')||{value:''}).value;
-  var fproxMax=(document.getElementById('f-prox-max')||{value:''}).value;
+  var fdMin=(document.getElementById('f-data-min')||{value:''}).value;
+  var fdMax=(document.getElementById('f-data-max')||{value:''}).value;
+  var fpMin=(document.getElementById('f-prox-min')||{value:''}).value;
+  var fpMax=(document.getElementById('f-prox-max')||{value:''}).value;
   var fase=(document.getElementById('clientes-fase-filter')||{value:''}).value;
   var orig=(document.getElementById('clientes-origem-filter')||{value:''}).value;
   var sit=(document.getElementById('clientes-sit-filter')||{value:''}).value;
   var trat=(document.getElementById('clientes-trat-filter')||{value:''}).value;
   var aval=(document.getElementById('clientes-aval-filter')||{value:''}).value;
   var filtered=clientesData.filter(function(r){
-    var nm=(r.name||'').toLowerCase();var ph=(r.phone||'');
-    var nameMatch=!q&&!fnome||nm.includes(q)||ph.includes(q)||nm.includes(fnome);
-    var telMatch=!ftel||ph.includes(ftel);
-    var faseMatch=!fase||r.stage===fase;
-    var origMatch=!orig||(r.origin||'')===orig;
+    var nm=(r.name||'').toLowerCase(),ph=(r.phone||'');
+    if(q&&!nm.includes(q)&&!ph.includes(q))return false;
+    if(fnome&&!nm.includes(fnome))return false;
+    if(ftel&&!ph.includes(ftel))return false;
+    if(fase&&r.stage!==fase)return false;
+    if(orig&&(r.origin||'')!==orig)return false;
     var fechou=isFechou(r.stage);
-    var sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
+    if(sit==='fechado'&&!fechou)return false;
+    if(sit==='aberto'&&fechou)return false;
     var phn=ph.replace(/[^0-9]/g,'');
     var d=_ccData[phn]||{orcamentos:[],atividades:[]};
-    var tratMatch=!trat||(d.orcamentos||[]).some(function(o){return o.tratamento===trat;});
-    var avalMatch=!aval||(d.orcamentos||[]).some(function(o){return o.avaliador===aval;});
-    var dataMatch=true;
-    if(fdataMin||fdataMax){var dt=new Date(r.created_at||r.timestamp||0);if(fdataMin&&dt<new Date(fdataMin))dataMatch=false;if(fdataMax&&dt>new Date(fdataMax+'T23:59:59'))dataMatch=false;}
-    var proxMatch=true;
-    if(fproxMin||fproxMax){var prx=d.atividades&&d.atividades.find(function(a){return a.proximo;});if(!prx){proxMatch=false;}else{var dp=new Date(prx.proximo);if(fproxMin&&dp<new Date(fproxMin))proxMatch=false;if(fproxMax&&dp>new Date(fproxMax))proxMatch=false;}}
-    return nameMatch&&telMatch&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dataMatch&&proxMatch;
+    if(trat&&!(d.orcamentos||[]).some(function(o){return o.tratamento===trat;}))return false;
+    if(aval&&!(d.orcamentos||[]).some(function(o){return o.avaliador===aval;}))return false;
+    if(fdMin||fdMax){var dt=new Date(r.created_at||r.timestamp||0);if(fdMin&&dt<new Date(fdMin))return false;if(fdMax&&dt>new Date(fdMax+'T23:59:59'))return false;}
+    if(fpMin||fpMax){var prx=(d.atividades||[]).find(function(a){return a.proximo;});if(!prx)return false;var dp=new Date(prx.proximo);if(fpMin&&dp<new Date(fpMin))return false;if(fpMax&&dp>new Date(fpMax))return false;}
+    return true;
   });
-  var taberto=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
-  var tfech=clientesData.filter(function(r){return isFechou(r.stage);}).length;
-  var vOrc=0,vFech=0;
-  clientesData.forEach(function(r){
-    var phn=String(r.phone||'').replace(/[^0-9]/g,'');
-    var d=_ccData[phn]||{orcamentos:[]};
-    (d.orcamentos||[]).forEach(function(o){vOrc+=Number(o.valor)||0;var fs=o.fechamentos||[];if(fs.length>0)vFech+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));});
-  });
-  var e1=document.getElementById('cli-total-aberto');if(e1)e1.textContent=taberto;
-  var e2=document.getElementById('cli-total-fechado');if(e2)e2.textContent=tfech;
-  var e3=document.getElementById('cli-val-orcado');if(e3)e3.textContent=fmtBRL(vOrc);
-  var e4=document.getElementById('cli-val-fechado');if(e4)e4.textContent=fmtBRL(vFech);
+  var ta=clientesData.filter(function(r){return !isFechou(r.stage);}).length;
+  var tf=clientesData.filter(function(r){return isFechou(r.stage);}).length;
+  var vO=0,vF=0;
+  clientesData.forEach(function(r){var phn=String(r.phone||'').replace(/[^0-9]/g,'');var d=_ccData[phn]||{orcamentos:[]};(d.orcamentos||[]).forEach(function(o){vO+=Number(o.valor)||0;var fs=o.fechamentos||[];if(fs.length>0)vF+=Math.max.apply(null,fs.map(function(f){return Number(f.valor)||0;}));});});
+  var e;e=document.getElementById('cli-total-aberto');if(e)e.textContent=ta;e=document.getElementById('cli-total-fechado');if(e)e.textContent=tf;e=document.getElementById('cli-val-orcado');if(e)e.textContent=fmtBRL(vO);e=document.getElementById('cli-val-fechado');if(e)e.textContent=fmtBRL(vF);
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
   document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(function(r,fi){
-    var fechou=isFechou(r.stage);var val=parseFloat(r.value||0);
-    var idx=clientesData.indexOf(r);if(idx<0)idx=fi;
-    var phn=String(r.phone||'').replace(/[^0-9]/g,'');
-    var d=_ccData[phn]||{orcamentos:[],atividades:[]};
-    var o0=d.orcamentos&&d.orcamentos[0];
-    var px=d.atividades&&d.atividades.find(function(a){return a.proximo;});
-    return '<tr style="cursor:pointer;" onclick="openClienteCard('+idx+')">'
-      +'<td><strong style="color:#2a2520;">'+(r.name||'—')+'</strong></td>'
-      +'<td class="tm">'+fmtDate(r.created_at||r.timestamp)+'</td>'
-      +'<td>'+(r.phone||'—')+'</td>'
-      +'<td>'+(r.stage||'—')+'</td>'
-      +'<td><span class="status-pill '+(fechou?'status-fechado':'status-aberto')+'">'+(fechou?'Fechado':'Em aberto')+'</span></td>'
-      +'<td style="font-size:12px;">'+(o0&&o0.tratamento?o0.tratamento:'—')+'</td>'
-      +'<td style="font-size:12px;">'+(o0&&o0.avaliador?o0.avaliador:'—')+'</td>'
-      +'<td style="font-size:12px;color:#5a8a6a;">'+(px?new Date(px.proximo+'T12:00').toLocaleDateString('pt-BR'):'—')+'</td>'
-      +'<td style="text-align:right" class="tm">'+(o0&&o0.valor>0?fmtBRL(o0.valor):'—')+'</td>'
-      +'<td style="text-align:right" class="tg">'+(fechou&&val>0?fmtBRL(val):'—')+'</td>'
-      +'</tr>';
+    var fechou=isFechou(r.stage);var val=parseFloat(r.value||0);var idx=clientesData.indexOf(r);if(idx<0)idx=fi;
+    var phn=String(r.phone||'').replace(/[^0-9]/g,'');var d=_ccData[phn]||{orcamentos:[],atividades:[]};var o0=d.orcamentos&&d.orcamentos[0];var px=(d.atividades||[]).find(function(a){return a.proximo;});
+    return '<tr style="cursor:pointer;" onclick="openClienteCard('+idx+')">'+'<td><strong style="color:#2a2520;">'+(r.name||'—')+'</strong></td>'+'<td class="tm">'+fmtDate(r.created_at||r.timestamp)+'</td>'+'<td>'+(r.phone||'—')+'</td>'+'<td>'+(r.stage||'—')+'</td>'+'<td><span class="status-pill '+(fechou?'status-fechado':'status-aberto')+'">'+(fechou?'Fechado':'Em aberto')+'</span></td>'+'<td style="font-size:12px;">'+(o0&&o0.tratamento?o0.tratamento:'—')+'</td>'+'<td style="font-size:12px;">'+(o0&&o0.avaliador?o0.avaliador:'—')+'</td>'+'<td style="font-size:12px;color:#5a8a6a;">'+(px?new Date(px.proximo+'T12:00').toLocaleDateString('pt-BR'):'—')+'</td>'+'<td style="text-align:right" class="tm">'+(o0&&o0.valor>0?fmtBRL(o0.valor):'—')+'</td>'+'<td style="text-align:right" class="tg">'+(fechou&&val>0?fmtBRL(val):'—')+'</td>'+'</tr>';
   }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
 function toggleFiltros(){var el=document.getElementById('filtros-avancados');if(el)el.style.display=el.style.display==='none'?'block':'none';}
-function limparFiltros(){
-  ['f-nome','f-tel','f-data-min','f-data-max','f-prox-min','f-prox-max'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  ['clientes-fase-filter','clientes-origem-filter','clientes-sit-filter','clientes-trat-filter','clientes-aval-filter'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  filterClientesTable();
-}
+function limparFiltros(){['f-nome','f-tel','f-data-min','f-data-max','f-prox-min','f-prox-max'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});['clientes-fase-filter','clientes-origem-filter','clientes-sit-filter','clientes-trat-filter','clientes-aval-filter'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});filterClientesTable();}
 function fmtBRL(v){return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 </script>
-
 </body>
 </html>
