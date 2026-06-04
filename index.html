@@ -918,11 +918,11 @@ function filterClientesTable(){
     return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch;
   });
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
-  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(r=>{
+  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map((r,fi)=>{
     const fechou=isFechou(r.stage);
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
-    return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx==-1?0:idx})">
+    return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx>=0?idx:fi})">
       <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.timestamp)}</td>
       <td>${r.phone||'—'}</td>
