@@ -1482,8 +1482,8 @@ function lupaAdLeads(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const phoneMap={};
-  const allPeriod=[..._lastCloudiaFiltered,...(_lastCloudiaFilteredEvents||[])];
-  allPeriod.filter(r=>{
+  // Só leads do período (filtrado por created_at)
+  _lastCloudiaFiltered.filter(r=>{
     const rawId=String(r.ad_id||'');
     const rawName=String(r.ad_name||'');
     if(rawId){
@@ -1500,35 +1500,27 @@ function lupaAdLeads(adKey){
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0))
-    .map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.stage||'—']);
-  openModal('Leads — '+label.substring(0,30),['Data','Nome','Telefone','Etapa'],rows);
+    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
+    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',r.stage||'—']);
+  openModal('Leads — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Etapa'],rows);
 }
 function lupaAdAgend(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const phoneMap={};
-  const allPeriod=[..._lastCloudiaFiltered,...(_lastCloudiaFilteredEvents||[])];
-  allPeriod.filter(r=>{
+  // Usa os phones já casados no adMap — garante que só mostra quem é desse anúncio
+  const adPhones=adInfo&&adInfo.phones?adInfo.phones:new Set();
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
     if(!isAgend(r.stage)&&!isComp(r.stage)&&!isFechou(r.stage))return false;
-    const rawId=String(r.ad_id||'');
-    const rawName=String(r.ad_name||'');
-    if(rawId){
-      const normId=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
-      if(normId===adKey)return true;
-    }
-    if(rawName&&adInfo&&adInfo.label){
-      if(rawName.trim().toLowerCase().startsWith(adInfo.label.trim().toLowerCase().substring(0,20)))return true;
-      if(adInfo.label.trim().toLowerCase().startsWith(rawName.trim().toLowerCase().substring(0,20)))return true;
-    }
-    return false;
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    return adPhones.has(ph);
   }).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',getStatusAgend(r.stage),fmtDate(r.timestamp)]);
+    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',getStatusAgend(r.stage),fmtDate(r.timestamp)]);
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
 }
 function getStatusAgend(stage){
