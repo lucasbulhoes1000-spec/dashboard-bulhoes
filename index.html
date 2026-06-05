@@ -955,6 +955,8 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
+    console.log('[CLOUDIA HEADERS]', h);
+    console.log('[CLOUDIA ROW SAMPLE]', rows[0]);
     // DEBUG: loga ad_name/ad_id de todos os leads de hoje
     if(rows.length>0){
       const hoje=rows.filter(r=>{
