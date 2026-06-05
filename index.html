@@ -1133,6 +1133,14 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
 
   // Funil por anúncio
+  // Leads sem rastreamento (não casaram com nenhum anúncio)
+  const trackeadosPhones=new Set();
+  Object.values(adMap).forEach(d=>(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p)));
+  const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
+  if(semRastreioPhones.size>0){
+    adMap['__sem_rastreio__']={spend:0,leads:semRastreioPhones.size,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:semRastreioPhones};
+  }
+
   window._lastAdMap=adMap;
   const adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
   document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?adRows.map(([name,d])=>{
@@ -1788,16 +1796,24 @@ function renderRelOrigem(){
       if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;
       if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;
     }
-    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),valorOrc:0,valorFech:0};
+    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),valorOrc:0,valorFech:0,orcPhones:new Set()};
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     const dc=parseCloudiaDate(r.created_at);
     const s=new Date(document.getElementById('ro-from').value);
     const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
-    if(dc&&dc>=s&&dc<=u)map[org].leads.add(ph);
+    if(dc&&dc>=s&&dc<=u){
+      map[org].leads.add(ph);
+      // valorOrc: soma valor máximo por lead único no período
+      const v=parseFloat(r.value||0);
+      if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
+    }
     if(isAgend(r.stage))map[org].agend.add(ph);
     if(isComp(r.stage))map[org].comp.add(ph);
-    if(isFechou(r.stage)){map[org].fechou.add(ph);map[org].valorFech+=parseFloat(r.value||0);}
-    map[org].valorOrc+=parseFloat(r.value||0);
+    if(isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
+      map[org].fechou.add(ph);
+      map[org].fechPhones.add(ph);
+      map[org].valorFech+=parseFloat(r.value||0);
+    }
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
@@ -1914,14 +1930,18 @@ function renderRelOrcamentos(){
       avalMap[av].total+=Number(o.valor)||0;
     });
   });
-  // Fallback: usa Cloudia rows se não tiver dados no CRM
+  // Fallback: usa Cloudia rows se não tiver dados no CRM — deduplicado por telefone
   if(Object.keys(avalMap).length===0){
+    const seenPhones=new Set();
     allCloudiaRows.filter(r=>{
       if(!isFechou(r.stage))return false;
       const dt=parseCloudiaDate(r.timestamp);
       return dt&&dt>=s&&dt<=u&&(!origFilt||(r.origin||'')===origFilt);
-    }).forEach(r=>{
-      const ph=String(r.phone||'').replace(/\D/g,'');
+    }).sort((a,b)=>parseFloat(b.value||0)-parseFloat(a.value||0))
+    .forEach(r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+      if(seenPhones.has(ph))return; // já contou esse lead
+      seenPhones.add(ph);
       const d=_ccData[ph]||{orcamentos:[]};
       const orc=d.orcamentos&&d.orcamentos[0];
       const av=orc&&orc.avaliador?orc.avaliador:'Sem avaliador';
