@@ -978,6 +978,9 @@ async function fetchCloudia(){
 function renderTrafego(metaAds,filtered,filteredEvents){
   // --- META ADS ---
   let spend=0;
+  // Normaliza string para comparação: lowercase + remove acentos + remove espaços duplos
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+
   const adMap={};
   const adNameMap={}; // mapeia ad_name normalizado → chave do adMap
   metaAds.forEach(ad=>{
@@ -989,7 +992,7 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     adMap[key].spend+=s;
     // Indexa também pelo nome para casar com Cloudia
     if(ad.ad_name){
-      const nameKey=ad.ad_name.trim().toLowerCase();
+      const nameKey=norm(ad.ad_name);
       adNameMap[nameKey]=key;
     }
   });
@@ -1012,12 +1015,12 @@ function renderTrafego(metaAds,filtered,filteredEvents){
       const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
       matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
-    // Tenta 2: casar pelo ad_name (texto)
+    // Tenta 2: casar pelo ad_name (texto, com normalização de acentos)
     if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
-      const nameKey=r.ad_name.trim().toLowerCase();
+      const nameKey=norm(r.ad_name);
       matchKey=adNameMap[nameKey]||null;
       if(!matchKey){
-        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,20))||nameKey.startsWith(k.substring(0,20)));
+        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,25))||nameKey.startsWith(k.substring(0,25)));
         if(found)matchKey=adNameMap[found];
       }
     }
@@ -1038,10 +1041,10 @@ function renderTrafego(metaAds,filtered,filteredEvents){
       matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
     if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
-      const nameKey=r.ad_name.trim().toLowerCase();
+      const nameKey=norm(r.ad_name);
       matchKey=adNameMap[nameKey]||null;
       if(!matchKey){
-        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,20))||nameKey.startsWith(k.substring(0,20)));
+        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,25))||nameKey.startsWith(k.substring(0,25)));
         if(found)matchKey=adNameMap[found];
       }
     }
