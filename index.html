@@ -960,7 +960,8 @@ async function fetchCloudia(){
         const now=new Date();
         return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
       });
-      console.log('[AD DEBUG] Leads de hoje:', hoje.map(r=>({name:r.name,ad_name:r.ad_name,ad_id:r.ad_id,origin:r.origin})));
+    console.log('[AD DEBUG] Leads de hoje:', hoje.map(r=>({name:r.name,ad_name:r.ad_name,ad_id:r.ad_id,ad_id_normalizado:String(r.ad_id||'').replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))),origin:r.origin})));
+    console.log('[AD DEBUG] Chaves do adMap (Meta):', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     }
     document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
     return rows;
@@ -978,7 +979,8 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   metaAds.forEach(ad=>{
     const s=parseFloat(ad.spend||0);spend+=s;
     const rawKey=String(ad.ad_id||ad.ad_name||'Sem nome');
-    const key=String(parseInt(parseFloat(rawKey))||rawKey).substring(0,13);
+    // Usa o ad_id completo sem truncar
+    const key=String(ad.ad_id||rawKey).trim();
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||rawKey,phones:new Set()};
     adMap[key].spend+=s;
     // Indexa também pelo nome para casar com Cloudia
@@ -1000,19 +1002,16 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   // Mapeia por anúncio — tenta casar por ad_id numérico, depois por ad_name
   (filteredEvents||filtered).forEach(r=>{
     let matchKey=null;
-    // Tenta 1: casar pelo ad_id numérico
+    // Tenta 1: casar pelo ad_id numérico (normaliza formato científico)
     const rawId=String(r.ad_id||'');
     if(rawId&&rawId!=='undefined'&&rawId!==''){
       const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
-      const key=normalized.substring(0,13);
-      matchKey=Object.keys(adMap).find(k=>k===key||key.startsWith(k)||k.startsWith(key))||null;
+      matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
     // Tenta 2: casar pelo ad_name (texto)
     if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
       const nameKey=r.ad_name.trim().toLowerCase();
-      // Busca exata
       matchKey=adNameMap[nameKey]||null;
-      // Busca parcial (começa com)
       if(!matchKey){
         const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,20))||nameKey.startsWith(k.substring(0,20)));
         if(found)matchKey=adNameMap[found];
@@ -1032,8 +1031,7 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     const rawId=String(r.ad_id||'');
     if(rawId&&rawId!=='undefined'&&rawId!==''){
       const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
-      const key=normalized.substring(0,13);
-      matchKey=Object.keys(adMap).find(k=>k===key||key.startsWith(k)||k.startsWith(key))||null;
+      matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
     if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
       const nameKey=r.ad_name.trim().toLowerCase();
