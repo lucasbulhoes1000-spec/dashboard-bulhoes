@@ -831,11 +831,15 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
-    // DEBUG: loga o campo created_at dos 3 primeiros registros
+    // DEBUG: loga ad_name/ad_id de todos os leads de hoje
     if(rows.length>0){
-      const sample=rows.slice(0,3).map(r=>({name:r.name,created_at:r.created_at,timestamp:r.timestamp,stage:r.stage}));
-      console.log('[CLOUDIA DEBUG] Headers:', Object.keys(rows[0]));
-      console.log('[CLOUDIA DEBUG] Sample created_at:', sample);
+      const hoje=rows.filter(r=>{
+        const d=parseCloudiaDate(r.created_at);
+        if(!d)return false;
+        const now=new Date();
+        return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
+      });
+      console.log('[AD DEBUG] Leads de hoje:', hoje.map(r=>({name:r.name,ad_name:r.ad_name,ad_id:r.ad_id,origin:r.origin})));
     }
     document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
     return rows;
