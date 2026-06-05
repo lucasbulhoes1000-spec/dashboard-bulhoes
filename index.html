@@ -125,7 +125,7 @@ tbody tr:hover td{background:#faf7f3;}
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sidebar-logo">
-    <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAoACgDASIAAhEBAxEB/8QAGQAAAwEBAQAAAAAAAAAAAAAAAAUGBAMH/8QAKhAAAQMDBAEEAgMAAAAAAAAAAQIDBAAFERIhBhMxQVEUYSIjMkJx/8QAFwEBAQEBAAAAAAAAAAAAAAAABAMCAf/EACERAAICAgIDAQEAAAAAAAAAAAECAAMRITESQVGB/9oADAMBAAIRAxEAPwD2zxHiuXC3vQ2VpQ4sABSxlIwc5x8VSLbqBi3XNmCpDq3XSQFpACRgZyc+1fNwuCn7xJnMvOtNKWQhbSsFQHQH5qqzQpKNRR3GUkc3Ck/mPNRtqbVrHjmzxFdG5c4T2FLCApLfPnBqFqC4Ql6eiuNBba0NFC0kYKTx2I9q5bqO4JiW6bdA2pxlJwtKTgKB6H+q3b1GDWo3wEAJcCHUJHYKGD/dZqSaJTafnCbbWotxmG8nASFHIHsM/FZdxlszJKnG0kJJPHqc1paSS4lC3MEDKgDg/FVOV+WbfJjJOMkgfORx+quijW2vOItqrBuTzDZISpQGemDzU3bYMi43FqGwtKFuE4Uo4AA5JNVN5spF1eShSEp3gYI5OBXSaUgIukhA7uFQ+2B/FTm3RTSsqZaHgqFJC07gRkHsas+kIDjdlU+8gB2W4XQON6BhI/AB+6rtYk7FJkj5MH9JA0AAAAASUVORK5CYII=" alt="Bulhões">
+    <span style="font-size:13px;font-weight:700;color:#A18B6C;white-space:nowrap;letter-spacing:.5px;">Bulhões</span>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section">Principal</div>
@@ -717,14 +717,25 @@ function getRange(tab){
   return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
 }
 
+// Parseia data do Cloudia — suporta ISO (2026-06-05T08:58) e BR (05/06/2026 08:58:00)
+function parseCloudiaDate(raw){
+  if(!raw)return null;
+  const s=String(raw).trim();
+  // Formato ISO: 2026-06-05 ou 2026-06-05T08:58...
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){const d=new Date(s);return isNaN(d)?null:d;}
+  // Formato BR: 05/06/2026 08:58:00
+  const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));return isNaN(d)?null:d;}
+  return null;
+}
 // Filtra SEMPRE por created_at (data de entrada do lead no sistema)
-// NUNCA usar timestamp aqui — timestamp é a data do último evento/stage
+// NUNCA usar timestamp — timestamp muda quando o stage atualiza
 function filterByRange(rows,tab){
   const r=getRange(tab);
   const s=new Date(r.since),u=new Date(r.until+'T23:59:59');
   return rows.filter(row=>{
-    const d=new Date(row.created_at||'');
-    return !isNaN(d)&&d>=s&&d<=u;
+    const d=parseCloudiaDate(row.created_at);
+    return d&&d>=s&&d<=u;
   });
 }
 
@@ -739,8 +750,8 @@ function isFaltou(s){if(!s)return false;const l=s.toLowerCase();return l.include
 function isFechou(s){if(!s)return false;const l=s.toLowerCase();return l==='ganho'||l.includes('ganho');}
 function fmtDate(str){
   if(!str)return'—';
-  const d=new Date(str);
-  if(isNaN(d))return str;
+  const d=parseCloudiaDate(str)||new Date(str);
+  if(isNaN(d))return String(str);
   return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
