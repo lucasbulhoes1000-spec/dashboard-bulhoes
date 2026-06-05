@@ -907,6 +907,8 @@ async function loadTrafego(){
     _lastCloudiaFilteredEvents=filteredEvents;
     updateOrigemCount(filtered);
     renderTrafego(metaAds,filtered,filteredEvents);
+    console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
+    console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
     document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -962,7 +964,6 @@ async function fetchCloudia(){
         return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
       });
     console.log('[AD DEBUG] Leads de hoje:', hoje.map(r=>({name:r.name,ad_name:r.ad_name,ad_id:r.ad_id,ad_id_normalizado:String(r.ad_id||'').replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))),origin:r.origin})));
-    console.log('[AD DEBUG] Chaves do adMap (Meta):', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     }
     document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
     return rows;
