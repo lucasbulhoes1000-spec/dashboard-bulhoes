@@ -325,6 +325,13 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== CLIENTES PAGE ===== -->
     <div class="page" id="page-clientes">
+      <!-- CARDS RESUMO -->
+      <div class="row r4" style="margin-bottom:16px;">
+        <div class="mc"><div class="ml">Total de clientes</div><div class="mv" id="cc-total-clientes">—</div><div class="ms">compareceram ou fecharam</div></div>
+        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms">em aberto</div></div>
+        <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms">contratos</div></div>
+        <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms">de receita</div></div>
+      </div>
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
         <span class="count-badge" id="clientes-count"></span>
@@ -668,6 +675,7 @@ function switchPage(page,el){
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='dashboard') reloadCurrent();
+  else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
 }
 
 function switchDashTab(tab,el){
@@ -709,13 +717,13 @@ function getRange(tab){
   return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
 }
 
-// FIX: filter by created_at (data de cadastro no Cloudia), não timestamp de update
+// Filtra SEMPRE por created_at (data de entrada do lead no sistema)
+// NUNCA usar timestamp aqui — timestamp é a data do último evento/stage
 function filterByRange(rows,tab){
   const r=getRange(tab);
   const s=new Date(r.since),u=new Date(r.until+'T23:59:59');
   return rows.filter(row=>{
-    // Usa created_at como data de entrada do lead no sistema
-    const d=new Date(row.created_at||row.timestamp||'');
+    const d=new Date(row.created_at||'');
     return !isNaN(d)&&d>=s&&d<=u;
   });
 }
@@ -1125,7 +1133,7 @@ function renderClientesTable(){
     const v=parseFloat(r.value||0);
     if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
   });
-  clientesData=Object.values(phoneMap).sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
+  clientesData=Object.values(phoneMap).sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
   // Atualiza selects de filtro
   const fasesSel=document.getElementById('clientes-fase-filter');
   fasesSel.innerHTML='<option value="">Todas as fases</option>';
@@ -1133,6 +1141,15 @@ function renderClientesTable(){
   const origSel=document.getElementById('clientes-origem-filter');
   origSel.innerHTML='<option value="">Todas as origens</option>';
   [...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));
+  // Popula cards de resumo
+  const totalC=clientesData.length;
+  const totalF=clientesData.filter(r=>isFechou(r.stage)).length;
+  const totalA=totalC-totalF;
+  const valorF=clientesData.filter(r=>isFechou(r.stage)).reduce((s,r)=>s+parseFloat(r.value||0),0);
+  document.getElementById('cc-total-clientes').textContent=totalC;
+  document.getElementById('cc-total-abertos').textContent=totalA;
+  document.getElementById('cc-total-fechados').textContent=totalF;
+  document.getElementById('cc-valor-fechado').textContent=valorF>0?fmt(valorF):'—';
   filterClientesTable();
 }
 function filterClientesTable(){
@@ -1166,7 +1183,7 @@ function filterClientesTable(){
     const orc0=d.orcamentos&&d.orcamentos[0];
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
-      <td class="tm">${fmtDate(r.timestamp)}</td>
+      <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
       <td>${r.phone||'—'}</td>
       <td>${r.stage||'—'}</td>
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
