@@ -706,15 +706,20 @@ function applyCustom(tab){
   customDates[tab].to=document.getElementById(tab+'-to').value?new Date(document.getElementById(tab+'-to').value+'T23:59:59'):null;
   if(customDates[tab].from&&customDates[tab].to)reloadCurrent();
 }
+function localDateStr(d){
+  // Retorna YYYY-MM-DD no horário LOCAL (não UTC)
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
 function getRange(tab){
   const now=new Date(),f=filters[tab];
-  if(f==='hoje'){const t=now.toISOString().split('T')[0];return{since:t,until:t};}
-  if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=y.toISOString().split('T')[0];return{since:t,until:t};}
-  if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:s.toISOString().split('T')[0],until:now.toISOString().split('T')[0]};}
-  if(f==='mes')return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
-  if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:fm.toISOString().split('T')[0],until:lm.toISOString().split('T')[0]};}
-  if(f==='personalizado'&&customDates[tab].from&&customDates[tab].to)return{since:customDates[tab].from.toISOString().split('T')[0],until:customDates[tab].to.toISOString().split('T')[0]};
-  return{since:new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0],until:now.toISOString().split('T')[0]};
+  if(f==='hoje'){const t=localDateStr(now);return{since:t,until:t};}
+  if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=localDateStr(y);return{since:t,until:t};}
+  if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:localDateStr(s),until:localDateStr(now)};}
+  if(f==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
+  if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:localDateStr(fm),until:localDateStr(lm)};}
+  if(f==='personalizado'&&customDates[tab].from&&customDates[tab].to)return{since:localDateStr(customDates[tab].from),until:localDateStr(customDates[tab].to)};
+  return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
 }
 
 // Parseia data do Cloudia — suporta ISO (2026-06-05T08:58) e BR (05/06/2026 08:58:00)
@@ -729,13 +734,16 @@ function parseCloudiaDate(raw){
   return null;
 }
 // Filtra SEMPRE por created_at (data de entrada do lead no sistema)
-// NUNCA usar timestamp — timestamp muda quando o stage atualiza
+// Compara pela data LOCAL (não UTC) para evitar erro de fuso horário
 function filterByRange(rows,tab){
   const r=getRange(tab);
-  const s=new Date(r.since),u=new Date(r.until+'T23:59:59');
+  // since e until são strings YYYY-MM-DD no horário local
   return rows.filter(row=>{
     const d=parseCloudiaDate(row.created_at);
-    return d&&d>=s&&d<=u;
+    if(!d)return false;
+    // Converte para string local YYYY-MM-DD para comparar
+    const ds=localDateStr(d);
+    return ds>=r.since&&ds<=r.until;
   });
 }
 
