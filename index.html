@@ -148,15 +148,15 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-label">Gerenciar</span>
     </div>
     <div class="nav-section">Relatórios</div>
-    <div class="nav-item" onclick="window.open('https://appcrc.com.br/relatorios/origem','_blank')">
+    <div class="nav-item" onclick="switchPage('rel-origem',this)">
       <span class="nav-icon">📈</span>
       <span class="nav-label">Métricas de Origem</span>
     </div>
-    <div class="nav-item" onclick="window.open('https://appcrc.com.br/relatorios/metricas-comparecimento-por-agendamento','_blank')">
+    <div class="nav-item" onclick="switchPage('rel-comparecidos',this)">
       <span class="nav-icon">📅</span>
       <span class="nav-label">Comparecidos x Agend.</span>
     </div>
-    <div class="nav-item" onclick="window.open('https://appcrc.com.br/relatorios/metricas-orcamentos-fechados','_blank')">
+    <div class="nav-item" onclick="switchPage('rel-orcamentos',this)">
       <span class="nav-icon">💰</span>
       <span class="nav-label">Orçamentos Fechados</span>
     </div>
@@ -487,6 +487,111 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
     </div>
 
+
+    <!-- ===== REL MÉTRICAS DE ORIGEM ===== -->
+    <div class="page" id="page-rel-origem">
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="ro-from" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data final</label><input type="date" id="ro-to" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Origem</label>
+          <select id="ro-origem" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todas</option>
+          </select></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Avaliador</label>
+          <select id="ro-aval" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos</option>
+            <option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
+          </select></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Tratamento</label>
+          <select id="ro-trat" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos</option>
+            <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option>
+            <option>#Implantes</option><option>#Lentes em Porcelana</option><option>#Lentes em Resina</option>
+            <option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option>
+          </select></div>
+        <button onclick="renderRelOrigem()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+      </div>
+      <div class="table-card">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Origem</th>
+              <th style="text-align:right">Leads</th>
+              <th style="text-align:right">Agendamentos</th>
+              <th style="text-align:right">% Agend.</th>
+              <th style="text-align:right">Agendados</th>
+              <th style="text-align:right">Compareceu</th>
+              <th style="text-align:right">% Comp.</th>
+              <th style="text-align:right">Fechados</th>
+              <th style="text-align:right">% Fecha.</th>
+              <th style="text-align:right">Valor Orçado</th>
+              <th style="text-align:right">Valor Fechado</th>
+              <th style="text-align:right">% Conversão</th>
+              <th style="text-align:right">Ticket Médio</th>
+            </tr></thead>
+            <tbody id="ro-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== REL COMPARECIDOS x AGENDAMENTO ===== -->
+    <div class="page" id="page-rel-comparecidos">
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="rc-from" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data final</label><input type="date" id="rc-to" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Origem</label>
+          <select id="rc-origem" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todas</option>
+          </select></div>
+        <button onclick="renderRelComparecidos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+      </div>
+      <div style="background:#f5f0ea;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7a6550;">
+        <strong>Legenda:</strong> Distância em dias entre a data de criação do agendamento e a data da consulta. % Comp. = Comparecidos / Agendados. % Agend. Dist. = Agendados nessa distância / Total de agendamentos.
+      </div>
+      <div class="table-card" id="rc-table-wrap">
+        <div class="tw"><table id="rc-table"><thead><tr id="rc-thead"></tr></thead><tbody id="rc-tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ===== REL ORÇAMENTOS FECHADOS ===== -->
+    <div class="page" id="page-rel-orcamentos">
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="rof-from" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data final</label><input type="date" id="rof-to" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Origem</label>
+          <select id="rof-origem" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todas</option>
+          </select></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Avaliador</label>
+          <select id="rof-aval" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos</option>
+            <option>Dra Victoria Mota</option><option>Dra Larissa Bulhões</option><option>Dra Gabriela Vera</option>
+          </select></div>
+        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Tratamento</label>
+          <select id="rof-trat" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos</option>
+            <option>#Alinhador Ortodontico</option><option>#Aparelho Ortodontico</option><option>#Clareamento Conjugado</option>
+            <option>#Implantes</option><option>#Lentes em Porcelana</option><option>#Lentes em Resina</option>
+            <option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option>
+          </select></div>
+        <button onclick="renderRelOrcamentos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+      </div>
+      <div class="table-card">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Avaliador</th>
+              <th style="text-align:right">Fechados</th>
+              <th style="text-align:right">Total Fechado</th>
+              <th style="text-align:right">Ticket Médio</th>
+            </tr></thead>
+            <tbody id="rof-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -684,12 +789,15 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar',financeiro:'Financeiro'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar',financeiro:'Financeiro','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
+  else if(page==='rel-origem') setTimeout(()=>initRelOrigem(),50);
+  else if(page==='rel-comparecidos') setTimeout(()=>initRelComparecidos(),50);
+  else if(page==='rel-orcamentos') setTimeout(()=>initRelOrcamentos(),50);
 }
 
 function switchDashTab(tab,el){
@@ -1366,10 +1474,22 @@ function lupaAdLeads(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const phoneMap={};
-  _lastCloudiaFiltered.filter(r=>{
-    const rawAdName=String(r.ad_name||r.ad_id||'');
-    const key=rawAdName.replace(/\.\d+e\+\d+/,s=>String(parseInt(parseFloat(s)))).substring(0,13);
-    return key===adKey;
+  // Busca em filtered (created_at) E filteredEvents (timestamp) — usa todos do período
+  const allPeriod=[..._lastCloudiaFiltered,...(_lastCloudiaFilteredEvents||[])];
+  allPeriod.filter(r=>{
+    const rawId=String(r.ad_id||'');
+    const rawName=String(r.ad_name||'');
+    // Casa por ad_id numérico
+    if(rawId){
+      const normId=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
+      if(normId.substring(0,13)===adKey)return true;
+    }
+    // Casa por ad_name (primeiros 20 chars)
+    if(rawName&&adInfo&&adInfo.label){
+      if(rawName.trim().toLowerCase().startsWith(adInfo.label.trim().toLowerCase().substring(0,20)))return true;
+      if(adInfo.label.trim().toLowerCase().startsWith(rawName.trim().toLowerCase().substring(0,20)))return true;
+    }
+    return false;
   }).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
@@ -1621,6 +1741,213 @@ function renderLista(tab){
 function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);}
 function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);}
 function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);}
+
+// ===== RELATÓRIOS =====
+function initRelDates(fromId, toId){
+  const now=new Date();
+  const from=new Date(now.getFullYear(),now.getMonth(),1);
+  document.getElementById(fromId).value=localDateStr(from);
+  document.getElementById(toId).value=localDateStr(now);
+}
+function getRelRows(fromId, toId){
+  const s=new Date(document.getElementById(fromId).value);
+  const u=new Date(document.getElementById(toId).value+'T23:59:59');
+  // Usa created_at para leads, timestamp para eventos
+  return allCloudiaRows.filter(r=>{
+    const dc=parseCloudiaDate(r.created_at);
+    const dt=parseCloudiaDate(r.timestamp);
+    const d=dc||dt;
+    return d&&d>=s&&d<=u;
+  });
+}
+
+// ── MÉTRICAS DE ORIGEM ────────────────────────────────────
+function initRelOrigem(){
+  initRelDates('ro-from','ro-to');
+  // Popula origens
+  const sel=document.getElementById('ro-origem');
+  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+  renderRelOrigem();
+}
+function renderRelOrigem(){
+  const rows=getRelRows('ro-from','ro-to');
+  const origFilt=document.getElementById('ro-origem').value;
+  const avalFilt=document.getElementById('ro-aval').value;
+  const tratFilt=document.getElementById('ro-trat').value;
+  // Agrupa por origem
+  const map={};
+  rows.forEach(r=>{
+    const org=r.origin||'—';
+    if(origFilt&&org!==origFilt)return;
+    // Filtro avaliador e tratamento via _ccData
+    if(avalFilt||tratFilt){
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      const d=_ccData[ph]||{orcamentos:[]};
+      const orcs=d.orcamentos||[];
+      if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;
+      if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;
+    }
+    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),valorOrc:0,valorFech:0};
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const dc=parseCloudiaDate(r.created_at);
+    const s=new Date(document.getElementById('ro-from').value);
+    const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
+    if(dc&&dc>=s&&dc<=u)map[org].leads.add(ph);
+    if(isAgend(r.stage))map[org].agend.add(ph);
+    if(isComp(r.stage))map[org].comp.add(ph);
+    if(isFechou(r.stage)){map[org].fechou.add(ph);map[org].valorFech+=parseFloat(r.value||0);}
+    map[org].valorOrc+=parseFloat(r.value||0);
+  });
+  const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
+  // Totais
+  let tL=0,tA=0,tC=0,tF=0,tO=0,tFech=0;
+  entries.forEach(([,d])=>{tL+=d.leads.size;tA+=d.agend.size;tC+=d.comp.size;tF+=d.fechou.size;tO+=d.valorOrc;tFech+=d.valorFech;});
+  const pct2=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
+  document.getElementById('ro-tbody').innerHTML=entries.map(([org,d])=>`
+    <tr>
+      <td><span class="origem-pill">${org}</span></td>
+      <td style="text-align:right">${d.leads.size}</td>
+      <td style="text-align:right">${d.agend.size}</td>
+      <td style="text-align:right" class="tm">${pct2(d.agend.size,d.leads.size)}</td>
+      <td style="text-align:right">${d.agend.size}</td>
+      <td style="text-align:right">${d.comp.size}</td>
+      <td style="text-align:right" class="tm">${pct2(d.comp.size,d.agend.size)}</td>
+      <td style="text-align:right" class="tg">${d.fechou.size}</td>
+      <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.comp.size)}</td>
+      <td style="text-align:right" class="ta">${d.valorOrc>0?fmt(d.valorOrc):'—'}</td>
+      <td style="text-align:right" class="tg">${d.valorFech>0?fmt(d.valorFech):'—'}</td>
+      <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.leads.size)}</td>
+      <td style="text-align:right" class="tg">${d.fechou.size>0?fmt(d.valorFech/d.fechou.size):'—'}</td>
+    </tr>`).join('')+`
+    <tr style="font-weight:600;background:#faf7f3;">
+      <td>TOTAL</td>
+      <td style="text-align:right">${tL}</td>
+      <td style="text-align:right">${tA}</td>
+      <td style="text-align:right" class="tm">${pct2(tA,tL)}</td>
+      <td style="text-align:right">${tA}</td>
+      <td style="text-align:right">${tC}</td>
+      <td style="text-align:right" class="tm">${pct2(tC,tA)}</td>
+      <td style="text-align:right" class="tg">${tF}</td>
+      <td style="text-align:right" class="tm">${pct2(tF,tC)}</td>
+      <td style="text-align:right" class="ta">${tO>0?fmt(tO):'—'}</td>
+      <td style="text-align:right" class="tg">${tFech>0?fmt(tFech):'—'}</td>
+      <td style="text-align:right" class="tm">${pct2(tF,tL)}</td>
+      <td style="text-align:right" class="tg">${tF>0?fmt(tFech/tF):'—'}</td>
+    </tr>`;
+}
+
+// ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
+function initRelComparecidos(){
+  initRelDates('rc-from','rc-to');
+  const sel=document.getElementById('rc-origem');
+  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+  renderRelComparecidos();
+}
+function renderRelComparecidos(){
+  const rows=getRelRows('rc-from','rc-to');
+  const origFilt=document.getElementById('rc-origem').value;
+  // Pega só quem agendou ou compareceu
+  const agendados=rows.filter(r=>(isAgend(r.stage)||isComp(r.stage))&&(!origFilt||(r.origin||'')=== origFilt));
+  // Calcula distância em dias entre created_at e timestamp
+  const distances=[0,1,2,3,4,5,6,17];
+  const distMap={};
+  distances.forEach(d=>distMap[d]={agend:0,comp:0});
+  agendados.forEach(r=>{
+    const dc=parseCloudiaDate(r.created_at);
+    const dt=parseCloudiaDate(r.timestamp);
+    if(!dc||!dt)return;
+    const diff=Math.round((dt-dc)/(1000*60*60*24));
+    const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
+    if(!distMap[bucket])distMap[bucket]={agend:0,comp:0};
+    distMap[bucket].agend++;
+    if(isComp(r.stage))distMap[bucket].comp++;
+  });
+  const totalAgend=agendados.length;
+  // Build dynamic headers
+  const thead=document.getElementById('rc-thead');
+  thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
+  document.getElementById('rc-tbody').innerHTML=Object.entries(distMap)
+    .sort((a,b)=>parseInt(a[0])-parseInt(b[0]))
+    .map(([dias,d])=>`
+    <tr>
+      <td>${dias==='17'?'17+ dias':dias+' dia(s)'}</td>
+      <td style="text-align:right">${d.agend}</td>
+      <td style="text-align:right" class="tm">${totalAgend>0?(d.agend/totalAgend*100).toFixed(1)+'%':'—'}</td>
+      <td style="text-align:right">${d.comp}</td>
+      <td style="text-align:right" class="tm">${d.agend>0?(d.comp/d.agend*100).toFixed(1)+'%':'—'}</td>
+    </tr>`).join('');
+}
+
+// ── ORÇAMENTOS FECHADOS ───────────────────────────────────
+function initRelOrcamentos(){
+  initRelDates('rof-from','rof-to');
+  const sel=document.getElementById('rof-origem');
+  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+  renderRelOrcamentos();
+}
+function renderRelOrcamentos(){
+  const s=new Date(document.getElementById('rof-from').value);
+  const u=new Date(document.getElementById('rof-to').value+'T23:59:59');
+  const origFilt=document.getElementById('rof-origem').value;
+  const avalFilt=document.getElementById('rof-aval').value;
+  const tratFilt=document.getElementById('rof-trat').value;
+  // Agrupa por avaliador via _ccData
+  const avalMap={};
+  Object.entries(_ccData).forEach(([ph,d])=>{
+    (d.orcamentos||[]).forEach(o=>{
+      if(o.status!=='Aprovado')return;
+      const dataOrc=new Date(o.data||'');
+      if(isNaN(dataOrc)||dataOrc<s||dataOrc>u)return;
+      const av=o.avaliador||'Sem avaliador';
+      if(avalFilt&&av!==avalFilt)return;
+      if(tratFilt&&o.tratamento!==tratFilt)return;
+      // Verifica origem do lead
+      if(origFilt){
+        const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        if(!row||(row.origin||'')!==origFilt)return;
+      }
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0};
+      avalMap[av].fechados++;
+      avalMap[av].total+=Number(o.valor)||0;
+    });
+  });
+  // Fallback: usa Cloudia rows se não tiver dados no CRM
+  if(Object.keys(avalMap).length===0){
+    allCloudiaRows.filter(r=>{
+      if(!isFechou(r.stage))return false;
+      const dt=parseCloudiaDate(r.timestamp);
+      return dt&&dt>=s&&dt<=u&&(!origFilt||(r.origin||'')===origFilt);
+    }).forEach(r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      const d=_ccData[ph]||{orcamentos:[]};
+      const orc=d.orcamentos&&d.orcamentos[0];
+      const av=orc&&orc.avaliador?orc.avaliador:'Sem avaliador';
+      if(avalFilt&&av!==avalFilt)return;
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0};
+      avalMap[av].fechados++;
+      avalMap[av].total+=parseFloat(r.value||0);
+    });
+  }
+  const entries=Object.entries(avalMap).sort((a,b)=>b[1].total-a[1].total);
+  let tF=0,tV=0;
+  entries.forEach(([,d])=>{tF+=d.fechados;tV+=d.total;});
+  document.getElementById('rof-tbody').innerHTML=entries.map(([av,d])=>`
+    <tr>
+      <td style="font-weight:500;">${av}</td>
+      <td style="text-align:right" class="tg">${d.fechados}</td>
+      <td style="text-align:right" class="tg">${fmt(d.total)}</td>
+      <td style="text-align:right" class="tg">${d.fechados>0?fmt(d.total/d.fechados):'—'}</td>
+    </tr>`).join('')+`
+    <tr style="font-weight:600;background:#faf7f3;">
+      <td>TOTAL</td>
+      <td style="text-align:right" class="tg">${tF}</td>
+      <td style="text-align:right" class="tg">${fmt(tV)}</td>
+      <td style="text-align:right" class="tg">${tF>0?fmt(tV/tF):'—'}</td>
+    </tr>`;
+}
 
 // INIT
 window.addEventListener('load',()=>{
