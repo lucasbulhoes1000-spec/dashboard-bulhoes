@@ -924,6 +924,7 @@ async function fetchMeta(){
     const tr=encodeURIComponent(JSON.stringify(range));
     const url=`https://graph.facebook.com/v18.0/${META_ACCOUNT}/insights?fields=ad_id,ad_name,adset_name,spend,impressions,clicks,actions&time_range=${tr}&level=ad&limit=100&access_token=${META_TOKEN}`;
     const res=await fetch(url);const data=await res.json();
+    console.log('[META DEBUG] Status:', res.status, '| data.data length:', data.data?.length, '| error:', data.error?.message||'none', '| range:', range);
     if(data.error)throw new Error(data.error.message);
     document.getElementById('badge-meta').textContent='⬤ Meta Ads — conectado';
     return data.data||[];
