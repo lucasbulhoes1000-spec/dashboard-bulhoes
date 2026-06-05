@@ -658,6 +658,7 @@ let allSSRows=[];
 let _lastMetaAds=[];
 let _lastCloudiaRows=[];
 let _lastCloudiaFiltered=[];
+let _lastCloudiaFilteredEvents=[];
 let _origemFilter='';
 var _ccData={};
 var _currentClienteIdx=-1;
@@ -735,15 +736,22 @@ function parseCloudiaDate(raw){
 }
 // Filtra SEMPRE por created_at (data de entrada do lead no sistema)
 // Compara pela data LOCAL (não UTC) para evitar erro de fuso horário
+// Filtra leads pelo created_at (quando entrou no sistema)
 function filterByRange(rows,tab){
   const r=getRange(tab);
-  // since e until são strings YYYY-MM-DD no horário local
   return rows.filter(row=>{
     const d=parseCloudiaDate(row.created_at);
     if(!d)return false;
-    // Converte para string local YYYY-MM-DD para comparar
-    const ds=localDateStr(d);
-    return ds>=r.since&&ds<=r.until;
+    return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
+  });
+}
+// Filtra eventos (agendamentos, comparecimentos, fechamentos) pelo timestamp (quando aconteceu)
+function filterEventsByRange(rows,tab){
+  const r=getRange(tab);
+  return rows.filter(row=>{
+    const d=parseCloudiaDate(row.timestamp);
+    if(!d)return false;
+    return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
 
@@ -773,9 +781,11 @@ async function loadTrafego(){
     _lastMetaAds=metaAds;
     _lastCloudiaRows=cloudiaRows;
     const filtered=filterCloudiaByOrigin(filterByRange(cloudiaRows,'trafego'));
+    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(cloudiaRows,'trafego'));
     _lastCloudiaFiltered=filtered;
+    _lastCloudiaFilteredEvents=filteredEvents;
     updateOrigemCount(filtered);
-    renderTrafego(metaAds,filtered);
+    renderTrafego(metaAds,filtered,filteredEvents);
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
     document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -835,7 +845,7 @@ async function fetchCloudia(){
   }
 }
 
-function renderTrafego(metaAds,filtered){
+function renderTrafego(metaAds,filtered,filteredEvents){
   // --- META ADS ---
   let spend=0;
   const adMap={};
@@ -856,21 +866,27 @@ function renderTrafego(metaAds,filtered){
   });
   const cloudiaLeadsCount=leadsPhones.size;
 
-  // Mapeia por anúncio
-  filtered.forEach(r=>{
+  // Mapeia por anúncio — usa filteredEvents para agend/comp/fechou
+  // mas conta leads pelo filtered (created_at)
+  (filteredEvents||filtered).forEach(r=>{
     const rawAdName=String(r.ad_name||r.ad_id||'');
-    const key=rawAdName.replace(/\.\d+e\+\d+/,s=>String(parseInt(parseFloat(s)))).substring(0,13);
-    if(key&&adMap[key]){
+    if(!rawAdName||rawAdName==='undefined')return;
+    // Normaliza: converte notação científica (1.23e+15 → 1230000000000000)
+    const normalized=rawAdName.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
+    const key=normalized.substring(0,13);
+    // Procura no adMap pela chave exata ou por prefixo
+    const matchKey=Object.keys(adMap).find(k=>k===key||key.startsWith(k)||k.startsWith(key));
+    if(matchKey){
       const ph=String(r.phone||'').replace(/\D/g,'');
-      if(ph)adMap[key].phones.add(ph);
-      if(isAgend(r.stage))adMap[key].agend++;
-      if(isComp(r.stage))adMap[key].comp++;
-      if(isFechou(r.stage)){adMap[key].fechou++;adMap[key].vendas+=parseFloat(r.value||0);}
+      if(ph)adMap[matchKey].phones.add(ph);
+      if(isAgend(r.stage))adMap[matchKey].agend++;
+      if(isComp(r.stage))adMap[matchKey].comp++;
+      if(isFechou(r.stage)){adMap[matchKey].fechou++;adMap[matchKey].vendas+=parseFloat(r.value||0);}
     }
   });
   Object.values(adMap).forEach(d=>{d.leads=d.phones?d.phones.size:0;});
 
-  // Origens: deduplicar por telefone dentro de cada origem
+  // Origens: deduplicar por telefone dentro de cada origem (usa created_at)
   const origenPhonesSeen={};
   filtered.forEach(r=>{
     const org=r.origin||'—';
@@ -881,12 +897,13 @@ function renderTrafego(metaAds,filtered){
   const origens={};
   Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
 
-  // Funil: deduplicar por telefone em cada etapa
-  const agendPhones=new Set(filtered.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  // Funil: agend/comp/fechou pelo timestamp do evento (quando aconteceu)
+  const evts=filteredEvents||filtered; // fallback para filtered se não tiver eventos
+  const agendPhones=new Set(evts.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agend=agendPhones.size;
-  const compPhones=new Set(filtered.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const compPhones=new Set(evts.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const comp=compPhones.size;
-  const fechados=filtered.filter(r=>isFechou(r.stage));
+  const fechados=evts.filter(r=>isFechou(r.stage));
   const fechadosPhones=new Set(fechados.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const contratos=fechadosPhones.size;
 
@@ -1075,8 +1092,10 @@ function applyOrigemFilter(){
   _origemFilter=document.getElementById('origem-filter').value.toLowerCase();
   if(_lastCloudiaRows.length>0){
     const filtered=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
+    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(_lastCloudiaRows,'trafego'));
     _lastCloudiaFiltered=filtered;
-    renderTrafego(_lastMetaAds,filtered);
+    _lastCloudiaFilteredEvents=filteredEvents;
+    renderTrafego(_lastMetaAds,filtered,filteredEvents);
     updateOrigemCount(filtered);
   }
 }
@@ -1255,7 +1274,7 @@ function lupaLeads(){
 }
 function lupaAgend(){
   const phoneMap={};
-  _lastCloudiaFiltered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
@@ -1266,7 +1285,7 @@ function lupaAgend(){
 }
 function lupaComp(){
   const phoneMap={};
-  _lastCloudiaFiltered.filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
@@ -1277,7 +1296,7 @@ function lupaComp(){
 }
 function lupaContratos(){
   const phoneMap={};
-  _lastCloudiaFiltered.filter(r=>isFechou(r.stage)).forEach(r=>{
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph]){phoneMap[ph]=r;}
     else{const v=parseFloat(r.value||0);if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;}
