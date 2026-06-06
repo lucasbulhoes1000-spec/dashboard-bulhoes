@@ -984,87 +984,82 @@ async function fetchCloudia(){
 }
 
 function renderTrafego(metaAds,filtered,filteredEvents){
-  // --- META ADS ---
+  // Normaliza string: lowercase + sem acentos + sem espaços duplos
+  const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+
+  // --- STEP 1: Monta adMap com dados da Meta ---
   let spend=0;
-  // Normaliza string para comparação: lowercase + remove acentos + remove espaços duplos
-  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
-
-  const adMap={};
-  const adNameMap={}; // mapeia ad_name normalizado → chave do adMap
+  const adMap={};    // chave: ad_id completo da Meta
+  const adNameMap={}; // chave: ad_name normalizado → ad_id
   metaAds.forEach(ad=>{
-    const s=parseFloat(ad.spend||0);spend+=s;
-    const rawKey=String(ad.ad_id||ad.ad_name||'Sem nome');
-    // Usa os primeiros 15 dígitos do ad_id (float JS perde precisão após 15 dígitos)
-    const key=String(ad.ad_id||rawKey).trim().substring(0,15);
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||rawKey,phones:new Set()};
-    adMap[key].spend+=s;
-    // Indexa também pelo nome para casar com Cloudia
-    if(ad.ad_name){
-      const nameKey=norm(ad.ad_name);
-      adNameMap[nameKey]=key;
-    }
+    spend+=parseFloat(ad.spend||0);
+    const key=String(ad.ad_id||'').trim();
+    if(!key)return;
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||key,phones:new Set()};
+    adMap[key].spend+=parseFloat(ad.spend||0);
+    if(ad.ad_name)adNameMap[norm(ad.ad_name)]=key;
   });
 
-  // --- CLOUDIA: deduplicar por telefone para contar leads únicos no período ---
-  // FIX: leads = telefones únicos no período filtrado (não todos os registros do Cloudia)
+  // --- STEP 2: Função para casar um row do Cloudia com uma chave do adMap ---
+  function findAdKey(r){
+    // Tenta pelo ad_id (extrai dígitos, compara com keys do adMap)
+    const rawId=String(r.ad_id||'').trim();
+    if(rawId&&rawId!=='undefined'){
+      // Compara direto primeiro
+      if(adMap[rawId])return rawId;
+      // Tenta casar pelos primeiros 15 dígitos (seguro contra perda de float)
+      const id15=rawId.substring(0,15);
+      const found=Object.keys(adMap).find(k=>k.substring(0,15)===id15);
+      if(found)return found;
+    }
+    // Tenta pelo ad_name normalizado
+    const adName=norm(r.ad_name||'');
+    if(adName){
+      if(adNameMap[adName])return adNameMap[adName];
+      // Busca parcial nos primeiros 25 chars
+      const found=Object.keys(adNameMap).find(k=>k.startsWith(adName.substring(0,25))||adName.startsWith(k.substring(0,25)));
+      if(found)return adNameMap[found];
+    }
+    return null;
+  }
+
+  // --- STEP 3: Conta leads únicos por telefone (filtrado por created_at) ---
   const leadsPhones=new Set();
-  filtered.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    if(ph)leadsPhones.add(ph);
-  });
+  filtered.forEach(r=>{const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsPhones.add(ph);});
   const cloudiaLeadsCount=leadsPhones.size;
 
-  // Mapeia por anúncio — tenta casar por ad_id numérico, depois por ad_name
-  (filteredEvents||filtered).forEach(r=>{
-    let matchKey=null;
-    // Tenta 1: casar pelo ad_id numérico (normaliza formato científico)
-    const rawId=String(r.ad_id||'');
-    if(rawId&&rawId!=='undefined'&&rawId!==''){
-      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))).substring(0,15);
-      matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
-    }
-    // Tenta 2: casar pelo ad_name (texto, com normalização de acentos)
-    if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
-      const nameKey=norm(r.ad_name);
-      matchKey=adNameMap[nameKey]||null;
-      if(!matchKey){
-        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,25))||nameKey.startsWith(k.substring(0,25)));
-        if(found)matchKey=adNameMap[found];
-      }
-    }
-    if(matchKey){
-      const ph=String(r.phone||'').replace(/\D/g,'');
-      if(ph)adMap[matchKey].phones.add(ph);
-      if(isAgend(r.stage))adMap[matchKey].agend++;
-      if(isComp(r.stage))adMap[matchKey].comp++;
-      if(isFechou(r.stage)){adMap[matchKey].fechou++;adMap[matchKey].vendas+=parseFloat(r.value||0);}
-    }
-  });
-  // DEBUG: mostra os primeiros 3 leads com ad_id e as chaves do adMap
-  console.log('[MATCH DEBUG] adMap keys sub15:', Object.keys(adMap).filter(k=>k!=='__sem_rastreio__').map(k=>k.substring(0,15)));
-  console.log('[MATCH DEBUG] Cloudia leads com ad_id:', filtered.filter(r=>r.ad_id).slice(0,5).map(r=>({name:r.name,ad_id:r.ad_id,ad_id_sub15:String(r.ad_id).substring(0,15)})));
-
-  // Leads: mesmo processo mas usando filtered (created_at)
+  // --- STEP 4: Distribui leads por anúncio (usa filtered = filtrado por created_at) ---
   filtered.forEach(r=>{
-    let matchKey=null;
-    const rawId=String(r.ad_id||'');
-    if(rawId&&rawId!=='undefined'&&rawId!==''){
-      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))).substring(0,15);
-      matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
-    }
-    if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
-      const nameKey=norm(r.ad_name);
-      matchKey=adNameMap[nameKey]||null;
-      if(!matchKey){
-        const found=Object.keys(adNameMap).find(k=>k.startsWith(nameKey.substring(0,25))||nameKey.startsWith(k.substring(0,25)));
-        if(found)matchKey=adNameMap[found];
-      }
-    }
-    if(matchKey){
+    const key=findAdKey(r);
+    if(key){
       const ph=String(r.phone||'').replace(/\D/g,'');
-      if(ph)adMap[matchKey].phones.add(ph);
+      if(ph)adMap[key].phones.add(ph);
     }
   });
+
+  // --- STEP 5: Distribui eventos (agend/comp/fechou) por anúncio ---
+  // Usa allCloudiaRows completo para eventos — não limita por data aqui
+  // porque o telefone já foi casado no step 4
+  const allRows=[...filtered,...(filteredEvents||[])];
+  const seenEventPhone=new Set();
+  allRows.forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    if(!ph)return;
+    // Encontra qual anúncio esse telefone pertence
+    let matchKey=null;
+    for(const [k,d] of Object.entries(adMap)){
+      if(d.phones&&d.phones.has(ph)){matchKey=k;break;}
+    }
+    if(!matchKey)return;
+    if(isAgend(r.stage))adMap[matchKey].agend++;
+    if(isComp(r.stage))adMap[matchKey].comp++;
+    if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){
+      seenEventPhone.add(ph+'_fechou');
+      adMap[matchKey].fechou++;
+      adMap[matchKey].vendas+=parseFloat(r.value||0);
+    }
+  });
+
   Object.values(adMap).forEach(d=>{d.leads=d.phones?d.phones.size:0;});
 
   // Origens: deduplicar por telefone dentro de cada origem (usa created_at)
