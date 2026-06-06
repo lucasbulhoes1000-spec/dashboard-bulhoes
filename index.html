@@ -1029,8 +1029,10 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   filtered.forEach(r=>{const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsPhones.add(ph);});
   const cloudiaLeadsCount=leadsPhones.size;
 
-  // --- STEP 4: Distribui leads por anúncio (usa filtered = filtrado por created_at) ---
-  filtered.forEach(r=>{
+  // --- STEP 4: Distribui leads por anúncio ---
+  // Usa TODOS os rows (allCloudiaRows) para casar telefone com anúncio
+  // assim leads que entraram fora do período mas agendaram dentro são trackeados
+  allCloudiaRows.forEach(r=>{
     const key=findAdKey(r);
     if(key){
       const ph=String(r.phone||'').replace(/\D/g,'');
@@ -1038,12 +1040,11 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     }
   });
 
-  // --- STEP 5: Distribui eventos (agend/comp/fechou) por anúncio ---
-  // Usa allCloudiaRows completo para eventos — não limita por data aqui
-  // porque o telefone já foi casado no step 4
-  const allRows=[...filtered,...(filteredEvents||[])];
+  // --- STEP 5: Distribui eventos (agend/comp/fechou) filtrados por período ---
+  // Usa filteredEvents para contar apenas eventos que aconteceram no período
+  const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenEventPhone=new Set();
-  allRows.forEach(r=>{
+  evtsParaFunil.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     if(!ph)return;
     // Encontra qual anúncio esse telefone pertence
@@ -1051,7 +1052,18 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     for(const [k,d] of Object.entries(adMap)){
       if(d.phones&&d.phones.has(ph)){matchKey=k;break;}
     }
-    if(!matchKey)return;
+    if(!matchKey){
+      // Sem rastreamento — conta separado
+      if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:new Set()};
+      if(isAgend(r.stage))adMap['__sem_rastreio__'].agend++;
+      if(isComp(r.stage))adMap['__sem_rastreio__'].comp++;
+      if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){
+        seenEventPhone.add(ph+'_fechou');
+        adMap['__sem_rastreio__'].fechou++;
+        adMap['__sem_rastreio__'].vendas+=parseFloat(r.value||0);
+      }
+      return;
+    }
     if(isAgend(r.stage))adMap[matchKey].agend++;
     if(isComp(r.stage))adMap[matchKey].comp++;
     if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){
@@ -1061,7 +1073,13 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     }
   });
 
-  Object.values(adMap).forEach(d=>{d.leads=d.phones?d.phones.size:0;});
+  // Conta leads únicos por anúncio apenas do período filtrado
+  Object.keys(adMap).forEach(k=>{
+    if(k==='__sem_rastreio__')return;
+    // Intersecção entre phones do adMap e phones do período
+    const phonesNoPeriodo=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p)));
+    adMap[k].leads=phonesNoPeriodo.size;
+  });
 
   // Origens: deduplicar por telefone dentro de cada origem (usa created_at)
   const origenPhonesSeen={};
@@ -1145,14 +1163,14 @@ function renderTrafego(metaAds,filtered,filteredEvents){
       <span style="font-size:10px;color:#b5a898;width:32px;text-align:right;">${Math.round(n/totalO*100)}%</span>
     </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
 
-  // Funil por anúncio
-  // Leads sem rastreamento (não casaram com nenhum anúncio)
+  // Funil por anúncio — Leads sem rastreamento
   const trackeadosPhones=new Set();
-  Object.values(adMap).forEach(d=>(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p)));
+  Object.values(adMap).filter((_,i)=>Object.keys(adMap)[i]!=='__sem_rastreio__').forEach(d=>(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p)));
   const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
-  if(semRastreioPhones.size>0){
-    adMap['__sem_rastreio__']={spend:0,leads:semRastreioPhones.size,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:semRastreioPhones};
-  }
+  if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:new Set()};
+  semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
+  adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
+  if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0)delete adMap['__sem_rastreio__'];
 
   window._lastAdMap=adMap;
   const adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
