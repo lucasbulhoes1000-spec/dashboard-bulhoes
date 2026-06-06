@@ -1040,6 +1040,10 @@ function renderTrafego(metaAds,filtered,filteredEvents){
       if(isFechou(r.stage)){adMap[matchKey].fechou++;adMap[matchKey].vendas+=parseFloat(r.value||0);}
     }
   });
+  // DEBUG: mostra os primeiros 3 leads com ad_id e as chaves do adMap
+  console.log('[MATCH DEBUG] adMap keys sub15:', Object.keys(adMap).filter(k=>k!=='__sem_rastreio__').map(k=>k.substring(0,15)));
+  console.log('[MATCH DEBUG] Cloudia leads com ad_id:', filtered.filter(r=>r.ad_id).slice(0,5).map(r=>({name:r.name,ad_id:r.ad_id,ad_id_sub15:String(r.ad_id).substring(0,15)})));
+
   // Leads: mesmo processo mas usando filtered (created_at)
   filtered.forEach(r=>{
     let matchKey=null;
