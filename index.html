@@ -947,6 +947,14 @@ async function fetchCloudia(){
     const rows=raw.slice(1).map(r=>{
       const o={};h.forEach((k,i)=>o[k]=r[i]);return o;
     }).map(r=>{
+      // Extrai ad_id do campo "Anúncio mais recente" que vem como "Whatsapp:120247238399920437"
+      const anuncioRecente=String(r['Anúncio mais recente']||r['anuncio_mais_recente']||r['ad_id']||'').trim();
+      const adIdMatch=anuncioRecente.match(/(\d{10,})/);
+      if(adIdMatch)r.ad_id=adIdMatch[1];
+      // Extrai ad_name do campo "Nome do anúncio (+Recente)"
+      const adNome=String(r['Nome do anúncio (+Recente)']||r['nome_anuncio']||r['ad_name']||'').trim();
+      if(adNome)r.ad_name=adNome;
+      // Define origin
       if(r.ad_name&&String(r.ad_name).trim()!=='')r.origin='#Instagram ADS';
       if(r.origin&&/^\d+$/.test(String(r.origin).trim())){
         const m={'4067':'Instagram Orgânico','2557':'WhatsApp Direto'};
@@ -956,7 +964,7 @@ async function fetchCloudia(){
     });
     allCloudiaRows=rows;
     console.log('[CLOUDIA HEADERS]', h);
-    console.log('[CLOUDIA ROW SAMPLE]', rows[0]);
+    console.log('[CLOUDIA SAMPLE com ad_id]', rows.filter(r=>r.ad_id).slice(0,3).map(r=>({name:r.name,ad_id:r.ad_id,ad_name:r.ad_name})));
     // DEBUG: loga ad_name/ad_id de todos os leads de hoje
     if(rows.length>0){
       const hoje=rows.filter(r=>{
@@ -986,8 +994,8 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   metaAds.forEach(ad=>{
     const s=parseFloat(ad.spend||0);spend+=s;
     const rawKey=String(ad.ad_id||ad.ad_name||'Sem nome');
-    // Usa o ad_id completo sem truncar
-    const key=String(ad.ad_id||rawKey).trim();
+    // Usa os primeiros 15 dígitos do ad_id (float JS perde precisão após 15 dígitos)
+    const key=String(ad.ad_id||rawKey).trim().substring(0,15);
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||rawKey,phones:new Set()};
     adMap[key].spend+=s;
     // Indexa também pelo nome para casar com Cloudia
@@ -1012,7 +1020,7 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     // Tenta 1: casar pelo ad_id numérico (normaliza formato científico)
     const rawId=String(r.ad_id||'');
     if(rawId&&rawId!=='undefined'&&rawId!==''){
-      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
+      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))).substring(0,15);
       matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
     // Tenta 2: casar pelo ad_name (texto, com normalização de acentos)
@@ -1037,7 +1045,7 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     let matchKey=null;
     const rawId=String(r.ad_id||'');
     if(rawId&&rawId!=='undefined'&&rawId!==''){
-      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
+      const normalized=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))).substring(0,15);
       matchKey=Object.keys(adMap).find(k=>k===normalized)||null;
     }
     if(!matchKey&&r.ad_name&&r.ad_name.trim()!==''){
