@@ -1423,7 +1423,31 @@ function filterClientesTable(){
   }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
 
-// CRM EXPORT/IMPORT
+// CRM PERSISTÊNCIA — salva e carrega da planilha Google Sheets (aba CRM)
+const CRM_URL = CLOUDIA_URL; // mesmo Apps Script, parâmetro action=crm
+
+async function salvarCRMRemoto(){
+  try{
+    await fetch(CRM_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'saveCRM',data:_ccData})
+    });
+  }catch(e){console.warn('Erro ao salvar CRM remoto:',e);}
+}
+
+async function carregarCRMRemoto(){
+  try{
+    const res=await fetch(CRM_URL+'?action=loadCRM');
+    const raw=await res.json();
+    if(raw&&typeof raw==='object'&&!Array.isArray(raw)){
+      _ccData=raw;
+      console.log('[CRM] Dados carregados da planilha. Clientes:',Object.keys(_ccData).length);
+    }
+  }catch(e){console.warn('Erro ao carregar CRM remoto:',e);}
+}
+
+// Export/Import manual (backup)
 function exportarCRM(){
   const data=JSON.stringify(_ccData,null,2);
   const blob=new Blob([data],{type:'application/json'});
@@ -1434,7 +1458,14 @@ function importarCRM(){document.getElementById('crm-import-input').click();}
 function loadCRMFile(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=ev=>{try{_ccData=JSON.parse(ev.target.result);filterClientesTable();alert('CRM importado!');}catch(err){alert('Erro ao importar: '+err.message);}};
+  reader.onload=ev=>{
+    try{
+      _ccData=JSON.parse(ev.target.result);
+      salvarCRMRemoto();
+      filterClientesTable();
+      alert('CRM importado e salvo na planilha!');
+    }catch(err){alert('Erro ao importar: '+err.message);}
+  };
   reader.readAsText(file);
 }
 
@@ -1642,6 +1673,7 @@ function salvarOrcamento(){
   refreshOrcamentos(d);
   updateEntradas();
   filterClientesTable();
+  salvarCRMRemoto();
 }
 function excluirOrcamento(idx){
   if(!confirm('Excluir este orçamento?'))return;
@@ -1649,6 +1681,7 @@ function excluirOrcamento(idx){
   d.orcamentos.splice(idx,1);
   refreshOrcamentos(d);
   updateEntradas();
+  salvarCRMRemoto();
 }
 function refreshOrcamentos(d){
   var orcs=d.orcamentos||[];
@@ -1694,6 +1727,7 @@ function salvarAtividade(){
   document.getElementById('cc-atv-form').style.display='none';
   refreshAtividades(r,d);
   switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
+  salvarCRMRemoto();
 }
 function refreshAtividades(r,d){
   var auto=[];
@@ -1726,6 +1760,7 @@ function salvarAnotacao(){
   d.anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
   document.getElementById('cc-anot-input').value='';
   refreshAnotacoes(d);
+  salvarCRMRemoto();
 }
 function refreshAnotacoes(d){
   document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(a=>`
@@ -1998,7 +2033,8 @@ function renderRelOrcamentos(){
 }
 
 // INIT
-window.addEventListener('load',()=>{
+window.addEventListener('load',async ()=>{
+  await carregarCRMRemoto();
   loadTrafego();
 });
 </script>
