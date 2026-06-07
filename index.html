@@ -2171,9 +2171,9 @@ function exportModalCSV(){
 function exportModalXLSX(){
   const {headers,rows}=_modalExportData;if(!rows.length)return;
   let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="UTF-8"></head><body><table>';
-  xml+='<tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
-  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'</td>').join('')+'</tr>';});
-  xml+='</table></body></html>';
+  xml+='<tr>'+headers.map(h=>'<th>'+h+'<\/th>').join('')+'<\/tr>';
+  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'<\/td>').join('')+'<\/tr>';});
+  xml+='<\/table><\/body><\/html>';
 
 </script>
 <!-- MODAL CRIAR LEAD -->
