@@ -1868,7 +1868,7 @@ function renderRelOrigem(){
       if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;
       if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;
     }
-    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[]};
+    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     const dc=parseCloudiaDate(r.created_at);
     const s=new Date(document.getElementById('ro-from').value);
@@ -1880,10 +1880,11 @@ function renderRelOrigem(){
       if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
     }
     if(isAgend(r.stage)){map[org].agend.add(ph);map[org].agendRows.push(r);}
-    if(isComp(r.stage))map[org].comp.add(ph);
+    if(isComp(r.stage)){map[org].comp.add(ph);map[org].compRows.push(r);}
     if(isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
       map[org].fechou.add(ph);
       map[org].fechPhones.add(ph);
+      map[org].fechRows.push(r);
       map[org].valorFech+=parseFloat(r.value||0);
     }
   });
@@ -1895,13 +1896,13 @@ function renderRelOrigem(){
   document.getElementById('ro-tbody').innerHTML=entries.map(([org,d])=>`
     <tr>
       <td><span class="origem-pill">${org}</span></td>
-      <td style="text-align:right">${d.leads.size} <button class="lupa" onclick="openModal('Leads — '+${JSON.stringify(org)},['Data','Nome','Telefone','Origem'],[...(d.leadRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']))" title="Ver leads">🔍</button></td>
-      <td style="text-align:right">${d.agend.size} <button class="lupa" onclick="openModal('Agend. — '+${JSON.stringify(org)},['Data','Nome','Telefone'],[...(d.agendRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']))" title="Ver agendamentos">🔍</button></td>
+      <td style="text-align:right">${d.leads.size} <button class="lupa" onclick="openModal('Leads — ${org}',['Data','Nome','Telefone','Origem'],[...(d.leadRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']))" title="Ver leads">🔍</button></td>
+      <td style="text-align:right">${d.agend.size} <button class="lupa" onclick="openModal('Agend. — ${org}',['Data','Nome','Telefone'],[...(d.agendRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']))" title="Ver agend.">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.agend.size,d.leads.size)}</td>
       <td style="text-align:right">${d.agend.size}</td>
-      <td style="text-align:right">${d.comp.size}</td>
+      <td style="text-align:right">${d.comp.size} <button class="lupa" onclick="openModal('Comp. — ${org}',['Data','Nome','Telefone'],[...(d.compRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']))" title="Ver comparecimentos">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.comp.size,d.agend.size)}</td>
-      <td style="text-align:right" class="tg">${d.fechou.size}</td>
+      <td style="text-align:right" class="tg">${d.fechou.size} <button class="lupa" onclick="openModal('Fechados — ${org}',['Data','Nome','Telefone','Valor'],[...(d.fechRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—','R$ '+parseFloat(r.value||0).toFixed(2)]))" title="Ver fechamentos">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.comp.size)}</td>
       <td style="text-align:right" class="ta">${d.valorOrc>0?fmt(d.valorOrc):'—'}</td>
       <td style="text-align:right" class="tg">${d.valorFech>0?fmt(d.valorFech):'—'}</td>
