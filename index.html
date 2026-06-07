@@ -1656,7 +1656,218 @@ function exportModalXLSX(){
   xml+='<head><meta charset="UTF-8"></head><body><table>';
   xml+='<tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
   rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'</td>').join('')+'</tr>';});
+  xml+='</table></body></html>';
+    const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.xls';
+  a.click();
+}
+
+function exportTableCSV(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  const csv=[headersArr.join(','),...rows.map(r=>r.map(c=>'"'+c.replace(/"/g,'""')+'"').join(','))].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename+'.csv';a.click();
+}
+
+function exportTableXLS(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table>';
+  xml+='<tr>'+headersArr.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>';});
   xml+='</table>
+
+// ===== CRIAR LEAD =====
+function openCriarLead(){
+  const today=new Date().toISOString().split('T')[0];
+  const now=new Date().toTimeString().slice(0,5);
+  document.getElementById('cl-data').value=today;
+  document.getElementById('cl-hora').value=now;
+  document.getElementById('cl-nome').value='';
+  document.getElementById('cl-telefone').value='';
+  document.getElementById('cl-origem').value='';
+  document.getElementById('cl-status').value='Lead';
+  document.getElementById('modal-criar-lead').style.display='flex';
+}
+
+async function salvarCriarLead(){
+  const data=document.getElementById('cl-data').value;
+  const hora=document.getElementById('cl-hora').value;
+  const nome=document.getElementById('cl-nome').value.trim();
+  const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');
+  const origem=document.getElementById('cl-origem').value;
+  const status=document.getElementById('cl-status').value;
+  if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}
+  const createdAt=data+'T'+hora+':00';
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:createdAt}})
+    });
+    const r=await res.json();
+    if(r.status==='ok'){
+      document.getElementById('modal-criar-lead').style.display='none';
+      alert('✅ Lead criado com sucesso!');
+      // Recarrega dados
+      fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});
+    }
+  }catch(e){alert('Erro ao criar lead: '+e.message);}
+}
+
+// ===== CRIAR CLIENTE =====
+function openCriarCliente(){
+  const today=new Date().toISOString().split('T')[0];
+  const now=new Date().toTimeString().slice(0,5);
+  document.getElementById('cc2-data').value=today;
+  document.getElementById('cc2-hora').value=now;
+  document.getElementById('cc2-nome').value='';
+  document.getElementById('cc2-telefone').value='';
+  document.getElementById('cc2-origem').value='';
+  document.getElementById('cc2-status').value='Compareceu';
+  document.getElementById('cc2-valor').value='';
+  document.getElementById('modal-criar-cliente').style.display='flex';
+}
+
+async function salvarCriarCliente(){
+  const data=document.getElementById('cc2-data').value;
+  const hora=document.getElementById('cc2-hora').value;
+  const nome=document.getElementById('cc2-nome').value.trim();
+  const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');
+  const origem=document.getElementById('cc2-origem').value;
+  const status=document.getElementById('cc2-status').value;
+  const valor=parseFloat(document.getElementById('cc2-valor').value)||0;
+  if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}
+  const createdAt=data+'T'+hora+':00';
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:createdAt}})
+    });
+    const r=await res.json();
+    if(r.status==='ok'){
+      document.getElementById('modal-criar-cliente').style.display='none';
+      alert('✅ Cliente criado com sucesso!');
+      fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});
+    }
+  }catch(e){alert('Erro ao criar cliente: '+e.message);}
+}
+
+// ===== IMPORTAR LEADS =====
+function openImportarLeads(){
+  document.getElementById('importar-leads-csv').value='';
+  document.getElementById('importar-leads-preview').style.display='none';
+  document.getElementById('modal-importar-leads').style.display='flex';
+}
+
+function lerArquivoLeads(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    document.getElementById('importar-leads-csv').value=ev.target.result;
+    const lines=ev.target.result.trim().split('\n');
+    const prev=document.getElementById('importar-leads-preview');
+    prev.style.display='block';
+    prev.textContent=lines.length+' linhas detectadas. Primeira: '+lines[0];
+  };
+  reader.readAsText(file);
+}
+
+async function executarImportarLeads(){
+  const csv=document.getElementById('importar-leads-csv').value.trim();
+  if(!csv){alert('Cole ou faça upload de um arquivo CSV');return;}
+  const lines=csv.split('\n').filter(l=>l.trim());
+  // Detecta se tem cabeçalho
+  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
+  const leads=[];
+  for(let i=start;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<4)continue;
+    // data,hora,nome,telefone,origem,status
+    const [dataStr,hora,nome,telefone,origem,status]=cols;
+    const parts=dataStr.split('/');
+    let createdAt=dataStr;
+    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';
+    leads.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Lead',created_at:createdAt});
+  }
+  if(!leads.length){alert('Nenhum lead válido encontrado');return;}
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'importLeads',leads})
+    });
+    const r=await res.json();
+    document.getElementById('modal-importar-leads').style.display='none';
+    alert('✅ '+r.imported+' leads importados!');
+    fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});
+  }catch(e){alert('Erro ao importar: '+e.message);}
+}
+
+// ===== IMPORTAR CLIENTES =====
+function openImportarClientes(){
+  document.getElementById('importar-clientes-csv').value='';
+  document.getElementById('importar-clientes-preview').style.display='none';
+  document.getElementById('modal-importar-clientes').style.display='flex';
+}
+
+function lerArquivoClientes(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    document.getElementById('importar-clientes-csv').value=ev.target.result;
+    const lines=ev.target.result.trim().split('\n');
+    const prev=document.getElementById('importar-clientes-preview');
+    prev.style.display='block';
+    prev.textContent=lines.length+' linhas detectadas. Primeira: '+lines[0];
+  };
+  reader.readAsText(file);
+}
+
+async function executarImportarClientes(){
+  const csv=document.getElementById('importar-clientes-csv').value.trim();
+  if(!csv){alert('Cole ou faça upload de um arquivo CSV');return;}
+  const lines=csv.split('\n').filter(l=>l.trim());
+  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
+  const clientes=[];
+  for(let i=start;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<4)continue;
+    const [dataStr,hora,nome,telefone,origem,status,valor]=cols;
+    const parts=dataStr.split('/');
+    let createdAt=dataStr;
+    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';
+    clientes.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt});
+  }
+  if(!clientes.length){alert('Nenhum cliente válido encontrado');return;}
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'importClientes',clientes})
+    });
+    const r=await res.json();
+    document.getElementById('modal-importar-clientes').style.display='none';
+    alert('✅ '+r.imported+' clientes importados!');
+    fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});
+  }catch(e){alert('Erro ao importar: '+e.message);}
+}
+
+// INIT
+window.addEventListener('load',()=>{
+  loadTrafego();
+  // CRM carrega em background sem bloquear
+  setTimeout(()=>carregarCRMRemoto(),2000);
+});
+</script>
+
 <!-- MODAL CRIAR LEAD -->
 <div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
@@ -1780,32 +1991,7 @@ function exportModalXLSX(){
     </div>
   </div>
 </div>
-</body></html>';
-  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.xls';
-  a.click();
-}
 
-function exportTableCSV(tbodyId,headersArr,filename){
-  const tbody=document.getElementById(tbodyId);
-  if(!tbody)return;
-  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
-  const csv=[headersArr.join(','),...rows.map(r=>r.map(c=>'"'+c.replace(/"/g,'""')+'"').join(','))].join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=filename+'.csv';a.click();
-}
-
-function exportTableXLS(tbodyId,headersArr,filename){
-  const tbody=document.getElementById(tbodyId);
-  if(!tbody)return;
-  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
-  let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table>';
-  xml+='<tr>'+headersArr.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
-  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>';});
-  xml+='</table>
 <!-- MODAL CRIAR LEAD -->
 <div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
@@ -2381,313 +2567,5 @@ function renderRelOrcamentos(){
 }
 
 
-// ===== CRIAR LEAD =====
-function openCriarLead(){
-  const today=new Date().toISOString().split('T')[0];
-  const now=new Date().toTimeString().slice(0,5);
-  document.getElementById('cl-data').value=today;
-  document.getElementById('cl-hora').value=now;
-  document.getElementById('cl-nome').value='';
-  document.getElementById('cl-telefone').value='';
-  document.getElementById('cl-origem').value='';
-  document.getElementById('cl-status').value='Lead';
-  document.getElementById('modal-criar-lead').style.display='flex';
-}
-
-async function salvarCriarLead(){
-  const data=document.getElementById('cl-data').value;
-  const hora=document.getElementById('cl-hora').value;
-  const nome=document.getElementById('cl-nome').value.trim();
-  const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');
-  const origem=document.getElementById('cl-origem').value;
-  const status=document.getElementById('cl-status').value;
-  if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}
-  const createdAt=data+'T'+hora+':00';
-  try{
-    const res=await fetch(CLOUDIA_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:createdAt}})
-    });
-    const r=await res.json();
-    if(r.status==='ok'){
-      document.getElementById('modal-criar-lead').style.display='none';
-      alert('✅ Lead criado com sucesso!');
-      // Recarrega dados
-      fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});
-    }
-  }catch(e){alert('Erro ao criar lead: '+e.message);}
-}
-
-// ===== CRIAR CLIENTE =====
-function openCriarCliente(){
-  const today=new Date().toISOString().split('T')[0];
-  const now=new Date().toTimeString().slice(0,5);
-  document.getElementById('cc2-data').value=today;
-  document.getElementById('cc2-hora').value=now;
-  document.getElementById('cc2-nome').value='';
-  document.getElementById('cc2-telefone').value='';
-  document.getElementById('cc2-origem').value='';
-  document.getElementById('cc2-status').value='Compareceu';
-  document.getElementById('cc2-valor').value='';
-  document.getElementById('modal-criar-cliente').style.display='flex';
-}
-
-async function salvarCriarCliente(){
-  const data=document.getElementById('cc2-data').value;
-  const hora=document.getElementById('cc2-hora').value;
-  const nome=document.getElementById('cc2-nome').value.trim();
-  const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');
-  const origem=document.getElementById('cc2-origem').value;
-  const status=document.getElementById('cc2-status').value;
-  const valor=parseFloat(document.getElementById('cc2-valor').value)||0;
-  if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}
-  const createdAt=data+'T'+hora+':00';
-  try{
-    const res=await fetch(CLOUDIA_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:createdAt}})
-    });
-    const r=await res.json();
-    if(r.status==='ok'){
-      document.getElementById('modal-criar-cliente').style.display='none';
-      alert('✅ Cliente criado com sucesso!');
-      fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});
-    }
-  }catch(e){alert('Erro ao criar cliente: '+e.message);}
-}
-
-// ===== IMPORTAR LEADS =====
-function openImportarLeads(){
-  document.getElementById('importar-leads-csv').value='';
-  document.getElementById('importar-leads-preview').style.display='none';
-  document.getElementById('modal-importar-leads').style.display='flex';
-}
-
-function lerArquivoLeads(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    document.getElementById('importar-leads-csv').value=ev.target.result;
-    const lines=ev.target.result.trim().split('\n');
-    const prev=document.getElementById('importar-leads-preview');
-    prev.style.display='block';
-    prev.textContent=lines.length+' linhas detectadas. Primeira: '+lines[0];
-  };
-  reader.readAsText(file);
-}
-
-async function executarImportarLeads(){
-  const csv=document.getElementById('importar-leads-csv').value.trim();
-  if(!csv){alert('Cole ou faça upload de um arquivo CSV');return;}
-  const lines=csv.split('\n').filter(l=>l.trim());
-  // Detecta se tem cabeçalho
-  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
-  const leads=[];
-  for(let i=start;i<lines.length;i++){
-    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-    if(cols.length<4)continue;
-    // data,hora,nome,telefone,origem,status
-    const [dataStr,hora,nome,telefone,origem,status]=cols;
-    const parts=dataStr.split('/');
-    let createdAt=dataStr;
-    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';
-    leads.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Lead',created_at:createdAt});
-  }
-  if(!leads.length){alert('Nenhum lead válido encontrado');return;}
-  try{
-    const res=await fetch(CLOUDIA_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'importLeads',leads})
-    });
-    const r=await res.json();
-    document.getElementById('modal-importar-leads').style.display='none';
-    alert('✅ '+r.imported+' leads importados!');
-    fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});
-  }catch(e){alert('Erro ao importar: '+e.message);}
-}
-
-// ===== IMPORTAR CLIENTES =====
-function openImportarClientes(){
-  document.getElementById('importar-clientes-csv').value='';
-  document.getElementById('importar-clientes-preview').style.display='none';
-  document.getElementById('modal-importar-clientes').style.display='flex';
-}
-
-function lerArquivoClientes(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    document.getElementById('importar-clientes-csv').value=ev.target.result;
-    const lines=ev.target.result.trim().split('\n');
-    const prev=document.getElementById('importar-clientes-preview');
-    prev.style.display='block';
-    prev.textContent=lines.length+' linhas detectadas. Primeira: '+lines[0];
-  };
-  reader.readAsText(file);
-}
-
-async function executarImportarClientes(){
-  const csv=document.getElementById('importar-clientes-csv').value.trim();
-  if(!csv){alert('Cole ou faça upload de um arquivo CSV');return;}
-  const lines=csv.split('\n').filter(l=>l.trim());
-  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
-  const clientes=[];
-  for(let i=start;i<lines.length;i++){
-    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-    if(cols.length<4)continue;
-    const [dataStr,hora,nome,telefone,origem,status,valor]=cols;
-    const parts=dataStr.split('/');
-    let createdAt=dataStr;
-    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';
-    clientes.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt});
-  }
-  if(!clientes.length){alert('Nenhum cliente válido encontrado');return;}
-  try{
-    const res=await fetch(CLOUDIA_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'importClientes',clientes})
-    });
-    const r=await res.json();
-    document.getElementById('modal-importar-clientes').style.display='none';
-    alert('✅ '+r.imported+' clientes importados!');
-    fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});
-  }catch(e){alert('Erro ao importar: '+e.message);}
-}
-
-// INIT
-window.addEventListener('load',()=>{
-  loadTrafego();
-  // CRM carrega em background sem bloquear
-  setTimeout(()=>carregarCRMRemoto(),2000);
-});
-</script>
-
-<!-- MODAL CRIAR LEAD -->
-<div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <div style="font-size:15px;font-weight:700;color:#2a2520;">+ Criar Lead</div>
-      <button onclick="document.getElementById('modal-criar-lead').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data de inclusão</label>
-        <input id="cl-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
-        <input id="cl-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    </div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome</label>
-      <input id="cl-nome" type="text" placeholder="Nome do lead" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
-      <input id="cl-telefone" type="text" placeholder="Ex: 5511999999999" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Origem</label>
-      <select id="cl-origem" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="">Selecione...</option>
-        <option>#Instagram ADS</option><option>#Organico</option><option>#Social Selling</option><option>#Indicação</option>
-      </select></div>
-    <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-      <select id="cl-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="Lead">Lead</option>
-        <option value="Agendou">Agendou</option>
-      </select></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="salvarCriarLead()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Criar</button>
-      <button onclick="document.getElementById('modal-criar-lead').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CRIAR CLIENTE -->
-<div id="modal-criar-cliente" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <div style="font-size:15px;font-weight:700;color:#2a2520;">+ Criar Cliente Retroativo</div>
-      <button onclick="document.getElementById('modal-criar-cliente').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data</label>
-        <input id="cc2-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
-        <input id="cc2-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    </div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome</label>
-      <input id="cc2-nome" type="text" placeholder="Nome do cliente" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
-      <input id="cc2-telefone" type="text" placeholder="Ex: 5511999999999" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Origem</label>
-      <select id="cc2-origem" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="">Selecione...</option>
-        <option>#Instagram ADS</option><option>#Organico</option><option>#Social Selling</option><option>#Indicação</option>
-      </select></div>
-    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-      <select id="cc2-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="Compareceu">Compareceu</option>
-        <option value="Ganho">Ganho</option>
-      </select></div>
-    <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor (R$)</label>
-      <input id="cc2-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="salvarCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Criar</button>
-      <button onclick="document.getElementById('modal-criar-cliente').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL IMPORTAR LEADS -->
-<div id="modal-importar-leads" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="font-size:15px;font-weight:700;color:#2a2520;">↑ Importar Leads em Massa</div>
-      <button onclick="document.getElementById('modal-importar-leads').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-    </div>
-    <div style="background:#f5f0ea;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#7a6550;">
-      <strong>Formato CSV:</strong> data,hora,nome,telefone,origem,status<br>
-      <strong>Exemplo:</strong> 07/06/2026,10:30,João Silva,5511999999999,#Instagram ADS,Lead
-    </div>
-    <div style="margin-bottom:14px;">
-      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:6px;">Cole o CSV aqui ou faça upload do arquivo:</label>
-      <textarea id="importar-leads-csv" placeholder="data,hora,nome,telefone,origem,status&#10;07/06/2026,10:30,João Silva,5511999999999,#Instagram ADS,Lead" style="width:100%;min-height:150px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
-    </div>
-    <div style="margin-bottom:18px;">
-      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:6px;">Ou faça upload de arquivo CSV/Excel:</label>
-      <input type="file" id="importar-leads-file" accept=".csv,.xlsx,.xls" onchange="lerArquivoLeads(event)" style="font-size:12px;">
-    </div>
-    <div id="importar-leads-preview" style="display:none;margin-bottom:14px;background:#f5f0ea;border-radius:8px;padding:10px;font-size:12px;color:#5a4e44;"></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="executarImportarLeads()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Importar</button>
-      <button onclick="document.getElementById('modal-importar-leads').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL IMPORTAR CLIENTES -->
-<div id="modal-importar-clientes" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="font-size:15px;font-weight:700;color:#2a2520;">↑ Importar Clientes em Massa</div>
-      <button onclick="document.getElementById('modal-importar-clientes').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
-    </div>
-    <div style="background:#f5f0ea;border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:#7a6550;">
-      <strong>Formato CSV:</strong> data,hora,nome,telefone,origem,status,valor<br>
-      <strong>Exemplo:</strong> 07/06/2026,14:00,Maria Santos,5511999999999,#Instagram ADS,Compareceu,5000
-    </div>
-    <div style="margin-bottom:14px;">
-      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:6px;">Cole o CSV aqui ou faça upload:</label>
-      <textarea id="importar-clientes-csv" placeholder="data,hora,nome,telefone,origem,status,valor&#10;07/06/2026,14:00,Maria Santos,5511999999999,#Instagram ADS,Compareceu,5000" style="width:100%;min-height:150px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
-    </div>
-    <div style="margin-bottom:18px;">
-      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:6px;">Ou faça upload de arquivo CSV/Excel:</label>
-      <input type="file" id="importar-clientes-file" accept=".csv,.xlsx,.xls" onchange="lerArquivoClientes(event)" style="font-size:12px;">
-    </div>
-    <div id="importar-clientes-preview" style="display:none;margin-bottom:14px;background:#f5f0ea;border-radius:8px;padding:10px;font-size:12px;color:#5a4e44;"></div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="executarImportarClientes()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Importar</button>
-      <button onclick="document.getElementById('modal-importar-clientes').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
