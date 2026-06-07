@@ -1479,13 +1479,16 @@ async function salvarCRMRemoto(){
 
 async function carregarCRMRemoto(){
   try{
-    const res=await fetch(CRM_URL+'?action=loadCRM');
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),5000);
+    const res=await fetch(CRM_URL+'?action=loadCRM',{signal:controller.signal});
+    clearTimeout(timeout);
     const raw=await res.json();
     if(raw&&typeof raw==='object'&&!Array.isArray(raw)){
       _ccData=raw;
       console.log('[CRM] Dados carregados da planilha. Clientes:',Object.keys(_ccData).length);
     }
-  }catch(e){console.warn('Erro ao carregar CRM remoto:',e);}
+  }catch(e){console.warn('Erro ao carregar CRM remoto (timeout ou falha):',e);}
 }
 
 // Export/Import manual (backup)
