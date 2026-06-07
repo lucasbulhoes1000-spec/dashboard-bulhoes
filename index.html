@@ -323,6 +323,8 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="">Todas as origens</option>
         </select>
         <span class="count-badge" id="leads-count"></span>
+        <button onclick="exportTableXLS('leads-tbody',['Nome','Data de inclusão','Telefone','Origem'],'leads')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">↓ XLSX</button>
+        <button onclick="exportTableCSV('leads-tbody',['Nome','Data de inclusão','Telefone','Origem'],'leads')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">↓ CSV</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -351,6 +353,8 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">💾 Exportar CRM</button>
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">📂 Importar CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
+        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data','Telefone','Fase','Situação','Tratamento','Avaliador','Valor Orçado','Valor Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">↓ XLSX</button>
+        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data','Telefone','Fase','Situação','Tratamento','Avaliador','Valor Orçado','Valor Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;">↓ CSV</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
           <select class="filter-select" id="clientes-origem-filter" onchange="filterClientesTable()"><option value="">Todas as origens</option></select>
           <select class="filter-select" id="clientes-fase-filter" onchange="filterClientesTable()"><option value="">Todas as fases</option></select>
@@ -510,6 +514,8 @@ tbody tr:hover td{background:#faf7f3;}
             <option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option>
           </select></div>
         <button onclick="renderRelOrigem()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+        <button onclick="exportTableXLS('ro-tbody',['Origem','Leads','Agendamentos','%Agend','Agendados','Compareceu','%Comp','Fechados','%Fecha','Valor Orçado','Valor Fechado','%Conversão','Ticket Médio'],'metricas_origem')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ XLSX</button>
+        <button onclick="exportTableCSV('ro-tbody',['Origem','Leads','Agendamentos','%Agend','Agendados','Compareceu','%Comp','Fechados','%Fecha','Valor Orçado','Valor Fechado','%Conversão','Ticket Médio'],'metricas_origem')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ CSV</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -545,6 +551,8 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="">Todas</option>
           </select></div>
         <button onclick="renderRelComparecidos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+        <button onclick="exportTableXLS('rc-tbody',['Distância','Agendamentos','% do Total','Comparecimentos','% Comp'],'comparecidos_agendamento')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ XLSX</button>
+        <button onclick="exportTableCSV('rc-tbody',['Distância','Agendamentos','% do Total','Comparecimentos','% Comp'],'comparecidos_agendamento')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ CSV</button>
       </div>
       <div style="background:#f5f0ea;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7a6550;">
         <strong>Legenda:</strong> Distância em dias entre a data de criação do agendamento e a data da consulta. % Comp. = Comparecidos / Agendados. % Agend. Dist. = Agendados nessa distância / Total de agendamentos.
@@ -576,6 +584,8 @@ tbody tr:hover td{background:#faf7f3;}
             <option>#Protocolo sobre Implantes</option><option>#Reabilitação Oral</option>
           </select></div>
         <button onclick="renderRelOrcamentos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+        <button onclick="exportTableXLS('rof-tbody',['Avaliador','Fechados','Total Fechado','Ticket Médio'],'orcamentos_fechados')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ XLSX</button>
+        <button onclick="exportTableCSV('rof-tbody',['Avaliador','Fechados','Total Fechado','Ticket Médio'],'orcamentos_fechados')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:12px;">↓ CSV</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -600,7 +610,11 @@ tbody tr:hover td{background:#faf7f3;}
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title" id="modal-title">Leads</span>
-      <span class="modal-close" onclick="closeModal()">✕</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="exportModalXLSX()" style="background:#5a8a6a;color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:500;">↓ XLSX</button>
+        <button onclick="exportModalCSV()" style="background:#4a7a9a;color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:500;">↓ CSV</button>
+        <span class="modal-close" onclick="closeModal()">✕</span>
+      </div>
     </div>
     <div class="modal-body">
       <table class="modal-table">
@@ -1600,6 +1614,7 @@ function getStatusAgend(stage){
 
 // MODAL
 function openModal(title,headers,rows){
+  _modalExportData={headers,rows};
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-thead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
   document.getElementById('modal-tbody').innerHTML=rows.length>0
@@ -1609,6 +1624,61 @@ function openModal(title,headers,rows){
 }
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+
+// EXPORT FUNCTIONS
+var _modalExportData={headers:[],rows:[]};
+
+function exportModalCSV(){
+  const headers=_modalExportData.headers;
+  const rows=_modalExportData.rows;
+  if(!rows.length)return;
+  const csv=[headers.join(','),...rows.map(r=>r.map(c=>'"'+(String(c||'').replace(/<[^>]+>/g,'').replace(/"/g,'""'))+'"').join(','))].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.csv';
+  a.click();
+}
+
+function exportModalXLSX(){
+  const headers=_modalExportData.headers;
+  const rows=_modalExportData.rows;
+  if(!rows.length)return;
+  // Build simple XLSX-compatible XML (actually TSV saved as .xls that Excel opens)
+  let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">';
+  xml+='<head><meta charset="UTF-8"></head><body><table>';
+  xml+='<tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'</td>').join('')+'</tr>';});
+  xml+='</table></body></html>';
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.xls';
+  a.click();
+}
+
+function exportTableCSV(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  const csv=[headersArr.join(','),...rows.map(r=>r.map(c=>'"'+c.replace(/"/g,'""')+'"').join(','))].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename+'.csv';a.click();
+}
+
+function exportTableXLS(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);
+  if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table>';
+  xml+='<tr>'+headersArr.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>';});
+  xml+='</table></body></html>';
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename+'.xls';a.click();
+}
 
 // CRM STATE
 function ccKey(r){var ph=String(r.phone||'').replace(/\D/g,'');return ph.length>6?ph:(r.name||'unknown');}
