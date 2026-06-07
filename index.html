@@ -2559,9 +2559,10 @@ async function executarImportarClientes(){
 }
 
 // INIT
-window.addEventListener('load',async ()=>{
-  await carregarCRMRemoto();
+window.addEventListener('load',()=>{
   loadTrafego();
+  // CRM carrega em background sem bloquear
+  setTimeout(()=>carregarCRMRemoto(),2000);
 });
 </script>
 
