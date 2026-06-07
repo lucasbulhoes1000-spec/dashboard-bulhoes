@@ -1085,9 +1085,9 @@ function renderTrafego(metaAds,filtered,filteredEvents){
     if(key){const ph=String(r.phone||'').replace(/\D/g,'');if(ph)adMap[key].phones.add(ph);}
   });
   // STEP 5: Conta eventos do período
-  const evts=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
+  const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenEventPhone=new Set();
-  evts.forEach(r=>{
+  evtsParaFunil.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
     let matchKey=null;
     for(const [k,d] of Object.entries(adMap)){if(d.phones&&d.phones.has(ph)){matchKey=k;break;}}
@@ -1116,10 +1116,10 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
 
   // Funil: agend/comp/fechou pelo timestamp do evento (quando aconteceu)
-  const evts=filteredEvents||filtered; // fallback para filtered se não tiver eventos
-  const agendPhones=new Set(evts.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const evtsGeral=filteredEvents||filtered; // fallback para filtered se não tiver eventos
+  const agendPhones=new Set(evtsGeral.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agend=agendPhones.size;
-  const compPhones=new Set(evts.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const comp=compPhones.size;
   const fechados=evts.filter(r=>isFechou(r.stage));
   const fechadosPhones=new Set(fechados.map(r=>String(r.phone||'').replace(/\D/g,'')));
