@@ -2170,11 +2170,57 @@ function exportModalCSV(){
 }
 function exportModalXLSX(){
   const {headers,rows}=_modalExportData;if(!rows.length)return;
-  let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="UTF-8"></head><body><table>';
-  xml+='<tr>'+headers.map(h=>'<th>'+h+'<\/th>').join('')+'<\/tr>';
-  rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'<\/td>').join('')+'<\/tr>';});
-  xml+='<\/table><\/body><\/html>';
+  _downloadBlob(_buildXLS(headers,rows),document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.xls','application/vnd.ms-excel');
+}
+function _buildCSV(headers,rows){
+  return [headers.join(','),...rows.map(r=>r.map(c=>'"'+(String(c||'').replace(/<[^>]+>/g,'').replace(/"/g,'""'))+'"').join(','))].join('\n');
+}
+function _downloadBlob(content,filename,mime){
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function _buildXLS(headers,rows){
+  const o=n=>'<'+n+'>',c=n=>'<'+'/'+n+'>';
+  let s=o('html')+o('head')+'<meta charset="UTF-8">'+c('head')+o('body')+o('table');
+  s+=o('tr')+headers.map(h=>o('th')+h+c('th')).join('')+c('tr');
+  rows.forEach(r=>{s+=o('tr')+r.map(x=>o('td')+String(x||'').replace(/<[^>]+>/g,'')+c('td')).join('')+c('tr');});
+  s+=c('table')+c('body')+c('html');
+  return s;
+}
+function exportTableCSV(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  _downloadBlob('\uFEFF'+_buildCSV(headersArr,rows),filename+'.csv','text/csv;charset=utf-8;');
+}
+function exportTableXLS(tbodyId,headersArr,filename){
+  const tbody=document.getElementById(tbodyId);if(!tbody)return;
+  const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));
+  _downloadBlob(_buildXLS(headersArr,rows),filename+'.xls','application/vnd.ms-excel');
+}
 
+
+// CRM
+const CRM_URL=CLOUDIA_URL;
+async function salvarCRMRemoto(){
+  try{await fetch(CRM_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'saveCRM',data:_ccData})});}catch(e){console.warn('CRM save:',e);}
+}
+async function carregarCRMRemoto(){
+  try{
+    const controller=new AbortController();
+    setTimeout(()=>controller.abort(),4000);
+    const res=await fetch(CRM_URL+'?action=loadCRM',{signal:controller.signal});
+    const raw=await res.json();
+    if(raw&&typeof raw==='object'&&!Array.isArray(raw)){_ccData=raw;console.log('[CRM] Carregado:',Object.keys(_ccData).length);}
+  }catch(e){console.warn('CRM load:',e);}
+}
+
+// INIT
+window.addEventListener('load',()=>{
+  loadTrafego();
+  setTimeout(()=>carregarCRMRemoto(),3000);
+});
 </script>
 <!-- MODAL CRIAR LEAD -->
 <div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
