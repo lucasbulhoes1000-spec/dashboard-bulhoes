@@ -824,8 +824,11 @@ function setFilter(tab,f,el){
   if(f!=='personalizado')reloadCurrent();
 }
 function applyCustom(tab){
-  customDates[tab].from=document.getElementById(tab+'-from').value?new Date(document.getElementById(tab+'-from').value):null;
-  customDates[tab].to=document.getElementById(tab+'-to').value?new Date(document.getElementById(tab+'-to').value+'T23:59:59'):null;
+  // Adiciona T00:00 para forçar interpretação como horário local (não UTC)
+  const fv=document.getElementById(tab+'-from').value;
+  const tv=document.getElementById(tab+'-to').value;
+  customDates[tab].from=fv?new Date(fv+'T00:00:00'):null;
+  customDates[tab].to=tv?new Date(tv+'T23:59:59'):null;
   if(customDates[tab].from&&customDates[tab].to)reloadCurrent();
 }
 function localDateStr(d){
@@ -847,9 +850,9 @@ function getRange(tab){
 function parseCloudiaDate(raw){
   if(!raw)return null;
   const s=String(raw).trim();
-  // Datas com Z (UTC do Cloudia) — browser converte para local automaticamente
+  // timestamp (com Z = UTC): converte para local automaticamente pelo browser
   if(s.includes('Z')||s.includes('T')){const d=new Date(s);return isNaN(d)?null:d;}
-  // Formato ISO sem Z: 2026-06-05 11:55:00
+  // created_at (sem Z, formato "2026-06-07 02:57:16" = já em BRT): trata como local
   const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2})?:?(\d{2})?:?(\d{2})?/);
   if(iso){const d=new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]||0),parseInt(iso[5]||0),parseInt(iso[6]||0));return isNaN(d)?null:d;}
   // Formato BR: 05/06/2026 08:58:00
