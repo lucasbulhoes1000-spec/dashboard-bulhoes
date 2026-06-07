@@ -2173,7 +2173,7 @@ function exportModalXLSX(){
   let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="UTF-8"></head><body><table>';
   xml+='<tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
   rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+String(c||'').replace(/<[^>]+>/g,'')+'</td>').join('')+'</tr>';});
-  xml+='</table>
+  xml+='</table></body></html>';
 <!-- MODAL CRIAR LEAD -->
 <div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
@@ -2284,7 +2284,7 @@ function exportTableXLS(tbodyId,headersArr,filename){
   let xml='<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="UTF-8"></head><body><table>';
   xml+='<tr>'+headersArr.map(h=>'<th>'+h+'</th>').join('')+'</tr>';
   rows.forEach(r=>{xml+='<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>';});
-  xml+='</table>
+  xml+='</table></body></html>';
 <!-- MODAL CRIAR LEAD -->
 <div id="modal-criar-lead" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
