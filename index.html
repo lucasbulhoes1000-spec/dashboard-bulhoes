@@ -129,6 +129,10 @@ tbody tr:hover td{background:#faf7f3;}
   </div>
   <div class="sidebar-nav">
     <div class="nav-section">Principal</div>
+    <div class="nav-item" onclick="switchPage('inicio',this)">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Início</span>
+    </div>
     <div class="nav-item active" onclick="switchPage('dashboard',this)">
       <span class="nav-icon">📊</span>
       <span class="nav-label">Dashboard</span>
@@ -176,7 +180,36 @@ tbody tr:hover td{background:#faf7f3;}
   <div class="content">
 
     <!-- ===== DASHBOARD PAGE ===== -->
-    <div class="page active" id="page-dashboard">
+    <div class="page active" id="page-inicio" class="page" style="display:none;">
+    <div style="padding:40px;max-width:700px;margin:0 auto;text-align:center;">
+      <div style="font-size:48px;margin-bottom:16px;">🦷</div>
+      <h2 style="font-size:24px;font-weight:700;color:#2a2520;margin-bottom:8px;">Bulhões Odontologia</h2>
+      <p style="color:#8a7a6a;font-size:14px;margin-bottom:32px;">Dashboard de performance e gestão de leads</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:left;">
+        <div onclick="switchPage('dashboard',document.querySelector('[onclick*=dashboard]'))" style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:20px;cursor:pointer;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:28px;margin-bottom:8px;">📊</div>
+          <div style="font-weight:600;color:#2a2520;margin-bottom:4px;">Dashboard</div>
+          <div style="font-size:12px;color:#8a7a6a;">Métricas de tráfego, funil e anúncios</div>
+        </div>
+        <div onclick="switchPage('leads',document.querySelector('[onclick*=leads]'))" style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:20px;cursor:pointer;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:28px;margin-bottom:8px;">👤</div>
+          <div style="font-weight:600;color:#2a2520;margin-bottom:4px;">Leads</div>
+          <div style="font-size:12px;color:#8a7a6a;">Lista de leads e criação manual</div>
+        </div>
+        <div onclick="switchPage('clientes',document.querySelector('[onclick*=clientes]'))" style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:20px;cursor:pointer;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:28px;margin-bottom:8px;">👥</div>
+          <div style="font-weight:600;color:#2a2520;margin-bottom:4px;">Clientes</div>
+          <div style="font-size:12px;color:#8a7a6a;">CRM e gestão de pacientes</div>
+        </div>
+        <div onclick="switchPage('relatorios',document.querySelector('[onclick*=relatorios]'))" style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:20px;cursor:pointer;" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:28px;margin-bottom:8px;">📈</div>
+          <div style="font-weight:600;color:#2a2520;margin-bottom:4px;">Relatórios</div>
+          <div style="font-size:12px;color:#8a7a6a;">Análise por origem e avaliador</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="page-dashboard">
       <div class="dash-tabs">
         <div class="tab active" onclick="switchDashTab('trafego',this)"><span class="tab-dot"></span>Tráfego Pago</div>
         <div class="tab" onclick="switchDashTab('social',this)"><span class="tab-dot"></span>Social Selling</div>
@@ -866,9 +899,19 @@ function getRange(tab){
 function parseCloudiaDate(raw){
   if(!raw)return null;
   const s=String(raw).trim();
-  if(s.includes('Z')||s.includes('T')){const d=new Date(s);return isNaN(d)?null:d;}
-  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2})?:?(\d{2})?:?(\d{2})?/);
-  if(iso){const d=new Date(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]||0),parseInt(iso[5]||0),parseInt(iso[6]||0));return isNaN(d)?null:d;}
+  // Com Z ou T (ISO UTC) — browser converte para local automaticamente
+  if(s.includes('Z')||(/^\d{4}-\d{2}-\d{2}T/.test(s))){const d=new Date(s);return isNaN(d)?null:d;}
+  // Sem Z mas com espaço (ex: "2026-06-07 14:24:00") — Cloudia armazena UTC sem Z, converter -3h
+  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if(iso){
+    // Trata como UTC e converte para BRT (UTC-3)
+    const utc=new Date(Date.UTC(parseInt(iso[1]),parseInt(iso[2])-1,parseInt(iso[3]),parseInt(iso[4]),parseInt(iso[5]),parseInt(iso[6]||0)));
+    return isNaN(utc)?null:utc;
+  }
+  // Só data sem hora: "2026-06-07"
+  const isoDate=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(isoDate){return new Date(Date.UTC(parseInt(isoDate[1]),parseInt(isoDate[2])-1,parseInt(isoDate[3])));}
+  // Formato BR: 05/06/2026 08:58:00
   const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
   if(m){const d=new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]),parseInt(m[4]||0),parseInt(m[5]||0),parseInt(m[6]||0));return isNaN(d)?null:d;}
   return null;
