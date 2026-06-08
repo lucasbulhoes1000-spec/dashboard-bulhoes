@@ -1122,7 +1122,9 @@ function renderTrafego(metaAds,filtered,filteredEvents){
 
   // Agendamentos: por created_at (dia que agendou) — sincronizado com a lupa
   // Comparecimentos/fechamentos: por timestamp (dia que aconteceu)
-  const agendPhones=new Set(filtered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const agendRows=filtered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage));
+  console.log('[AGEND DEBUG] filtered total:',filtered.length,'agendRows:',agendRows.length, agendRows.map(r=>({name:r.name,stage:r.stage,created_at:r.created_at,phone:r.phone})));
+  const agendPhones=new Set(agendRows.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agend=agendPhones.size;
   const evtsGeral=filteredEvents||filtered;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
