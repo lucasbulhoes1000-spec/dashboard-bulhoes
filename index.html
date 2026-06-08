@@ -1960,16 +1960,18 @@ function renderRelComparecidos(){
   const distances=[0,1,2,3,4,5,6,17];
   const distMap={};
   distances.forEach(d=>distMap[d]={agend:0,comp:0,agendRows:[],compRows:[]});
+  const seenAgend=new Set();
+  const seenComp=new Set();
   agendados.forEach(r=>{
     const dc=parseCloudiaDate(r.created_at);
     const dt=parseCloudiaDate(r.timestamp);
     if(!dc||!dt)return;
+    const ph=String(r.phone||'').replace(/\D/g,'');
     const diff=Math.round((dt-dc)/(1000*60*60*24));
     const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
     if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
-    distMap[bucket].agend++;
-    distMap[bucket].agendRows.push(r);
-    if(isComp(r.stage)){distMap[bucket].comp++;distMap[bucket].compRows.push(r);}
+    if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(r);}
+    if(isComp(r.stage)&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(r);}
   });
   const totalAgend=agendados.length;
   window._rcData={};
