@@ -934,34 +934,40 @@ function filterEventsByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra agendamentos: stage Agendou no período, dedup por telefone
-// Prioriza CUSTOMER_STAGE_UPDATED > CUSTOMER_CREATED > CUSTOMER_ACQUISITION_ORIGIN_UPDATED
-// Compareceu/Faltou/Fechou depois NÃO cancela — o agendamento continua contando
+// Filtra agendamentos: APENAS CUSTOMER_STAGE_UPDATED com stage Agendou no período
+// Dedup por telefone — pega o mais recente Agendou
+// Se depois teve CUSTOMER_STAGE_UPDATED com Lead ou Perdido → SDR corrigiu erro, cancela
+// Compareceu/Faltou/Fechou depois NÃO cancela
 function filterAgendByRange(rows,tab){
   const rng=getRange(tab);
-  const typeRank=t=>t==='CUSTOMER_STAGE_UPDATED'?3:t==='CUSTOMER_CREATED'?2:t==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'?1:0;
-  const phoneMap={};
+  const byPhone={};
   rows.forEach(row=>{
-    if(!isAgend(row.stage))return;
-    if(typeRank(row.type)===0)return;
-    const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
-    if(!d)return;
-    const ds=localDateStr(d);
-    if(ds<rng.since||ds>rng.until)return;
+    if(row.type!=='CUSTOMER_STAGE_UPDATED')return;
     const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
     if(!ph)return;
-    if(!phoneMap[ph]){
-      phoneMap[ph]=row;
-    } else {
-      const cur=phoneMap[ph];
-      const curRank=typeRank(cur.type);
-      const newRank=typeRank(row.type);
-      if(newRank>curRank||(newRank===curRank&&d>(parseCloudiaDate(cur.timestamp)||parseCloudiaDate(cur.created_at)||new Date(0)))){
-        phoneMap[ph]=row;
-      }
-    }
+    if(!byPhone[ph])byPhone[ph]=[];
+    byPhone[ph].push(row);
   });
-  return Object.values(phoneMap);
+  const result=[];
+  Object.values(byPhone).forEach(evts=>{
+    // Teve Agendou no período?
+    const agendInPeriod=evts.filter(e=>{
+      if(!isAgend(e.stage))return false;
+      const d=parseCloudiaDate(e.timestamp);
+      if(!d)return false;
+      const ds=localDateStr(d);
+      return ds>=rng.since&&ds<=rng.until;
+    });
+    if(!agendInPeriod.length)return;
+    // Último CUSTOMER_STAGE_UPDATED global é Lead ou Perdido? → cancelado
+    const sorted=evts.slice().sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    const lastStage=sorted[0].stage;
+    if(lastStage==='Lead'||lastStage==='Perdido')return;
+    // Pega o Agendou mais recente no período
+    agendInPeriod.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    result.push(agendInPeriod[0]);
+  });
+  return result;
 }
 
 // HELPERS
