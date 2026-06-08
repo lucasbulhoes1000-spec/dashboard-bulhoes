@@ -1304,7 +1304,7 @@ function renderSocial(rows){
   if(ssChartInstance)ssChartInstance.destroy();
   if(resEntries.length>0)ssChartInstance=new Chart(document.getElementById('ss-result-chart'),{type:'doughnut',data:{labels:resEntries.map(([k])=>k),datasets:[{data:resEntries.map(([,v])=>v),backgroundColor:resEntries.map(([k])=>resColors[k]||'#888'),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
   const icons={'Seguidor':'👥','Curtida':'❤️','Comentário':'💬','Enquete/Reação':'📊','Stories':'⭕'};
-  const maxConv=Math.max(...Object.keys(tipos).map(t=>tipos[t]>0?(tipoAgend[t]||0)/tipos[t]*100:0),1);
+  const maxConv=Math.max(...Object.keys(tipos).map(t=>tipos[t]>0?(tipoComp[t]||0)/tipos[t]*100:0),1);
   document.getElementById('ss-tipos').innerHTML=Object.entries(tipos).sort((a,b)=>((tipoComp[b[0]]||0)/b[1])-((tipoComp[a[0]]||0)/a[1])).map(([t,n])=>{
     const cv=n>0?Math.round((tipoComp[t]||0)/n*100):0;
     return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid #ede6dc;">
@@ -1687,6 +1687,7 @@ function salvarOrcamento(){
   refreshOrcamentos(d);
   updateEntradas();
   filterClientesTable();
+  salvarCRMDebounced();
 }
 function excluirOrcamento(idx){
   if(!confirm('Excluir este orçamento?'))return;
@@ -1739,6 +1740,7 @@ function salvarAtividade(){
   document.getElementById('cc-atv-form').style.display='none';
   refreshAtividades(r,d);
   switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
+  salvarCRMDebounced();
 }
 function refreshAtividades(r,d){
   var auto=[];
@@ -1771,6 +1773,7 @@ function salvarAnotacao(){
   d.anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
   document.getElementById('cc-anot-input').value='';
   refreshAnotacoes(d);
+  salvarCRMDebounced();
 }
 function refreshAnotacoes(d){
   document.getElementById('cc-anot-list').innerHTML=(d.anotacoes||[]).map(a=>`
@@ -2101,13 +2104,39 @@ async function executarImportarClientes(){const csv=document.getElementById('imp
 
 // CRM
 const CRM_URL=CLOUDIA_URL;
-async function salvarCRMRemoto(){try{await fetch(CRM_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'saveCRM',data:_ccData})});}catch(e){console.warn('CRM save:',e);}}
-async function carregarCRMRemoto(){try{const res=await Promise.race([fetch(CRM_URL+'?action=loadCRM'),new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),4000))]);const raw=await res.json();if(raw&&typeof raw==='object'&&!Array.isArray(raw)){_ccData=raw;console.log('[CRM] Carregado:',Object.keys(_ccData).length);}}catch(e){console.warn('CRM load:',e);}}
+let _crmSaveTimer=null;
+async function salvarCRMRemoto(){
+  try{
+    const res=await fetch(CRM_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'saveCRM',data:_ccData})});
+    const r=await res.json();
+    console.log('[CRM] Salvo:',Object.keys(_ccData).length,'clientes');
+    return true;
+  }catch(e){console.warn('[CRM] Erro ao salvar:',e);return false;}
+}
+function salvarCRMDebounced(){
+  clearTimeout(_crmSaveTimer);
+  _crmSaveTimer=setTimeout(()=>salvarCRMRemoto(),1500);
+}
+async function carregarCRMRemoto(){
+  try{
+    const res=await Promise.race([
+      fetch(CRM_URL+'?action=loadCRM'),
+      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),6000))
+    ]);
+    const raw=await res.json();
+    if(raw&&typeof raw==='object'&&!Array.isArray(raw)&&Object.keys(raw).length>0){
+      _ccData=raw;
+      console.log('[CRM] Carregado:',Object.keys(_ccData).length,'clientes');
+      renderClientesTable();
+    }
+  }catch(e){console.warn('[CRM] Erro ao carregar:',e);}
+}
 
 // INIT
-window.addEventListener('load',()=>{
+window.addEventListener('load',async ()=>{
+  // Carrega CRM primeiro, depois renderiza
+  await carregarCRMRemoto();
   loadTrafego();
-  setTimeout(()=>carregarCRMRemoto(),3000);
 });
 </script>
 
