@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -934,27 +934,29 @@ function filterEventsByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra agendamentos pelo timestamp — qualquer tipo com stage Agendou
-// Usa dedup por telefone para não contar duplicatas (CUSTOMER_CREATED + CUSTOMER_STAGE_UPDATED do mesmo lead)
+// Filtra agendamentos: pega o ÚLTIMO stage de cada telefone no período
+// Se o último stage for Agendou → conta. Se viraram Lead depois → não conta.
 function filterAgendByRange(rows,tab){
   const r=getRange(tab);
-  // Prioriza CUSTOMER_STAGE_UPDATED; se não tiver, aceita qualquer tipo
-  const phoneMap={};
+  // Primeiro: pega o último CUSTOMER_STAGE_UPDATED de cada telefone no período
+  const lastStageMap={};
   rows.forEach(row=>{
-    if(!isAgend(row.stage))return;
+    if(row.type!=='CUSTOMER_STAGE_UPDATED')return;
     if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
     const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return;
     if(localDateStr(d)<r.since||localDateStr(d)>r.until)return;
     const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
-    if(!phoneMap[ph]){
-      phoneMap[ph]=row;
+    if(!lastStageMap[ph]){
+      lastStageMap[ph]=row;
     } else {
-      // Prioriza CUSTOMER_STAGE_UPDATED
-      if(row.type==='CUSTOMER_STAGE_UPDATED')phoneMap[ph]=row;
+      // Guarda o mais recente
+      const dOld=parseCloudiaDate(lastStageMap[ph].timestamp)||parseCloudiaDate(lastStageMap[ph].created_at)||new Date(0);
+      if(d>dOld)lastStageMap[ph]=row;
     }
   });
-  return Object.values(phoneMap);
+  // Retorna só quem o último stage é Agendou
+  return Object.values(lastStageMap).filter(r=>isAgend(r.stage));
 }
 
 // HELPERS
