@@ -652,39 +652,44 @@ tbody tr:hover td{background:#faf7f3;}
     <div class="page" id="page-comissoes">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <input type="date" id="com-from" class="filter-select" oninput="renderComissoes()">
-          <span style="font-size:12px;color:#b5a898;">até</span>
-          <input type="date" id="com-to" class="filter-select" oninput="renderComissoes()">
-          <select id="com-membro" class="filter-select" onchange="renderComissoes()">
+          <select id="com-mes-sel" class="filter-select" onchange="renderComissoes()" style="font-weight:500;">
+            <option value="">Todos os meses</option>
+            <option value="2026-01">Jan/2026</option><option value="2026-02">Fev/2026</option>
+            <option value="2026-03">Mar/2026</option><option value="2026-04">Abr/2026</option>
+            <option value="2026-05">Mai/2026</option><option value="2026-06">Jun/2026</option>
+            <option value="2026-07">Jul/2026</option><option value="2026-08">Ago/2026</option>
+            <option value="2026-09">Set/2026</option><option value="2026-10">Out/2026</option>
+            <option value="2026-11">Nov/2026</option><option value="2026-12">Dez/2026</option>
+          </select>
+          <select id="com-membro-fil" class="filter-select" onchange="renderComissoes()">
             <option value="">Todos os membros</option>
           </select>
-          <button onclick="clearComDates()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#9a8c7e;font-size:11px;padding:5px 8px;cursor:pointer;">✕ Limpar</button>
+          <select id="com-status-fil" class="filter-select" onchange="renderComissoes()">
+            <option value="">Todos os status</option>
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+          </select>
         </div>
         <button onclick="openComForm(null)" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">+ Lançar comissão</button>
       </div>
-
-      <!-- Cards resumo -->
       <div class="row r4" style="margin-bottom:16px;">
         <div class="mc"><div class="ml">Total pago</div><div class="mv tg" id="com-total-pago">—</div><div class="ms">no período</div></div>
         <div class="mc"><div class="ml">Total pendente</div><div class="mv ta" id="com-total-pendente">—</div><div class="ms">a pagar</div></div>
-        <div class="mc"><div class="ml">Lançamentos</div><div class="mv" id="com-total-lancamentos">—</div><div class="ms">no período</div></div>
-        <div class="mc"><div class="ml">Membros ativos</div><div class="mv" id="com-total-membros">—</div><div class="ms">com comissão</div></div>
+        <div class="mc"><div class="ml">Comissão avaliadores</div><div class="mv" id="com-total-aval">—</div><div class="ms">no período</div></div>
+        <div class="mc"><div class="ml">Comissão CRC</div><div class="mv" id="com-total-crc">—</div><div class="ms">no período</div></div>
       </div>
-
-      <!-- Tabela -->
+      <div id="com-resumo-membros" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
       <div class="table-card">
         <div class="tw">
           <table>
             <thead><tr>
-              <th>Membro</th>
-              <th>Cargo</th>
-              <th>Referência</th>
-              <th>Tipo</th>
-              <th>Período</th>
-              <th style="text-align:right">Valor</th>
-              <th>Status</th>
-              <th>Observação</th>
-              <th></th>
+              <th>Data</th><th>Paciente</th><th>Avaliador</th><th>CRC</th>
+              <th style="text-align:right">Vl. Trat.</th>
+              <th style="text-align:right">Entrada</th>
+              <th style="text-align:right">% Ent.</th>
+              <th style="text-align:right">Com. Aval.</th>
+              <th style="text-align:right">Com. CRC</th>
+              <th>Pgto</th><th>Status</th><th></th>
             </tr></thead>
             <tbody id="com-tbody"></tbody>
           </table>
@@ -692,53 +697,68 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
     </div>
 
-    <!-- FORM COMISSÃO -->
+    <!-- FORM LANÇAMENTO COMISSÃO -->
     <div id="com-form-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+      <div style="background:#fff;border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <div id="com-form-title" style="font-size:15px;font-weight:700;color:#2a2520;">Lançar Comissão</div>
           <button onclick="closeComForm()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
         </div>
         <input type="hidden" id="com-edit-idx" value="">
-        <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Membro</label>
-          <input id="com-membro-input" type="text" placeholder="Nome do membro" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" list="com-membros-list">
-          <datalist id="com-membros-list"></datalist>
+        <div style="background:#f5f0ea;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:10px;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Dados do fechamento</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data</label>
+              <input id="com-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Paciente</label>
+              <input id="com-paciente" type="text" placeholder="Nome do paciente" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
+              <select id="com-avaliador" onchange="calcComissoes()" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+                <option value="">Sem avaliador</option><option>Victoria</option><option>Larissa</option><option>Gabi</option>
+              </select></div>
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">CRC</label>
+              <input id="com-crc" type="text" placeholder="Nome da CRC" list="com-crc-list" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+              <datalist id="com-crc-list"><option value="Ana"><option value="Lucas"><option value="Natalia"><option value="Nathalia"></datalist>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor tratamento (R$)</label>
+              <input id="com-valor-trat" type="number" placeholder="0" oninput="calcComissoes()" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Entrada (R$)</label>
+              <input id="com-entrada-val" type="number" placeholder="0" oninput="calcComissoes()" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Forma pagamento</label>
+              <select id="com-pgto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+                <option value="">—</option><option>À vista</option><option>Boleto</option><option>Cartão</option><option>PIX</option>
+              </select></div>
+          </div>
         </div>
-        <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Cargo / Função</label>
-          <input id="com-cargo" type="text" placeholder="Ex: SDR, Avaliador, Gestor..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        <div style="background:#f0f5f0;border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:10px;color:#5a8a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">⚡ Comissões calculadas automaticamente</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+            <div style="text-align:center;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">% Entrada</div>
+              <div id="com-pct-display" style="font-size:20px;font-weight:700;color:#A18B6C;">—</div></div>
+            <div style="text-align:center;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">Comissão Avaliador</div>
+              <div id="com-aval-display" style="font-size:20px;font-weight:700;color:#5a8a6a;">—</div></div>
+            <div style="text-align:center;"><div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">Comissão CRC</div>
+              <div id="com-crc-display" style="font-size:20px;font-weight:700;color:#4a7a9a;">—</div></div>
+          </div>
+          <div style="font-size:10px;color:#9a8c7e;margin-top:8px;text-align:center;" id="com-regra-display"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tipo</label>
-            <select id="com-tipo" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-              <option>Fixa mensal</option>
-              <option>Por agendamento</option>
-              <option>Por comparecimento</option>
-              <option>Por fechamento</option>
-              <option>Percentual sobre vendas</option>
-              <option>Bônus</option>
-              <option>Outro</option>
-            </select>
-          </div>
+          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Comissão Avaliador (R$) — editável</label>
+            <input id="com-aval-manual" type="number" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Comissão CRC (R$) — editável</label>
+            <input id="com-crc-manual" type="number" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
           <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-            <select id="com-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-            </select>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Período referência</label>
-            <input id="com-periodo" type="month" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-          </div>
-          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor (R$)</label>
-            <input id="com-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-          </div>
-        </div>
-        <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Referência (cliente, meta, etc)</label>
-          <input id="com-ref" type="text" placeholder="Ex: Fechamento Fernanda, Meta junho..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-        </div>
-        <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
-          <textarea id="com-obs" placeholder="Observações..." style="width:100%;min-height:60px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+            <select id="com-status-form" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+              <option value="pendente">Pendente</option><option value="pago">Pago</option>
+            </select></div>
+          <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
+            <input id="com-obs" type="text" placeholder="Opcional..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
         </div>
         <div style="display:flex;gap:10px;">
           <button onclick="salvarComissao()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
@@ -748,6 +768,8 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
   </div><!-- /content -->
 </div><!-- /main -->
+
+
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
@@ -2469,176 +2491,154 @@ function iniciarApp(){
 // ===== COMISSÕES =====
 let _comissoes=[];
 
+function calcComissaoRegras(valorTrat,entrada){
+  if(!valorTrat||valorTrat<=0)return{pct:0,comAval:0,comCrc:0,regra:''};
+  const pct=entrada/valorTrat;
+  let txAval=0,txCrc=0,regra='';
+  if(pct<0.1){txAval=0;txCrc=0;regra='Abaixo de 10% — sem comissão CRC';}
+  else if(pct<0.2){txAval=0.02;txCrc=0.005;regra='10-19,99% entrada → Aval: 2% | CRC: 0,5%';}
+  else if(pct<0.3){txAval=0.03;txCrc=0.008;regra='20-29,99% entrada → Aval: 3% | CRC: 0,8%';}
+  else{txAval=0.04;txCrc=0.01;regra='≥30% entrada → Aval: 4% | CRC: 1%';}
+  return{pct,comAval:Math.round(txAval*valorTrat*100)/100,comCrc:Math.round(txCrc*valorTrat*100)/100,regra};
+}
+function calcComissoes(){
+  const vt=parseFloat(document.getElementById('com-valor-trat').value)||0;
+  const ent=parseFloat(document.getElementById('com-entrada-val').value)||0;
+  const r=calcComissaoRegras(vt,ent);
+  if(vt>0){
+    document.getElementById('com-pct-display').textContent=(r.pct*100).toFixed(1)+'%';
+    document.getElementById('com-aval-display').textContent=r.comAval>0?fmt(r.comAval):'—';
+    document.getElementById('com-crc-display').textContent=r.comCrc>0?fmt(r.comCrc):'—';
+    document.getElementById('com-regra-display').textContent=r.regra;
+    document.getElementById('com-aval-manual').value=r.comAval||'';
+    document.getElementById('com-crc-manual').value=r.comCrc||'';
+  } else {
+    ['com-pct-display','com-aval-display','com-crc-display'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('com-regra-display').textContent='';
+  }
+}
 function initComissoes(){
-  // Dados já carregados do Supabase em carregarCRMRemoto
-  // Fallback: localStorage caso ainda não tenha sido carregado
-  if(!_comissoes.length){
-    const saved=localStorage.getItem('bulhoes_comissoes');
-    if(saved)try{_comissoes=JSON.parse(saved);}catch(e){_comissoes=[];}
-  }
-  // Pré-preenche período atual
+  if(!_comissoes.length){const s=localStorage.getItem('bulhoes_comissoes');if(s)try{_comissoes=JSON.parse(s);}catch(e){_comissoes=[];}}
   const now=new Date();
-  const mesAtual=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const primeiroDia=mesAtual+'-01';
-  const ultimoDia=localDateStr(new Date(now.getFullYear(),now.getMonth()+1,0));
-  if(!document.getElementById('com-from').value)document.getElementById('com-from').value=primeiroDia;
-  if(!document.getElementById('com-to').value)document.getElementById('com-to').value=ultimoDia;
+  const mesAtual='2026-'+String(now.getMonth()+1).padStart(2,'0');
+  const sel=document.getElementById('com-mes-sel');
+  if(sel&&!sel.value)sel.value=mesAtual;
   renderComissoes();
 }
-
-function clearComDates(){
-  document.getElementById('com-from').value='';
-  document.getElementById('com-to').value='';
-  renderComissoes();
-}
-
 function renderComissoes(){
-  const fromV=document.getElementById('com-from').value;
-  const toV=document.getElementById('com-to').value;
-  const membroFilt=document.getElementById('com-membro').value;
-
-  // Filtra
+  const mesFil=(document.getElementById('com-mes-sel')||{}).value||'';
+  const membroFil=(document.getElementById('com-membro-fil')||{}).value||'';
+  const statusFil=(document.getElementById('com-status-fil')||{}).value||'';
   const filtered=_comissoes.filter(c=>{
-    const periodo=c.periodo||'';
-    // Compara pelo período (YYYY-MM) dentro do range de datas
-    let dateMatch=true;
-    if(fromV||toV){
-      const mes=periodo; // YYYY-MM
-      const mesFrom=fromV?fromV.substring(0,7):'';
-      const mesTo=toV?toV.substring(0,7):'';
-      if(mesFrom&&mes&&mes<mesFrom)dateMatch=false;
-      if(mesTo&&mes&&mes>mesTo)dateMatch=false;
-    }
-    const membroMatch=!membroFilt||c.membro===membroFilt;
-    return dateMatch&&membroMatch;
+    const mesMatch=!mesFil||(c.data||'').substring(0,7)===mesFil;
+    const memMatch=!membroFil||(c.avaliador===membroFil||c.crc===membroFil);
+    const stMatch=!statusFil||c.status===statusFil;
+    return mesMatch&&memMatch&&stMatch;
   });
-
-  // Atualiza select de membros
-  const membros=[...new Set(_comissoes.map(c=>c.membro).filter(Boolean))].sort();
-  const sel=document.getElementById('com-membro');
-  const curVal=sel.value;
-  sel.innerHTML='<option value="">Todos os membros</option>'+membros.map(m=>`<option value="${m}"${m===curVal?' selected':''}>${m}</option>`).join('');
-
-  // Datalist
-  const dl=document.getElementById('com-membros-list');
-  if(dl)dl.innerHTML=membros.map(m=>`<option value="${m}">`).join('');
-
-  // Cards
-  const totalPago=filtered.filter(c=>c.status==='pago').reduce((s,c)=>s+Number(c.valor||0),0);
-  const totalPendente=filtered.filter(c=>c.status==='pendente').reduce((s,c)=>s+Number(c.valor||0),0);
-  const membrosAtivos=new Set(filtered.map(c=>c.membro).filter(Boolean)).size;
+  const todos=new Set();_comissoes.forEach(c=>{if(c.avaliador)todos.add(c.avaliador);if(c.crc)todos.add(c.crc);});
+  const sel=document.getElementById('com-membro-fil');
+  if(sel){const cv=sel.value;sel.innerHTML='<option value="">Todos os membros</option>'+[...todos].sort().map(m=>`<option${m===cv?' selected':''}>${m}</option>`).join('');}
+  const totalPago=filtered.filter(c=>c.status==='pago').reduce((s,c)=>s+Number(c.comAval||0)+Number(c.comCrc||0),0);
+  const totalPend=filtered.filter(c=>c.status!=='pago').reduce((s,c)=>s+Number(c.comAval||0)+Number(c.comCrc||0),0);
+  const totalAval=filtered.reduce((s,c)=>s+Number(c.comAval||0),0);
+  const totalCrc=filtered.reduce((s,c)=>s+Number(c.comCrc||0),0);
   document.getElementById('com-total-pago').textContent=totalPago>0?fmt(totalPago):'—';
-  document.getElementById('com-total-pendente').textContent=totalPendente>0?fmt(totalPendente):'—';
-  document.getElementById('com-total-lancamentos').textContent=filtered.length;
-  document.getElementById('com-total-membros').textContent=membrosAtivos||'—';
-
-  // Tabela
+  document.getElementById('com-total-pendente').textContent=totalPend>0?fmt(totalPend):'—';
+  document.getElementById('com-total-aval').textContent=totalAval>0?fmt(totalAval):'—';
+  document.getElementById('com-total-crc').textContent=totalCrc>0?fmt(totalCrc):'—';
+  const byMembro={};
+  filtered.forEach(c=>{
+    const add=(nome,val)=>{if(!nome)return;if(!byMembro[nome])byMembro[nome]={total:0,pago:0};byMembro[nome].total+=val;if(c.status==='pago')byMembro[nome].pago+=val;};
+    add(c.avaliador,Number(c.comAval||0));add(c.crc,Number(c.comCrc||0));
+  });
+  const rmEl=document.getElementById('com-resumo-membros');
+  if(rmEl)rmEl.innerHTML=Object.entries(byMembro).sort((a,b)=>b[1].total-a[1].total).map(([nome,d])=>`
+    <div style="background:#fff;border:0.5px solid #e0d8ce;border-radius:8px;padding:10px 14px;min-width:140px;">
+      <div style="font-size:11px;font-weight:600;color:#2a2520;margin-bottom:4px;">${nome}</div>
+      <div style="font-size:14px;font-weight:700;color:#A18B6C;">${fmt(d.total)}</div>
+      <div style="font-size:10px;color:#5a8a6a;">✓ ${fmt(d.pago)} pago</div>
+      ${d.total-d.pago>0?`<div style="font-size:10px;color:#b5856a;">⏳ ${fmt(d.total-d.pago)} pendente</div>`:''}
+    </div>`).join('');
   const tbody=document.getElementById('com-tbody');
-  if(!filtered.length){
-    tbody.innerHTML='<tr><td colspan="9" class="empty-state">Nenhuma comissão lançada no período</td></tr>';
-    return;
-  }
-  const sorted=[...filtered].sort((a,b)=>(b.periodo||'').localeCompare(a.periodo||'')||(a.membro||'').localeCompare(b.membro||''));
-  tbody.innerHTML=sorted.map((c,i)=>{
-    const realIdx=_comissoes.indexOf(c);
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="12" class="empty-state">Nenhum lançamento no período</td></tr>';return;}
+  tbody.innerHTML=[...filtered].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(c=>{
+    const ri=_comissoes.indexOf(c);
     const sc=c.status==='pago'?'#5a8a6a':'#A18B6C';
-    const label=c.status==='pago'?'✓ Pago':'⏳ Pendente';
+    const pct=c.valorTrat>0?((c.entrada||0)/c.valorTrat*100).toFixed(1)+'%':'—';
     return`<tr>
-      <td style="font-weight:500;color:#2a2520;">${c.membro||'—'}</td>
-      <td class="tm">${c.cargo||'—'}</td>
-      <td style="font-size:12px;">${c.ref||'—'}</td>
-      <td><span class="origem-pill">${c.tipo||'—'}</span></td>
-      <td class="tm">${c.periodo?fmtPeriodo(c.periodo):'—'}</td>
-      <td style="text-align:right;font-weight:600;color:#2a2520;">${Number(c.valor||0)>0?fmt(Number(c.valor)):''}</td>
-      <td><span style="background:${sc}22;color:${sc};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${label}</span></td>
-      <td class="tm" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;">${c.obs||''}</td>
+      <td class="tm">${c.data?new Date(c.data+'T12:00').toLocaleDateString('pt-BR'):'—'}</td>
+      <td style="font-weight:500;color:#2a2520;">${c.paciente||'—'}</td>
+      <td class="tm">${c.avaliador||'—'}</td><td class="tm">${c.crc||'—'}</td>
+      <td style="text-align:right" class="ta">${c.valorTrat>0?fmt(c.valorTrat):'—'}</td>
+      <td style="text-align:right">${c.entrada>0?fmt(c.entrada):'—'}</td>
+      <td style="text-align:right" class="tm">${pct}</td>
+      <td style="text-align:right;font-weight:600;color:#5a8a6a;">${c.comAval>0?fmt(c.comAval):'—'}</td>
+      <td style="text-align:right;font-weight:600;color:#4a7a9a;">${c.comCrc>0?fmt(c.comCrc):'—'}</td>
+      <td class="tm">${c.pgto||'—'}</td>
+      <td><span style="background:${sc}22;color:${sc};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${c.status==='pago'?'✓ Pago':'⏳ Pendente'}</span></td>
       <td style="white-space:nowrap;">
-        ${c.status==='pendente'?`<button onclick="marcarPago(${realIdx})" style="background:#e8f5e9;color:#5a8a6a;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;margin-right:4px;">✓ Pagar</button>`:''}
-        <button onclick="openComForm(${realIdx})" style="background:#e8e2da;color:#2a2520;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;margin-right:4px;">✏</button>
-        <button onclick="excluirComissao(${realIdx})" style="background:#fdecea;color:#c0392b;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">🗑</button>
-      </td>
-    </tr>`;
+        ${c.status!=='pago'?`<button onclick="marcarPago(${ri})" style="background:#e8f5e9;color:#5a8a6a;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;margin-right:4px;">✓</button>`:''}
+        <button onclick="openComForm(${ri})" style="background:#e8e2da;color:#2a2520;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;margin-right:4px;">✏</button>
+        <button onclick="excluirComissao(${ri})" style="background:#fdecea;color:#c0392b;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;">🗑</button>
+      </td></tr>`;
   }).join('');
 }
-
-function fmtPeriodo(p){
-  if(!p)return'—';
-  const [y,m]=p.split('-');
-  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  return(meses[parseInt(m)-1]||m)+'/'+y;
-}
-
 function openComForm(idx){
   document.getElementById('com-form-overlay').style.display='flex';
   document.getElementById('com-edit-idx').value=idx!=null?idx:'';
-  const now=new Date();
-  const mesAtual=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const today=new Date().toISOString().split('T')[0];
   if(idx!=null&&_comissoes[idx]){
     const c=_comissoes[idx];
-    document.getElementById('com-membro-input').value=c.membro||'';
-    document.getElementById('com-cargo').value=c.cargo||'';
-    document.getElementById('com-tipo').value=c.tipo||'Fixa mensal';
-    document.getElementById('com-status').value=c.status||'pendente';
-    document.getElementById('com-periodo').value=c.periodo||mesAtual;
-    document.getElementById('com-valor').value=c.valor||'';
-    document.getElementById('com-ref').value=c.ref||'';
+    document.getElementById('com-data').value=c.data||today;
+    document.getElementById('com-paciente').value=c.paciente||'';
+    document.getElementById('com-avaliador').value=c.avaliador||'';
+    document.getElementById('com-crc').value=c.crc||'';
+    document.getElementById('com-valor-trat').value=c.valorTrat||'';
+    document.getElementById('com-entrada-val').value=c.entrada||'';
+    document.getElementById('com-pgto').value=c.pgto||'';
+    document.getElementById('com-aval-manual').value=c.comAval||'';
+    document.getElementById('com-crc-manual').value=c.comCrc||'';
+    document.getElementById('com-status-form').value=c.status||'pendente';
     document.getElementById('com-obs').value=c.obs||'';
-    document.getElementById('com-form-title').textContent='Editar Comissão';
+    document.getElementById('com-form-title').textContent='Editar Lançamento';
+    calcComissoes();
   } else {
-    document.getElementById('com-membro-input').value='';
-    document.getElementById('com-cargo').value='';
-    document.getElementById('com-tipo').value='Fixa mensal';
-    document.getElementById('com-status').value='pendente';
-    document.getElementById('com-periodo').value=mesAtual;
-    document.getElementById('com-valor').value='';
-    document.getElementById('com-ref').value='';
-    document.getElementById('com-obs').value='';
+    ['com-paciente','com-crc','com-obs'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('com-data').value=today;
+    document.getElementById('com-avaliador').value='';
+    document.getElementById('com-valor-trat').value='';
+    document.getElementById('com-entrada-val').value='';
+    document.getElementById('com-pgto').value='';
+    document.getElementById('com-aval-manual').value='';
+    document.getElementById('com-crc-manual').value='';
+    document.getElementById('com-status-form').value='pendente';
     document.getElementById('com-form-title').textContent='Lançar Comissão';
+    ['com-pct-display','com-aval-display','com-crc-display'].forEach(id=>document.getElementById(id).textContent='—');
+    document.getElementById('com-regra-display').textContent='';
   }
 }
-
 function closeComForm(){document.getElementById('com-form-overlay').style.display='none';}
-
 function salvarComissao(){
-  const membro=document.getElementById('com-membro-input').value.trim();
-  if(!membro){alert('Nome do membro é obrigatório');return;}
-  const c={
-    membro,
-    cargo:document.getElementById('com-cargo').value.trim(),
-    tipo:document.getElementById('com-tipo').value,
-    status:document.getElementById('com-status').value,
-    periodo:document.getElementById('com-periodo').value,
-    valor:parseFloat(document.getElementById('com-valor').value)||0,
-    ref:document.getElementById('com-ref').value.trim(),
+  const paciente=document.getElementById('com-paciente').value.trim();
+  const avaliador=document.getElementById('com-avaliador').value;
+  const crc=document.getElementById('com-crc').value.trim();
+  if(!paciente&&!avaliador&&!crc){alert('Preencha ao menos paciente ou avaliador');return;}
+  const vt=parseFloat(document.getElementById('com-valor-trat').value)||0;
+  const ent=parseFloat(document.getElementById('com-entrada-val').value)||0;
+  const c={data:document.getElementById('com-data').value,paciente,avaliador,crc,valorTrat:vt,entrada:ent,
+    pgto:document.getElementById('com-pgto').value,
+    comAval:parseFloat(document.getElementById('com-aval-manual').value)||0,
+    comCrc:parseFloat(document.getElementById('com-crc-manual').value)||0,
+    status:document.getElementById('com-status-form').value,
     obs:document.getElementById('com-obs').value.trim(),
-    criadoEm:new Date().toISOString()
-  };
-  const editIdx=document.getElementById('com-edit-idx').value;
-  if(editIdx!=='')_comissoes[parseInt(editIdx)]=c;
-  else _comissoes.unshift(c);
-  salvarComissoes();
-  closeComForm();
-  renderComissoes();
+    criadoEm:new Date().toISOString()};
+  const ei=document.getElementById('com-edit-idx').value;
+  if(ei!=='')_comissoes[parseInt(ei)]=c;else _comissoes.unshift(c);
+  salvarComissoes();closeComForm();renderComissoes();
 }
-
-function marcarPago(idx){
-  if(!_comissoes[idx])return;
-  _comissoes[idx].status='pago';
-  salvarComissoes();
-  renderComissoes();
-}
-
-function excluirComissao(idx){
-  if(!confirm('Excluir esta comissão?'))return;
-  _comissoes.splice(idx,1);
-  salvarComissoes();
-  renderComissoes();
-}
-
-function salvarComissoes(){
-  // Salva no Supabase (junto com o CRM) com debounce
-  salvarCRMDebounced();
-}
+function marcarPago(idx){if(!_comissoes[idx])return;_comissoes[idx].status='pago';salvarComissoes();renderComissoes();}
+function excluirComissao(idx){if(!confirm('Excluir?'))return;_comissoes.splice(idx,1);salvarComissoes();renderComissoes();}
+function salvarComissoes(){salvarCRMDebounced();}
 
 // INIT
 window.addEventListener('load',()=>{
