@@ -934,16 +934,27 @@ function filterEventsByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra só agendamentos (CUSTOMER_STAGE_UPDATED com stage Agendou) pelo timestamp
+// Filtra agendamentos pelo timestamp — qualquer tipo com stage Agendou
+// Usa dedup por telefone para não contar duplicatas (CUSTOMER_CREATED + CUSTOMER_STAGE_UPDATED do mesmo lead)
 function filterAgendByRange(rows,tab){
   const r=getRange(tab);
-  return rows.filter(row=>{
-    if(row.type!=='CUSTOMER_STAGE_UPDATED')return false;
-    if(!isAgend(row.stage))return false;
+  // Prioriza CUSTOMER_STAGE_UPDATED; se não tiver, aceita qualquer tipo
+  const phoneMap={};
+  rows.forEach(row=>{
+    if(!isAgend(row.stage))return;
+    if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
     const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
-    if(!d)return false;
-    return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
+    if(!d)return;
+    if(localDateStr(d)<r.since||localDateStr(d)>r.until)return;
+    const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
+    if(!phoneMap[ph]){
+      phoneMap[ph]=row;
+    } else {
+      // Prioriza CUSTOMER_STAGE_UPDATED
+      if(row.type==='CUSTOMER_STAGE_UPDATED')phoneMap[ph]=row;
+    }
   });
+  return Object.values(phoneMap);
 }
 
 // HELPERS
