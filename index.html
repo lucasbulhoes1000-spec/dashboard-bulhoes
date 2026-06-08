@@ -1120,13 +1120,17 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   const origens={};
   Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
 
-  // Agendamentos: por created_at (dia que agendou) — sincronizado com a lupa
-  // Comparecimentos/fechamentos: por timestamp (dia que aconteceu)
-  const agendRows=filtered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage));
-  console.log('[AGEND DEBUG] filtered total:',filtered.length,'agendRows:',agendRows.length, agendRows.map(r=>({name:r.name,stage:r.stage,created_at:r.created_at,phone:r.phone})));
-  const agendPhones=new Set(agendRows.map(r=>String(r.phone||'').replace(/\D/g,'')));
-  const agend=agendPhones.size;
+  // Agendamentos: por timestamp (quando a SDR registrou o agendamento)
+  // Comparecimentos/fechamentos: por timestamp (quando aconteceu)
   const evtsGeral=filteredEvents||filtered;
+  // Agendamentos = quem tem stage agendou/faltou/comp/fechou no período por timestamp
+  // mas só conta como agendamento quem TEM registro de agendou (não quem só compareceu sem ter agendado no período)
+  const agendPhones=new Set(evtsGeral.filter(r=>isAgend(r.stage)||isFaltou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  // Quem compareceu ou fechou também agendou (mas pode ter agendado fora do período)
+  // Inclui no contador de agendamentos quem compareceu/fechou E tinha agendado (stage agendou em qualquer data)
+  const compFechouPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  compFechouPhones.forEach(ph=>agendPhones.add(ph));
+  const agend=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const comp=compPhones.size;
   const fechados=evtsGeral.filter(r=>isFechou(r.stage));
@@ -1517,23 +1521,22 @@ function lupaLeads(){
   openModal('Leads — '+rows.length+' únicos no período',['Data de cadastro','Nome','Telefone','Origem'],rows);
 }
 function lupaAgend(){
-  // USA _lastCloudiaFiltered (filtrado por created_at = dia que agendou)
-  // Assim, filtro "hoje" mostra quem AGENDOU hoje, não quem teve consulta hoje
+  // Usa filteredEvents (por timestamp = quando a SDR registrou o agendamento)
+  // Mostra quem tem stage agendou/faltou no período, + quem compareceu/fechou no período
   const phoneMap={};
-  _lastCloudiaFiltered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
     else{
-      // mantém o registro mais antigo (primeira vez que agendou)
-      const dCur=new Date(r.created_at||0);
-      const dOld=new Date(phoneMap[ph].created_at||0);
-      if(dCur<dOld)phoneMap[ph]=r;
+      // prioriza stage mais avançado
+      const rank=s=>{if(isFechou(s))return 4;if(isComp(s))return 3;if(isFaltou(s))return 2;if(isAgend(s))return 1;return 0;};
+      if(rank(r.stage)>rank(phoneMap[ph].stage))phoneMap[ph]=r;
     }
   });
   const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
-    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',r.origin||'—',getStatusAgend(r.stage)]);
-  openModal('Agendamentos — '+rows.length+' registros',['Data agendou','Nome','Telefone','Origem','Status'],rows);
+    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
+    .map(r=>[fmtDate(r.timestamp||r.created_at),r.name||'—',r.phone||'—',r.origin||'—',getStatusAgend(r.stage)]);
+  openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status'],rows);
 }
 function lupaComp(){
   const phoneMap={};
