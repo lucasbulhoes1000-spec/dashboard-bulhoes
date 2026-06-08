@@ -934,32 +934,34 @@ function filterEventsByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra agendamentos: CUSTOMER_STAGE_UPDATED com stage Agendou no período
-// Exclui quem depois teve um CUSTOMER_STAGE_UPDATED posterior com stage diferente no MESMO dia
+// Filtra agendamentos: stage Agendou no período, dedup por telefone
+// Prioriza CUSTOMER_STAGE_UPDATED > CUSTOMER_CREATED > CUSTOMER_ACQUISITION_ORIGIN_UPDATED
+// Compareceu/Faltou/Fechou depois NÃO cancela — o agendamento continua contando
 function filterAgendByRange(rows,tab){
-  const r=getRange(tab);
-  // Pega todos os CUSTOMER_STAGE_UPDATED no período, indexados por telefone+dia
-  const allStages={};
+  const rng=getRange(tab);
+  const typeRank=t=>t==='CUSTOMER_STAGE_UPDATED'?3:t==='CUSTOMER_CREATED'?2:t==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'?1:0;
+  const phoneMap={};
   rows.forEach(row=>{
-    if(row.type!=='CUSTOMER_STAGE_UPDATED')return;
+    if(!isAgend(row.stage))return;
+    if(typeRank(row.type)===0)return;
     const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return;
     const ds=localDateStr(d);
-    if(ds<r.since||ds>r.until)return;
+    if(ds<rng.since||ds>rng.until)return;
     const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
-    const key=ph+'|'+ds;
-    if(!allStages[key])allStages[key]=[];
-    allStages[key].push({row,d});
+    if(!ph)return;
+    if(!phoneMap[ph]){
+      phoneMap[ph]=row;
+    } else {
+      const cur=phoneMap[ph];
+      const curRank=typeRank(cur.type);
+      const newRank=typeRank(row.type);
+      if(newRank>curRank||(newRank===curRank&&d>(parseCloudiaDate(cur.timestamp)||parseCloudiaDate(cur.created_at)||new Date(0)))){
+        phoneMap[ph]=row;
+      }
+    }
   });
-  // Para cada telefone+dia, pega o stage mais recente
-  // Se o mais recente for Agendou → inclui
-  const result=[];
-  Object.values(allStages).forEach(entries=>{
-    entries.sort((a,b)=>b.d-a.d);
-    const latest=entries[0].row;
-    if(isAgend(latest.stage))result.push(latest);
-  });
-  return result;
+  return Object.values(phoneMap);
 }
 
 // HELPERS
