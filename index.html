@@ -1850,6 +1850,19 @@ function initRelOrigem(){
   sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
   renderRelOrigem();
 }
+function openROModal(i,type){
+  const {org,d}=window._roData[i];
+  const titles={leads:'Leads',agend:'Agendamentos',comp:'Comparecimentos',fechou:'Fechados'};
+  const rowsMap={
+    leads:(d.leadRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']),
+    agend:(d.agendRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']),
+    comp:(d.compRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']),
+    fechou:(d.fechRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—','R$ '+parseFloat(r.value||0).toFixed(2)])
+  };
+  const hdrs={leads:['Data','Nome','Telefone','Origem'],agend:['Data','Nome','Telefone'],comp:['Data','Nome','Telefone'],fechou:['Data','Nome','Telefone','Valor']};
+  openModal(titles[type]+' — '+org, hdrs[type], rowsMap[type]);
+}
+
 function renderRelOrigem(){
   const rows=getRelRows('ro-from','ro-to');
   const origFilt=document.getElementById('ro-origem').value;
@@ -1893,22 +1906,24 @@ function renderRelOrigem(){
   let tL=0,tA=0,tC=0,tF=0,tO=0,tFech=0;
   entries.forEach(([,d])=>{tL+=d.leads.size;tA+=d.agend.size;tC+=d.comp.size;tF+=d.fechou.size;tO+=d.valorOrc;tFech+=d.valorFech;});
   const pct2=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
-  document.getElementById('ro-tbody').innerHTML=entries.map(([org,d])=>`
-    <tr>
+  document.getElementById('ro-tbody').innerHTML=entries.map(([org,d],i)=>{
+    window._roData=window._roData||{};
+    window._roData[i]={org,d};
+    return `<tr>
       <td><span class="origem-pill">${org}</span></td>
-      <td style="text-align:right">${d.leads.size} <button class="lupa" onclick="openModal('Leads — ${org}',['Data','Nome','Telefone','Origem'],[...(d.leadRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']))" title="Ver leads">🔍</button></td>
-      <td style="text-align:right">${d.agend.size} <button class="lupa" onclick="openModal('Agend. — ${org}',['Data','Nome','Telefone'],[...(d.agendRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']))" title="Ver agend.">🔍</button></td>
+      <td style="text-align:right">${d.leads.size} <button class="lupa" onclick="openROModal(${i},'leads')">🔍</button></td>
+      <td style="text-align:right">${d.agend.size} <button class="lupa" onclick="openROModal(${i},'agend')">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.agend.size,d.leads.size)}</td>
       <td style="text-align:right">${d.agend.size}</td>
-      <td style="text-align:right">${d.comp.size} <button class="lupa" onclick="openModal('Comp. — ${org}',['Data','Nome','Telefone'],[...(d.compRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']))" title="Ver comparecimentos">🔍</button></td>
+      <td style="text-align:right">${d.comp.size} <button class="lupa" onclick="openROModal(${i},'comp')">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.comp.size,d.agend.size)}</td>
-      <td style="text-align:right" class="tg">${d.fechou.size} <button class="lupa" onclick="openModal('Fechados — ${org}',['Data','Nome','Telefone','Valor'],[...(d.fechRows||[])].map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—','R$ '+parseFloat(r.value||0).toFixed(2)]))" title="Ver fechamentos">🔍</button></td>
+      <td style="text-align:right" class="tg">${d.fechou.size} <button class="lupa" onclick="openROModal(${i},'fechou')">🔍</button></td>
       <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.comp.size)}</td>
       <td style="text-align:right" class="ta">${d.valorOrc>0?fmt(d.valorOrc):'—'}</td>
       <td style="text-align:right" class="tg">${d.valorFech>0?fmt(d.valorFech):'—'}</td>
       <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.leads.size)}</td>
       <td style="text-align:right" class="tg">${d.fechou.size>0?fmt(d.valorFech/d.fechou.size):'—'}</td>
-    </tr>`).join('')+`
+    </tr>`}).join('')+`
     <tr style="font-weight:600;background:#faf7f3;">
       <td>TOTAL</td>
       <td style="text-align:right">${tL}</td>
