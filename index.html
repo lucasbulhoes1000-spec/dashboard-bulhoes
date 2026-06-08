@@ -1887,15 +1887,18 @@ function renderRelOrigem(){
     const dc=parseCloudiaDate(r.created_at);
     const s=new Date(document.getElementById('ro-from').value);
     const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
-    if(dc&&dc>=s&&dc<=u&&r.type==='CUSTOMER_CREATED'){
+    // Leads: só CUSTOMER_CREATED no período, mas aceita qualquer type se phone ainda não foi contado
+    if(r.type==='CUSTOMER_CREATED'&&dc&&dc>=s&&dc<=u&&!map[org].leads.has(ph)){
       map[org].leads.add(ph); map[org].leadRows.push(r);
-      // valorOrc: soma valor máximo por lead único no período
       const v=parseFloat(r.value||0);
       if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
     }
-    if(isAgend(r.stage)){map[org].agend.add(ph);map[org].agendRows.push(r);}
-    if(isComp(r.stage)){map[org].comp.add(ph);map[org].compRows.push(r);}
-    if(isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
+    // Agend/Comp/Fechou: qualquer evento no período (já filtrado por getRelRows via timestamp)
+    const dt=parseCloudiaDate(r.timestamp);
+    const inPeriod=(dt&&dt>=s&&dt<=u)||(dc&&dc>=s&&dc<=u);
+    if(inPeriod&&isAgend(r.stage)&&!map[org].agend.has(ph)){map[org].agend.add(ph);map[org].agendRows.push(r);}
+    if(inPeriod&&isComp(r.stage)&&!map[org].comp.has(ph)){map[org].comp.add(ph);map[org].compRows.push(r);}
+    if(inPeriod&&isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
       map[org].fechou.add(ph);
       map[org].fechPhones.add(ph);
       map[org].fechRows.push(r);
@@ -1953,36 +1956,44 @@ function initRelComparecidos(){
 function renderRelComparecidos(){
   const rows=getRelRows('rc-from','rc-to');
   const origFilt=document.getElementById('rc-origem').value;
-  // Pega só quem agendou ou compareceu
   const agendados=rows.filter(r=>(isAgend(r.stage)||isComp(r.stage))&&(!origFilt||(r.origin||'')=== origFilt));
-  // Calcula distância em dias entre created_at e timestamp
   const distances=[0,1,2,3,4,5,6,17];
   const distMap={};
-  distances.forEach(d=>distMap[d]={agend:0,comp:0});
+  distances.forEach(d=>distMap[d]={agend:0,comp:0,agendRows:[],compRows:[]});
   agendados.forEach(r=>{
     const dc=parseCloudiaDate(r.created_at);
     const dt=parseCloudiaDate(r.timestamp);
     if(!dc||!dt)return;
     const diff=Math.round((dt-dc)/(1000*60*60*24));
     const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
-    if(!distMap[bucket])distMap[bucket]={agend:0,comp:0};
+    if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
     distMap[bucket].agend++;
-    if(isComp(r.stage))distMap[bucket].comp++;
+    distMap[bucket].agendRows.push(r);
+    if(isComp(r.stage)){distMap[bucket].comp++;distMap[bucket].compRows.push(r);}
   });
   const totalAgend=agendados.length;
-  // Build dynamic headers
+  window._rcData={};
   const thead=document.getElementById('rc-thead');
   thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
   document.getElementById('rc-tbody').innerHTML=Object.entries(distMap)
     .sort((a,b)=>parseInt(a[0])-parseInt(b[0]))
-    .map(([dias,d])=>`
-    <tr>
+    .map(([dias,d],i)=>{
+      window._rcData[i]={dias,d};
+      return `<tr>
       <td>${dias==='17'?'17+ dias':dias+' dia(s)'}</td>
-      <td style="text-align:right">${d.agend}</td>
+      <td style="text-align:right">${d.agend} <button class="lupa" onclick="openRCModal(${i},'agend')">🔍</button></td>
       <td style="text-align:right" class="tm">${totalAgend>0?(d.agend/totalAgend*100).toFixed(1)+'%':'—'}</td>
-      <td style="text-align:right">${d.comp}</td>
+      <td style="text-align:right">${d.comp} <button class="lupa" onclick="openRCModal(${i},'comp')">🔍</button></td>
       <td style="text-align:right" class="tm">${d.agend>0?(d.comp/d.agend*100).toFixed(1)+'%':'—'}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
+}
+function openRCModal(i,type){
+  if(!window._rcData||!window._rcData[i]){alert('Clique em Filtrar primeiro.');return;}
+  const {dias,d}=window._rcData[i];
+  const label=dias==='17'?'17+ dias':dias+' dia(s)';
+  const rows=type==='agend'?d.agendRows:d.compRows;
+  const title=(type==='agend'?'Agendamentos':'Comparecimentos')+' — '+label;
+  openModal(title,['Data','Nome','Telefone','Origem'],rows.map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']));
 }
 
 // ── ORÇAMENTOS FECHADOS ───────────────────────────────────
