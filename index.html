@@ -168,7 +168,7 @@ tbody tr:hover td{background:#faf7f3;}
 </div>
 
 <!-- MAIN -->
-<div id="app-wrapper" style="display:none;width:100%;"><div class="main">
+<div id="app-wrapper" class="main">
   <div class="topbar">
     <span class="topbar-title" id="topbar-title">Dashboard</span>
     <div class="topbar-right">
@@ -2239,6 +2239,11 @@ async function fazerLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-wrapper').style.display='flex';
     iniciarApp();
+    // Vai para tela de início após login
+    setTimeout(()=>{
+      const inicioNav=document.querySelector('[onclick*="inicio"]');
+      if(inicioNav)switchPage('inicio',inicioNav);
+    },500);
   } else {
     errEl.textContent='Email ou senha incorretos.';
     errEl.style.display='block';
