@@ -1120,10 +1120,11 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   const origens={};
   Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
 
-  // Funil: agend/comp/fechou pelo timestamp do evento (quando aconteceu)
-  const evtsGeral=filteredEvents||filtered; // fallback para filtered se não tiver eventos
-  const agendPhones=new Set(evtsGeral.filter(r=>isAgend(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  // Agendamentos: por created_at (dia que agendou) — sincronizado com a lupa
+  // Comparecimentos/fechamentos: por timestamp (dia que aconteceu)
+  const agendPhones=new Set(filtered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agend=agendPhones.size;
+  const evtsGeral=filteredEvents||filtered;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const comp=compPhones.size;
   const fechados=evtsGeral.filter(r=>isFechou(r.stage));
