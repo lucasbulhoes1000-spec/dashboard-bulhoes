@@ -670,7 +670,10 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="pago">Pago</option>
           </select>
         </div>
-        <button onclick="openComForm(null)" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">+ Lançar comissão</button>
+        <div style="display:flex;gap:8px;">
+          <button onclick="importarFechamentos()" style="background:#f5efe8;border:0.5px solid #A18B6C;color:#7a6550;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">⬇ Importar fechamentos</button>
+          <button onclick="openComForm(null)" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">+ Lançar comissão</button>
+        </div>
       </div>
       <div class="row r4" style="margin-bottom:16px;">
         <div class="mc"><div class="ml">Total pago</div><div class="mv tg" id="com-total-pago">—</div><div class="ms">no período</div></div>
@@ -2638,6 +2641,57 @@ function salvarComissao(){
 }
 function marcarPago(idx){if(!_comissoes[idx])return;_comissoes[idx].status='pago';salvarComissoes();renderComissoes();}
 function excluirComissao(idx){if(!confirm('Excluir?'))return;_comissoes.splice(idx,1);salvarComissoes();renderComissoes();}
+function importarFechamentos(){
+  // Cruza _ccData (orçamentos Aprovados) com clientesData (stage Ganho/Compareceu)
+  const mesFil=(document.getElementById('com-mes-sel')||{}).value||'';
+  let importados=0,ignorados=0;
+  // Monta set de chaves já lançadas (data+paciente) para evitar duplicata
+  const jaLancados=new Set(_comissoes.map(c=>(c.data||'')+'|'+(c.paciente||'').toLowerCase()));
+
+  // Percorre todos os clientes no _ccData
+  Object.entries(_ccData).forEach(([ph,d])=>{
+    const orcs=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&o.valor>0);
+    if(!orcs.length)return;
+    // Pega nome do cliente a partir do Cloudia
+    const clienteRow=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const nomePaciente=clienteRow?clienteRow.name||'—':'—';
+    orcs.forEach(o=>{
+      const dataOrc=o.data||o.entradaData||'';
+      // Filtra pelo mês selecionado
+      if(mesFil&&dataOrc&&dataOrc.substring(0,7)!==mesFil)return;
+      const chave=dataOrc+'|'+nomePaciente.toLowerCase();
+      if(jaLancados.has(chave)){ignorados++;return;}
+      // Calcula comissões
+      const vt=Number(o.valor)||0;
+      const ent=Number(o.entrada)||0;
+      const r=calcComissaoRegras(vt,ent);
+      const novo={
+        data:dataOrc,
+        paciente:nomePaciente,
+        avaliador:o.avaliador||'',
+        crc:'',
+        valorTrat:vt,
+        entrada:ent,
+        pgto:o.pagamento||'',
+        comAval:r.comAval,
+        comCrc:r.comCrc,
+        status:'pendente',
+        obs:o.tratamento||'',
+        criadoEm:new Date().toISOString()
+      };
+      _comissoes.unshift(novo);
+      jaLancados.add(chave);
+      importados++;
+    });
+  });
+  if(importados>0){
+    salvarComissoes();
+    renderComissoes();
+    alert(`✅ ${importados} fechamento(s) importado(s)!${ignorados>0?' '+ignorados+' já existiam.':''}`);
+  } else {
+    alert(ignorados>0?`Todos os ${ignorados} fechamentos já foram importados.`:'Nenhum orçamento aprovado encontrado no período selecionado.\n\nVerifique se os orçamentos no CRM estão com status "Aprovado".');
+  }
+}
 function salvarComissoes(){salvarCRMDebounced();}
 
 // INIT
