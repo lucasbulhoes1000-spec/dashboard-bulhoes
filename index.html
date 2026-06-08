@@ -922,11 +922,13 @@ function filterByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra eventos (agendamentos, comparecimentos, fechamentos) pelo timestamp (quando aconteceu)
+// Filtra eventos pelo timestamp do CUSTOMER_STAGE_UPDATED (quando SDR registrou a ação)
+// Ignora CUSTOMER_ACQUISITION_ORI que é só troca de origem, não ação da SDR
 function filterEventsByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
-    const d=parseCloudiaDate(row.timestamp);
+    if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
+    const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return false;
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
