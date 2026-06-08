@@ -252,7 +252,7 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="slabel">Investimento & leads</div>
             <div class="row r3">
               <div class="mc"><div class="ml">Investimento em ADS</div><div class="mv gold" id="t-spend">—</div><div class="ms">campanhas de captação</div></div>
-              <div class="mc"><div class="ml">CPL — Custo por lead</div><div class="mv cost" id="t-cpl">—</div><div class="ms" id="t-leads-sub">aguardando dados</div></div>
+              <div class="mc"><div class="ml">CPL — Meta ADS</div><div class="mv cost" id="t-cpl">—</div><div class="ms" id="t-leads-sub">aguardando dados</div></div>
               <div class="mc"><div class="ml">Leads</div><div class="mv" id="t-leads">— <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button></div><div class="ms">no período</div></div>
             </div>
             <div class="slabel">Captação</div>
@@ -1140,8 +1140,17 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   const totalVendas=Object.values(vendasMap).reduce((s,v)=>s+v,0);
   const ticket=contratos>0?totalVendas/contratos:0;
 
+  // CPL: só leads pagos (#Instagram ADS)
+  const leadsInstagram=new Set();
+  filtered.forEach(r=>{
+    if((r.origin||'').toLowerCase().includes('instagram ads')||
+       (r.ad_name&&String(r.ad_name).trim()!=='')){
+      const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsInstagram.add(ph);
+    }
+  });
   const leadsBase=cloudiaLeadsCount;
-  const cplReal=leadsBase>0&&spend>0?spend/leadsBase:0;
+  const leadsBasePago=leadsInstagram.size||leadsBase;
+  const cplReal=leadsBasePago>0&&spend>0?spend/leadsBasePago:0;
   const cpa=agend>0?spend/agend:0;
   const cpcomp=comp>0?spend/comp:0;
   const cpc2=contratos>0?spend/contratos:0;
@@ -1149,7 +1158,7 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   document.getElementById('t-spend').textContent=fmt(spend);
   document.getElementById('t-cpl').textContent=cplReal>0?fmt(cplReal):'—';
   document.getElementById('t-leads').innerHTML=fmtN(leadsBase)+' <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-leads-sub').textContent='leads únicos no período';
+  document.getElementById('t-leads-sub').textContent=(leadsInstagram.size>0?leadsInstagram.size+' leads Meta ADS':'base: '+leadsBase+' leads');
   document.getElementById('t-agend').innerHTML=(agend||'0')+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
   document.getElementById('t-comp').innerHTML=(comp||'0')+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
@@ -1505,15 +1514,23 @@ function lupaLeads(){
   openModal('Leads — '+rows.length+' únicos no período',['Data de cadastro','Nome','Telefone','Origem'],rows);
 }
 function lupaAgend(){
+  // USA _lastCloudiaFiltered (filtrado por created_at = dia que agendou)
+  // Assim, filtro "hoje" mostra quem AGENDOU hoje, não quem teve consulta hoje
   const phoneMap={};
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
+  _lastCloudiaFiltered.filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
+    else{
+      // mantém o registro mais antigo (primeira vez que agendou)
+      const dCur=new Date(r.created_at||0);
+      const dOld=new Date(phoneMap[ph].created_at||0);
+      if(dCur<dOld)phoneMap[ph]=r;
+    }
   });
   const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0))
-    .map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—',getStatusAgend(r.stage)]);
-  openModal('Agendamentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Status'],rows);
+    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
+    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',r.origin||'—',getStatusAgend(r.stage)]);
+  openModal('Agendamentos — '+rows.length+' registros',['Data agendou','Nome','Telefone','Origem','Status'],rows);
 }
 function lupaComp(){
   const phoneMap={};
