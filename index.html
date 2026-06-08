@@ -672,6 +672,7 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
         <div style="display:flex;gap:8px;">
           <button onclick="importarFechamentos()" style="background:#f5efe8;border:0.5px solid #A18B6C;color:#7a6550;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">⬇ Importar fechamentos</button>
+          <button onclick="openComSDR()" style="background:#f0f5f0;border:0.5px solid #5a8a6a;color:#3a6a4a;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">👤 Comissão SDR</button>
           <button onclick="openComForm(null)" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">+ Lançar comissão</button>
         </div>
       </div>
@@ -2714,6 +2715,112 @@ function importarFechamentos(){
 }
 function salvarComissoes(){salvarCRMDebounced();}
 
+// ===== COMISSÃO SDR =====
+let _sdrCompCount=0;
+
+function openComSDR(){
+  const now=new Date();
+  const mesAtual=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('sdr-mes').value=(document.getElementById('com-mes-sel')||{}).value||mesAtual;
+  document.getElementById('sdr-nome').value='';
+  document.getElementById('sdr-bonus').value='';
+  document.getElementById('sdr-status').value='pendente';
+  document.getElementById('sdr-obs').value='';
+  document.getElementById('sdr-comp-count').textContent='—';
+  document.getElementById('sdr-comp-valor').textContent='—';
+  document.getElementById('sdr-total-display').textContent='—';
+  _sdrCompCount=0;
+  document.getElementById('modal-sdr').style.display='flex';
+}
+
+function calcSDR(){
+  const mes=document.getElementById('sdr-mes').value; // YYYY-MM
+  if(!mes){alert('Selecione o mês de referência');return;}
+  // Conta comparecimentos no mês pelo Cloudia (filteredEvents por timestamp)
+  const since=mes+'-01';
+  const lastDay=new Date(parseInt(mes.split('-')[0]),parseInt(mes.split('-')[1]),0).getDate();
+  const until=mes+'-'+String(lastDay).padStart(2,'0');
+  const phones=new Set();
+  allCloudiaRows.forEach(r=>{
+    if(!isComp(r.stage)&&!isFechou(r.stage))return;
+    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
+    const d=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
+    if(!d)return;
+    const ds=localDateStr(d);
+    if(ds>=since&&ds<=until){
+      const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+      phones.add(ph);
+    }
+  });
+  _sdrCompCount=phones.size;
+  const valorBase=_sdrCompCount*10;
+  document.getElementById('sdr-comp-count').textContent=_sdrCompCount;
+  document.getElementById('sdr-comp-valor').textContent=fmt(valorBase);
+  calcSDRTotal();
+}
+
+function calcSDRTotal(){
+  const valorBase=_sdrCompCount*10;
+  const bonus=parseFloat(document.getElementById('sdr-bonus').value)||0;
+  const total=valorBase+bonus;
+  document.getElementById('sdr-total-display').textContent=total>0?fmt(total):'—';
+}
+
+function salvarComissaoSDR(){
+  const nome=document.getElementById('sdr-nome').value.trim();
+  if(!nome){alert('Informe o nome da SDR');return;}
+  const mes=document.getElementById('sdr-mes').value;
+  if(!mes){alert('Selecione o mês de referência');return;}
+  const valorBase=_sdrCompCount*10;
+  const bonus=parseFloat(document.getElementById('sdr-bonus').value)||0;
+  const total=valorBase+bonus;
+  if(total<=0){alert('Calcule primeiro clicando em "Calcular do Cloudia"');return;}
+  // Salva como dois lançamentos separados se tiver bônus, ou um único
+  const dataRef=mes+'-01';
+  const [ano,m]=mes.split('-');
+  const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesNome=meses[parseInt(m)-1]+'/'+ano;
+  // Lançamento base (comparecimentos)
+  if(valorBase>0){
+    _comissoes.unshift({
+      data:dataRef,
+      paciente:'',
+      avaliador:'',
+      crc:nome,
+      valorTrat:0,
+      entrada:0,
+      pgto:'',
+      comAval:0,
+      comCrc:valorBase,
+      status:document.getElementById('sdr-status').value,
+      obs:_sdrCompCount+' comparecimentos × R$10,00 — '+mesNome+(document.getElementById('sdr-obs').value?' | '+document.getElementById('sdr-obs').value:''),
+      criadoEm:new Date().toISOString()
+    });
+  }
+  // Bônus separado
+  if(bonus>0){
+    _comissoes.unshift({
+      data:dataRef,
+      paciente:'',
+      avaliador:'',
+      crc:nome,
+      valorTrat:0,
+      entrada:0,
+      pgto:'',
+      comAval:0,
+      comCrc:bonus,
+      status:document.getElementById('sdr-status').value,
+      obs:'Bônus — '+mesNome+(document.getElementById('sdr-obs').value?' | '+document.getElementById('sdr-obs').value:''),
+      criadoEm:new Date().toISOString()
+    });
+  }
+  salvarComissoes();
+  document.getElementById('modal-sdr').style.display='none';
+  renderComissoes();
+  alert('✅ Comissão SDR salva!');
+}
+
+
 // INIT
 window.addEventListener('load',()=>{
   verificarLogin();
@@ -2723,6 +2830,65 @@ window.addEventListener('load',()=>{
   }
 });
 </script>
+</div>
+
+<!-- MODAL COMISSÃO SDR -->
+<div id="modal-sdr" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:700;color:#2a2520;">👤 Comissão SDR</div>
+      <button onclick="document.getElementById('modal-sdr').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+    </div>
+
+    <!-- SDR e período -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome da SDR</label>
+        <input id="sdr-nome" type="text" placeholder="Nome da SDR" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Mês de referência</label>
+        <input id="sdr-mes" type="month" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    </div>
+
+    <!-- Cálculo automático -->
+    <div style="background:#f0f5f0;border-radius:8px;padding:14px;margin-bottom:14px;">
+      <div style="font-size:10px;color:#5a8a6a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">⚡ Calculado automaticamente pelo Cloudia</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;color:#5a4e44;">Comparecimentos no mês</span>
+        <span id="sdr-comp-count" style="font-size:20px;font-weight:700;color:#2a2520;">—</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;color:#5a4e44;">R$ 10,00 por comparecimento</span>
+        <span id="sdr-comp-valor" style="font-size:20px;font-weight:700;color:#5a8a6a;">—</span>
+      </div>
+      <button onclick="calcSDR()" style="width:100%;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:8px;cursor:pointer;font-size:12px;font-weight:600;margin-top:4px;">↻ Calcular do Cloudia</button>
+    </div>
+
+    <!-- Bônus manual -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Bônus manual (R$)</label>
+      <input id="sdr-bonus" type="number" placeholder="0" oninput="calcSDRTotal()" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+      <div style="font-size:11px;color:#9a8c7e;margin-top:4px;">Bônus por meta batida, desempenho, etc.</div>
+    </div>
+
+    <!-- Total -->
+    <div style="background:#f5f0ea;border-radius:8px;padding:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:13px;font-weight:600;color:#5a4e44;">Total comissão SDR</span>
+      <span id="sdr-total-display" style="font-size:22px;font-weight:700;color:#A18B6C;">—</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
+        <select id="sdr-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+          <option value="pendente">Pendente</option><option value="pago">Pago</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
+        <input id="sdr-obs" type="text" placeholder="Opcional..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button onclick="salvarComissaoSDR()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar comissão</button>
+      <button onclick="document.getElementById('modal-sdr').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL CRIAR LEAD -->
