@@ -1887,7 +1887,7 @@ function renderRelOrigem(){
     const dc=parseCloudiaDate(r.created_at);
     const s=new Date(document.getElementById('ro-from').value);
     const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
-    if(dc&&dc>=s&&dc<=u){
+    if(dc&&dc>=s&&dc<=u&&r.type==='CUSTOMER_CREATED'){
       map[org].leads.add(ph); map[org].leadRows.push(r);
       // valorOrc: soma valor máximo por lead único no período
       const v=parseFloat(r.value||0);
