@@ -903,6 +903,17 @@ tbody tr:hover td{background:#faf7f3;}
         <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
       </select></div>
   </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">CRC participou?</label>
+      <select id="orc-crc-particip" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <option value="nao">Não participou</option>
+        <option value="sim">Sim — calcular comissão CRC</option>
+      </select></div>
+    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome da CRC</label>
+      <input id="orc-crc-nome" type="text" placeholder="Nome da CRC" list="orc-crc-list" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+      <datalist id="orc-crc-list"><option value="Ana"><option value="Lucas"><option value="Natalia"><option value="Nathalia"></datalist>
+    </div>
+  </div>
   <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
     <textarea id="orc-obs" placeholder="Observação..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
   <div style="display:flex;gap:10px;">
@@ -1872,10 +1883,13 @@ function openOrcForm(editIdx){
     document.getElementById('orc-entrada').value=o.entrada||'';
     document.getElementById('orc-entrada-data').value=o.entradaData||'';
     document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
+    document.getElementById('orc-crc-particip').value=o.crcParticip||'nao';
+    document.getElementById('orc-crc-nome').value=o.crcNome||'';
     document.getElementById('orc-obs').value=o.obs||'';
   }else{
     document.getElementById('orc-status').value='Em aberto';
-    ['orc-avaliador','orc-tratamento','orc-pagamento','orc-parcelas','orc-obs'].forEach(id=>document.getElementById(id).value='');
+    ['orc-avaliador','orc-tratamento','orc-pagamento','orc-parcelas','orc-obs','orc-crc-nome'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('orc-crc-particip').value='nao';
     document.getElementById('orc-data').value=today;
     document.getElementById('orc-valor').value='';
     document.getElementById('orc-entrada').value='';
@@ -1900,6 +1914,8 @@ function salvarOrcamento(){
     entradaData:document.getElementById('orc-entrada-data').value,
     entradaPgto:document.getElementById('orc-entrada-pgto').value,
     obs:document.getElementById('orc-obs').value,
+    crcParticip:document.getElementById('orc-crc-particip').value,
+    crcNome:document.getElementById('orc-crc-nome').value.trim(),
     fechamentos:editIdx!==''?(d.orcamentos[parseInt(editIdx)]?d.orcamentos[parseInt(editIdx)].fechamentos||[]:[]):[]
   };
   if(editIdx!=='')d.orcamentos[parseInt(editIdx)]=orc;
@@ -2665,16 +2681,17 @@ function importarFechamentos(){
       const vt=Number(o.valor)||0;
       const ent=Number(o.entrada)||0;
       const r=calcComissaoRegras(vt,ent);
+      const crcParticipou=(o.crcParticip==='sim');
       const novo={
         data:dataOrc,
         paciente:nomePaciente,
         avaliador:o.avaliador||'',
-        crc:'',
+        crc:crcParticipou?(o.crcNome||''):'',
         valorTrat:vt,
         entrada:ent,
         pgto:o.pagamento||'',
         comAval:r.comAval,
-        comCrc:r.comCrc,
+        comCrc:crcParticipou?r.comCrc:0,
         status:'pendente',
         obs:o.tratamento||'',
         criadoEm:new Date().toISOString()
