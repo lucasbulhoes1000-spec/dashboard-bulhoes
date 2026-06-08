@@ -1851,6 +1851,7 @@ function initRelOrigem(){
   renderRelOrigem();
 }
 function openROModal(i,type){
+  if(!window._roData||!window._roData[i]){alert('Dados não encontrados. Clique em Filtrar e tente novamente.');return;}
   const {org,d}=window._roData[i];
   const titles={leads:'Leads',agend:'Agendamentos',comp:'Comparecimentos',fechou:'Fechados'};
   const rowsMap={
@@ -1907,7 +1908,7 @@ function renderRelOrigem(){
   entries.forEach(([,d])=>{tL+=d.leads.size;tA+=d.agend.size;tC+=d.comp.size;tF+=d.fechou.size;tO+=d.valorOrc;tFech+=d.valorFech;});
   const pct2=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
   document.getElementById('ro-tbody').innerHTML=entries.map(([org,d],i)=>{
-    window._roData=window._roData||{};
+    window._roData={};
     window._roData[i]={org,d};
     return `<tr>
       <td><span class="origem-pill">${org}</span></td>
