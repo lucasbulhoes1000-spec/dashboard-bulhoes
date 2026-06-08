@@ -1910,8 +1910,7 @@ function renderRelOrigem(){
   let tL=0,tA=0,tC=0,tF=0,tO=0,tFech=0;
   entries.forEach(([,d])=>{tL+=d.leads.size;tA+=d.agend.size;tC+=d.comp.size;tF+=d.fechou.size;tO+=d.valorOrc;tFech+=d.valorFech;});
   const pct2=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
-  document.getElementById('ro-tbody').innerHTML=entries.map(([org,d],i)=>{
-    window._roData={};
+  document.getElementById('ro-tbody').innerHTML=(window._roData={},entries.map(([org,d],i)=>{
     window._roData[i]={org,d};
     return `<tr>
       <td><span class="origem-pill">${org}</span></td>
@@ -1927,7 +1926,7 @@ function renderRelOrigem(){
       <td style="text-align:right" class="tg">${d.valorFech>0?fmt(d.valorFech):'—'}</td>
       <td style="text-align:right" class="tm">${pct2(d.fechou.size,d.leads.size)}</td>
       <td style="text-align:right" class="tg">${d.fechou.size>0?fmt(d.valorFech/d.fechou.size):'—'}</td>
-    </tr>`}).join('')+`
+    </tr>`})).join('')+`
     <tr style="font-weight:600;background:#faf7f3;">
       <td>TOTAL</td>
       <td style="text-align:right">${tL}</td>
