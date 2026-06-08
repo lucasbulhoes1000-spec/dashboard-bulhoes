@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -934,29 +934,32 @@ function filterEventsByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra agendamentos: pega o ÚLTIMO stage de cada telefone no período
-// Se o último stage for Agendou → conta. Se viraram Lead depois → não conta.
+// Filtra agendamentos: CUSTOMER_STAGE_UPDATED com stage Agendou no período
+// Exclui quem depois teve um CUSTOMER_STAGE_UPDATED posterior com stage diferente no MESMO dia
 function filterAgendByRange(rows,tab){
   const r=getRange(tab);
-  // Primeiro: pega o último CUSTOMER_STAGE_UPDATED de cada telefone no período
-  const lastStageMap={};
+  // Pega todos os CUSTOMER_STAGE_UPDATED no período, indexados por telefone+dia
+  const allStages={};
   rows.forEach(row=>{
     if(row.type!=='CUSTOMER_STAGE_UPDATED')return;
-    if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
     const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return;
-    if(localDateStr(d)<r.since||localDateStr(d)>r.until)return;
+    const ds=localDateStr(d);
+    if(ds<r.since||ds>r.until)return;
     const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
-    if(!lastStageMap[ph]){
-      lastStageMap[ph]=row;
-    } else {
-      // Guarda o mais recente
-      const dOld=parseCloudiaDate(lastStageMap[ph].timestamp)||parseCloudiaDate(lastStageMap[ph].created_at)||new Date(0);
-      if(d>dOld)lastStageMap[ph]=row;
-    }
+    const key=ph+'|'+ds;
+    if(!allStages[key])allStages[key]=[];
+    allStages[key].push({row,d});
   });
-  // Retorna só quem o último stage é Agendou
-  return Object.values(lastStageMap).filter(r=>isAgend(r.stage));
+  // Para cada telefone+dia, pega o stage mais recente
+  // Se o mais recente for Agendou → inclui
+  const result=[];
+  Object.values(allStages).forEach(entries=>{
+    entries.sort((a,b)=>b.d-a.d);
+    const latest=entries[0].row;
+    if(isAgend(latest.stage))result.push(latest);
+  });
+  return result;
 }
 
 // HELPERS
