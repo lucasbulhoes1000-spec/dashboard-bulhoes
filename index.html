@@ -1225,7 +1225,7 @@ async function loadSocial(){
   document.getElementById('loading-social').style.display='flex';
   document.getElementById('content-social').style.display='none';
   try{
-    const res=await fetch(SS_URL);const raw=await res.json();
+    const res=await fetch(SS_SOCIAL);const raw=await res.json();
     if(!Array.isArray(raw)||raw.length<2){allSSRows=[];}
     else{const h=raw[0];allSSRows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});}
     document.getElementById('badge-ss').textContent='⬤ Google Sheets — '+allSSRows.length+' registros';
