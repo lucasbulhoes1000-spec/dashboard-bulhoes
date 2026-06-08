@@ -829,6 +829,7 @@ let _lastMetaAds=[];
 let _lastCloudiaRows=[];
 let _lastCloudiaFiltered=[];
 let _lastCloudiaFilteredEvents=[];
+let _lastCloudiaFilteredAgend=[];
 let _origemFilter='';
 var _ccData={};
 var _currentClienteIdx=-1;
@@ -922,12 +923,23 @@ function filterByRange(rows,tab){
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
 }
-// Filtra eventos pelo timestamp do CUSTOMER_STAGE_UPDATED (quando SDR registrou a ação)
-// Ignora CUSTOMER_ACQUISITION_ORI que é só troca de origem, não ação da SDR
+// Filtra eventos pelo timestamp do CUSTOMER_STAGE_UPDATED
+// Ignora CUSTOMER_ACQUISITION_ORI que é só troca de origem
 function filterEventsByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
     if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
+    const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
+    if(!d)return false;
+    return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
+  });
+}
+// Filtra só agendamentos (CUSTOMER_STAGE_UPDATED com stage Agendou) pelo timestamp
+function filterAgendByRange(rows,tab){
+  const r=getRange(tab);
+  return rows.filter(row=>{
+    if(row.type!=='CUSTOMER_STAGE_UPDATED')return false;
+    if(!isAgend(row.stage))return false;
     const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return false;
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
@@ -961,10 +973,12 @@ async function loadTrafego(){
     _lastCloudiaRows=cloudiaRows;
     const filtered=filterCloudiaByOrigin(filterByRange(cloudiaRows,'trafego'));
     const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(cloudiaRows,'trafego'));
+    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(cloudiaRows,'trafego'));
     _lastCloudiaFiltered=filtered;
     _lastCloudiaFilteredEvents=filteredEvents;
+    _lastCloudiaFilteredAgend=filteredAgend;
     updateOrigemCount(filtered);
-    renderTrafego(metaAds,filtered,filteredEvents);
+    renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
     console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
@@ -1041,7 +1055,7 @@ async function fetchCloudia(){
   }
 }
 
-function renderTrafego(metaAds,filtered,filteredEvents){
+function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Normaliza string: lowercase + sem acentos + sem espaços duplos
   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 
@@ -1122,16 +1136,11 @@ function renderTrafego(metaAds,filtered,filteredEvents){
   const origens={};
   Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
 
-  // Agendamentos: por timestamp (quando a SDR registrou o agendamento)
-  // Comparecimentos/fechamentos: por timestamp (quando aconteceu)
+  // Agendamentos: só CUSTOMER_STAGE_UPDATED com stage Agendou (filteredAgend)
+  // Comparecimentos/fechamentos: qualquer CUSTOMER_STAGE_UPDATED no período (filteredEvents)
   const evtsGeral=filteredEvents||filtered;
-  // Agendamentos = quem tem stage agendou/faltou/comp/fechou no período por timestamp
-  // mas só conta como agendamento quem TEM registro de agendou (não quem só compareceu sem ter agendado no período)
-  const agendPhones=new Set(evtsGeral.filter(r=>isAgend(r.stage)||isFaltou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
-  // Quem compareceu ou fechou também agendou (mas pode ter agendado fora do período)
-  // Inclui no contador de agendamentos quem compareceu/fechou E tinha agendado (stage agendou em qualquer data)
-  const compFechouPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
-  compFechouPhones.forEach(ph=>agendPhones.add(ph));
+  const agendSrc=filteredAgend||[];
+  const agendPhones=new Set(agendSrc.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agend=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   const comp=compPhones.size;
@@ -1343,9 +1352,11 @@ function applyOrigemFilter(){
   if(_lastCloudiaRows.length>0){
     const filtered=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
     const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(_lastCloudiaRows,'trafego'));
+    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(_lastCloudiaRows,'trafego'));
     _lastCloudiaFiltered=filtered;
     _lastCloudiaFilteredEvents=filteredEvents;
-    renderTrafego(_lastMetaAds,filtered,filteredEvents);
+    _lastCloudiaFilteredAgend=filteredAgend;
+    renderTrafego(_lastMetaAds,filtered,filteredEvents,filteredAgend);
     updateOrigemCount(filtered);
   }
 }
@@ -1523,16 +1534,15 @@ function lupaLeads(){
   openModal('Leads — '+rows.length+' únicos no período',['Data de cadastro','Nome','Telefone','Origem'],rows);
 }
 function lupaAgend(){
-  // Usa filteredEvents (por timestamp = quando a SDR registrou o agendamento)
-  // Mostra quem tem stage agendou/faltou no período, + quem compareceu/fechou no período
+  // Usa _lastCloudiaFilteredAgend: só CUSTOMER_STAGE_UPDATED com stage Agendou no período
   const phoneMap={};
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isAgend(r.stage)||isComp(r.stage)||isFaltou(r.stage)||isFechou(r.stage)).forEach(r=>{
+  (_lastCloudiaFilteredAgend||[]).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
     else{
-      // prioriza stage mais avançado
-      const rank=s=>{if(isFechou(s))return 4;if(isComp(s))return 3;if(isFaltou(s))return 2;if(isAgend(s))return 1;return 0;};
-      if(rank(r.stage)>rank(phoneMap[ph].stage))phoneMap[ph]=r;
+      const dCur=new Date(r.timestamp||r.created_at||0);
+      const dOld=new Date(phoneMap[ph].timestamp||phoneMap[ph].created_at||0);
+      if(dCur>dOld)phoneMap[ph]=r; // mais recente
     }
   });
   const rows=Object.values(phoneMap)
