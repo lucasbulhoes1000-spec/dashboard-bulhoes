@@ -402,8 +402,8 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">💾 CRM</button>
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📂 CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
-        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
-        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
@@ -431,7 +431,7 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="tw">
           <table>
             <thead><tr>
-              <th>Nome</th><th>Data do registro</th><th>Telefone</th><th>Fase</th>
+              <th>Nome</th><th>Data do registro</th><th>Data comparecimento</th><th>Telefone</th><th>Fase</th>
               <th>Situação</th><th>Tratamento</th><th>Avaliador</th>
               <th style="text-align:right">Valor orçado</th><th style="text-align:right">Valor fechado</th>
             </tr></thead>
@@ -1685,7 +1685,8 @@ function filterClientesTable(){
     const orc0=d.orcamentos&&d.orcamentos[0];
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
-      <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
+      <td class="tm">${fmtDate(r.created_at)}</td>
+      <td class="tm">${r.timestamp&&r.timestamp!==r.created_at?fmtDate(r.timestamp):'—'}</td>
       <td>${r.phone||'—'}</td>
       <td>${r.stage||'—'}</td>
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
