@@ -336,7 +336,7 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="sep"></div>
             <div class="two-col">
               <div class="card no-mb"><div class="ctitle">Funil de conversão</div><div id="ss-funnel"></div></div>
-              <div class="card no-mb"><div class="ctitle">Conversão por tipo</div><div id="ss-tipos"></div></div>
+              <div class="card no-mb"><div class="ctitle">Comparecimento por tipo</div><div id="ss-tipos"></div></div>
             </div>
             <div style="margin-top:12px;">
               <div class="card">
@@ -1256,7 +1256,7 @@ function renderSocial(rows){
   const s=new Date(range.since),u=new Date(range.until+'T23:59:59');
   const filtered=rows.filter(r=>{const d=parseDateSS(r['DATA']||r['data']);return d&&d>=s&&d<=u;});
   let abord=0,resp=0,follow=0,agend=0,comp=0,vendas=0,desq=0;
-  const tipos={},tipoAgend={},resultados={};
+  const tipos={},tipoAgend={},tipoComp={},resultados={};
   filtered.forEach(r=>{
     abord++;
     const rs=(r['RESPONDEU?']||'').toString().toUpperCase();
@@ -1266,7 +1266,7 @@ function renderSocial(rows){
     if(rs==='SIM')resp++;follow+=fol;
     if(res.includes('AGENDADO'))agend++;if(res.includes('COMPARECEU'))comp++;
     if(res.includes('VENDA'))vendas++;if(res.includes('DESQUALIFICADO'))desq++;
-    if(tipo){tipos[tipo]=(tipos[tipo]||0)+1;if(res.includes('AGENDADO'))tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;}
+    if(tipo){tipos[tipo]=(tipos[tipo]||0)+1;if(res.includes('AGENDADO'))tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;if(res.includes('COMPARECEU'))tipoComp[tipo]=(tipoComp[tipo]||0)+1;}
     if(res)resultados[res]=(resultados[res]||0)+1;
   });
   const txResp=abord>0?Math.round(resp/abord*100):0;
@@ -1305,8 +1305,8 @@ function renderSocial(rows){
   if(resEntries.length>0)ssChartInstance=new Chart(document.getElementById('ss-result-chart'),{type:'doughnut',data:{labels:resEntries.map(([k])=>k),datasets:[{data:resEntries.map(([,v])=>v),backgroundColor:resEntries.map(([k])=>resColors[k]||'#888'),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
   const icons={'Seguidor':'👥','Curtida':'❤️','Comentário':'💬','Enquete/Reação':'📊','Stories':'⭕'};
   const maxConv=Math.max(...Object.keys(tipos).map(t=>tipos[t]>0?(tipoAgend[t]||0)/tipos[t]*100:0),1);
-  document.getElementById('ss-tipos').innerHTML=Object.entries(tipos).sort((a,b)=>((tipoAgend[b[0]]||0)/b[1])-((tipoAgend[a[0]]||0)/a[1])).map(([t,n])=>{
-    const cv=n>0?Math.round((tipoAgend[t]||0)/n*100):0;
+  document.getElementById('ss-tipos').innerHTML=Object.entries(tipos).sort((a,b)=>((tipoComp[b[0]]||0)/b[1])-((tipoComp[a[0]]||0)/a[1])).map(([t,n])=>{
+    const cv=n>0?Math.round((tipoComp[t]||0)/n*100):0;
     return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid #ede6dc;">
       <span style="font-size:11px;color:#5a4e44;width:130px;flex-shrink:0;">${icons[t]||'•'} ${t} <span style="color:#b5a898;font-size:10px;">(${n})</span></span>
       <div style="flex:1;background:#ede6dc;border-radius:3px;height:14px;overflow:hidden;"><div style="width:${Math.max(cv/maxConv*100,2)}%;height:100%;background:#A18B6C;border-radius:3px;"></div></div>
