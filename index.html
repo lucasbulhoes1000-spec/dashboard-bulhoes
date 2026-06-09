@@ -1764,7 +1764,8 @@ function filterClientesTable(){
         (isComp(row.stage)||isFechou(row.stage)) &&
         parseCloudiaDate(row.timestamp)
       );
-      const dd=compRow?parseCloudiaDate(compRow.timestamp):null;
+      // Fallback: usa timestamp do próprio row (importados via CSV)
+      const dd=compRow?parseCloudiaDate(compRow.timestamp):parseCloudiaDate(r.timestamp||r.created_at);
       const ds=dd?localDateStr(dd):'';
       if(fromV&&ds&&ds<fromV)dateMatch=false;
       if(toV&&ds&&ds>toV)dateMatch=false;
@@ -1816,7 +1817,7 @@ function renderClientesPage(){
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.created_at)}</td>
-      <td class="tm">${r.timestamp&&r.timestamp!==r.created_at?fmtDate(r.timestamp):'—'}</td>
+      <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
       <td>${r.phone||'—'}</td>
       <td>${r.stage||'—'}</td>
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
