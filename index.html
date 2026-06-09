@@ -2540,12 +2540,14 @@ function executarImportarClientes(){
   for(let i=start;i<lines.length;i++){
     const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
     if(cols.length<4)continue;
-    const [dataStr,hora,nome,telefone,origem,status,valor]=cols;
+    const [dataStr,hora,nome,telefone,origem,status,valor,dataComp]=cols;
     if(!telefone||telefone==='telefone')continue;
     const parts=dataStr.split('/');
     let createdAt=dataStr;
     if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'08:00')+':00';
-    clientes.push({name:nome||'—',phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt});
+    let timestamp=createdAt;
+    if(dataComp){const pc=dataComp.split('/');if(pc.length===3)timestamp=pc[2]+'-'+pc[1].padStart(2,'0')+'-'+pc[0].padStart(2,'0')+'T08:00:00';}
+    clientes.push({name:nome||'—',phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt,timestamp});
   }
   if(!clientes.length){alert('Nenhum cliente válido');return;}
 
@@ -2560,7 +2562,7 @@ function executarImportarClientes(){
       allCloudiaRows.push({
         name:c.name,phone:c.phone,origin:c.origin,
         stage:c.stage,value:c.value,
-        created_at:c.created_at,timestamp:c.created_at,
+        created_at:c.created_at,timestamp:c.timestamp||c.created_at,
         type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
       });
       phonesExistentes.add(ph);
