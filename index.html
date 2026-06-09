@@ -1330,7 +1330,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!isComp(r.stage)&&!isFechou(r.stage))return false;
     const ph=String(r.phone||'').replace(/\D/g,'');
     if(!ph)return false;
-    const d=parseCloudiaDate(r.timestamp||r.created_at);
+    // Para importados usa created_at (data de registro) pois timestamp pode ser data de fechamento futura
+    const d=parseCloudiaDate(r.created_at)||parseCloudiaDate(r.timestamp);
     if(!d)return false;
     const ds=localDateStr(d);
     return ds>=_rangeComp.since&&ds<=_rangeComp.until;
