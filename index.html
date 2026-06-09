@@ -1609,14 +1609,15 @@ function filterLeadsTable(){
     return match&&origFilter&&dateMatch;
   });
   document.getElementById('leads-count').textContent=filtered.length+' leads';
-  // renderLeadsPage vai renderizar
-  if(typeof renderLeadsPage==='function'){}
+  _leadsFiltered=filtered;
+  _leadsPage=1;
+  renderLeadsPage();
 }
-let _leadsFiltered=[];let _leadsPage=1;const _leadsPerPage=50;
+let _leadsFiltered=[];let _leadsPage=1;let _leadsPerPage=20;
 function renderLeadsPage(){
   const filtered=_leadsFiltered;
   const total=filtered.length;
-  const totalPags=Math.ceil(total/_leadsPerPage);
+  const totalPags=Math.ceil(total/_leadsPerPage)||1;
   const start=(_leadsPage-1)*_leadsPerPage;
   const pagina=filtered.slice(start,start+_leadsPerPage);
   document.getElementById('leads-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
@@ -1631,16 +1632,20 @@ function renderLeadsPage(){
   // Paginação
   const pag=document.getElementById('leads-pagination');
   if(pag){
-    if(totalPags<=1){pag.innerHTML='';return;}
     pag.innerHTML=`
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #e0d8ce;font-size:12px;color:#9a8c7e;">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #e0d8ce;font-size:12px;color:#9a8c7e;flex-wrap:wrap;">
         <button onclick="mudaPagLead(${_leadsPage-1})" ${_leadsPage<=1?'disabled':''} style="background:${_leadsPage<=1?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">‹ Ant</button>
-        <span>Pág. ${_leadsPage} de ${totalPags} · ${start+1}–${Math.min(start+_leadsPerPage,total)} de ${total}</span>
+        <span>Pág. ${_leadsPage} de ${totalPags} · ${total>0?start+1+'-'+Math.min(start+_leadsPerPage,total):0} de ${total}</span>
         <button onclick="mudaPagLead(${_leadsPage+1})" ${_leadsPage>=totalPags?'disabled':''} style="background:${_leadsPage>=totalPags?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">Próx ›</button>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+          <span style="color:#b5a898;">Exibir:</span>
+          ${[10,20,50,100].map(n=>`<button onclick="setLeadsPerPage(${n})" style="background:${_leadsPerPage===n?'#A18B6C':'#fff'};color:${_leadsPerPage===n?'#fff':'#7a6550'};border:0.5px solid ${_leadsPerPage===n?'#A18B6C':'#d4c9bc'};border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:${_leadsPerPage===n?'600':'400'};">${n}</button>`).join('')}
+        </span>
       </div>`;
   }
 }
 function mudaPagLead(p){_leadsPage=p;renderLeadsPage();}
+function setLeadsPerPage(n){_leadsPerPage=n;_leadsPage=1;renderLeadsPage();}
 
 // ===== CLIENTES PAGE =====
 function renderClientes(){
