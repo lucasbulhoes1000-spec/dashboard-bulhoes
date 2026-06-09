@@ -1792,7 +1792,8 @@ function renderClientesPage(){
   filtered.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=_ccData[ph];
-    if(d&&d.orcamentos)d.orcamentos.forEach(o=>totalOrcado+=Number(o.valor||0));
+    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
+    if(orcs)orcs.forEach(o=>totalOrcado+=Number(o.valor||0));
     else totalOrcado+=parseFloat(r.value||0);
   });
   // Valor fechado: só orçamentos aprovados
@@ -1800,7 +1801,8 @@ function renderClientesPage(){
   filtered.filter(r=>isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=_ccData[ph];
-    if(d&&d.orcamentos)d.orcamentos.filter(o=>o.status==='Aprovado').forEach(o=>valorF+=Number(o.valor||0));
+    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
+    if(orcs)orcs.filter(o=>o.status==='Aprovado').forEach(o=>valorF+=Number(o.valor||0));
     else valorF+=parseFloat(r.value||0);
   });
   document.getElementById('cc-total-clientes').textContent=totalOrcado>0?fmt(totalOrcado):'—';
@@ -1823,8 +1825,8 @@ function renderClientesPage(){
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
       <td style="font-size:12px;">${orc0&&orc0.tratamento?orc0.tratamento:'—'}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
-      <td style="text-align:right" class="tm">${(()=>{const orcVal=(d.orcamentos||[]).reduce((s,o)=>s+Number(o.valor||0),0);return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
-      <td style="text-align:right" class="tg">${(()=>{const orcAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0);return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
+      <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
+      <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
