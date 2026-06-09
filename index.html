@@ -1358,9 +1358,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-vendas').textContent=totalVendas>0?fmt(totalVendas):'—';
   document.getElementById('t-ticket').textContent=ticket>0?fmt(ticket):'—';
 
-  // Entradas do CRM
+  // Entradas do CRM — filtra pela data da entrada dentro do período selecionado
+  const _range=getRange('trafego');
   let totalEntradas=0;
-  Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>o.status==='Aprovado').forEach(o=>totalEntradas+=Number(o.entrada)||0));
+  Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>{
+    if(o.status!=='Aprovado')return false;
+    const dataEntrada=o.entradaData||o.data||'';
+    if(!dataEntrada)return false;
+    return dataEntrada>=_range.since&&dataEntrada<=_range.until;
+  }).forEach(o=>totalEntradas+=Number(o.entrada)||0));
   document.getElementById('t-entradas').textContent=totalEntradas>0?fmt(totalEntradas):'—';
 
   // Funil visual
@@ -2114,8 +2120,13 @@ function refreshAnotacoes(d){
 }
 
 function updateEntradas(){
+  var r=getRange('trafego');
   var te=0;
-  Object.values(_ccData).forEach(dd=>(dd.orcamentos||[]).forEach(o=>te+=Number(o.entrada)||0));
+  Object.values(_ccData).forEach(dd=>(dd.orcamentos||[]).filter(o=>{
+    if(o.status!=='Aprovado')return false;
+    const de=o.entradaData||o.data||'';
+    return de&&de>=r.since&&de<=r.until;
+  }).forEach(o=>te+=Number(o.entrada)||0));
   var el=document.getElementById('t-entradas');if(el)el.textContent=te>0?fmt(te):'—';
 }
 
