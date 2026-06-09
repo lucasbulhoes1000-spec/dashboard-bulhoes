@@ -1210,6 +1210,7 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
+    sincronizarNomesCRM(rows);
     console.log('[CLOUDIA HEADERS]', h);
     console.log('[CLOUDIA SAMPLE com ad_id]', rows.filter(r=>r.ad_id).slice(0,3).map(r=>({name:r.name,ad_id:r.ad_id,ad_name:r.ad_name})));
     // DEBUG: loga ad_name/ad_id de todos os leads de hoje
@@ -1577,6 +1578,15 @@ function renderLeadsTable(){
     }
   });
   leadsData=Object.values(phoneMap).sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
+  // Aplica edições manuais salvas no CRM (_ccData) sobre os dados do Cloudia
+  leadsData.forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=_ccData[ph];
+    if(!d)return;
+    if(d.nomeAtual)r.name=d.nomeAtual;
+    if(d.origemAtual)r.origin=d.origemAtual;
+    if(d.statusAtual)r.stage=d.statusAtual;
+  });
   const origens=[...new Set(leadsData.map(r=>r.origin||'—').filter(Boolean))].sort();
   const sel=document.getElementById('leads-origem-filter');
   sel.innerHTML='<option value="">Todas as origens</option>'+origens.map(o=>`<option value="${o}">${o}</option>`).join('');
@@ -1602,11 +1612,14 @@ function filterLeadsTable(){
     return match&&origMatch&&dateMatch;
   });
   document.getElementById('leads-count').textContent=filtered.length+' leads';
-  document.getElementById('leads-tbody').innerHTML=filtered.length>0?filtered.map(r=>`
-    <tr><td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
-    <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
-    <td>${r.phone||'—'}</td>
-    <td><span class="origem-pill">${r.origin||'—'}</span></td></tr>`).join('')
+  document.getElementById('leads-tbody').innerHTML=filtered.length>0?filtered.map((r,i)=>{
+    const idx=leadsData.indexOf(r);
+    return`<tr style="cursor:pointer;" onclick="openLeadCard(${idx})">
+      <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
+      <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
+      <td>${r.phone||'—'}</td>
+      <td><span class="origem-pill">${r.origin||'—'}</span></td>
+    </tr>`;}).join('')
     :'<tr><td colspan="4" class="empty-state">Nenhum lead encontrado</td></tr>';
 }
 
@@ -1847,7 +1860,9 @@ function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
   _currentClienteIdx=idx;
   var d=ccGet(r);
-  document.getElementById('cc-name').textContent=r.name||'—';
+  const ph_cc=String(r.phone||'').replace(/\D/g,'');
+  const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
+  document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
   document.getElementById('cc-stage-tag').textContent=r.stage||'—';
   document.getElementById('cc-origin-tag').textContent=r.origin||'—';
@@ -2822,6 +2837,129 @@ function salvarComissaoSDR(){
 }
 
 
+// Sincroniza nomes do Cloudia → CRM pelo telefone
+// Toda vez que o Cloudia carrega, atualiza os nomes no _ccData se mudaram
+function sincronizarNomesCRM(cloudiaRows){
+  if(!cloudiaRows||!cloudiaRows.length)return;
+  // Monta mapa telefone → nome mais recente do Cloudia
+  const phoneNameMap={};
+  cloudiaRows.forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'').trim();
+    if(!ph||!r.name)return;
+    const d=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at)||new Date(0);
+    if(!phoneNameMap[ph]||d>phoneNameMap[ph].d){
+      phoneNameMap[ph]={name:String(r.name).trim(),d};
+    }
+  });
+  // Atualiza _ccData onde o nome mudou
+  let alterados=0;
+  Object.entries(_ccData).forEach(([ph,data])=>{
+    if(phoneNameMap[ph]&&phoneNameMap[ph].name){
+      // Guarda nome antigo para log
+      const nomeAtual=data.nomeAtual||'';
+      const nomeNovo=phoneNameMap[ph].name;
+      if(nomeAtual&&nomeAtual!==nomeNovo){
+        console.log('[CRM SYNC] Nome atualizado:',nomeAtual,'→',nomeNovo,'(',ph,')');
+        alterados++;
+      }
+      data.nomeAtual=nomeNovo;
+    }
+  });
+  if(alterados>0){
+    salvarCRMDebounced();
+    console.log('[CRM SYNC] ✅',alterados,'nome(s) atualizados no CRM');
+  }
+}
+
+
+// ===== LEAD CARD =====
+let _currentLeadIdx=-1;
+
+function openLeadCard(idx){
+  const r=leadsData[idx];
+  if(!r)return;
+  _currentLeadIdx=idx;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  // Preenche campos
+  document.getElementById('lc-nome').value=r.name||'';
+  document.getElementById('lc-telefone').value=r.phone||'';
+  // Origem — tenta casar com as opções do select
+  const origSel=document.getElementById('lc-origem');
+  const origVal=r.origin||'';
+  let found=false;
+  for(let op of origSel.options){if(op.value===origVal){found=true;break;}}
+  if(!found&&origVal){const op=new Option(origVal,origVal);origSel.add(op);}
+  origSel.value=origVal;
+  // Status
+  const stSel=document.getElementById('lc-status');
+  stSel.value=(r.stage&&(r.stage==='Agendou'||r.stage==='Lead'))?r.stage:'Lead';
+  // Anotações do _ccData (reutiliza a mesma estrutura)
+  const d=_ccData[ph]||{anotacoes:[]};
+  refreshLeadAnotacoes(d);
+  document.getElementById('lc-anot-input').value='';
+  document.getElementById('lead-card-overlay').style.display='block';
+}
+
+function closeLeadCard(e){
+  if(e.target===document.getElementById('lead-card-overlay'))
+    document.getElementById('lead-card-overlay').style.display='none';
+}
+
+function salvarLeadCard(){
+  const r=leadsData[_currentLeadIdx];
+  if(!r)return;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  const novoNome=document.getElementById('lc-nome').value.trim();
+  const novoTel=document.getElementById('lc-telefone').value.trim().replace(/\D/g,'');
+  const novaOrigem=document.getElementById('lc-origem').value;
+  const novoStatus=document.getElementById('lc-status').value;
+
+  // Salva no _ccData (Supabase) — fonte de verdade para edições manuais
+  if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+  _ccData[ph].nomeAtual=novoNome||r.name;
+  _ccData[ph].origemAtual=novaOrigem||r.origin;
+  _ccData[ph].statusAtual=novoStatus;
+  _ccData[ph].telefoneAtual=novoTel||ph;
+
+  // Atualiza allCloudiaRows em memória para refletir na tabela imediatamente
+  allCloudiaRows.forEach(row=>{
+    const rowPh=String(row.phone||'').replace(/\D/g,'');
+    if(rowPh===ph){
+      if(novoNome)row.name=novoNome;
+      if(novaOrigem)row.origin=novaOrigem;
+      if(novoStatus)row.stage=novoStatus;
+    }
+  });
+
+  salvarCRMDebounced();
+  // Recarrega a tabela de leads
+  renderLeadsTable();
+  document.getElementById('lead-card-overlay').style.display='none';
+}
+
+function salvarLeadAnotacao(){
+  const r=leadsData[_currentLeadIdx];if(!r)return;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  const text=document.getElementById('lc-anot-input').value.trim();
+  if(!text)return;
+  if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+  if(!_ccData[ph].anotacoes)_ccData[ph].anotacoes=[];
+  _ccData[ph].anotacoes.unshift({text,date:new Date().toLocaleString('pt-BR')});
+  document.getElementById('lc-anot-input').value='';
+  refreshLeadAnotacoes(_ccData[ph]);
+  salvarCRMDebounced();
+}
+
+function refreshLeadAnotacoes(d){
+  document.getElementById('lc-anot-list').innerHTML=(d.anotacoes||[]).map(a=>`
+    <div style="background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;margin-bottom:8px;">
+      <div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">${a.date}</div>
+      <div style="font-size:13px;color:#2a2520;">${a.text}</div>
+    </div>`).join('')
+    ||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
+}
+
+
 // INIT
 window.addEventListener('load',()=>{
   verificarLogin();
@@ -2888,6 +3026,56 @@ window.addEventListener('load',()=>{
     <div style="display:flex;gap:10px;">
       <button onclick="salvarComissaoSDR()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar comissão</button>
       <button onclick="document.getElementById('modal-sdr').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD CARD -->
+<div id="lead-card-overlay" onclick="closeLeadCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
+  <div id="lead-card-panel" style="position:fixed;top:0;right:0;width:420px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:15px;font-weight:700;color:#2a2520;">Lead</div>
+        <button onclick="document.getElementById('lead-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
+      </div>
+      <!-- Nome -->
+      <div style="margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome</label>
+        <input id="lc-nome" type="text" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:600;box-sizing:border-box;background:#fff;">
+      </div>
+      <!-- Telefone -->
+      <div style="margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
+        <input id="lc-telefone" type="text" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#fff;">
+      </div>
+      <!-- Origem -->
+      <div style="margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Origem</label>
+        <select id="lc-origem" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+          <option value="">—</option>
+          <option>#Instagram ADS</option>
+          <option>#Orgânico</option>
+          <option>#Social Selling</option>
+          <option>#Indicação</option>
+          <option>#Facebook ADS</option>
+        </select>
+      </div>
+      <!-- Status -->
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
+        <select id="lc-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+          <option value="Lead">Lead</option>
+          <option value="Agendou">Agendou</option>
+        </select>
+      </div>
+      <button onclick="salvarLeadCard()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
+    </div>
+    <!-- Anotações -->
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      <div style="font-size:10px;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Anotações</div>
+      <textarea id="lc-anot-input" placeholder="Digite uma anotação..." style="width:100%;min-height:80px;border:1px solid #e0d9d0;border-radius:8px;padding:10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea>
+      <button onclick="salvarLeadAnotacao()" style="margin-top:6px;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 18px;cursor:pointer;font-size:13px;">Salvar anotação</button>
+      <div id="lc-anot-list" style="margin-top:14px;"></div>
     </div>
   </div>
 </div>
