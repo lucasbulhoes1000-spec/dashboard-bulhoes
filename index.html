@@ -1697,7 +1697,7 @@ function filterClientesTable(){
     const d=_ccData[ph]||{orcamentos:[]};
     const orc0=d.orcamentos&&d.orcamentos[0];
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
-      <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
+      <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.created_at)}</td>
       <td class="tm">${r.timestamp&&r.timestamp!==r.created_at?fmtDate(r.timestamp):'—'}</td>
       <td>${r.phone||'—'}</td>
@@ -1741,7 +1741,7 @@ function lupaLeads(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0))
-    .map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']);
+    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—'];});
   openModal('Leads — '+rows.length+' únicos no período',['Data de cadastro','Nome','Telefone','Origem'],rows);
 }
 function lupaAgend(){
@@ -1758,7 +1758,7 @@ function lupaAgend(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>[fmtDate(r.timestamp||r.created_at),r.name||'—',r.phone||'—',r.origin||'—',getStatusAgend(r.stage)]);
+    .map(r=>{const e=applyEdits(r);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(e.stage)];});
   openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status'],rows);
 }
 function lupaComp(){
@@ -1769,7 +1769,7 @@ function lupaComp(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))
-    .map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—',fmtDate(r.timestamp)]);
+    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(e.timestamp)];});
   openModal('Oportunidades — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
 function lupaContratos(){
@@ -1781,7 +1781,7 @@ function lupaContratos(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))
-    .map(r=>{const v=parseFloat(r.value||0);return[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—',v>0?fmt(v):'—',v>0?fmt(v):'—'];});
+    .map(r=>{const e=applyEdits(r);const v=parseFloat(e.value||0);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',v>0?fmt(v):'—',v>0?fmt(v):'—'];});
   openModal('Fechamentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Valor orçado','Valor fechado'],rows);
 }
 function lupaAdLeads(adKey){
@@ -1807,7 +1807,7 @@ function lupaAdLeads(adKey){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
-    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',r.stage||'—']);
+    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.stage||'—'];});
   openModal('Leads — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Etapa'],rows);
 }
 function lupaAdAgend(adKey){
@@ -1826,7 +1826,7 @@ function lupaAdAgend(adKey){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>[fmtDate(r.created_at),r.name||'—',r.phone||'—',getStatusAgend(r.stage),fmtDate(r.timestamp)]);
+    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',getStatusAgend(e.stage),fmtDate(e.timestamp)];});
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
 }
 function getStatusAgend(stage){
@@ -1865,7 +1865,8 @@ function openClienteCard(idx){
   document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
   document.getElementById('cc-stage-tag').textContent=r.stage||'—';
-  document.getElementById('cc-origin-tag').textContent=r.origin||'—';
+  const e_cc=applyEdits(r);
+  document.getElementById('cc-origin-tag').textContent=e_cc.origin||'—';
   document.getElementById('cc-date-tag').textContent=fmtDate(r.created_at||r.timestamp);
   var val=parseFloat(r.value||0);
   if(val>0&&d.orcamentos.length===0){
@@ -2116,9 +2117,9 @@ function openROModal(i,type){
   const {org,d}=window._roData[i];
   const titles={leads:'Leads',agend:'Agendamentos',comp:'Comparecimentos',fechou:'Fechados'};
   const rowsMap={
-    leads:(d.leadRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']),
-    agend:(d.agendRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']),
-    comp:(d.compRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']),
+    leads:(d.leadRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—'];}),
+    agend:(d.agendRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—'];}),
+    comp:(d.compRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—'];}),
     fechou:(d.fechRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—','R$ '+parseFloat(r.value||0).toFixed(2)])
   };
   const hdrs={leads:['Data','Nome','Telefone','Origem'],agend:['Data','Nome','Telefone'],comp:['Data','Nome','Telefone'],fechou:['Data','Nome','Telefone','Valor']};
@@ -2963,6 +2964,21 @@ function refreshLeadAnotacoes(d){
     </div>`).join('')
     ||'<div style="color:#8a7a6a;font-size:13px;text-align:center;padding:16px;">Nenhuma anotação</div>';
 }
+
+
+// Aplica edições manuais do CRM (_ccData) sobre um row do Cloudia
+function applyEdits(r){
+  if(!r)return r;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  const d=_ccData[ph];
+  if(!d)return r;
+  return Object.assign({},r,{
+    name:d.nomeAtual||r.name,
+    origin:d.origemAtual||r.origin
+  });
+}
+// Aplica em lista
+function applyEditsAll(rows){return (rows||[]).map(applyEdits);}
 
 
 // INIT
