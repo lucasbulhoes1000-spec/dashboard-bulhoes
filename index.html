@@ -262,8 +262,8 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="slabel">Captação</div>
             <div class="row r4">
-              <div class="mc"><div class="ml">Agendamentos</div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">dos leads</div></div>
-              <div class="mc"><div class="ml">Comparecimentos</div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div></div>
+              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">dos leads</div></div>
+              <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
             </div>
@@ -1321,9 +1321,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const evtsGeral=filteredEvents||filtered;
   const agendSrc=filteredAgend||[];
   const agendPhones=new Set(agendSrc.map(r=>String(r.phone||'').replace(/\D/g,'')));
-  const agend=agendPhones.size;
+  const agendAuto=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
-  const comp=compPhones.size;
+  const compAuto=compPhones.size;
+  // Usa valor manual se definido, senão usa automático
+  const _agendManual=getManualOverride('agend');
+  const _compManual=getManualOverride('comp');
+  const agend=_agendManual!=null?_agendManual:agendAuto;
+  const comp=_compManual!=null?_compManual:compAuto;
   const fechados=evtsGeral.filter(r=>isFechou(r.stage));
   const fechadosPhones=new Set(fechados.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const contratos=fechadosPhones.size;
@@ -1357,9 +1362,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-cpl').textContent=cplReal>0?fmt(cplReal):'—';
   document.getElementById('t-leads').innerHTML=fmtN(leadsBase)+' <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-leads-sub').textContent=(leadsInstagram.size>0?leadsInstagram.size+' leads Meta ADS':'base: '+leadsBase+' leads');
-  document.getElementById('t-agend').innerHTML=(agend||'0')+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
+  const agendTag=_agendManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
+  const compTag=_compManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
+  document.getElementById('t-agend').innerHTML=(agend||'0')+agendTag+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
-  document.getElementById('t-comp').innerHTML=(comp||'0')+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-comp').innerHTML=(comp||'0')+compTag+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-comp-sub').textContent=pct(comp,agend)+' show rate';
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
@@ -3286,6 +3293,74 @@ function populateDynamicSelects(){
 }
 
 
+
+// ===== EDIÇÃO MANUAL DE MÉTRICAS =====
+let _edicaoManualSenhaOk = false;
+let _edicaoManualCampo = null; // 'agend' ou 'comp'
+
+function _getPeriodoKey(){
+  const r = getRange('trafego');
+  return r.since + '_' + r.until;
+}
+
+function abrirEdicaoManual(campo){
+  _edicaoManualCampo = campo;
+  _edicaoManualSenhaOk = false;
+  document.getElementById('edicao-manual-titulo') && (document.getElementById('edicao-manual-titulo').textContent = '');
+  document.getElementById('edicao-manual-title').textContent = campo === 'agend' ? '✏️ Agendamentos' : '✏️ Comparecimentos';
+  document.getElementById('edicao-manual-senha').value = '';
+  document.getElementById('edicao-manual-senha-erro').style.display = 'none';
+  document.getElementById('edicao-manual-senha-wrap').style.display = 'block';
+  document.getElementById('edicao-manual-form-wrap').style.display = 'none';
+  document.getElementById('modal-edicao-manual').style.display = 'flex';
+  setTimeout(()=>document.getElementById('edicao-manual-senha').focus(), 100);
+}
+
+function confirmarSenhaEdicao(){
+  const senha = document.getElementById('edicao-manual-senha').value;
+  if(senha !== '14891'){
+    document.getElementById('edicao-manual-senha-erro').style.display = 'block';
+    return;
+  }
+  _edicaoManualSenhaOk = true;
+  document.getElementById('edicao-manual-senha-wrap').style.display = 'none';
+  document.getElementById('edicao-manual-form-wrap').style.display = 'block';
+  const r = getRange('trafego');
+  document.getElementById('edicao-manual-periodo-label').textContent = 'Período: ' + r.since + ' até ' + r.until;
+  // Preenche com valor atual se já houver
+  const key = _getPeriodoKey();
+  const salvo = (_ccData.__manuais__ && _ccData.__manuais__[key] && _ccData.__manuais__[key][_edicaoManualCampo]);
+  document.getElementById('edicao-manual-valor').value = salvo != null ? salvo : '';
+  setTimeout(()=>document.getElementById('edicao-manual-valor').focus(), 100);
+}
+
+function salvarEdicaoManual(){
+  if(!_edicaoManualSenhaOk) return;
+  const val = document.getElementById('edicao-manual-valor').value;
+  const key = _getPeriodoKey();
+  if(!_ccData.__manuais__) _ccData.__manuais__ = {};
+  if(!_ccData.__manuais__[key]) _ccData.__manuais__[key] = {};
+  if(val === '' || val == null){
+    delete _ccData.__manuais__[key][_edicaoManualCampo];
+  } else {
+    _ccData.__manuais__[key][_edicaoManualCampo] = parseInt(val);
+  }
+  salvarCRMDebounced();
+  document.getElementById('modal-edicao-manual').style.display = 'none';
+  loadTrafego();
+}
+
+function limparEdicaoManual(){
+  document.getElementById('edicao-manual-valor').value = '';
+}
+
+function getManualOverride(campo){
+  const key = _getPeriodoKey();
+  if(!_ccData.__manuais__ || !_ccData.__manuais__[key]) return null;
+  const v = _ccData.__manuais__[key][campo];
+  return (v != null) ? v : null;
+}
+
 // INIT
 window.addEventListener('load',()=>{
   verificarLogin();
@@ -3470,6 +3545,35 @@ window.addEventListener('load',()=>{
     </div>
     <button onclick="fazerLogin()" id="login-btn" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">Entrar</button>
     <p style="font-size:11px;color:#b5a898;margin-top:16px;">Acesso restrito à equipe Bulhões</p>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO MANUAL MÉTRICAS -->
+<div id="modal-edicao-manual" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;width:360px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:700;color:#2a2520;" id="edicao-manual-title">Editar valor</div>
+      <button onclick="document.getElementById('modal-edicao-manual').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+    </div>
+    <div id="edicao-manual-senha-wrap">
+      <div style="font-size:12px;color:#8a7a6a;margin-bottom:8px;">Digite a senha para editar:</div>
+      <input id="edicao-manual-senha" type="password" placeholder="••••••" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:14px;box-sizing:border-box;" onkeydown="if(event.key==='Enter')confirmarSenhaEdicao()">
+      <button onclick="confirmarSenhaEdicao()" style="width:100%;margin-top:12px;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Confirmar</button>
+      <div id="edicao-manual-senha-erro" style="display:none;color:#c0392b;font-size:12px;margin-top:8px;">Senha incorreta.</div>
+    </div>
+    <div id="edicao-manual-form-wrap" style="display:none;">
+      <div style="font-size:12px;color:#8a7a6a;margin-bottom:6px;" id="edicao-manual-periodo-label"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:#8a7a6a;margin-bottom:4px;">Valor manual (deixe vazio para usar automático)</div>
+          <input id="edicao-manual-valor" type="number" min="0" placeholder="Ex: 97" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:10px 12px;font-size:18px;font-weight:600;box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="salvarEdicaoManual()" style="flex:1;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;">Salvar</button>
+        <button onclick="limparEdicaoManual()" style="background:#f5f0ea;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">Limpar</button>
+      </div>
+    </div>
   </div>
 </div>
 </body>
