@@ -1753,8 +1753,9 @@ function filterClientesTable(){
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=_ccData[ph]||{orcamentos:[]};
     const orcs=d.orcamentos||[];
-    const tratMatch=!trat||orcs.some(o=>o.tratamento===trat);
-    const avalMatch=!aval||orcs.some(o=>o.avaliador===aval);
+    const normStr=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    const tratMatch=!trat||orcs.some(o=>normStr(o.tratamento)===normStr(trat));
+    const avalMatch=!aval||orcs.some(o=>normStr(o.avaliador)===normStr(aval));
     let dateMatch=true;
     if(fromV||toV){
       // Busca o timestamp do CUSTOMER_STAGE_UPDATED com Compareceu ou Ganho
@@ -3248,9 +3249,12 @@ function populateDynamicSelects(){
   const trats=_listas.tratamentos?_listas.tratamentos.ativos||[]:[];
   const origs=_listas.origens?[...(_listas.origens.padroes||[]),...(_listas.origens.ativos||[])]:[];
 
-  // Avaliadores — inclui os que estão nos orçamentos do _ccData
-  const avaisDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).map(o=>o.avaliador).filter(Boolean)))];
-  const avaisTodos=[...new Set([...avais,...avaisDoOrc])].sort();
+  // Avaliadores — inclui os que estão nos orçamentos do _ccData, deduplicando por nome normalizado
+  const avaisDoOrc=Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).map(o=>o.avaliador).filter(Boolean));
+  const normNome=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const avaisMap={};
+  [...avais,...avaisDoOrc].forEach(a=>{const k=normNome(a);if(!avaisMap[k])avaisMap[k]=a;});
+  const avaisTodos=Object.values(avaisMap).sort();
   ['orc-avaliador','clientes-aval-filter','ro-aval','rof-aval'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const cur=el.value;
