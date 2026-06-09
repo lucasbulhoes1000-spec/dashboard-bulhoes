@@ -2360,7 +2360,52 @@ async function salvarCriarCliente(){const data=document.getElementById('cc2-data
 // ===== IMPORTAR LEADS =====
 function openImportarLeads(){document.getElementById('importar-leads-csv').value='';document.getElementById('importar-leads-preview').style.display='none';document.getElementById('modal-importar-leads').style.display='flex';}
 function lerArquivoLeads(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{document.getElementById('importar-leads-csv').value=ev.target.result;const lines=ev.target.result.trim().split('\n');const prev=document.getElementById('importar-leads-preview');prev.style.display='block';prev.textContent=lines.length+' linhas. Primeira: '+lines[0];};reader.readAsText(file);}
-async function executarImportarLeads(){const csv=document.getElementById('importar-leads-csv').value.trim();if(!csv){alert('Cole ou faça upload de um CSV');return;}const lines=csv.split('\n').filter(l=>l.trim());const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;const leads=[];for(let i=start;i<lines.length;i++){const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));if(cols.length<4)continue;const [dataStr,hora,nome,telefone,origem,status]=cols;const parts=dataStr.split('/');let createdAt=dataStr;if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';leads.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Lead',created_at:createdAt});}if(!leads.length){alert('Nenhum lead válido');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'importLeads',leads})});const r=await res.json();document.getElementById('modal-importar-leads').style.display='none';alert('✅ '+r.imported+' leads importados!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});}catch(e){alert('Erro: '+e.message);}}
+async function executarImportarLeads(){
+  const csv=document.getElementById('importar-leads-csv').value.trim();
+  if(!csv){alert('Cole ou faça upload de um CSV');return;}
+  const lines=csv.split('\n').filter(l=>l.trim());
+  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
+  const leads=[];
+  for(let i=start;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<4)continue;
+    const [dataStr,hora,nome,telefone,origem,status]=cols;
+    if(!telefone||telefone==='telefone')continue;
+    const parts=dataStr.split('/');
+    let createdAt=dataStr;
+    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';
+    leads.push({name:nome||'—',phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Lead',created_at:createdAt});
+  }
+  if(!leads.length){alert('Nenhum lead válido');return;}
+
+  // Salva localmente no allCloudiaRows + _ccData (sem precisar do Cloudia)
+  let importados=0,ignorados=0;
+  const phonesExistentes=new Set(allCloudiaRows.map(r=>String(r.phone||'').replace(/\D/g,'')));
+  leads.forEach(l=>{
+    const ph=String(l.phone||'').replace(/\D/g,'');
+    if(!ph)return;
+    if(phonesExistentes.has(ph)){ignorados++;return;}
+    phonesExistentes.add(ph);
+    // Adiciona ao allCloudiaRows como row local
+    allCloudiaRows.push({
+      name:l.name,phone:l.phone,origin:l.origin,stage:l.stage,
+      created_at:l.created_at,timestamp:'',
+      type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
+    });
+    // Salva edições manuais no _ccData para persistir nome/origem
+    if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+    if(l.name&&l.name!=='—'){_ccData[ph].nomeAtual=l.name;_ccData[ph].editadoManualmente=true;}
+    if(l.origin)_ccData[ph].origemAtual=l.origin;
+    if(l.stage)_ccData[ph].statusAtual=l.stage;
+    _ccData[ph].created_at=l.created_at;
+    importados++;
+  });
+
+  salvarCRMDebounced();
+  document.getElementById('modal-importar-leads').style.display='none';
+  renderLeadsTable();
+  alert('✅ '+importados+' leads importados localmente!'+(ignorados?' '+ignorados+' já existiam.':''));
+}
 
 // ===== IMPORTAR CLIENTES =====
 function openImportarClientes(){document.getElementById('importar-clientes-csv').value='';document.getElementById('importar-clientes-preview').style.display='none';document.getElementById('modal-importar-clientes').style.display='flex';}
