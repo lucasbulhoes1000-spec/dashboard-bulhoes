@@ -941,10 +941,6 @@ tbody tr:hover td{background:#faf7f3;}
   <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Fase atual</label>
     <select id="atv-fase" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
       <option value="">Selecione...</option>
-      <option>1° contato - Vídeo de agradecimento</option><option>2° contato - Antes/Depois + lembrei de você</option>
-      <option>Agendou retorno</option><option>Aguardando 1° contato</option><option>Aguardando entrada</option>
-      <option>Avaliação comercial</option><option>Fechamento por telefone e WhatsApp</option><option>Fechou</option>
-      <option>Pós venda</option><option>Sem resposta</option>
     </select></div>
   <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Probabilidade de fechamento (0-10)</label>
     <input id="atv-prob" type="number" min="0" max="10" placeholder="Ex: 7" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
@@ -1647,19 +1643,16 @@ function renderClientesTable(){
   // Atualiza selects de filtro
   const fasesSel=document.getElementById('clientes-fase-filter');
   fasesSel.innerHTML='<option value="">Todas as fases</option>';
-  [...new Set(clientesData.map(r=>r.stage||'').filter(Boolean))].sort().forEach(f=>fasesSel.add(new Option(f,f)));
+  // Usa as fases das listas gerenciadas (ativas) + fases dos dados que não estejam na lista
+  const fasesAtivas=_listas.fases.ativos||[];
+  const fasesNoDado=[...new Set(clientesData.map(r=>r.stage||'').filter(Boolean))];
+  const todasFases=[...new Set([...fasesAtivas,...fasesNoDado])].sort();
+  todasFases.forEach(f=>fasesSel.add(new Option(f,f)));
   const origSel=document.getElementById('clientes-origem-filter');
   origSel.innerHTML='<option value="">Todas as origens</option>';
   [...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));
   // Popula cards de resumo
-  const totalC=clientesData.length;
-  const totalF=clientesData.filter(r=>isFechou(r.stage)).length;
-  const totalA=totalC-totalF;
-  const valorF=clientesData.filter(r=>isFechou(r.stage)).reduce((s,r)=>s+parseFloat(r.value||0),0);
-  document.getElementById('cc-total-clientes').textContent=totalC;
-  document.getElementById('cc-total-abertos').textContent=totalA;
-  document.getElementById('cc-total-fechados').textContent=totalF;
-  document.getElementById('cc-valor-fechado').textContent=valorF>0?fmt(valorF):'—';
+  // Cards agora são atualizados pelo filterClientesTable com base no filtered
   filterClientesTable();
 }
 function clearClientesDates(){document.getElementById('clientes-from').value='';document.getElementById('clientes-to').value='';filterClientesTable();}
@@ -1708,6 +1701,15 @@ function filterClientesTable(){
     return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dateMatch;
   });
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
+  // Atualiza cards conforme filtro atual
+  const totalC=filtered.length;
+  const totalF=filtered.filter(r=>isFechou(r.stage)).length;
+  const totalA=totalC-totalF;
+  const valorF=filtered.filter(r=>isFechou(r.stage)).reduce((s,r)=>s+parseFloat(r.value||0),0);
+  document.getElementById('cc-total-clientes').textContent=totalC;
+  document.getElementById('cc-total-abertos').textContent=totalA;
+  document.getElementById('cc-total-fechados').textContent=totalF;
+  document.getElementById('cc-valor-fechado').textContent=valorF>0?fmt(valorF):'—';
   document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(r=>{
     const fechou=isFechou(r.stage);
     const val=parseFloat(r.value||0);
@@ -2006,6 +2008,10 @@ function refreshOrcamentos(d){
 function openAtvForm(){
   document.getElementById('atv-data').value=new Date().toISOString().split('T')[0];
   ['atv-hora','atv-fase','atv-prob','atv-proximo','atv-obs'].forEach(id=>document.getElementById(id).value='');
+  // Preenche fases dinamicamente das listas gerenciadas
+  const faseSel=document.getElementById('atv-fase');
+  const curVal=faseSel.value;
+  faseSel.innerHTML='<option value="">Selecione...</option>'+(_listas.fases.ativos||[]).map(f=>`<option${f===curVal?' selected':''}>${f}</option>`).join('');
   document.getElementById('cc-atv-form').style.display='block';
 }
 function salvarAtividade(){
