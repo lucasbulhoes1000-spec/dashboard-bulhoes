@@ -1322,7 +1322,19 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const agendSrc=filteredAgend||[];
   const agendPhones=new Set(agendSrc.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agendAuto=agendPhones.size;
-  const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho, com timestamp no período)
+  const _range=getRange('trafego');
+  allCloudiaRows.filter(r=>{
+    if(r.type!=='CUSTOMER_CREATED')return false;
+    if(!isComp(r.stage)&&!isFechou(r.stage))return false;
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    if(!ph)return false;
+    const d=parseCloudiaDate(r.timestamp||r.created_at);
+    if(!d)return false;
+    const ds=localDateStr(d);
+    return ds>=_range.since&&ds<=_range.until;
+  }).forEach(r=>compPhones.add(String(r.phone||'').replace(/\D/g,'')));
   const compAuto=compPhones.size;
   // Usa valor manual se definido, senão usa automático
   const _agendManual=getManualOverride('agend');
