@@ -373,6 +373,13 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="faltou">Faltou/Desmarcou</option>
         </select>
         <span class="count-badge" id="leads-count"></span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#b5a898;">Exibir:
+          <button onclick="setLeadsPerPage(10)" id="lpb-10" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">10</button>
+          <button onclick="setLeadsPerPage(20)" id="lpb-20" style="background:#A18B6C;color:#fff;border:0.5px solid #A18B6C;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;">20</button>
+          <button onclick="setLeadsPerPage(50)" id="lpb-50" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">50</button>
+          <button onclick="setLeadsPerPage(100)" id="lpb-100" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">100</button>
+          <button onclick="setLeadsPerPage(0)" id="lpb-0" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">Todos</button>
+        </span>
         <button onclick="exportTableXLS('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
         <button onclick="exportTableCSV('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarLead()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Lead</button>
@@ -1639,9 +1646,10 @@ let _leadsFiltered=[];let _leadsPage=1;let _leadsPerPage=20;
 function renderLeadsPage(){
   const filtered=_leadsFiltered;
   const total=filtered.length;
-  const totalPags=Math.ceil(total/_leadsPerPage)||1;
-  const start=(_leadsPage-1)*_leadsPerPage;
-  const pagina=filtered.slice(start,start+_leadsPerPage);
+  const perPage=_leadsPerPage===0?total:_leadsPerPage;
+  const totalPags=Math.ceil(total/(perPage||1))||1;
+  const start=(_leadsPage-1)*(perPage||total);
+  const pagina=_leadsPerPage===0?filtered:filtered.slice(start,start+perPage);
   document.getElementById('leads-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const idx=leadsData.indexOf(r);
     const e=applyEdits(r);
@@ -1668,17 +1676,26 @@ function renderLeadsPage(){
     pag.innerHTML=`
       <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #e0d8ce;font-size:12px;color:#9a8c7e;flex-wrap:wrap;">
         <button onclick="mudaPagLead(${_leadsPage-1})" ${_leadsPage<=1?'disabled':''} style="background:${_leadsPage<=1?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">‹ Ant</button>
-        <span>Pág. ${_leadsPage} de ${totalPags} · ${total>0?start+1+'-'+Math.min(start+_leadsPerPage,total):0} de ${total}</span>
-        <button onclick="mudaPagLead(${_leadsPage+1})" ${_leadsPage>=totalPags?'disabled':''} style="background:${_leadsPage>=totalPags?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">Próx ›</button>
-        <span style="margin-left:auto;display:flex;align-items:center;gap:6px;">
-          <span style="color:#b5a898;">Exibir:</span>
-          ${[10,20,50,100].map(n=>`<button onclick="setLeadsPerPage(${n})" style="background:${_leadsPerPage===n?'#A18B6C':'#fff'};color:${_leadsPerPage===n?'#fff':'#7a6550'};border:0.5px solid ${_leadsPerPage===n?'#A18B6C':'#d4c9bc'};border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;font-weight:${_leadsPerPage===n?'600':'400'};">${n}</button>`).join('')}
-        </span>
+        <span>${_leadsPerPage===0?'Todos os '+total+' leads':'Pág. '+_leadsPage+' de '+totalPags+' · '+(total>0?start+1+'-'+Math.min(start+perPage,total):0)+' de '+total}</span>
+        <button onclick="mudaPagLead(${_leadsPage+1})" ${(_leadsPage>=totalPags||_leadsPerPage===0)?'disabled':''} style="background:${(_leadsPage>=totalPags||_leadsPerPage===0)?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">Próx ›</button>
       </div>`;
   }
 }
 function mudaPagLead(p){_leadsPage=p;renderLeadsPage();}
-function setLeadsPerPage(n){_leadsPerPage=n;_leadsPage=1;renderLeadsPage();}
+function setLeadsPerPage(n){
+  _leadsPerPage=n;_leadsPage=1;
+  // Atualiza estilo dos botões do topo
+  [10,20,50,100,0].forEach(v=>{
+    const btn=document.getElementById('lpb-'+v);
+    if(!btn)return;
+    const active=v===n;
+    btn.style.background=active?'#A18B6C':'#fff';
+    btn.style.color=active?'#fff':'#7a6550';
+    btn.style.borderColor=active?'#A18B6C':'#d4c9bc';
+    btn.style.fontWeight=active?'600':'400';
+  });
+  renderLeadsPage();
+}
 
 // ===== CLIENTES PAGE =====
 function renderClientes(){
