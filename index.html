@@ -2099,9 +2099,9 @@ function renderLista(tab){
     var dEl=document.getElementById(tab+'-desativos');if(dEl)dEl.innerHTML=(lista.desativos||[]).map(t=>makeItem(t,'desativo',tab)).join('');
   }
 }
-function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);}
-function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);}
-function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);}
+function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);salvarCRMDebounced();}
+function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);salvarCRMDebounced();}
+function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);salvarCRMDebounced();}
 
 // ===== RELATÓRIOS =====
 function initRelDates(fromId, toId){
@@ -2392,6 +2392,7 @@ async function salvarCRMRemoto(){
       email_clinica: email,
       crm_json: JSON.stringify(_ccData),
       comissoes_json: JSON.stringify(_comissoes),
+      listas_json: JSON.stringify(_listas),
       atualizado_em: new Date().toISOString()
     };
     const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
@@ -2432,7 +2433,7 @@ async function carregarCRMRemoto(){
     const email=localStorage.getItem('bulhoes_email');
     if(!email)return;
     // Busca do Supabase primeiro
-    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(email)+'&select=crm_json,comissoes_json',{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(email)+'&select=crm_json,comissoes_json,listas_json',{
       headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
     });
     const rows=await res.json();
@@ -2455,6 +2456,16 @@ async function carregarCRMRemoto(){
             console.log('[CRM] Comissões carregadas do Supabase ✅',_comissoes.length,'registros');
           }
         }catch(e){console.warn('[CRM] Erro ao parsear comissoes_json:',e);}
+      }
+      if(rows[0].listas_json){
+        try{
+          const listasParsed=JSON.parse(rows[0].listas_json);
+          if(listasParsed&&typeof listasParsed==='object'){
+            // Merge: preserva estrutura default e sobrescreve com salvo
+            Object.keys(listasParsed).forEach(k=>{if(_listas[k])_listas[k]=listasParsed[k];});
+            console.log('[CRM] Listas carregadas do Supabase ✅');
+          }
+        }catch(e){console.warn('[CRM] Erro ao parsear listas_json:',e);}
       }
       if(rows[0].crm_json)return;
     }
