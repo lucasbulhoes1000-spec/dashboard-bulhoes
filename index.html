@@ -395,8 +395,8 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
-        <input type="date" id="clientes-from" class="filter-select" onchange="filterClientesTable()" title="Data inicial">
-        <input type="date" id="clientes-to" class="filter-select" onchange="filterClientesTable()" title="Data final">
+        <input type="date" id="clientes-from" class="filter-select" onchange="filterClientesTable()" title="Data comparecimento inicial">
+        <input type="date" id="clientes-to" class="filter-select" onchange="filterClientesTable()" title="Data comparecimento final">
         <button onclick="clearClientesDates()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#9a8c7e;font-size:11px;padding:5px 8px;cursor:pointer;" title="Limpar datas">✕</button>
         <span class="count-badge" id="clientes-count"></span>
         <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">💾 CRM</button>
@@ -1691,7 +1691,15 @@ function filterClientesTable(){
     const avalMatch=!aval||orcs.some(o=>o.avaliador===aval);
     let dateMatch=true;
     if(fromV||toV){
-      const dd=parseCloudiaDate(r.created_at||r.timestamp);
+      // Busca o timestamp do CUSTOMER_STAGE_UPDATED com Compareceu ou Ganho
+      const ph_dt=String(r.phone||'').replace(/\D/g,'');
+      const compRow=allCloudiaRows.find(row=>
+        String(row.phone||'').replace(/\D/g,'')=== ph_dt &&
+        row.type==='CUSTOMER_STAGE_UPDATED' &&
+        (isComp(row.stage)||isFechou(row.stage)) &&
+        parseCloudiaDate(row.timestamp)
+      );
+      const dd=compRow?parseCloudiaDate(compRow.timestamp):null;
       const ds=dd?localDateStr(dd):'';
       if(fromV&&ds&&ds<fromV)dateMatch=false;
       if(toV&&ds&&ds>toV)dateMatch=false;
