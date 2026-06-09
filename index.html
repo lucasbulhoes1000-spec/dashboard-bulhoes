@@ -1598,7 +1598,7 @@ function filterLeadsTable(){
   const orig=document.getElementById('leads-origem-filter').value;
   const fromV=document.getElementById('leads-from').value;
   const toV=document.getElementById('leads-to').value;
-  const qDigits=q.replace(/\D/g,''); // só dígitos para busca de telefone
+  const qDigits=(q||'').replace(/\D/g,''); // só dígitos para busca de telefone
   const filtered=leadsData.filter(r=>{
     const e=applyEdits(r);
     const phoneClean=String(e.phone||'').replace(/\D/g,'');
@@ -1673,12 +1673,12 @@ function filterClientesTable(){
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
-  const qDigits2=q.replace(/\D/g,'');
+  const qDigits2=(q||'').replace(/\D/g,'');
   const filtered=clientesData.filter(r=>{
     const e=applyEdits(r);
     const phoneClean2=String(e.phone||'').replace(/\D/g,'');
-    const nameMatch2=(e.name||'').toLowerCase().includes(ql);
-    const phoneMatch2=qDigits2?phoneClean2.includes(qDigits2):(e.phone||'').includes(q);
+    const nameMatch2=(e.name||'').toLowerCase().includes(ql||'');
+    const phoneMatch2=qDigits2?phoneClean2.includes(qDigits2):phoneClean2.includes(q||'');
     const match=!ql||(nameMatch2||phoneMatch2);
     const faseMatch=!fase||r.stage===fase;
     const origMatch=!orig||(e.origin||'')===orig;
@@ -2982,8 +2982,9 @@ function applyEdits(r){
   if(!r)return r;
   const ph=String(r.phone||'').replace(/\D/g,'');
   const d=_ccData[ph];
-  if(!d)return r;
-  return Object.assign({},r,{
+  const base=Object.assign({},r,{phone:String(r.phone||'')});
+  if(!d)return base;
+  return Object.assign(base,{
     name:d.nomeAtual||r.name,
     origin:d.origemAtual||r.origin
   });
