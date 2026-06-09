@@ -1138,9 +1138,10 @@ async function loadTrafego(){
     const[metaAds,cloudiaRows]=await Promise.all([fetchMeta(),fetchCloudia()]);
     _lastMetaAds=metaAds;
     _lastCloudiaRows=cloudiaRows;
-    const filtered=filterCloudiaByOrigin(filterByRange(cloudiaRows,'trafego'));
-    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(cloudiaRows,'trafego'));
-    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(cloudiaRows,'trafego'));
+    // Usa allCloudiaRows que já inclui importados reconstruídos pelo fetchCloudia
+    const filtered=filterCloudiaByOrigin(filterByRange(allCloudiaRows,'trafego'));
+    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
+    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(allCloudiaRows,'trafego'));
     _lastCloudiaFiltered=filtered;
     _lastCloudiaFilteredEvents=filteredEvents;
     _lastCloudiaFilteredAgend=filteredAgend;
