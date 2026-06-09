@@ -2855,14 +2855,16 @@ function sincronizarNomesCRM(cloudiaRows){
   let alterados=0;
   Object.entries(_ccData).forEach(([ph,data])=>{
     if(phoneNameMap[ph]&&phoneNameMap[ph].name){
-      // Guarda nome antigo para log
-      const nomeAtual=data.nomeAtual||'';
       const nomeNovo=phoneNameMap[ph].name;
-      if(nomeAtual&&nomeAtual!==nomeNovo){
-        console.log('[CRM SYNC] Nome atualizado:',nomeAtual,'→',nomeNovo,'(',ph,')');
-        alterados++;
+      // Só sincroniza se não foi editado manualmente (editadoManualmente=true protege)
+      if(!data.editadoManualmente){
+        const nomeAtual=data.nomeAtual||'';
+        if(nomeAtual&&nomeAtual!==nomeNovo){
+          console.log('[CRM SYNC] Nome Cloudia atualizado:',nomeAtual,'→',nomeNovo,'(',ph,')');
+          alterados++;
+        }
+        data.nomeAtual=nomeNovo;
       }
-      data.nomeAtual=nomeNovo;
     }
   });
   if(alterados>0){
@@ -2880,19 +2882,21 @@ function openLeadCard(idx){
   if(!r)return;
   _currentLeadIdx=idx;
   const ph=String(r.phone||'').replace(/\D/g,'');
-  // Preenche campos
-  document.getElementById('lc-nome').value=r.name||'';
+  // Preenche campos — prioriza edições manuais salvas no CRM
+  const d_lc=_ccData[ph]||{};
+  document.getElementById('lc-nome').value=d_lc.nomeAtual||r.name||'';
   document.getElementById('lc-telefone').value=r.phone||'';
-  // Origem — tenta casar com as opções do select
+  // Origem — prioriza edição manual do CRM
   const origSel=document.getElementById('lc-origem');
-  const origVal=r.origin||'';
+  const origVal=d_lc.origemAtual||r.origin||'';
   let found=false;
   for(let op of origSel.options){if(op.value===origVal){found=true;break;}}
   if(!found&&origVal){const op=new Option(origVal,origVal);origSel.add(op);}
   origSel.value=origVal;
-  // Status
+  // Status — prioriza edição manual do CRM
   const stSel=document.getElementById('lc-status');
-  stSel.value=(r.stage&&(r.stage==='Agendou'||r.stage==='Lead'))?r.stage:'Lead';
+  const stVal=d_lc.statusAtual||r.stage||'Lead';
+  stSel.value=(stVal==='Agendou')?'Agendou':'Lead';
   // Anotações do _ccData (reutiliza a mesma estrutura)
   const d=_ccData[ph]||{anotacoes:[]};
   refreshLeadAnotacoes(d);
@@ -2920,6 +2924,7 @@ function salvarLeadCard(){
   _ccData[ph].origemAtual=novaOrigem||r.origin;
   _ccData[ph].statusAtual=novoStatus;
   _ccData[ph].telefoneAtual=novoTel||ph;
+  _ccData[ph].editadoManualmente=true; // protege contra sobrescrita do Cloudia
 
   // Atualiza allCloudiaRows em memória para refletir na tabela imediatamente
   allCloudiaRows.forEach(row=>{
