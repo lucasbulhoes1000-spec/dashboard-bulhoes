@@ -1598,9 +1598,15 @@ function filterLeadsTable(){
   const orig=document.getElementById('leads-origem-filter').value;
   const fromV=document.getElementById('leads-from').value;
   const toV=document.getElementById('leads-to').value;
+  const qDigits=q.replace(/\D/g,''); // só dígitos para busca de telefone
   const filtered=leadsData.filter(r=>{
-    const match=!q||(r.name||'').toLowerCase().includes(q)||(r.phone||'').includes(q)||(r.origin||'').toLowerCase().includes(q);
-    const origMatch=!orig||(r.origin||'')===orig;
+    const e=applyEdits(r);
+    const phoneClean=String(e.phone||'').replace(/\D/g,'');
+    const nameMatch=(e.name||'').toLowerCase().includes(q);
+    const phoneMatch=qDigits?phoneClean.includes(qDigits):(e.phone||'').includes(q);
+    const origMatch2=(e.origin||'').toLowerCase().includes(q);
+    const match=!q||(nameMatch||phoneMatch||origMatch2);
+    const origFilter=!orig||(e.origin||'')===orig;
     let dateMatch=true;
     if(fromV||toV){
       const d=parseCloudiaDate(r.created_at||r.timestamp);
@@ -1609,7 +1615,7 @@ function filterLeadsTable(){
       if(toV&&ds&&ds>toV)dateMatch=false;
       if(!ds)dateMatch=false;
     }
-    return match&&origMatch&&dateMatch;
+    return match&&origFilter&&dateMatch;
   });
   document.getElementById('leads-count').textContent=filtered.length+' leads';
   document.getElementById('leads-tbody').innerHTML=filtered.length>0?filtered.map((r,i)=>{
@@ -1667,10 +1673,15 @@ function filterClientesTable(){
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
+  const qDigits2=q.replace(/\D/g,'');
   const filtered=clientesData.filter(r=>{
-    const match=!ql||(r.name||'').toLowerCase().includes(ql)||(r.phone||'').includes(q);
+    const e=applyEdits(r);
+    const phoneClean2=String(e.phone||'').replace(/\D/g,'');
+    const nameMatch2=(e.name||'').toLowerCase().includes(ql);
+    const phoneMatch2=qDigits2?phoneClean2.includes(qDigits2):(e.phone||'').includes(q);
+    const match=!ql||(nameMatch2||phoneMatch2);
     const faseMatch=!fase||r.stage===fase;
-    const origMatch=!orig||(r.origin||'')===orig;
+    const origMatch=!orig||(e.origin||'')===orig;
     const fechou=isFechou(r.stage);
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const ph=String(r.phone||'').replace(/\D/g,'');
