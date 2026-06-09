@@ -366,9 +366,15 @@ tbody tr:hover td{background:#faf7f3;}
         <input type="date" id="leads-from" class="filter-select" onchange="filterLeadsTable()" title="Data inicial">
         <input type="date" id="leads-to" class="filter-select" onchange="filterLeadsTable()" title="Data final">
         <button onclick="clearLeadsDates()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#9a8c7e;font-size:11px;padding:5px 8px;cursor:pointer;" title="Limpar datas">✕</button>
+        <select class="filter-select" id="leads-status-filter" onchange="filterLeadsTable()">
+          <option value="">Todos os status</option>
+          <option value="nao_agendado">Não agendado</option>
+          <option value="agendado">Agendado</option>
+          <option value="faltou">Faltou/Desmarcou</option>
+        </select>
         <span class="count-badge" id="leads-count"></span>
-        <button onclick="exportTableXLS('leads-tbody',['Nome','Data','Telefone','Origem'],'leads')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
-        <button onclick="exportTableCSV('leads-tbody',['Nome','Data','Telefone','Origem'],'leads')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableXLS('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarLead()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Lead</button>
         <button onclick="openImportarLeads()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
       </div>
@@ -376,7 +382,7 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="tw">
           <table>
             <thead><tr>
-              <th>Nome</th><th>Data de inclusão</th><th>Telefone</th><th>Origem</th>
+              <th>Nome</th><th>Data de inclusão</th><th>Telefone</th><th>Origem</th><th>Status agendamento</th>
             </tr></thead>
             <tbody id="leads-tbody"></tbody>
           </table>
@@ -1561,8 +1567,9 @@ function renderLeadsTable(){
   const phoneMap={};
   allCloudiaRows.forEach(r=>{
     const s=(r.stage||'').toLowerCase();
-    // Só mostra Lead/Agendou na página de leads
-    if(s===''||s==='lead'||s.includes('agendou')){
+    // Mostra Lead, Agendou e Faltou/Desmarcou (não compareceu, não fechou)
+    const isLeadStage=s===''||s==='lead'||s.includes('agendou')||s.includes('faltou')||s.includes('desmarcou');
+    if(isLeadStage){
       const ph=String(r.phone||'').replace(/\D/g,'')||r.name||Math.random();
       const existing=phoneMap[ph];
       if(!existing){phoneMap[ph]=r;}
@@ -1596,6 +1603,7 @@ function filterLeadsTable(){
   const fromV=document.getElementById('leads-from').value;
   const toV=document.getElementById('leads-to').value;
   const qDigits=(q||'').replace(/\D/g,''); // só dígitos para busca de telefone
+  const statusFil=document.getElementById('leads-status-filter').value;
   const filtered=leadsData.filter(r=>{
     const e=applyEdits(r);
     const phoneClean=String(e.phone||'').replace(/\D/g,'');
@@ -1612,7 +1620,15 @@ function filterLeadsTable(){
       if(toV&&ds&&ds>toV)dateMatch=false;
       if(!ds)dateMatch=false;
     }
-    return match&&origFilter&&dateMatch;
+    const s=(e.stage||'').toLowerCase();
+    const isAgendado=s.includes('agendou');
+    const isFaltouStage=s.includes('faltou')||s.includes('desmarcou');
+    const statusMatch=!statusFil||(
+      (statusFil==='nao_agendado'&&!isAgendado&&!isFaltouStage)||
+      (statusFil==='agendado'&&isAgendado)||
+      (statusFil==='faltou'&&isFaltouStage)
+    );
+    return match&&origFilter&&dateMatch&&statusMatch;
   });
   document.getElementById('leads-count').textContent=filtered.length+' leads';
   _leadsFiltered=filtered;
@@ -1628,13 +1644,24 @@ function renderLeadsPage(){
   const pagina=filtered.slice(start,start+_leadsPerPage);
   document.getElementById('leads-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const idx=leadsData.indexOf(r);
+    const e=applyEdits(r);
+    const sl=(e.stage||'').toLowerCase();
+    let statusBadge;
+    if(sl.includes('faltou')||sl.includes('desmarcou')){
+      statusBadge='<span style="background:#fdf0ea;color:#b5856a;border:0.5px solid #b5856a;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;">✗ Faltou/Desmarcou</span>';
+    } else if(sl.includes('agendou')){
+      statusBadge='<span style="background:#f0f5f0;color:#5a8a6a;border:0.5px solid #5a8a6a;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;">📅 Agendado</span>';
+    } else {
+      statusBadge='<span style="background:#f5efe8;color:#9a8c7e;border:0.5px solid #CCBCA6;font-size:10px;padding:2px 8px;border-radius:10px;">Não agendado</span>';
+    }
     return`<tr style="cursor:pointer;" onclick="openLeadCard(${idx})">
-      <td><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
+      <td><strong style="color:#2a2520;">${e.name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
       <td>${r.phone||'—'}</td>
-      <td><span class="origem-pill">${applyEdits(r).origin||'—'}</span></td>
+      <td><span class="origem-pill">${e.origin||'—'}</span></td>
+      <td>${statusBadge}</td>
     </tr>`;}).join('')
-    :'<tr><td colspan="4" class="empty-state">Nenhum lead encontrado</td></tr>';
+    :'<tr><td colspan="5" class="empty-state">Nenhum lead encontrado</td></tr>';
   // Paginação
   const pag=document.getElementById('leads-pagination');
   if(pag){
