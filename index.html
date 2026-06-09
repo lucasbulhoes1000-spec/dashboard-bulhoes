@@ -2531,7 +2531,62 @@ async function executarImportarLeads(){
 // ===== IMPORTAR CLIENTES =====
 function openImportarClientes(){document.getElementById('importar-clientes-csv').value='';document.getElementById('importar-clientes-preview').style.display='none';document.getElementById('modal-importar-clientes').style.display='flex';}
 function lerArquivoClientes(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{document.getElementById('importar-clientes-csv').value=ev.target.result;const lines=ev.target.result.trim().split('\n');const prev=document.getElementById('importar-clientes-preview');prev.style.display='block';prev.textContent=lines.length+' linhas. Primeira: '+lines[0];};reader.readAsText(file);}
-async function executarImportarClientes(){const csv=document.getElementById('importar-clientes-csv').value.trim();if(!csv){alert('Cole ou faça upload de um CSV');return;}const lines=csv.split('\n').filter(l=>l.trim());const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;const clientes=[];for(let i=start;i<lines.length;i++){const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));if(cols.length<4)continue;const [dataStr,hora,nome,telefone,origem,status,valor]=cols;const parts=dataStr.split('/');let createdAt=dataStr;if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'00:00')+':00';clientes.push({name:nome,phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt});}if(!clientes.length){alert('Nenhum cliente válido');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'importClientes',clientes})});const r=await res.json();document.getElementById('modal-importar-clientes').style.display='none';alert('✅ '+r.imported+' clientes importados!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});}catch(e){alert('Erro: '+e.message);}}
+function executarImportarClientes(){
+  const csv=document.getElementById('importar-clientes-csv').value.trim();
+  if(!csv){alert('Cole ou faça upload de um CSV');return;}
+  const lines=csv.split('\n').filter(l=>l.trim());
+  const start=lines[0].toLowerCase().includes('nome')||lines[0].toLowerCase().includes('data')?1:0;
+  const clientes=[];
+  for(let i=start;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<4)continue;
+    const [dataStr,hora,nome,telefone,origem,status,valor]=cols;
+    if(!telefone||telefone==='telefone')continue;
+    const parts=dataStr.split('/');
+    let createdAt=dataStr;
+    if(parts.length===3)createdAt=parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0')+'T'+(hora||'08:00')+':00';
+    clientes.push({name:nome||'—',phone:telefone.replace(/\D/g,''),origin:origem||'',stage:status||'Compareceu',value:parseFloat(valor)||0,created_at:createdAt});
+  }
+  if(!clientes.length){alert('Nenhum cliente válido');return;}
+
+  // Salva localmente — mesmo padrão do importar leads
+  let importados=0,ignorados=0;
+  const phonesExistentes=new Set(allCloudiaRows.map(r=>String(r.phone||'').replace(/\D/g,'')));
+  clientes.forEach(c=>{
+    const ph=String(c.phone||'').replace(/\D/g,'');
+    if(!ph)return;
+    if(!phonesExistentes.has(ph)){
+      // Novo — adiciona ao allCloudiaRows
+      allCloudiaRows.push({
+        name:c.name,phone:c.phone,origin:c.origin,
+        stage:c.stage,value:c.value,
+        created_at:c.created_at,timestamp:c.created_at,
+        type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
+      });
+      phonesExistentes.add(ph);
+      importados++;
+    } else {
+      // Já existe — só atualiza stage/valor se vier como Ganho
+      if(c.stage==='Ganho'){
+        const existing=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')===ph);
+        if(existing){existing.stage=c.stage;if(c.value>0)existing.value=c.value;}
+      }
+      ignorados++;
+    }
+    // Salva no _ccData
+    if(!_ccData[ph])_ccData[ph]={orcamentos:[],anotacoes:[]};
+    if(c.name&&c.name!=='—'){_ccData[ph].nomeAtual=c.name;_ccData[ph].editadoManualmente=true;}
+    if(c.origin)_ccData[ph].origemAtual=c.origin;
+    _ccData[ph].statusAtual=c.stage;
+    _ccData[ph].created_at=c.created_at;
+    _ccData[ph].leadImportado=true;
+  });
+
+  salvarCRMDebounced();
+  document.getElementById('modal-importar-clientes').style.display='none';
+  renderClientesTable();
+  alert('✅ '+importados+' clientes importados!'+(ignorados?' '+ignorados+' já existiam (stage atualizado se Ganho).':''));
+}
 
 // CRM
 const CRM_URL=CLOUDIA_URL;
