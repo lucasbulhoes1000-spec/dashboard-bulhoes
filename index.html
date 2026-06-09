@@ -1210,7 +1210,7 @@ async function fetchCloudia(){
         allCloudiaRows.push({
           name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'',
           stage:d.statusAtual||'Lead',created_at:d.created_at||'',
-          timestamp:'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
+          timestamp:d.timestamp||d.created_at||'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
         });
       }
     });
@@ -2581,6 +2581,7 @@ function executarImportarClientes(){
     if(c.origin)_ccData[ph].origemAtual=c.origin;
     _ccData[ph].statusAtual=c.stage;
     _ccData[ph].created_at=c.created_at;
+    _ccData[ph].timestamp=c.timestamp||c.created_at;
     _ccData[ph].leadImportado=true;
   });
 
