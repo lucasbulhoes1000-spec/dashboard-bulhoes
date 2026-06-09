@@ -1725,6 +1725,7 @@ function renderClientesTable(){
   [...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));
   // Popula cards de resumo
   // Cards agora são atualizados pelo filterClientesTable com base no filtered
+  populateDynamicSelects();
   filterClientesTable();
 }
 function clearClientesDates(){document.getElementById('clientes-from').value='';document.getElementById('clientes-to').value='';filterClientesTable();}
@@ -2586,6 +2587,18 @@ function executarImportarClientes(){
     _ccData[ph].created_at=c.created_at;
     _ccData[ph].timestamp=c.timestamp||c.created_at;
     _ccData[ph].leadImportado=true;
+    // Cria orçamento automaticamente se tiver valor e não houver nenhum ainda
+    if(c.value>0&&(!_ccData[ph].orcamentos||_ccData[ph].orcamentos.length===0)){
+      if(!_ccData[ph].orcamentos)_ccData[ph].orcamentos=[];
+      const dataOrc=(c.timestamp||c.created_at||'').substring(0,10);
+      _ccData[ph].orcamentos.push({
+        status:isFechou(c.stage)?'Aprovado':'Em aberto',
+        avaliador:'',tratamento:'',pagamento:'',parcelas:'',
+        data:dataOrc,valor:c.value,entrada:0,
+        entradaData:'',entradaPgto:'',
+        obs:'Importado via CSV',crcParticip:'nao',crcNome:'',fechamentos:[]
+      });
+    }
   });
 
   salvarCRMDebounced();
@@ -3235,25 +3248,29 @@ function populateDynamicSelects(){
   const trats=_listas.tratamentos?_listas.tratamentos.ativos||[]:[];
   const origs=_listas.origens?[...(_listas.origens.padroes||[]),...(_listas.origens.ativos||[])]:[];
 
-  // Avaliadores
+  // Avaliadores — inclui os que estão nos orçamentos do _ccData
+  const avaisDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).map(o=>o.avaliador).filter(Boolean)))];
+  const avaisTodos=[...new Set([...avais,...avaisDoOrc])].sort();
   ['orc-avaliador','clientes-aval-filter','ro-aval','rof-aval'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const cur=el.value;
     const isFilter=id.includes('filter')||id.startsWith('ro')||id.startsWith('rof');
     el.innerHTML=(isFilter?'<option value="">Todos os avaliadores</option>':'<option value="">Selecione...</option>')
-      +avais.map(a=>`<option${a===cur?' selected':''}>${a}</option>`).join('');
+      +avaisTodos.map(a=>`<option${a===cur?' selected':''}>${a}</option>`).join('');
   });
   // com-avaliador (tem "Sem avaliador")
   const comAval=document.getElementById('com-avaliador');
-  if(comAval){const cur=comAval.value;comAval.innerHTML='<option value="">Sem avaliador</option>'+avais.map(a=>`<option${a===cur?' selected':''}>${a}</option>`).join('');}
+  if(comAval){const cur=comAval.value;comAval.innerHTML='<option value="">Sem avaliador</option>'+avaisTodos.map(a=>`<option${a===cur?' selected':''}>${a}</option>`).join('');}
 
-  // Tratamentos
+  // Tratamentos — inclui os que estão nos orçamentos do _ccData
+  const tratsDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).map(o=>o.tratamento).filter(Boolean)))];
+  const tratsTodos=[...new Set([...trats,...tratsDoOrc])].sort();
   ['orc-tratamento','clientes-trat-filter','ro-trat','rof-trat'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const cur=el.value;
     const isFilter=id.includes('filter')||id.startsWith('ro')||id.startsWith('rof');
     el.innerHTML=(isFilter?'<option value="">Todos os tratamentos</option>':'<option value="">Selecione...</option>')
-      +trats.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
+      +tratsTodos.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
   });
 
   // Origens nos modais criar lead/cliente e card de lead
