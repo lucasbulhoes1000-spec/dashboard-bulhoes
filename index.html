@@ -1346,7 +1346,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Entradas do CRM
   let totalEntradas=0;
-  Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).forEach(o=>totalEntradas+=Number(o.entrada)||0));
+  Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>o.status==='Aprovado').forEach(o=>totalEntradas+=Number(o.entrada)||0));
   document.getElementById('t-entradas').textContent=totalEntradas>0?fmt(totalEntradas):'—';
 
   // Funil visual
@@ -1707,8 +1707,8 @@ function filterClientesTable(){
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
       <td style="font-size:12px;">${orc0&&orc0.tratamento?orc0.tratamento:'—'}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
-      <td style="text-align:right" class="tm">${val>0?fmt(val):'—'}</td>
-      <td style="text-align:right" class="tg">${fechou&&val>0?fmt(val):'—'}</td>
+      <td style="text-align:right" class="tm">${(()=>{const orcVal=(d.orcamentos||[]).reduce((s,o)=>s+Number(o.valor||0),0);return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
+      <td style="text-align:right" class="tg">${(()=>{const orcAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0);return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
@@ -2392,12 +2392,13 @@ async function executarImportarLeads(){
       created_at:l.created_at,timestamp:'',
       type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
     });
-    // Salva edições manuais no _ccData para persistir nome/origem
+    // Salva no _ccData com flag leadImportado para reconstruir após reload
     if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
     if(l.name&&l.name!=='—'){_ccData[ph].nomeAtual=l.name;_ccData[ph].editadoManualmente=true;}
     if(l.origin)_ccData[ph].origemAtual=l.origin;
     if(l.stage)_ccData[ph].statusAtual=l.stage;
     _ccData[ph].created_at=l.created_at;
+    _ccData[ph].leadImportado=true; // flag para reconstruir allCloudiaRows ao carregar
     importados++;
   });
 
@@ -2500,6 +2501,21 @@ async function carregarCRMRemoto(){
             populateDynamicSelects();
           }
         }catch(e){console.warn('[CRM] Erro ao parsear listas_json:',e);}
+      }
+      // Reconstrói leads importados que não estão no Cloudia
+      if(_ccData){
+        Object.entries(_ccData).forEach(([ph,d])=>{
+          if(!d.leadImportado)return;
+          const jaExiste=allCloudiaRows.some(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+          if(!jaExiste){
+            allCloudiaRows.push({
+              name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'',
+              stage:d.statusAtual||'Lead',created_at:d.created_at||'',
+              timestamp:'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
+            });
+          }
+        });
+        console.log('[CRM] Leads importados reconstruídos ✅');
       }
       if(rows[0].crm_json)return;
     }
