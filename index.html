@@ -382,13 +382,14 @@ tbody tr:hover td{background:#faf7f3;}
           </table>
         </div>
       </div>
+      <div id="leads-pagination"></div>
     </div>
 
     <!-- ===== CLIENTES PAGE ===== -->
     <div class="page" id="page-clientes">
       <!-- CARDS RESUMO -->
       <div class="row r4" style="margin-bottom:16px;">
-        <div class="mc"><div class="ml">Total de clientes</div><div class="mv" id="cc-total-clientes">—</div><div class="ms">compareceram ou fecharam</div></div>
+        <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms">valor total em orçamentos</div></div>
         <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms">em aberto</div></div>
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms">de receita</div></div>
@@ -435,6 +436,7 @@ tbody tr:hover td{background:#faf7f3;}
           </table>
         </div>
       </div>
+      <div id="clientes-pagination"></div>
     </div>
 
     <!-- ===== GERENCIAR PAGE ===== -->
@@ -1187,6 +1189,18 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
+    // Reconstrói leads importados que não estão no Cloudia
+    Object.entries(_ccData).forEach(([ph,d])=>{
+      if(!d.leadImportado)return;
+      const jaExiste=allCloudiaRows.some(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      if(!jaExiste){
+        allCloudiaRows.push({
+          name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'',
+          stage:d.statusAtual||'Lead',created_at:d.created_at||'',
+          timestamp:'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
+        });
+      }
+    });
     sincronizarNomesCRM(rows);
     console.log('[CLOUDIA HEADERS]', h);
     console.log('[CLOUDIA SAMPLE com ad_id]', rows.filter(r=>r.ad_id).slice(0,3).map(r=>({name:r.name,ad_id:r.ad_id,ad_name:r.ad_name})));
@@ -1595,16 +1609,38 @@ function filterLeadsTable(){
     return match&&origFilter&&dateMatch;
   });
   document.getElementById('leads-count').textContent=filtered.length+' leads';
-  document.getElementById('leads-tbody').innerHTML=filtered.length>0?filtered.map((r,i)=>{
+  // renderLeadsPage vai renderizar
+  if(typeof renderLeadsPage==='function'){}
+}
+let _leadsFiltered=[];let _leadsPage=1;const _leadsPerPage=50;
+function renderLeadsPage(){
+  const filtered=_leadsFiltered;
+  const total=filtered.length;
+  const totalPags=Math.ceil(total/_leadsPerPage);
+  const start=(_leadsPage-1)*_leadsPerPage;
+  const pagina=filtered.slice(start,start+_leadsPerPage);
+  document.getElementById('leads-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const idx=leadsData.indexOf(r);
     return`<tr style="cursor:pointer;" onclick="openLeadCard(${idx})">
-      <td><strong style="color:#2a2520;">${r.name||'—'}</strong></td>
+      <td><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.created_at||r.timestamp)}</td>
       <td>${r.phone||'—'}</td>
-      <td><span class="origem-pill">${r.origin||'—'}</span></td>
+      <td><span class="origem-pill">${applyEdits(r).origin||'—'}</span></td>
     </tr>`;}).join('')
     :'<tr><td colspan="4" class="empty-state">Nenhum lead encontrado</td></tr>';
+  // Paginação
+  const pag=document.getElementById('leads-pagination');
+  if(pag){
+    if(totalPags<=1){pag.innerHTML='';return;}
+    pag.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #e0d8ce;font-size:12px;color:#9a8c7e;">
+        <button onclick="mudaPagLead(${_leadsPage-1})" ${_leadsPage<=1?'disabled':''} style="background:${_leadsPage<=1?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">‹ Ant</button>
+        <span>Pág. ${_leadsPage} de ${totalPags} · ${start+1}–${Math.min(start+_leadsPerPage,total)} de ${total}</span>
+        <button onclick="mudaPagLead(${_leadsPage+1})" ${_leadsPage>=totalPags?'disabled':''} style="background:${_leadsPage>=totalPags?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">Próx ›</button>
+      </div>`;
+  }
 }
+function mudaPagLead(p){_leadsPage=p;renderLeadsPage();}
 
 // ===== CLIENTES PAGE =====
 function renderClientes(){
@@ -1682,16 +1718,40 @@ function filterClientesTable(){
     return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dateMatch;
   });
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
+  _clientesFiltrados=filtered;_clientesPage=1;renderClientesPage();
+}
+let _clientesFiltrados=[];let _clientesPage=1;const _clientesPerPage=50;
+function renderClientesPage(){
+  const filtered=_clientesFiltrados;
+  const total=filtered.length;
+  const totalPags=Math.ceil(total/_clientesPerPage);
+  const start=(_clientesPage-1)*_clientesPerPage;
+  const pagina=filtered.slice(start,start+_clientesPerPage);
   // Atualiza cards conforme filtro atual
   const totalC=filtered.length;
   const totalF=filtered.filter(r=>isFechou(r.stage)).length;
   const totalA=totalC-totalF;
-  const valorF=filtered.filter(r=>isFechou(r.stage)).reduce((s,r)=>s+parseFloat(r.value||0),0);
-  document.getElementById('cc-total-clientes').textContent=totalC;
+  // Valor orçado: soma todos os orçamentos do CRM dos clientes filtrados
+  let totalOrcado=0;
+  filtered.forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=_ccData[ph];
+    if(d&&d.orcamentos)d.orcamentos.forEach(o=>totalOrcado+=Number(o.valor||0));
+    else totalOrcado+=parseFloat(r.value||0);
+  });
+  // Valor fechado: só orçamentos aprovados
+  let valorF=0;
+  filtered.filter(r=>isFechou(r.stage)).forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=_ccData[ph];
+    if(d&&d.orcamentos)d.orcamentos.filter(o=>o.status==='Aprovado').forEach(o=>valorF+=Number(o.valor||0));
+    else valorF+=parseFloat(r.value||0);
+  });
+  document.getElementById('cc-total-clientes').textContent=totalOrcado>0?fmt(totalOrcado):'—';
   document.getElementById('cc-total-abertos').textContent=totalA;
   document.getElementById('cc-total-fechados').textContent=totalF;
   document.getElementById('cc-valor-fechado').textContent=valorF>0?fmt(valorF):'—';
-  document.getElementById('clientes-tbody').innerHTML=filtered.length>0?filtered.map(r=>{
+  document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const fechou=isFechou(r.stage);
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
@@ -2501,21 +2561,6 @@ async function carregarCRMRemoto(){
             populateDynamicSelects();
           }
         }catch(e){console.warn('[CRM] Erro ao parsear listas_json:',e);}
-      }
-      // Reconstrói leads importados que não estão no Cloudia
-      if(_ccData){
-        Object.entries(_ccData).forEach(([ph,d])=>{
-          if(!d.leadImportado)return;
-          const jaExiste=allCloudiaRows.some(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-          if(!jaExiste){
-            allCloudiaRows.push({
-              name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'',
-              stage:d.statusAtual||'Lead',created_at:d.created_at||'',
-              timestamp:'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
-            });
-          }
-        });
-        console.log('[CRM] Leads importados reconstruídos ✅');
       }
       if(rows[0].crm_json)return;
     }
