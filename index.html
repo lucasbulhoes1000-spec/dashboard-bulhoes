@@ -1355,12 +1355,6 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const orc=d&&d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
     const dataFech=orc&&orc.data?orc.data:'';
     if(dataFech&&dataFech>=_rng.since&&dataFech<=_rng.until)fechadosPhones.add(ph);
-    // Fallback: usa created_at se não tem orçamento
-    else if(!dataFech){
-      const dc=parseCloudiaDate(r.created_at);
-      const ds=dc?localDateStr(dc):'';
-      if(ds>=_rng.since&&ds<=_rng.until)fechadosPhones.add(ph);
-    }
   });
   // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — usa timestamp do evento
   evtsGeral.filter(r=>isFechou(r.stage)).forEach(r=>{
