@@ -1325,15 +1325,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const agendAuto=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   window._lastCompPhones=compPhones;
-  // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho, com timestamp no período)
+  // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho)
+  // Usa SEMPRE o created_at (data de registro = data da consulta), nunca o timestamp (que pode ser data de fechamento)
   const _rangeComp=getRange('trafego');
   allCloudiaRows.filter(r=>{
     if(r.type!=='CUSTOMER_CREATED')return false;
     if(!isComp(r.stage)&&!isFechou(r.stage))return false;
     const ph=String(r.phone||'').replace(/\D/g,'');
     if(!ph)return false;
-    // Para importados usa created_at (data de registro) pois timestamp pode ser data de fechamento futura
-    const d=parseCloudiaDate(r.created_at)||parseCloudiaDate(r.timestamp);
+    const d=parseCloudiaDate(r.created_at);
     if(!d)return false;
     const ds=localDateStr(d);
     return ds>=_rangeComp.since&&ds<=_rangeComp.until;
