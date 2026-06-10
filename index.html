@@ -2016,15 +2016,20 @@ function lupaVendas(){
 }
 
 function lupaContratos(){
-  const phoneMap={};
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isFechou(r.stage)).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
-    if(!phoneMap[ph]){phoneMap[ph]=r;}
-    else{const v=parseFloat(r.value||0);if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;}
+  // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
+  const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>{
+    const da=_ccData[a.ph]&&_ccData[a.ph].created_at||'';
+    const db=_ccData[b.ph]&&_ccData[b.ph].created_at||'';
+    return da.localeCompare(db);
+  }).map(r=>{
+    const d=_ccData[r.ph]||{};
+    const row=allCloudiaRows.find(cr=>String(cr.phone||'').replace(/\D/g,'')=== r.ph);
+    const dataReg=fmtDate(d.created_at||(row&&row.created_at)||'');
+    const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
+    const valOrc=d.orcamentos&&d.orcamentos.length>0?d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0):r.value;
+    const origem=(d.origemAtual||(row&&row.origin)||'—');
+    return[dataReg,r.name,r.ph,origem,valOrc>0?fmt(valOrc):'—',fmt(r.value)];
   });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))
-    .map(r=>{const e=applyEdits(r);const v=parseFloat(e.value||0);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',v>0?fmt(v):'—',v>0?fmt(v):'—'];});
   openModal('Fechamentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Valor orçado','Valor fechado'],rows);
 }
 function lupaAdLeads(adKey){
