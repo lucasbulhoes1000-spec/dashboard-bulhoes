@@ -1448,6 +1448,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       if(v>0){totalOport+=v;_oportRows.push({name:nome,ph,value:v});}
     }
   });
+  // Oportunidades extras — orçamentos criados no período mas sem comparecimento em jan (somenteOrcamento)
+  Object.entries(_ccData||{}).forEach(([ph,d])=>{
+    if(!d.somenteOrcamento)return;
+    if(compPhonesSet.has(ph))return; // já contado acima
+    const orcs=(d.orcamentos||[]).filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
+    if(!orcs.length)return;
+    const tot=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
+    if(tot>0){totalOport+=tot;_oportRows.push({name:d.nomeAtual||'—',ph,value:tot});}
+  });
 
   window._lastVendaRows=_vendaRows;
   window._lastOportRows=_oportRows;
