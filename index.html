@@ -1987,23 +1987,19 @@ function lupaComp(){
 }
 
 function lupaOport(){
-  const rows=(window._lastOportRows||[]).slice().sort((a,b)=>b.value-a.value);
-  const total=rows.reduce((s,r)=>s+r.value,0);
-  showLupaModal('💰 Valor total de oportunidades — '+rows.length+' clientes',
-    rows.map(r=>`<tr><td>${r.name}</td><td>${r.ph}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
-    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td></tr>`,
-    ['Nome','Telefone','Valor Orçado']
-  );
+  const sorted=(window._lastOportRows||[]).slice().sort((a,b)=>b.value-a.value);
+  const total=sorted.reduce((s,r)=>s+r.value,0);
+  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
+  tableRows.push(['TOTAL','',fmt(total)]);
+  openModal('Oportunidades — '+sorted.length+' clientes',['Nome','Telefone','Valor Orçado'],tableRows);
 }
 
 function lupaVendas(){
-  const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
-  const total=rows.reduce((s,r)=>s+r.value,0);
-  showLupaModal('✅ Total de vendas — '+rows.length+' contratos',
-    rows.map(r=>`<tr><td>${r.name}</td><td>${r.ph}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
-    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td></tr>`,
-    ['Nome','Telefone','Valor Fechado']
-  );
+  const sorted=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
+  const total=sorted.reduce((s,r)=>s+r.value,0);
+  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
+  tableRows.push(['TOTAL','',fmt(total)]);
+  openModal('Vendas — '+sorted.length+' contratos',['Nome','Telefone','Valor Fechado'],tableRows);
 }
 
 function lupaContratos(){
