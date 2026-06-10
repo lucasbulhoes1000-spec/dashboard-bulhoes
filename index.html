@@ -1072,7 +1072,11 @@ function filterEventsByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
     if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
-    const d=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
+    // Para importados (CUSTOMER_CREATED), usa created_at (data da consulta)
+    // Para eventos do Cloudia (CUSTOMER_STAGE_UPDATED), usa timestamp
+    const d=row.type==='CUSTOMER_CREATED'
+      ?parseCloudiaDate(row.created_at)
+      :parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return false;
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
   });
