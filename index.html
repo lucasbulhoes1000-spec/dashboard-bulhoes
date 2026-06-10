@@ -785,7 +785,12 @@ tbody tr:hover td{background:#faf7f3;}
   <div class="modal-box">
     <div class="modal-header">
       <span class="modal-title" id="modal-title">Leads</span>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:#b5a898;">Exibir:</span>
+        <button onclick="setModalPerPage(10)" id="mpb-10" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">10</button>
+        <button onclick="setModalPerPage(50)" id="mpb-50" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">50</button>
+        <button onclick="setModalPerPage(100)" id="mpb-100" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">100</button>
+        <button onclick="setModalPerPage(0)" id="mpb-0" style="background:#A18B6C;color:#fff;border:0.5px solid #A18B6C;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;">Todos</button>
         <button onclick="exportModalXLSX()" style="background:#5a8a6a;color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
         <button onclick="exportModalCSV()" style="background:#4a7a9a;color:#fff;border:none;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <span class="modal-close" onclick="closeModal()">✕</span>
@@ -1484,7 +1489,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       return dataEntrada>=_range.since&&dataEntrada<=_range.until;
     }).forEach(o=>totalEntradas+=Number(o.entrada)||0));
   }
-  document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+entradaTag;
+  const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
+  const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
+  document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag;
 
   // Funil visual
   const maxF=Math.max(leadsBase,agend,comp,contratos,1);
@@ -2087,14 +2094,28 @@ function getStatusAgend(stage){
 }
 
 // MODAL
+let _modalPerPage=0;
 function openModal(title,headers,rows){
   _modalExportData={headers,rows};
+  _modalPerPage=0;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-thead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
-  document.getElementById('modal-tbody').innerHTML=rows.length>0
-    ?rows.map(r=>`<tr>${r.map(c=>`<td>${c||'—'}</td>`).join('')}</tr>`).join('')
-    :`<tr><td colspan="${headers.length}" class="modal-empty">Nenhum registro encontrado</td></tr>`;
+  renderModalRows();
   document.getElementById('modal-overlay').classList.add('open');
+  // Reset buttons
+  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===0?'#A18B6C':'#fff';b.style.color=v===0?'#fff':'#7a6550';b.style.borderColor=v===0?'#A18B6C':'#d4c9bc';b.style.fontWeight=v===0?'600':'400';}});
+}
+function renderModalRows(){
+  const {headers,rows}=_modalExportData;
+  const pagina=_modalPerPage===0?rows:rows.slice(0,_modalPerPage);
+  document.getElementById('modal-tbody').innerHTML=pagina.length>0
+    ?pagina.map(r=>`<tr>${r.map(c=>`<td>${c||'—'}</td>`).join('')}</tr>`).join('')
+    :`<tr><td colspan="${headers.length}" class="modal-empty">Nenhum registro encontrado</td></tr>`;
+}
+function setModalPerPage(n){
+  _modalPerPage=n;
+  renderModalRows();
+  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===n?'#A18B6C':'#fff';b.style.color=v===n?'#fff':'#7a6550';b.style.borderColor=v===n?'#A18B6C':'#d4c9bc';b.style.fontWeight=v===n?'600':'400';}});
 }
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
