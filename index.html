@@ -1409,32 +1409,48 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2):'—';
   // Vendas e oportunidades do _ccData filtradas pelo período
   const _range=getRange('trafego');
-  // Clientes comparecidos no período (phones)
-  const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
-  // Oportunidades: orçamentos EM ABERTO de clientes que compareceram no período
   let totalOport=0;
-  // Vendas: orçamentos APROVADOS de clientes que fecharam no período
   let totalVendasCRM=0;
   let contratosComValor=0;
+  const _vendaRows=[]; // para lupa
+  const _oportRows=[]; // para lupa
+
+  // VENDAS: só quem tem orçamento APROVADO com data dentro do período
+  // OPORTUNIDADES: todos os orçamentos de quem compareceu no período
+  const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
+
+  // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
+  fechadosPhones.forEach(ph=>{
+    const d=_ccData[ph];
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
+    if(d&&d.orcamentos&&d.orcamentos.length>0){
+      const orcsAprov=d.orcamentos.filter(o=>o.status==='Aprovado'&&o.data>=_range.since&&o.data<=_range.until);
+      orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.valor||0);});
+      if(orcsAprov.length>0){contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)});}
+    } else if(row){
+      const v=parseFloat(row.value||0);
+      if(v>0){totalVendasCRM+=v;contratosComValor++;_vendaRows.push({name:nome,ph,value:v});}
+    }
+  });
+
+  // Oportunidades — todos os orçamentos de quem compareceu
   compPhonesSet.forEach(ph=>{
     const d=_ccData[ph];
-    if(!d||!d.orcamentos||d.orcamentos.length===0){
-      // Fallback: usa r.value do allCloudiaRows
-      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-      if(row){
-        const v=parseFloat(row.value||0);
-        if(isFechou(row.stage)&&v>0){totalVendasCRM+=v;contratosComValor++;}
-        else if(v>0)totalOport+=v;
-      }
-      return;
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
+    if(d&&d.orcamentos&&d.orcamentos.length>0){
+      const tot=d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0);
+      totalOport+=tot;
+      if(tot>0)_oportRows.push({name:nome,ph,value:tot});
+    } else if(row){
+      const v=parseFloat(row.value||0);
+      if(v>0){totalOport+=v;_oportRows.push({name:nome,ph,value:v});}
     }
-    const orcsAberto=d.orcamentos.filter(o=>o.status!=='Aprovado');
-    const orcsAprov=d.orcamentos.filter(o=>o.status==='Aprovado');
-    // Oportunidades = todos os orçamentos (abertos + fechados)
-    d.orcamentos.forEach(o=>totalOport+=Number(o.valor||0));
-    orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.valor||0);});
-    if(orcsAprov.length>0)contratosComValor++;
   });
+
+  window._lastVendaRows=_vendaRows;
+  window._lastOportRows=_oportRows;
   const ticketCRM=contratosComValor>0?totalVendasCRM/contratosComValor:0;
 
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
@@ -1971,41 +1987,20 @@ function lupaComp(){
 }
 
 function lupaOport(){
-  // Mostra todos os clientes que compareceram no período com seus orçamentos
-  const rows=[];
-  [...(window._lastCompPhones||[])].forEach(ph=>{
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    const d=_ccData[ph];
-    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
-    const nome=(d&&d.nomeAtual)||row&&(row.name)||'—';
-    const totalOrc=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):parseFloat(row&&row.value||0);
-    if(totalOrc>0)rows.push({name:nome,phone:ph,value:totalOrc,status:row&&row.stage||'—'});
-  });
-  rows.sort((a,b)=>b.value-a.value);
+  const rows=(window._lastOportRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=rows.reduce((s,r)=>s+r.value,0);
   showLupaModal('💰 Valor total de oportunidades — '+rows.length+' clientes',
-    rows.map(r=>`<tr><td>${r.name}</td><td>${r.phone}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td><td><span style="font-size:10px;color:#8a7a6a;">${r.status}</span></td></tr>`).join('')+
-    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td><td></td></tr>`,
-    ['Nome','Telefone','Valor Orçado','Status']
+    rows.map(r=>`<tr><td>${r.name}</td><td>${r.ph}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
+    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td></tr>`,
+    ['Nome','Telefone','Valor Orçado']
   );
 }
 
 function lupaVendas(){
-  // Mostra clientes com orçamentos aprovados no período
-  const rows=[];
-  [...(window._lastCompPhones||[])].forEach(ph=>{
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    if(!row||!isFechou(row.stage))return;
-    const d=_ccData[ph];
-    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
-    const nome=(d&&d.nomeAtual)||row&&(row.name)||'—';
-    const totalFech=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):parseFloat(row&&row.value||0);
-    if(totalFech>0)rows.push({name:nome,phone:ph,value:totalFech});
-  });
-  rows.sort((a,b)=>b.value-a.value);
+  const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=rows.reduce((s,r)=>s+r.value,0);
   showLupaModal('✅ Total de vendas — '+rows.length+' contratos',
-    rows.map(r=>`<tr><td>${r.name}</td><td>${r.phone}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
+    rows.map(r=>`<tr><td>${r.name}</td><td>${r.ph}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
     `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td></tr>`,
     ['Nome','Telefone','Valor Fechado']
   );
