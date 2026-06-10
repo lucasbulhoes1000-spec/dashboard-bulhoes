@@ -275,8 +275,8 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="slabel">Vendas</div>
             <div class="row r4">
-              <div class="mc"><div class="ml">Valor total de oportunidades</div><div class="mv" id="t-oport">—</div></div>
-              <div class="mc"><div class="ml">Total de vendas</div><div class="mv green" id="t-vendas">—</div></div>
+              <div class="mc"><div class="ml">Valor total de oportunidades</div><div class="mv" id="t-oport">— <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button></div></div>
+              <div class="mc"><div class="ml">Total de vendas</div><div class="mv green" id="t-vendas">— <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button></div></div>
               <div class="mc"><div class="ml">Total de entradas <button onclick="abrirEdicaoManual('entrada')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-entradas" style="color:#4a7a9a;">—</div></div>
               <div class="mc"><div class="ml">Ticket médio</div><div class="mv green" id="t-ticket">—</div></div>
             </div>
@@ -1324,6 +1324,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const agendPhones=new Set(agendSrc.map(r=>String(r.phone||'').replace(/\D/g,'')));
   const agendAuto=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  window._lastCompPhones=compPhones;
   // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho, com timestamp no período)
   const _rangeComp=getRange('trafego');
   allCloudiaRows.filter(r=>{
@@ -1391,7 +1392,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Vendas e oportunidades do _ccData filtradas pelo período
   const _range=getRange('trafego');
   // Clientes comparecidos no período (phones)
-  const compPhonesSet=new Set([...compPhones]);
+  const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
   // Oportunidades: orçamentos EM ABERTO de clientes que compareceram no período
   let totalOport=0;
   // Vendas: orçamentos APROVADOS de clientes que fecharam no período
@@ -1418,8 +1419,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   const ticketCRM=contratosComValor>0?totalVendasCRM/contratosComValor:0;
 
-  document.getElementById('t-oport').textContent=totalOport>0?fmt(totalOport):'—';
-  document.getElementById('t-vendas').textContent=totalVendasCRM>0?fmt(totalVendasCRM):'—';
+  document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
 
   // Entradas — manual com senha
@@ -1950,6 +1951,48 @@ function lupaComp(){
     .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(e.timestamp)];});
   openModal('Oportunidades — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
+
+function lupaOport(){
+  // Mostra todos os clientes que compareceram no período com seus orçamentos
+  const rows=[];
+  [...(window._lastCompPhones||[])].forEach(ph=>{
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const d=_ccData[ph];
+    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
+    const nome=(d&&d.nomeAtual)||row&&(row.name)||'—';
+    const totalOrc=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):parseFloat(row&&row.value||0);
+    if(totalOrc>0)rows.push({name:nome,phone:ph,value:totalOrc,status:row&&row.stage||'—'});
+  });
+  rows.sort((a,b)=>b.value-a.value);
+  const total=rows.reduce((s,r)=>s+r.value,0);
+  showLupaModal('💰 Valor total de oportunidades — '+rows.length+' clientes',
+    rows.map(r=>`<tr><td>${r.name}</td><td>${r.phone}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td><td><span style="font-size:10px;color:#8a7a6a;">${r.status}</span></td></tr>`).join('')+
+    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td><td></td></tr>`,
+    ['Nome','Telefone','Valor Orçado','Status']
+  );
+}
+
+function lupaVendas(){
+  // Mostra clientes com orçamentos aprovados no período
+  const rows=[];
+  [...(window._lastCompPhones||[])].forEach(ph=>{
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    if(!row||!isFechou(row.stage))return;
+    const d=_ccData[ph];
+    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
+    const nome=(d&&d.nomeAtual)||row&&(row.name)||'—';
+    const totalFech=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):parseFloat(row&&row.value||0);
+    if(totalFech>0)rows.push({name:nome,phone:ph,value:totalFech});
+  });
+  rows.sort((a,b)=>b.value-a.value);
+  const total=rows.reduce((s,r)=>s+r.value,0);
+  showLupaModal('✅ Total de vendas — '+rows.length+' contratos',
+    rows.map(r=>`<tr><td>${r.name}</td><td>${r.phone}</td><td style="text-align:right;color:#5a8a6a;font-weight:600;">${fmt(r.value)}</td></tr>`).join('')+
+    `<tr style="border-top:1px solid #e0d8ce;font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;color:#5a8a6a;">${fmt(total)}</td></tr>`,
+    ['Nome','Telefone','Valor Fechado']
+  );
+}
+
 function lupaContratos(){
   const phoneMap={};
   (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isFechou(r.stage)).forEach(r=>{
