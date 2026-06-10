@@ -1356,11 +1356,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const dataFech=orc&&orc.data?orc.data:'';
     if(dataFech&&dataFech>=_rng.since&&dataFech<=_rng.until)fechadosPhones.add(ph);
   });
-  // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — usa timestamp do evento
+  // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — só conta se NÃO está no CSV importado
+  const importadosGanhoPhones=new Set(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
   evtsGeral.filter(r=>isFechou(r.stage)).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
-    // Se já veio do CSV, não duplica
-    if(!ph||allCloudiaRows.find(cr=>cr.type==='CUSTOMER_CREATED'&&isFechou(cr.stage)&&String(cr.phone||'').replace(/\D/g,'')=== ph))return;
+    if(!ph||importadosGanhoPhones.has(ph))return;
     fechadosPhones.add(ph);
   });
   const contratos=fechadosPhones.size;
