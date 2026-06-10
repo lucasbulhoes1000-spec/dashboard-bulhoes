@@ -1411,7 +1411,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     }
     const orcsAberto=d.orcamentos.filter(o=>o.status!=='Aprovado');
     const orcsAprov=d.orcamentos.filter(o=>o.status==='Aprovado');
-    orcsAberto.forEach(o=>totalOport+=Number(o.valor||0));
+    // Oportunidades = todos os orçamentos (abertos + fechados)
+    d.orcamentos.forEach(o=>totalOport+=Number(o.valor||0));
     orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.valor||0);});
     if(orcsAprov.length>0)contratosComValor++;
   });
