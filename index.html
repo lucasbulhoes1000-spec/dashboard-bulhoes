@@ -1103,11 +1103,18 @@ function filterAgendByRange(rows,tab){
   });
   const result=[];
   Object.values(byPhone).forEach(evts=>{
-    // Teve Agendou (qualquer tipo de evento) com timestamp no período?
+    // Teve Agendou com timestamp no período?
+    // CUSTOMER_STAGE_UPDATED: timestamp real do agendamento
+    // CUSTOMER_CREATED: created_at como fallback
+    // CUSTOMER_ACQUISITION_ORIGIN_UPDATED: timestamp real (Cloudia manda no momento do agendamento)
+    //   MAS ignora se já existe CUSTOMER_STAGE_UPDATED com stage posterior (Compareceu/Ganho/Faltou)
+    const hasPostStage=evts.some(e=>
+      e.type==='CUSTOMER_STAGE_UPDATED'&&
+      (isComp(e.stage)||isFechou(e.stage)||isFaltou(e.stage))
+    );
     const agendInPeriod=evts.filter(e=>{
       if(!isAgend(e.stage))return false;
-      // Para CUSTOMER_CREATED: usa created_at (lead já entrou como Agendado)
-      // Para outros tipos: usa APENAS timestamp (data real do agendamento)
+      if(e.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'&&hasPostStage)return false;
       const d=e.type==='CUSTOMER_CREATED'
         ?parseCloudiaDate(e.timestamp)||parseCloudiaDate(e.created_at)
         :parseCloudiaDate(e.timestamp);
