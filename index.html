@@ -817,7 +817,10 @@ tbody tr:hover td{background:#faf7f3;}
           <div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
           <div id="cc-phone" style="font-size:12px;color:#8a7a6a;margin-top:2px;"></div>
         </div>
-        <button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button onclick="excluirCliente()" title="Excluir cliente" style="background:none;border:none;cursor:pointer;font-size:16px;color:#c0776a;">🗑️</button>
+          <button onclick="document.getElementById('cliente-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
         <div style="background:#f0ebe3;border-radius:8px;padding:10px 12px;">
@@ -3587,6 +3590,38 @@ function salvarLeadCard(){
   document.getElementById('lead-card-overlay').style.display='none';
 }
 
+function excluirLead(){
+  const r=leadsData[_currentLeadIdx];if(!r)return;
+  if(!confirm('Excluir o lead "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  // Remove do _ccData
+  if(_ccData[ph])delete _ccData[ph];
+  // Remove de allCloudiaRows
+  allCloudiaRows=allCloudiaRows.filter(row=>String(row.phone||'').replace(/\D/g,'')!==ph);
+  // Envia exclusão para o Apps Script
+  fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'deleteLead',phone:ph})});
+  salvarCRMDebounced();
+  document.getElementById('lead-card-overlay').style.display='none';
+  renderLeadsTable();
+}
+
+function excluirCliente(){
+  const r=clientesData[_currentClienteIdx];if(!r)return;
+  if(!confirm('Excluir o cliente "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  // Remove do _ccData
+  if(_ccData[ph])delete _ccData[ph];
+  // Remove de allCloudiaRows
+  allCloudiaRows=allCloudiaRows.filter(row=>String(row.phone||'').replace(/\D/g,'')!==ph);
+  // Envia exclusão para o Apps Script
+  fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'deleteLead',phone:ph})});
+  salvarCRMDebounced();
+  document.getElementById('cliente-card-overlay').style.display='none';
+  renderClientesTable();
+}
+
 function salvarLeadAnotacao(){
   const r=leadsData[_currentLeadIdx];if(!r)return;
   const ph=String(r.phone||'').replace(/\D/g,'');
@@ -3814,7 +3849,10 @@ window.addEventListener('load',()=>{
     <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;overflow-y:auto;max-height:100vh;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <div style="font-size:15px;font-weight:700;color:#2a2520;">Lead</div>
-        <button onclick="document.getElementById('lead-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button onclick="excluirLead()" title="Excluir lead" style="background:none;border:none;cursor:pointer;font-size:16px;color:#c0776a;">🗑️</button>
+          <button onclick="document.getElementById('lead-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
+        </div>
       </div>
       <!-- Nome -->
       <div style="margin-bottom:11px;">
