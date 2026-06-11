@@ -1216,6 +1216,25 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
+    // Mescla CUSTOMER_ACQUISITION_ORIGIN_UPDATED na linha do lead original (mesmo telefone)
+    // Atualiza origin, ad_name, ad_id do CUSTOMER_CREATED correspondente — sem criar linha nova
+    const createdMap={};
+    allCloudiaRows.forEach(r=>{
+      if(r.type!=='CUSTOMER_CREATED')return;
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      if(ph&&!createdMap[ph])createdMap[ph]=r;
+    });
+    allCloudiaRows.forEach(r=>{
+      if(r.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      if(!ph)return;
+      const lead=createdMap[ph];
+      if(lead){
+        if(r.origin&&r.origin!==lead.origin)lead.origin=r.origin;
+        if(r.ad_name&&!lead.ad_name)lead.ad_name=r.ad_name;
+        if(r.ad_id&&!lead.ad_id)lead.ad_id=r.ad_id;
+      }
+    });
     // Reconstrói leads importados que não estão no Cloudia
     Object.entries(_ccData).forEach(([ph,d])=>{
       if(!d.leadImportado)return;
