@@ -1503,6 +1503,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!vendasMap[ph]||v>vendasMap[ph])vendasMap[ph]=v;
   });
   const totalVendas=Object.values(vendasMap).reduce((s,v)=>s+v,0);
+  // Contratos calculado aqui (pode ser atualizado abaixo com manuais)
+  let contratos=fechadosPhones.size;
   const ticket=contratos>0?totalVendas/contratos:0;
 
   // CPL: só leads pagos (#Instagram ADS)
@@ -1556,7 +1558,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
 
   // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
-  const contratos=fechadosPhones.size;
+  contratos=fechadosPhones.size; // atualiza após adicionar aprovados do CRM
 
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
