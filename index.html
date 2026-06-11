@@ -1520,7 +1520,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const cplReal=leadsBasePago>0&&spend>0?spend/leadsBasePago:0;
   const cpa=agend>0?spend/agend:0;
   const cpcomp=comp>0?spend/comp:0;
-  const cpc2=contratos>0?spend/contratos:0;
+  // cpc2 calculado após atualizar contratos (ver abaixo)
 
   document.getElementById('t-spend').textContent=fmt(spend);
   document.getElementById('t-cpl').textContent=cplReal>0?fmt(cplReal):'—';
@@ -1532,12 +1532,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
   document.getElementById('t-comp').innerHTML=(comp||'0')+compTag+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-comp-sub').textContent=pct(comp,agend)+' show rate';
-  document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
-  document.getElementById('t-conv').textContent=pct(contratos,leadsBase);
   document.getElementById('t-cpa').textContent=agend>0?fmt(cpa):'—';
   document.getElementById('t-cpcomp').textContent=comp>0?fmt(cpcomp):'—';
-  document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2):'—';
   // Vendas e oportunidades do _ccData filtradas pelo período
   const _range=getRange('trafego');
   let totalOport=0;
@@ -1559,6 +1555,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
   contratos=fechadosPhones.size; // atualiza após adicionar aprovados do CRM
+  const cpc2Final=contratos>0?spend/contratos:0;
+  document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
+  document.getElementById('t-conv').textContent=pct(contratos,leadsBase);
+  document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
 
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
