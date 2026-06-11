@@ -3417,7 +3417,8 @@ function salvarLeadCard(){
       // Manda para o Apps Script como evento de agendamento manual
       // O campo created_at do data é o created_at do lead original
       // Adicionamos _agend_timestamp para o Apps Script usar como timestamp da linha
-      fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      // Usa no-cors para evitar bloqueio CORS do Apps Script
+      fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           type:'CUSTOMER_STAGE_UPDATED',
           _agend_timestamp:agendTimestamp,
@@ -3425,15 +3426,14 @@ function salvarLeadCard(){
                 value:0,id:'',created_at:createdAt,
                 ad_data:[],acquisitionOrigin:novaOrigem||r.origin||''}
         })
-      }).then(()=>{
-        // Adiciona em memória imediatamente com timestamp correto
-        allCloudiaRows.push({
-          name:novoNome||r.name,phone:ph,origin:novaOrigem||r.origin||'',
-          stage:'Agendou',created_at:createdAt,timestamp:agendTimestamp,
-          type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''
-        });
-        renderLeadsTable();
       });
+      // Adiciona em memória imediatamente sem esperar resposta
+      allCloudiaRows.push({
+        name:novoNome||r.name,phone:ph,origin:novaOrigem||r.origin||'',
+        stage:'Agendou',created_at:createdAt,timestamp:agendTimestamp,
+        type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''
+      });
+      renderLeadsTable();
     } else {
       // Atualiza timestamp do agendamento existente em memória
       const agendRow=allCloudiaRows.find(row=>
