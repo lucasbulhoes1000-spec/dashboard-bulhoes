@@ -1106,7 +1106,11 @@ function filterAgendByRange(rows,tab){
     // Teve Agendou (qualquer tipo de evento) com timestamp no período?
     const agendInPeriod=evts.filter(e=>{
       if(!isAgend(e.stage))return false;
-      const d=parseCloudiaDate(e.timestamp)||parseCloudiaDate(e.created_at);
+      // Para CUSTOMER_CREATED: usa created_at (lead já entrou como Agendado)
+      // Para outros tipos: usa APENAS timestamp (data real do agendamento)
+      const d=e.type==='CUSTOMER_CREATED'
+        ?parseCloudiaDate(e.timestamp)||parseCloudiaDate(e.created_at)
+        :parseCloudiaDate(e.timestamp);
       if(!d)return false;
       const ds=localDateStr(d);
       return ds>=rng.since&&ds<=rng.until;
