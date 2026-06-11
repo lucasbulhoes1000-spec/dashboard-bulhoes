@@ -1548,6 +1548,13 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // OPORTUNIDADES: todos os orçamentos de quem compareceu no período
   const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
 
+  // Adiciona em fechadosPhones quem tem orçamento Aprovado no período (mesmo sem Ganho no Cloudia)
+  Object.entries(_ccData||{}).forEach(([ph,d])=>{
+    if(!d||!d.orcamentos)return;
+    const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado'&&o.data&&o.data>=_range.since&&o.data<=_range.until);
+    if(temAprovado)fechadosPhones.add(ph);
+  });
+
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
     const d=_ccData[ph];
