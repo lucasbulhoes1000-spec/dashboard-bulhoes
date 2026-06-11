@@ -898,57 +898,96 @@ tbody tr:hover td{background:#faf7f3;}
     <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
   </div>
   <input type="hidden" id="orc-edit-idx" value="">
+
+  <!-- Status -->
   <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-    <select id="orc-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+    <select id="orc-status" onchange="orcOnStatusChange(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
       <option value="">Selecione...</option><option>Em aberto</option><option>Aprovado</option><option>Reprovado</option><option>Cancelado</option>
     </select></div>
+
+  <!-- Avaliador -->
   <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
     <select id="orc-avaliador" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
       <option value="">Selecione...</option>
     </select></div>
+
+  <!-- Tratamento -->
   <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Tratamento</label>
     <select id="orc-tratamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
       <option value="">Selecione...</option>
     </select></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pagamento</label>
-      <select id="orc-pagamento" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Parcelamento</label>
-      <select id="orc-parcelas" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="">Selecione...</option><option>À vista</option><option>2x</option><option>3x</option><option>4x</option><option>5x</option><option>6x</option><option>7x</option><option>8x</option><option>9x</option><option>10x</option><option>11x</option><option>12x</option>
-      </select></div>
-  </div>
+
+  <!-- Data + Valor -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
     <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do orçamento</label>
       <input id="orc-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
     <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor orçado (R$)</label>
       <input id="orc-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:11px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor entrada (R$)</label>
-      <input id="orc-entrada" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data entrada</label>
-      <input id="orc-entrada-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pgto entrada</label>
-      <select id="orc-entrada-pgto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
+
+  <!-- Observação -->
+  <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
+    <textarea id="orc-obs" placeholder="Observação..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
+
+  <!-- Bloco de Fechamento — só aparece quando Aprovado -->
+  <div id="orc-fechamento-wrap" style="display:none;background:#f9f6f2;border-radius:8px;padding:14px;margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:700;color:#5a4a3a;margin-bottom:12px;">✅ Fechamento</div>
+
+    <!-- Data fechamento + Valor fechado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do fechamento</label>
+        <input id="orc-fech-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;"></div>
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor fechado (R$)</label>
+        <input id="orc-fech-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;"></div>
+    </div>
+
+    <!-- Possui entrada -->
+    <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Possui entrada?</label>
+      <select id="orc-tem-entrada" onchange="orcOnEntradaChange(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+        <option value="nao">Não</option>
+        <option value="sim">Sim</option>
       </select></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">CRC participou?</label>
-      <select id="orc-crc-particip" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
-        <option value="nao">Não participou</option>
-        <option value="sim">Sim — calcular comissão CRC</option>
-      </select></div>
-    <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome da CRC</label>
-      <input id="orc-crc-nome" type="text" placeholder="Nome da CRC" list="orc-crc-list" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-      <datalist id="orc-crc-list"><option value="Livia"></datalist>
+
+    <!-- Entrada (só aparece se Sim) -->
+    <div id="orc-entrada-wrap" style="display:none;margin-bottom:11px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor entrada (R$)</label>
+          <input id="orc-entrada" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;"></div>
+        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data entrada</label>
+          <input id="orc-entrada-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;"></div>
+        <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Pgto entrada</label>
+          <select id="orc-entrada-pgto" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+            <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
+          </select></div>
+      </div>
+    </div>
+
+    <!-- Pagamento restante -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Forma de pagamento</label>
+        <select id="orc-pagamento" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+          <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Qtd. parcelas</label>
+        <select id="orc-parcelas" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+          <option value="">Selecione...</option><option>À vista</option><option>2x</option><option>3x</option><option>4x</option><option>5x</option><option>6x</option><option>7x</option><option>8x</option><option>9x</option><option>10x</option><option>11x</option><option>12x</option>
+        </select></div>
+    </div>
+
+    <!-- CRC -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">CRC participou?</label>
+        <select id="orc-crc-particip" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+          <option value="nao">Não participou</option>
+          <option value="sim">Sim — calcular comissão CRC</option>
+        </select></div>
+      <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome da CRC</label>
+        <input id="orc-crc-nome" type="text" placeholder="Nome da CRC" list="orc-crc-list" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;">
+        <datalist id="orc-crc-list"><option value="Livia"></datalist>
+      </div>
     </div>
   </div>
-  <div style="margin-bottom:18px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Observação</label>
-    <textarea id="orc-obs" placeholder="Observação..." style="width:100%;min-height:70px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;resize:vertical;box-sizing:border-box;font-family:inherit;"></textarea></div>
+
   <div style="display:flex;gap:10px;">
     <button onclick="salvarOrcamento()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
     <button onclick="document.getElementById('cc-orc-form').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
@@ -2319,6 +2358,14 @@ function switchCCTab(tab,btn){
   if(btn){btn.style.color='#A18B6C';btn.style.borderBottomColor='#A18B6C';btn.style.fontWeight='600';}
 }
 
+function orcOnStatusChange(val){
+  const wrap=document.getElementById('orc-fechamento-wrap');
+  wrap.style.display=val==='Aprovado'?'block':'none';
+}
+function orcOnEntradaChange(val){
+  document.getElementById('orc-entrada-wrap').style.display=val==='sim'?'block':'none';
+}
+
 function openOrcForm(editIdx){
   populateDynamicSelects();
   var d=ccGet(clientesData[_currentClienteIdx]);
@@ -2332,6 +2379,12 @@ function openOrcForm(editIdx){
     document.getElementById('orc-tratamento').value=o.tratamento||'';
     document.getElementById('orc-pagamento').value=o.pagamento||'';
     document.getElementById('orc-parcelas').value=o.parcelas||'';
+    document.getElementById('orc-fech-data').value=o.fechData||o.data||'';
+    document.getElementById('orc-fech-valor').value=o.fechValor||o.valor||'';
+    const temEntrada=(parseFloat(o.entrada||0)>0)?'sim':'nao';
+    document.getElementById('orc-tem-entrada').value=temEntrada;
+    orcOnEntradaChange(temEntrada);
+    orcOnStatusChange(o.status||'');
     document.getElementById('orc-data').value=o.data||today;
     document.getElementById('orc-valor').value=o.valor||'';
     document.getElementById('orc-entrada').value=o.entrada||'';
@@ -2342,7 +2395,11 @@ function openOrcForm(editIdx){
     document.getElementById('orc-obs').value=o.obs||'';
   }else{
     document.getElementById('orc-status').value='Em aberto';
-    ['orc-avaliador','orc-tratamento','orc-pagamento','orc-parcelas','orc-obs','orc-crc-nome'].forEach(id=>document.getElementById(id).value='');
+    ['orc-avaliador','orc-tratamento','orc-pagamento','orc-parcelas','orc-obs','orc-crc-nome','orc-fech-data','orc-fech-valor','orc-entrada','orc-entrada-data','orc-entrada-pgto'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('orc-tem-entrada').value='nao';
+    document.getElementById('orc-crc-particip').value='nao';
+    orcOnStatusChange('Em aberto');
+    orcOnEntradaChange('nao');
     document.getElementById('orc-crc-particip').value='nao';
     document.getElementById('orc-data').value=today;
     document.getElementById('orc-valor').value='';
@@ -2362,6 +2419,9 @@ function salvarOrcamento(){
     tratamento:document.getElementById('orc-tratamento').value,
     pagamento:document.getElementById('orc-pagamento').value,
     parcelas:document.getElementById('orc-parcelas').value,
+    fechData:document.getElementById('orc-fech-data').value,
+    fechValor:parseFloat(document.getElementById('orc-fech-valor').value)||0,
+    temEntrada:document.getElementById('orc-tem-entrada').value,
     data:document.getElementById('orc-data').value,
     valor:parseFloat(document.getElementById('orc-valor').value)||0,
     entrada:parseFloat(document.getElementById('orc-entrada').value)||0,
