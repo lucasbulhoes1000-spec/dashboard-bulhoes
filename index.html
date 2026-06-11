@@ -1066,6 +1066,7 @@ function parseCloudiaDate(raw){
 function filterByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
+    if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const d=parseCloudiaDate(row.created_at);
     if(!d)return false;
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
