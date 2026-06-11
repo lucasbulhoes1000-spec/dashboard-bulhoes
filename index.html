@@ -1492,7 +1492,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!ph||importadosGanhoPhones.has(ph))return;
     fechadosPhones.add(ph);
   });
-  const contratos=fechadosPhones.size;
+  // contratos será recalculado após adicionar manuais (abaixo)
   const fechados=evtsGeral.filter(r=>isFechou(r.stage));
 
   // Vendas: valor máximo por telefone
@@ -1555,6 +1555,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(temAprovado)fechadosPhones.add(ph);
   });
 
+  // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
+  const contratos=fechadosPhones.size;
+
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
     const d=_ccData[ph];
@@ -1599,7 +1602,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const ticketCRM=contratosComValor>0?totalVendasCRM/contratosComValor:0;
 
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
+  const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
+  const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
+  document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
 
   // Entradas — manual com senha
@@ -1611,10 +1616,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   } else {
     Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
-      const dataEntrada=o.entradaData||o.data||'';
-      if(!dataEntrada)return false;
-      return dataEntrada>=_range.since&&dataEntrada<=_range.until;
-    }).forEach(o=>totalEntradas+=Number(o.entrada)||0));
+      const dataRef=o.fechData||o.entradaData||o.data||'';
+      if(!dataRef)return false;
+      return dataRef>=_range.since&&dataRef<=_range.until;
+    }).forEach(o=>{
+      // Novo formato: entrada salva em o.entrada (campo direto)
+      const entVal=Number(o.entrada||0);
+      if(entVal>0)totalEntradas+=entVal;
+    }));
   }
   const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
