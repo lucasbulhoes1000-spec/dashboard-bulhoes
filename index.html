@@ -3329,6 +3329,13 @@ function sincronizarNomesCRM(cloudiaRows){
 // ===== LEAD CARD =====
 let _currentLeadIdx=-1;
 
+function lcOnStatusChange(val){
+  const agendWrap=document.getElementById('lc-agend-wrap');
+  const valorWrap=document.getElementById('lc-valor-wrap');
+  agendWrap.style.display=['Agendou','Faltou/desmarcou','Compareceu','Ganho'].includes(val)?'block':'none';
+  valorWrap.style.display=['Compareceu','Ganho'].includes(val)?'block':'none';
+}
+
 function openLeadCard(idx){
   const r=leadsData[idx];
   if(!r)return;
@@ -3348,11 +3355,10 @@ function openLeadCard(idx){
   // Status — prioriza edição manual do CRM
   const stSel=document.getElementById('lc-status');
   const stVal=d_lc.statusAtual||r.stage||'Lead';
-  stSel.value=(stVal==='Agendou')?'Agendou':'Lead';
-  // Campo data agendamento
-  const agendWrap=document.getElementById('lc-agend-data-wrap');
-  agendWrap.style.display=(stVal==='Agendou')?'block':'none';
-  // Preenche com data existente se tiver
+  const stVal2=['Lead','Agendou','Faltou/desmarcou','Compareceu','Ganho','Perdido'].includes(stVal)?stVal:'Lead';
+  stSel.value=stVal2;
+  lcOnStatusChange(stVal2);
+  // Data agendamento
   const agendTs=d_lc.agendTimestamp||'';
   if(agendTs){
     document.getElementById('lc-agend-data').value=agendTs.substring(0,10);
@@ -3361,6 +3367,17 @@ function openLeadCard(idx){
     document.getElementById('lc-agend-data').value='';
     document.getElementById('lc-agend-hora').value='08:00';
   }
+  // Data consulta
+  const consultaTs=d_lc.consultaTimestamp||'';
+  if(consultaTs){
+    document.getElementById('lc-consulta-data').value=consultaTs.substring(0,10);
+    document.getElementById('lc-consulta-hora').value=consultaTs.substring(11,16)||'08:00';
+  } else {
+    document.getElementById('lc-consulta-data').value='';
+    document.getElementById('lc-consulta-hora').value='08:00';
+  }
+  // Valor
+  document.getElementById('lc-valor').value=d_lc.valorAtual||'';
   // Anotações do _ccData (reutiliza a mesma estrutura)
   const d=_ccData[ph]||{anotacoes:[]};
   refreshLeadAnotacoes(d);
@@ -3383,7 +3400,11 @@ function salvarLeadCard(){
   const novoStatus=document.getElementById('lc-status').value;
   const agendData=document.getElementById('lc-agend-data').value;
   const agendHora=document.getElementById('lc-agend-hora').value||'08:00';
-  const agendTimestamp=novoStatus==='Agendou'&&agendData?agendData+'T'+agendHora+':00':'';
+  const consultaData=document.getElementById('lc-consulta-data').value;
+  const consultaHora=document.getElementById('lc-consulta-hora').value||'08:00';
+  const novoValor=parseFloat(document.getElementById('lc-valor').value)||0;
+  const agendTimestamp=['Agendou','Faltou/desmarcou','Compareceu','Ganho'].includes(novoStatus)&&agendData?agendData+'T'+agendHora+':00':'';
+  const consultaTimestamp=consultaData?consultaData+'T'+consultaHora+':00':'';
 
   // Salva no _ccData (Supabase) — fonte de verdade para edições manuais
   if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
@@ -3393,6 +3414,8 @@ function salvarLeadCard(){
   _ccData[ph].telefoneAtual=novoTel||ph;
   _ccData[ph].editadoManualmente=true;
   if(agendTimestamp)_ccData[ph].agendTimestamp=agendTimestamp;
+  if(consultaTimestamp)_ccData[ph].consultaTimestamp=consultaTimestamp;
+  if(novoValor)_ccData[ph].valorAtual=novoValor;
 
   // Atualiza allCloudiaRows em memória
   allCloudiaRows.forEach(row=>{
@@ -3401,20 +3424,21 @@ function salvarLeadCard(){
       if(novoNome)row.name=novoNome;
       if(novaOrigem)row.origin=novaOrigem;
       if(novoStatus)row.stage=novoStatus;
+      if(novoValor)row.value=novoValor;
     }
   });
 
-  // Se status Agendou com data: grava CUSTOMER_STAGE_UPDATED na planilha
-  if(novoStatus==='Agendou'&&agendTimestamp){
-    // Verifica se já existe CUSTOMER_STAGE_UPDATED Agendou para esse telefone
-    const jaTemAgend=allCloudiaRows.some(row=>
+  // Se status com data: grava CUSTOMER_STAGE_UPDATED na planilha
+  if(['Agendou','Faltou/desmarcou','Compareceu','Ganho','Perdido'].includes(novoStatus)&&agendTimestamp){
+    const stageToCheck=novoStatus;
+    const jaTemStage=allCloudiaRows.some(row=>
       String(row.phone||'').replace(/\D/g,'')=== ph &&
       row.type==='CUSTOMER_STAGE_UPDATED' &&
-      isAgend(row.stage)
+      row.stage===stageToCheck
     );
-    if(!jaTemAgend){
+    if(!jaTemStage){
       const createdAt=r.created_at||agendTimestamp;
-      // Manda para o Apps Script como evento de agendamento manual
+      // Manda para o Apps Script como evento de stage manual
       // O campo created_at do data é o created_at do lead original
       // Adicionamos _agend_timestamp para o Apps Script usar como timestamp da linha
       // Usa no-cors para evitar bloqueio CORS do Apps Script
@@ -3422,25 +3446,25 @@ function salvarLeadCard(){
         body:JSON.stringify({
           type:'CUSTOMER_STAGE_UPDATED',
           _agend_timestamp:agendTimestamp,
-          data:{phone:ph,name:novoNome||r.name,stage:'Agendou',
-                value:0,id:'',created_at:createdAt,
+          data:{phone:ph,name:novoNome||r.name,stage:novoStatus,
+                value:novoValor||0,id:'',created_at:createdAt,
                 ad_data:[],acquisitionOrigin:novaOrigem||r.origin||''}
         })
       });
       // Adiciona em memória imediatamente sem esperar resposta
       allCloudiaRows.push({
         name:novoNome||r.name,phone:ph,origin:novaOrigem||r.origin||'',
-        stage:'Agendou',created_at:createdAt,timestamp:agendTimestamp,
-        type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''
+        stage:novoStatus,created_at:createdAt,timestamp:agendTimestamp,
+        type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:'',value:novoValor||0
       });
       renderLeadsTable();
     } else {
-      // Atualiza timestamp do agendamento existente em memória
-      const agendRow=allCloudiaRows.find(row=>
+      // Atualiza timestamp do stage existente em memória
+      const stageRow=allCloudiaRows.find(row=>
         String(row.phone||'').replace(/\D/g,'')=== ph &&
-        row.type==='CUSTOMER_STAGE_UPDATED' && isAgend(row.stage)
+        row.type==='CUSTOMER_STAGE_UPDATED' && row.stage===novoStatus
       );
-      if(agendRow)agendRow.timestamp=agendTimestamp;
+      if(stageRow)stageRow.timestamp=agendTimestamp;
     }
   }
 
@@ -3672,8 +3696,8 @@ window.addEventListener('load',()=>{
 
 <!-- LEAD CARD -->
 <div id="lead-card-overlay" onclick="closeLeadCard(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:600;">
-  <div id="lead-card-panel" style="position:fixed;top:0;right:0;width:420px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;">
-    <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
+  <div id="lead-card-panel" style="position:fixed;top:0;right:0;width:440px;max-width:96vw;height:100%;background:#f5f3f0;box-shadow:-4px 0 24px rgba(0,0,0,.13);display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;overflow-y:auto;max-height:100vh;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <div style="font-size:15px;font-weight:700;color:#2a2520;">Lead</div>
         <button onclick="document.getElementById('lead-card-overlay').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
@@ -3694,7 +3718,7 @@ window.addEventListener('load',()=>{
         <select id="lc-origem" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
           <option value="">—</option>
           <option>#Instagram ADS</option>
-          <option>#Orgânico</option>
+          <option>#Organico</option>
           <option>#Social Selling</option>
           <option>#Indicação</option>
           <option>#Facebook ADS</option>
@@ -3703,20 +3727,45 @@ window.addEventListener('load',()=>{
       <!-- Status -->
       <div style="margin-bottom:11px;">
         <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-        <select id="lc-status" onchange="document.getElementById('lc-agend-data-wrap').style.display=this.value==='Agendou'?'block':'none'" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <select id="lc-status" onchange="lcOnStatusChange(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
           <option value="Lead">Lead</option>
           <option value="Agendou">Agendou</option>
+          <option value="Faltou/desmarcou">Faltou / Desmarcou</option>
+          <option value="Compareceu">Compareceu</option>
+          <option value="Ganho">Fechou tratamento</option>
+          <option value="Perdido">Perdido</option>
         </select>
       </div>
-      <!-- Data do agendamento (só aparece quando Agendou) -->
-      <div id="lc-agend-data-wrap" style="display:none;margin-bottom:16px;">
-        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do agendamento</label>
+      <!-- Data do agendamento -->
+      <div id="lc-agend-wrap" style="display:none;background:#f9f6f2;border-radius:8px;padding:12px;margin-bottom:11px;">
+        <div style="font-size:11px;color:#8a7a6a;font-weight:600;margin-bottom:8px;">📅 Agendamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data agendou</label>
+            <input id="lc-agend-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
+            <input id="lc-agend-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;">
+          </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <input id="lc-agend-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-          <input id="lc-agend-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data da consulta</label>
+            <input id="lc-consulta-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
+            <input id="lc-consulta-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;">
+          </div>
         </div>
       </div>
-      <button onclick="salvarLeadCard()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
+      <!-- Valor (para Compareceu/Ganho) -->
+      <div id="lc-valor-wrap" style="display:none;margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor orçado / fechado (R$)</label>
+        <input id="lc-valor" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#fff;">
+      </div>
+      <button onclick="salvarLeadCard()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;font-weight:600;margin-top:4px;">Salvar</button>
     </div>
     <!-- Anotações -->
     <div style="flex:1;overflow-y:auto;padding:16px;">
