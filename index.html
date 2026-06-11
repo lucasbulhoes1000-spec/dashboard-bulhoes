@@ -1213,6 +1213,9 @@ async function fetchCloudia(){
         const m={'4067':'Instagram Orgânico','2557':'WhatsApp Direto'};
         r.origin=m[String(r.origin).trim()]||'Conexão '+r.origin;
       }
+      // Normaliza variações de origem
+      const _normOri={'Indicação de colega':'#Indicação','Organico':'#Organico','Orgânico':'#Organico','organico':'#Organico','orgânico':'#Organico','Instagram Orgânico':'#Organico'};
+      if(r.origin&&_normOri[String(r.origin).trim()])r.origin=_normOri[String(r.origin).trim()];
       return r;
     });
     allCloudiaRows=rows;
