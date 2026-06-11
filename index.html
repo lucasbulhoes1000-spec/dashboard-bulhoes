@@ -796,6 +796,9 @@ tbody tr:hover td{background:#faf7f3;}
         <span class="modal-close" onclick="closeModal()">✕</span>
       </div>
     </div>
+    <div style="padding:8px 16px 4px;border-bottom:1px solid #e0d9d0;">
+      <input id="modal-search" type="text" placeholder="🔍 Buscar por nome ou telefone..." oninput="filterModal(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 10px;font-size:13px;box-sizing:border-box;outline:none;">
+    </div>
     <div class="modal-body">
       <table class="modal-table">
         <thead><tr id="modal-thead"></tr></thead>
@@ -1103,11 +1106,10 @@ function filterAgendByRange(rows,tab){
   });
   const result=[];
   Object.values(byPhone).forEach(evts=>{
-    // Agendamentos: só CUSTOMER_STAGE_UPDATED e CUSTOMER_CREATED
+    // Agendamentos: aceita Agendou E Faltou/desmarcou (faltou = agendou antes)
     // CUSTOMER_ACQUISITION_ORIGIN_UPDATED é ignorado — dado inconsistente de data
-    // Com o novo Apps Script, todo agendamento gera CUSTOMER_STAGE_UPDATED correto
     const agendInPeriod=evts.filter(e=>{
-      if(!isAgend(e.stage))return false;
+      if(!isAgend(e.stage)&&!isFaltou(e.stage))return false;
       if(e.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
       const d=e.type==='CUSTOMER_CREATED'
         ?parseCloudiaDate(e.timestamp)||parseCloudiaDate(e.created_at)
@@ -1339,12 +1341,12 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
     if(!matchKey){
       if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:new Set()};
-      if(isAgend(r.stage))adMap['__sem_rastreio__'].agend++;
+      if(isAgend(r.stage)||isFaltou(r.stage))adMap['__sem_rastreio__'].agend++;
       if(isComp(r.stage))adMap['__sem_rastreio__'].comp++;
       if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){seenEventPhone.add(ph+'_fechou');adMap['__sem_rastreio__'].fechou++;adMap['__sem_rastreio__'].vendas+=parseFloat(r.value||0);}
       return;
     }
-    if(isAgend(r.stage))adMap[matchKey].agend++;
+    if(isAgend(r.stage)||isFaltou(r.stage))adMap[matchKey].agend++;
     if(isComp(r.stage))adMap[matchKey].comp++;
     if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){seenEventPhone.add(ph+'_fechou');adMap[matchKey].fechou++;adMap[matchKey].vendas+=parseFloat(r.value||0);}
   });
@@ -1562,6 +1564,32 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   window._lastAdMap=adMap;
   const adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
+  // Linha de totais
+  const totSpend=adRows.reduce((s,[,d])=>s+(d.spend||0),0);
+  const totLeads=adRows.reduce((s,[,d])=>s+(d.leads||0),0);
+  const totAgend=adRows.reduce((s,[,d])=>s+(d.agend||0),0);
+  const totComp=adRows.reduce((s,[,d])=>s+(d.comp||0),0);
+  const totFechou=adRows.reduce((s,[,d])=>s+(d.fechou||0),0);
+  const totVendas=adRows.reduce((s,[,d])=>s+(d.vendas||0),0);
+  const totCpl=totLeads>0?totSpend/totLeads:0;
+  const totCpa=totAgend>0?totSpend/totAgend:0;
+  const totCpcomp=totComp>0?totSpend/totComp:0;
+  const totCpc=totFechou>0?totSpend/totFechou:0;
+  const totTicket=totFechou>0?totVendas/totFechou:0;
+  const totalRow=`<tr style="font-weight:700;background:#f0ebe4;border-top:2px solid #c8bfb0;">
+    <td colspan="2" style="font-size:12px;color:#5a4a3a;">TOTAL / MÉDIA</td>
+    <td style="text-align:right" class="ta">${fmtK(totSpend)}</td>
+    <td style="text-align:right" class="ta">${totLeads>0?fmt(totCpl):'—'}</td>
+    <td style="text-align:right">${totLeads||'—'}</td>
+    <td style="text-align:right">${totAgend||'—'}</td>
+    <td style="text-align:right" class="ta">${totAgend>0?fmt(totCpa):'—'}</td>
+    <td style="text-align:right">${totComp||'—'}</td>
+    <td style="text-align:right" class="ta">${totComp>0?fmt(totCpcomp):'—'}</td>
+    <td style="text-align:right" class="tg">${totFechou||'—'}</td>
+    <td style="text-align:right" class="ta">${totFechou>0?fmt(totCpc):'—'}</td>
+    <td style="text-align:right" class="tg">${totVendas>0?fmtK(totVendas):'—'}</td>
+    <td style="text-align:right" class="tg">${totTicket>0?fmt(totTicket):'—'}</td>
+  </tr>`;
   document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?adRows.map(([name,d])=>{
     const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
     const adCpcomp=d.comp>0?d.spend/d.comp:0,adCpc=d.fechou>0?d.spend/d.fechou:0;
@@ -1581,7 +1609,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas):'—'}</td>
       <td style="text-align:right" class="tg">${adTicket>0?fmt(adTicket):'—'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="13" class="empty-state">Aguardando dados dos anúncios...</td></tr>';
+  }).join('')+totalRow:'<tr><td colspan="13" class="empty-state">Aguardando dados dos anúncios...</td></tr>';
 }
 
 // ===== SOCIAL SELLING =====
@@ -2131,14 +2159,21 @@ function getStatusAgend(stage){
 // MODAL
 let _modalPerPage=0;
 function openModal(title,headers,rows){
-  _modalExportData={headers,rows};
+  _modalExportData={headers,rows,allRows:rows};
   _modalPerPage=0;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-thead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
+  const searchEl=document.getElementById('modal-search');
+  if(searchEl)searchEl.value='';
   renderModalRows();
   document.getElementById('modal-overlay').classList.add('open');
-  // Reset buttons
   [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===0?'#A18B6C':'#fff';b.style.color=v===0?'#fff':'#7a6550';b.style.borderColor=v===0?'#A18B6C':'#d4c9bc';b.style.fontWeight=v===0?'600':'400';}});
+}
+function filterModal(q){
+  const all=_modalExportData.allRows||_modalExportData.rows;
+  if(!q){_modalExportData.rows=all;}
+  else{const qn=q.toLowerCase();_modalExportData.rows=all.filter(r=>r.some(c=>String(c||'').toLowerCase().includes(qn)));}
+  renderModalRows();
 }
 function renderModalRows(){
   const {headers,rows}=_modalExportData;
