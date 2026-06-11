@@ -1917,6 +1917,17 @@ function setLeadsPerPage(n){
 
 // ===== CLIENTES PAGE =====
 function renderClientes(){
+  // Define filtro padrão: mês atual pela data de comparecimento
+  const fromEl=document.getElementById('clientes-from');
+  const toEl=document.getElementById('clientes-to');
+  if(!fromEl.value&&!toEl.value){
+    const now=new Date();
+    const y=now.getFullYear();
+    const m=String(now.getMonth()+1).padStart(2,'0');
+    const lastDay=new Date(y,now.getMonth()+1,0).getDate();
+    fromEl.value=y+'-'+m+'-01';
+    toEl.value=y+'-'+m+'-'+String(lastDay).padStart(2,'0');
+  }
   if(allCloudiaRows.length===0){fetchCloudia().then(()=>renderClientesTable());}
   else{renderClientesTable();}
 }
