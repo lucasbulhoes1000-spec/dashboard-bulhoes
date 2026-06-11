@@ -3349,6 +3349,18 @@ function openLeadCard(idx){
   const stSel=document.getElementById('lc-status');
   const stVal=d_lc.statusAtual||r.stage||'Lead';
   stSel.value=(stVal==='Agendou')?'Agendou':'Lead';
+  // Campo data agendamento
+  const agendWrap=document.getElementById('lc-agend-data-wrap');
+  agendWrap.style.display=(stVal==='Agendou')?'block':'none';
+  // Preenche com data existente se tiver
+  const agendTs=d_lc.agendTimestamp||'';
+  if(agendTs){
+    document.getElementById('lc-agend-data').value=agendTs.substring(0,10);
+    document.getElementById('lc-agend-hora').value=agendTs.substring(11,16)||'08:00';
+  } else {
+    document.getElementById('lc-agend-data').value='';
+    document.getElementById('lc-agend-hora').value='08:00';
+  }
   // Anotações do _ccData (reutiliza a mesma estrutura)
   const d=_ccData[ph]||{anotacoes:[]};
   refreshLeadAnotacoes(d);
@@ -3369,6 +3381,9 @@ function salvarLeadCard(){
   const novoTel=document.getElementById('lc-telefone').value.trim().replace(/\D/g,'');
   const novaOrigem=document.getElementById('lc-origem').value;
   const novoStatus=document.getElementById('lc-status').value;
+  const agendData=document.getElementById('lc-agend-data').value;
+  const agendHora=document.getElementById('lc-agend-hora').value||'08:00';
+  const agendTimestamp=novoStatus==='Agendou'&&agendData?agendData+'T'+agendHora+':00':'';
 
   // Salva no _ccData (Supabase) — fonte de verdade para edições manuais
   if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
@@ -3376,9 +3391,10 @@ function salvarLeadCard(){
   _ccData[ph].origemAtual=novaOrigem||r.origin;
   _ccData[ph].statusAtual=novoStatus;
   _ccData[ph].telefoneAtual=novoTel||ph;
-  _ccData[ph].editadoManualmente=true; // protege contra sobrescrita do Cloudia
+  _ccData[ph].editadoManualmente=true;
+  if(agendTimestamp)_ccData[ph].agendTimestamp=agendTimestamp;
 
-  // Atualiza allCloudiaRows em memória para refletir na tabela imediatamente
+  // Atualiza allCloudiaRows em memória
   allCloudiaRows.forEach(row=>{
     const rowPh=String(row.phone||'').replace(/\D/g,'');
     if(rowPh===ph){
@@ -3388,8 +3404,47 @@ function salvarLeadCard(){
     }
   });
 
+  // Se status Agendou com data: grava CUSTOMER_STAGE_UPDATED na planilha
+  if(novoStatus==='Agendou'&&agendTimestamp){
+    // Verifica se já existe CUSTOMER_STAGE_UPDATED Agendou para esse telefone
+    const jaTemAgend=allCloudiaRows.some(row=>
+      String(row.phone||'').replace(/\D/g,'')=== ph &&
+      row.type==='CUSTOMER_STAGE_UPDATED' &&
+      isAgend(row.stage)
+    );
+    if(!jaTemAgend){
+      const createdAt=r.created_at||agendTimestamp;
+      // Manda para o Apps Script como evento de agendamento manual
+      // O campo created_at do data é o created_at do lead original
+      // Adicionamos _agend_timestamp para o Apps Script usar como timestamp da linha
+      fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          type:'CUSTOMER_STAGE_UPDATED',
+          _agend_timestamp:agendTimestamp,
+          data:{phone:ph,name:novoNome||r.name,stage:'Agendou',
+                value:0,id:'',created_at:createdAt,
+                ad_data:[],acquisitionOrigin:novaOrigem||r.origin||''}
+        })
+      }).then(()=>{
+        // Adiciona em memória imediatamente com timestamp correto
+        allCloudiaRows.push({
+          name:novoNome||r.name,phone:ph,origin:novaOrigem||r.origin||'',
+          stage:'Agendou',created_at:createdAt,timestamp:agendTimestamp,
+          type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''
+        });
+        renderLeadsTable();
+      });
+    } else {
+      // Atualiza timestamp do agendamento existente em memória
+      const agendRow=allCloudiaRows.find(row=>
+        String(row.phone||'').replace(/\D/g,'')=== ph &&
+        row.type==='CUSTOMER_STAGE_UPDATED' && isAgend(row.stage)
+      );
+      if(agendRow)agendRow.timestamp=agendTimestamp;
+    }
+  }
+
   salvarCRMDebounced();
-  // Recarrega a tabela de leads
   renderLeadsTable();
   document.getElementById('lead-card-overlay').style.display='none';
 }
@@ -3646,12 +3701,20 @@ window.addEventListener('load',()=>{
         </select>
       </div>
       <!-- Status -->
-      <div style="margin-bottom:16px;">
+      <div style="margin-bottom:11px;">
         <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Status</label>
-        <select id="lc-status" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
+        <select id="lc-status" onchange="document.getElementById('lc-agend-data-wrap').style.display=this.value==='Agendou'?'block':'none'" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;">
           <option value="Lead">Lead</option>
           <option value="Agendou">Agendou</option>
         </select>
+      </div>
+      <!-- Data do agendamento (só aparece quando Agendou) -->
+      <div id="lc-agend-data-wrap" style="display:none;margin-bottom:16px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data do agendamento</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <input id="lc-agend-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          <input id="lc-agend-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        </div>
       </div>
       <button onclick="salvarLeadCard()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
     </div>
