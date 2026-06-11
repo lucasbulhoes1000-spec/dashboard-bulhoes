@@ -1788,7 +1788,7 @@ function filterLeadsTable(){
   const filtered=leadsData.filter(r=>{
     const e=applyEdits(r);
     const phoneClean=String(e.phone||'').replace(/\D/g,'');
-    const nameMatch=(e.name||'').toLowerCase().includes(q);
+    const nameMatch=String(e.name||'').toLowerCase().includes(q);
     const phoneMatch=qDigits?phoneClean.includes(qDigits):(e.phone||'').includes(q);
     const origMatch2=(e.origin||'').toLowerCase().includes(q);
     const match=!q||(nameMatch||phoneMatch||origMatch2);
