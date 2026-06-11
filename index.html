@@ -1316,18 +1316,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   filtered.forEach(r=>{const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsPhones.add(ph);});
   const cloudiaLeadsCount=leadsPhones.size;
 
-  // STEP 4: Casa telefones com anúncios
+  // STEP 4: Casa telefones com anúncios — usa TODOS os rows (não só os filtrados)
+  // Monta mapa phone → adKey para usar nos eventos de agendamento/comparecimento
+  const phoneAdKeyMap={};
   allCloudiaRows.forEach(r=>{
     const key=findAdKey(r);
-    if(key){const ph=String(r.phone||'').replace(/\D/g,'');if(ph)adMap[key].phones.add(ph);}
+    if(key){const ph=String(r.phone||'').replace(/\D/g,'');if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
   });
   // STEP 5: Conta eventos do período
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenEventPhone=new Set();
   evtsParaFunil.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
+    // Tenta casar pelo ad_id/ad_name do próprio evento, senão usa o mapa phone→adKey
     let matchKey=null;
     for(const [k,d] of Object.entries(adMap)){if(d.phones&&d.phones.has(ph)){matchKey=k;break;}}
+    if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
     if(!matchKey){
       if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:new Set()};
       if(isAgend(r.stage))adMap['__sem_rastreio__'].agend++;
