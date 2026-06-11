@@ -842,6 +842,28 @@ tbody tr:hover td{background:#faf7f3;}
         <span id="cc-origin-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
         <span id="cc-date-tag" style="background:#e8e2da;color:#6a5a4a;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
       </div>
+      <!-- Datas de agendamento -->
+      <div style="background:#f9f6f2;border-radius:8px;padding:10px 12px;margin-top:10px;">
+        <div style="font-size:10px;color:#8a7a6a;font-weight:600;margin-bottom:8px;">📅 Agendamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data agendou</label>
+            <input id="cc-agend-data" type="date" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
+            <input id="cc-agend-hora" type="time" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data da consulta</label>
+            <input id="cc-consulta-data" type="date" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
+            <input id="cc-consulta-hora" type="time" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
     </div>
     <div style="display:flex;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
       <button class="cc-tab" onclick="switchCCTab('orcamentos',this)" style="flex:1;padding:9px 4px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">💰 Orçamentos</button>
@@ -2207,6 +2229,13 @@ function openClienteCard(idx){
   const e_cc=applyEdits(r);
   document.getElementById('cc-origin-tag').textContent=e_cc.origin||'—';
   document.getElementById('cc-date-tag').textContent=fmtDate(r.created_at||r.timestamp);
+  // Preenche datas de agendamento/consulta do _ccData
+  const agendTs=(_ccData[ph_cc]&&_ccData[ph_cc].agendTimestamp)||'';
+  const consultaTs=(_ccData[ph_cc]&&_ccData[ph_cc].consultaTimestamp)||'';
+  document.getElementById('cc-agend-data').value=agendTs?agendTs.substring(0,10):'';
+  document.getElementById('cc-agend-hora').value=agendTs?agendTs.substring(11,16)||'08:00':'';
+  document.getElementById('cc-consulta-data').value=consultaTs?consultaTs.substring(0,10):'';
+  document.getElementById('cc-consulta-hora').value=consultaTs?consultaTs.substring(11,16)||'08:00':'';
   var val=parseFloat(r.value||0);
   if(val>0&&d.orcamentos.length===0){
     d.orcamentos.push({status:isFechou(r.stage)?'Aprovado':'Em aberto',avaliador:'',tratamento:'',pagamento:'',parcelas:'',data:(r.created_at||r.timestamp||'').substring(0,10),valor:val,obs:'Importado do Cloudia',entrada:0,entradaData:'',entradaPgto:'',fechamentos:[]});
@@ -2220,6 +2249,37 @@ function openClienteCard(idx){
   document.getElementById('cliente-card-overlay').style.display='block';
 }
 function closeClienteCard(e){if(e.target===document.getElementById('cliente-card-overlay'))document.getElementById('cliente-card-overlay').style.display='none';}
+function salvarDatasCC(){
+  const r=clientesData[_currentClienteIdx];if(!r)return;
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+  const agendData=document.getElementById('cc-agend-data').value;
+  const agendHora=document.getElementById('cc-agend-hora').value||'08:00';
+  const consultaData=document.getElementById('cc-consulta-data').value;
+  const consultaHora=document.getElementById('cc-consulta-hora').value||'08:00';
+  if(agendData)_ccData[ph].agendTimestamp=agendData+'T'+agendHora+':00';
+  if(consultaData)_ccData[ph].consultaTimestamp=consultaData+'T'+consultaHora+':00';
+  // Grava CUSTOMER_STAGE_UPDATED Agendou na planilha se não existir
+  if(agendData){
+    const agendTimestamp=agendData+'T'+agendHora+':00';
+    const jaTemAgend=allCloudiaRows.some(row=>
+      String(row.phone||'').replace(/\D/g,'')=== ph &&
+      row.type==='CUSTOMER_STAGE_UPDATED' && isAgend(row.stage)
+    );
+    if(!jaTemAgend){
+      fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'CUSTOMER_STAGE_UPDATED',_agend_timestamp:agendTimestamp,
+          data:{phone:ph,name:r.name||'',stage:'Agendou',value:0,id:'',
+                created_at:r.created_at||agendTimestamp,ad_data:[],acquisitionOrigin:r.origin||''}
+        })
+      });
+      allCloudiaRows.push({name:r.name||'',phone:ph,origin:r.origin||'',
+        stage:'Agendou',created_at:r.created_at||agendTimestamp,timestamp:agendTimestamp,
+        type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''});
+    }
+  }
+  salvarCRMDebounced();
+}
 function switchCCTab(tab,btn){
   ['orcamentos','atividades','anotacoes'].forEach(t=>document.getElementById('cc-tab-'+t).style.display=t===tab?'block':'none');
   document.querySelectorAll('.cc-tab').forEach(b=>{b.style.color='#8a7a6a';b.style.borderBottomColor='transparent';b.style.fontWeight='400';});
