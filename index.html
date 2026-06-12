@@ -1513,7 +1513,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!ph)return;
     const d=_ccData[ph];
     const orc=d&&d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
-    const dataFech=orc&&orc.data?orc.data:'';
+    const dataFech=orc?(orc.fechData||orc.data||''):'';
     if(dataFech&&dataFech>=_rng.since&&dataFech<=_rng.until)fechadosPhones.add(ph);
   });
   // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — só conta se NÃO está no CSV importado
@@ -1581,7 +1581,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Só adiciona se o phone bate com o filtro de origem
   Object.entries(_ccData||{}).forEach(([ph,d])=>{
     if(!d||!d.orcamentos)return;
-    const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado'&&o.data&&o.data>=_range.since&&o.data<=_range.until);
+    // Usa fechData (data do fechamento) se disponível, senão data do orçamento
+    const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado'&&((o.fechData&&o.fechData>=_range.since&&o.fechData<=_range.until)||((!o.fechData)&&o.data&&o.data>=_range.since&&o.data<=_range.until)));
     if(!temAprovado)return;
     // Verifica origem do phone
     if(_origemFilter){
@@ -1630,9 +1631,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
-      const orcsAprov=d.orcamentos.filter(o=>o.status==='Aprovado'&&o.data>=_range.since&&o.data<=_range.until);
-      orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.valor||0);});
-      if(orcsAprov.length>0){contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)});}
+      // Filtra por data de FECHAMENTO (fechData), não por data do orçamento
+      const orcsAprov=d.orcamentos.filter(o=>{
+        if(o.status!=='Aprovado')return false;
+        const dataRef=o.fechData||o.data||'';
+        return dataRef>=_range.since&&dataRef<=_range.until;
+      });
+      orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.fechValor||o.valor||0);});
+      if(orcsAprov.length>0){contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)});}
     } else if(row){
       const v=parseFloat(row.value||0);
       if(v>0){totalVendasCRM+=v;contratosComValor++;_vendaRows.push({name:nome,ph,value:v});}
@@ -1682,7 +1688,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   } else {
     Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
-      const dataRef=o.fechData||o.entradaData||o.data||'';
+      const dataRef=o.entradaData||o.fechData||o.data||'';
       if(!dataRef)return false;
       return dataRef>=_range.since&&dataRef<=_range.until;
     }).forEach(o=>{
