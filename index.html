@@ -3671,13 +3671,14 @@ function importarFechamentos(){
     const clienteRow=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
     const nomePaciente=clienteRow?clienteRow.name||'—':'—';
     orcs.forEach(o=>{
-      const dataOrc=o.data||o.entradaData||'';
+      // Usa fechData (data do fechamento) para filtrar, fallback para data do orçamento
+      const dataOrc=o.fechData||o.data||o.entradaData||'';
       // Filtra pelo mês selecionado
       if(mesFil&&dataOrc&&dataOrc.substring(0,7)!==mesFil)return;
       const chave=dataOrc+'|'+nomePaciente.toLowerCase();
       if(jaLancados.has(chave)){ignorados++;return;}
-      // Calcula comissões
-      const vt=Number(o.valor)||0;
+      // Calcula comissões — usa valor fechado se disponível
+      const vt=Number(o.fechValor||o.valor)||0;
       const ent=Number(o.entrada)||0;
       const r=calcComissaoRegras(vt,ent);
       const crcParticipou=(o.crcParticip==='sim');
