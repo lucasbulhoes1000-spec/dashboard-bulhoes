@@ -2438,7 +2438,10 @@ function getStatusAgend(stage){
 // MODAL
 let _modalPerPage=0;
 function openModal(title,headers,rows){
-  _modalExportData={headers,rows,allRows:rows};
+  // Detecta coluna de telefone automaticamente (usado para link de card)
+  const phoneColIdx=headers.findIndex(h=>/telefone/i.test(h));
+  const nameColIdx=headers.findIndex(h=>/nome/i.test(h));
+  _modalExportData={headers,rows,allRows:rows,phoneColIdx,nameColIdx};
   _modalPerPage=0;
   document.getElementById('modal-title').textContent=title;
   document.getElementById('modal-thead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
@@ -2455,11 +2458,53 @@ function filterModal(q){
   renderModalRows();
 }
 function renderModalRows(){
-  const {headers,rows}=_modalExportData;
+  const {headers,rows,phoneColIdx,nameColIdx}=_modalExportData;
   const pagina=_modalPerPage===0?rows:rows.slice(0,_modalPerPage);
   document.getElementById('modal-tbody').innerHTML=pagina.length>0
-    ?pagina.map(r=>`<tr>${r.map(c=>`<td>${c||'—'}</td>`).join('')}</tr>`).join('')
+    ?pagina.map(r=>{
+      const phone=phoneColIdx>=0?String(r[phoneColIdx]||'').replace(/\D/g,''):'';
+      return`<tr>${r.map((c,i)=>{
+        // Coluna de nome — adiciona botão de abrir card se tiver telefone
+        if(i===nameColIdx&&phone&&c&&c!=='TOTAL'){
+          const label=String(c||'—');
+          return`<td><span style="display:flex;align-items:center;gap:6px;">${label}<button onclick="abrirCardPorTelefone('${phone}')" title="Abrir card" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:13px;padding:0;line-height:1;" >↗</button></span></td>`;
+        }
+        return`<td>${c||'—'}</td>`;
+      }).join('')}</tr>`;
+    }).join('')
     :`<tr><td colspan="${headers.length}" class="modal-empty">Nenhum registro encontrado</td></tr>`;
+}
+
+function abrirCardPorTelefone(phone){
+  closeModal();
+  // Tenta abrir como cliente primeiro, depois como lead
+  const ph=String(phone||'').replace(/\D/g,'');
+  // Procura em clientesData
+  const ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  if(ciIdx>=0){
+    // Garante que a aba clientes está visível
+    if(currentPage!=='clientes'){
+      const navEl=document.querySelector('[onclick*="clientes"]');
+      if(navEl)switchPage('clientes',navEl);
+      setTimeout(()=>openClienteCard(ciIdx),300);
+    } else {
+      openClienteCard(ciIdx);
+    }
+    return;
+  }
+  // Procura em leadsData
+  const liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  if(liIdx>=0){
+    if(currentPage!=='leads'){
+      const navEl=document.querySelector('[onclick*="leads"]');
+      if(navEl)switchPage('leads',navEl);
+      setTimeout(()=>openLeadCard(liIdx),300);
+    } else {
+      openLeadCard(liIdx);
+    }
+    return;
+  }
+  alert('Lead/cliente não encontrado. Tente recarregar a página.');
 }
 function setModalPerPage(n){
   _modalPerPage=n;
