@@ -1352,6 +1352,16 @@ async function fetchCloudia(){
         });
       }
     });
+    // Aplica consultaTimestamp do CRM em allCloudiaRows
+    // Garante que datas corrigidas pelo usuário persistam após recarregar o Cloudia
+    Object.entries(_ccData).forEach(([ph,d])=>{
+      if(!d.consultaTimestamp)return;
+      allCloudiaRows.forEach(row=>{
+        if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
+          row.timestamp=d.consultaTimestamp;
+        }
+      });
+    });
     sincronizarNomesCRM(rows);
     console.log('[CLOUDIA HEADERS]', h);
     console.log('[CLOUDIA SAMPLE com ad_id]', rows.filter(r=>r.ad_id).slice(0,3).map(r=>({name:r.name,ad_id:r.ad_id,ad_name:r.ad_name})));
