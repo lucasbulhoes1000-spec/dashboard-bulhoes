@@ -1752,6 +1752,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   fechadosPhones.forEach(ph=>{
     let key=phoneAdKeyMap[ph]||null;
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
+    if(!key){
+      // Tenta casar pela origem do lead (ex: #Instagram ADS → anúncio com mais leads no período)
+      const rowCloudia=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      const origLead=(rowCloudia&&rowCloudia.origin||'').toLowerCase();
+      if(origLead.includes('instagram')){
+        // Atribui ao anúncio com mais leads de Instagram no período
+        let bestKey=null,bestLeads=0;
+        Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__'&&d.leads>bestLeads){bestLeads=d.leads;bestKey=k;}});
+        if(bestKey)key=bestKey;
+      }
+    }
     if(!key)key='__sem_rastreio__';
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
     adMap[key].fechou++;
@@ -1759,7 +1770,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     // Valor real do orçamento aprovado
     const ccD=_ccData[ph];
     const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(!o.data||(o.data>=_range.since&&o.data<=_range.until)));
+    const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(()=>{const dr=o.fechData||o.data||'';return!dr||(dr>=_range.since&&dr<=_range.until);})());
     const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
     adMap[key].vendas+=val;
   });
