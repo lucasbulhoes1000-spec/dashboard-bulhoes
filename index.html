@@ -851,20 +851,24 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div>
             <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data agendou</label>
-            <input id="cc-agend-data" type="date" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+            <input id="cc-agend-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
           </div>
           <div>
             <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
-            <input id="cc-agend-hora" type="time" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+            <input id="cc-agend-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
           </div>
           <div>
             <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Data da consulta</label>
-            <input id="cc-consulta-data" type="date" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+            <input id="cc-consulta-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
           </div>
           <div>
             <label style="font-size:10px;color:#8a7a6a;display:block;margin-bottom:3px;">Hora</label>
-            <input id="cc-consulta-hora" type="time" onchange="salvarDatasCC()" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
+            <input id="cc-consulta-hora" type="time" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:6px 8px;font-size:12px;box-sizing:border-box;">
           </div>
+          <div style="margin-top:10px;">
+            <button onclick="salvarDatasCC()" style="width:100%;background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer;">💾 Salvar datas</button>
+          </div>
+          <div id="cc-datas-saved" style="display:none;color:#5a8a6a;font-size:11px;text-align:center;margin-top:6px;">✓ Salvo!</div>
         </div>
       </div>
     </div>
@@ -1457,7 +1461,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho)
   // Usa timestamp (data da consulta) se existir, senão created_at
   const _rangeComp=getRange('trafego');
-  allCloudiaRows.filter(r=>{
+  filterCloudiaByOrigin(allCloudiaRows).filter(r=>{
     if(r.type!=='CUSTOMER_CREATED')return false;
     if(!isComp(r.stage)&&!isFechou(r.stage))return false;
     const ph=String(r.phone||'').replace(/\D/g,'');
@@ -1476,8 +1480,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Contratos: usa data do orçamento aprovado no _ccData (mais preciso que timestamp do evento)
   const _rng=getRange('trafego');
   const fechadosPhones=new Set();
-  // 1. Importados via CSV — usa data do orçamento aprovado
-  allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage)).forEach(r=>{
+  // 1. Importados via CSV — usa data do orçamento aprovado (filtrado por origem)
+  filterCloudiaByOrigin(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage))).forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     if(!ph)return;
     const d=_ccData[ph];
@@ -1547,11 +1551,43 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
 
   // Adiciona em fechadosPhones quem tem orçamento Aprovado no período (mesmo sem Ganho no Cloudia)
+  // Só adiciona se o phone bate com o filtro de origem
   Object.entries(_ccData||{}).forEach(([ph,d])=>{
     if(!d||!d.orcamentos)return;
     const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado'&&o.data&&o.data>=_range.since&&o.data<=_range.until);
-    if(temAprovado)fechadosPhones.add(ph);
+    if(!temAprovado)return;
+    // Verifica origem do phone
+    if(_origemFilter){
+      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')===ph);
+      const org=(row&&row.origin||'').toLowerCase();
+      let match=false;
+      if(_origemFilter==='instagram ads')match=org.includes('instagram');
+      else if(_origemFilter==='organico')match=org.includes('organ');
+      else if(_origemFilter==='facebook ads')match=org.includes('facebook');
+      else if(_origemFilter==='social selling')match=org.includes('social');
+      else match=true;
+      if(!match)return;
+    }
+    fechadosPhones.add(ph);
   });
+
+  // Filtra fechadosPhones vindos do Cloudia pela origem também
+  if(_origemFilter){
+    const phonesOrigemOk=new Set(
+      allCloudiaRows
+        .filter(r=>{
+          const org=(r.origin||'').toLowerCase();
+          if(_origemFilter==='instagram ads')return org.includes('instagram');
+          if(_origemFilter==='organico')return org.includes('organ');
+          if(_origemFilter==='facebook ads')return org.includes('facebook');
+          if(_origemFilter==='social selling')return org.includes('social');
+          return true;
+        })
+        .map(r=>String(r.phone||'').replace(/\D/g,''))
+        .filter(p=>p)
+    );
+    fechadosPhones.forEach(ph=>{if(!phonesOrigemOk.has(ph))fechadosPhones.delete(ph);});
+  }
 
   // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
   contratos=fechadosPhones.size; // atualiza após adicionar aprovados do CRM
@@ -2074,7 +2110,13 @@ function renderClientesPage(){
   const pagina=filtered.slice(start,start+_clientesPerPage);
   // Atualiza cards conforme filtro atual
   const totalC=filtered.length;
-  const totalF=filtered.filter(r=>isFechou(r.stage)).length;
+  // Conta como fechado: stage Ganho OU tem orçamento Aprovado no CRM
+  const totalF=filtered.filter(r=>{
+    if(isFechou(r.stage))return true;
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=_ccData[ph];
+    return d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado');
+  }).length;
   const totalA=totalC-totalF;
   // Valor orçado: soma todos os orçamentos do CRM dos clientes filtrados
   let totalOrcado=0;
@@ -2085,11 +2127,13 @@ function renderClientesPage(){
     if(orcs)orcs.forEach(o=>totalOrcado+=Number(o.valor||0));
     else totalOrcado+=parseFloat(r.value||0);
   });
-  // Valor fechado: só orçamentos aprovados
+  // Valor fechado: orçamentos aprovados de quem é fechado (stage Ganho ou orç aprovado)
   let valorF=0;
-  filtered.filter(r=>isFechou(r.stage)).forEach(r=>{
+  filtered.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=_ccData[ph];
+    const ehFechado=isFechou(r.stage)||(d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado'));
+    if(!ehFechado)return;
     const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
     if(orcs)orcs.filter(o=>o.status==='Aprovado').forEach(o=>valorF+=Number(o.valor||0));
     else valorF+=parseFloat(r.value||0);
@@ -2349,7 +2393,36 @@ function salvarDatasCC(){
   const consultaData=document.getElementById('cc-consulta-data').value;
   const consultaHora=document.getElementById('cc-consulta-hora').value||'08:00';
   if(agendData)_ccData[ph].agendTimestamp=agendData+'T'+agendHora+':00';
-  if(consultaData)_ccData[ph].consultaTimestamp=consultaData+'T'+consultaHora+':00';
+  if(consultaData){
+    const newTs=consultaData+'T'+consultaHora+':00';
+    _ccData[ph].consultaTimestamp=newTs;
+    // Atualiza o timestamp do evento Compareceu/Ganho em allCloudiaRows para refletir a nova data
+    allCloudiaRows.forEach(row=>{
+      if(String(row.phone||'').replace(/\D/g,'')===ph&&(isComp(row.stage)||isFechou(row.stage))){
+        row.timestamp=newTs;
+      }
+    });
+    if(_lastCloudiaRows){
+      _lastCloudiaRows.forEach(row=>{
+        if(String(row.phone||'').replace(/\D/g,'')===ph&&(isComp(row.stage)||isFechou(row.stage))){
+          row.timestamp=newTs;
+        }
+      });
+    }
+  }
+  // Feedback visual
+  const fbEl=document.getElementById('cc-datas-saved');
+  if(fbEl){fbEl.style.display='block';setTimeout(()=>fbEl.style.display='none',2000);}
+  // Re-renderiza dashboard com os novos timestamps
+  if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
+    const filt=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
+    const filtEvts=filterCloudiaByOrigin(filterEventsByRange(_lastCloudiaRows,'trafego'));
+    const filtAgend=filterCloudiaByOrigin(filterAgendByRange(_lastCloudiaRows,'trafego'));
+    _lastCloudiaFiltered=filt;
+    _lastCloudiaFilteredEvents=filtEvts;
+    _lastCloudiaFilteredAgend=filtAgend;
+    renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+  }
   // Grava CUSTOMER_STAGE_UPDATED Agendou na planilha se não existir
   if(agendData){
     const agendTimestamp=agendData+'T'+agendHora+':00';
