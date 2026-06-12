@@ -1216,12 +1216,14 @@ function filterAgendByRange(rows,tab){
     const agendDs=localDateStr(agendD);
     if(agendDs<rng.since||agendDs>rng.until)return;
     
-    // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
+    // Cancela se o último stage for Lead, Perdido, Compareceu ou Ganho
+    // (Compareceu e Ganho já avançaram além do agendamento — não contam como "agendado")
     const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
       .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(stageUpdates.length>0){
       const lastStage=stageUpdates[0].stage;
       if(lastStage==='Lead'||lastStage==='Perdido')return;
+      if(isComp(lastStage)||isFechou(lastStage))return;
     }
     result.push(agendRef);
   });
