@@ -2677,6 +2677,14 @@ function switchCCTab(tab,btn){
 function orcOnStatusChange(val){
   const wrap=document.getElementById('orc-fechamento-wrap');
   wrap.style.display=val==='Aprovado'?'block':'none';
+  // Auto-preenche data de fechamento com hoje se estiver vazia
+  if(val==='Aprovado'){
+    const fechEl=document.getElementById('orc-fech-data');
+    if(fechEl&&!fechEl.value)fechEl.value=new Date().toISOString().split('T')[0];
+    const fechValEl=document.getElementById('orc-fech-valor');
+    const orcValEl=document.getElementById('orc-valor');
+    if(fechValEl&&!fechValEl.value&&orcValEl&&orcValEl.value)fechValEl.value=orcValEl.value;
+  }
 }
 function orcOnEntradaChange(val){
   document.getElementById('orc-entrada-wrap').style.display=val==='sim'?'block':'none';
