@@ -1706,17 +1706,23 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
   if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
   semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
-  // Vendas do sem rastreio: busca no _ccData pelos fechouPhones acumulados
-  let semRastreioVendas=0;
-  (adMap['__sem_rastreio__'].fechouPhones||new Set()).forEach(ph=>{
-    const d=_ccData[ph];const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
-    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
-    semRastreioVendas+=val;
-  });
-  if(semRastreioVendas>0)adMap['__sem_rastreio__'].vendas=semRastreioVendas;
   adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0&&adMap['__sem_rastreio__'].comp===0)delete adMap['__sem_rastreio__'];
+
+  // Recalcula vendas de todos os anúncios usando _ccData (valor real dos orçamentos aprovados)
+  // r.value do Cloudia é impreciso; o valor correto está nos orçamentos aprovados do CRM
+  const _rngAd=getRange('trafego');
+  Object.entries(adMap).forEach(([k,d])=>{
+    let vendaTotal=0;
+    (d.fechouPhones||new Set()).forEach(ph=>{
+      const ccD=_ccData[ph];
+      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(!o.data||(o.data>=_rngAd.since&&o.data<=_rngAd.until)));
+      const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
+      vendaTotal+=val;
+    });
+    d.vendas=vendaTotal;
+  });
 
   window._lastAdMap=adMap;
   // Populate filter dropdowns
