@@ -2964,9 +2964,24 @@ function getRelEventRows(fromId, toId){
   if(!since||!until)return[];
   return allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
-    const d=r.type==='CUSTOMER_CREATED'
-      ?parseCloudiaDate(r.created_at)
-      :parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ccD=_ccData[ph];
+    // Aplica overrides do CRM (consultaTimestamp e agendTimestamp)
+    let ts=r.timestamp;
+    if(ccD&&ccD.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage)))ts=ccD.consultaTimestamp;
+    if(ccD&&ccD.agendTimestamp&&r.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(r.stage))ts=ccD.agendTimestamp;
+    // Para CUSTOMER_CREATED com Compareceu/Ganho: usa consultaTimestamp se disponível
+    let dateToUse;
+    if(r.type==='CUSTOMER_CREATED'){
+      if((isComp(r.stage)||isFechou(r.stage))&&ccD&&ccD.consultaTimestamp){
+        dateToUse=parseCloudiaDate(ccD.consultaTimestamp);
+      } else {
+        dateToUse=parseCloudiaDate(r.created_at);
+      }
+    } else {
+      dateToUse=parseCloudiaDate(ts)||parseCloudiaDate(r.created_at);
+    }
+    const d=dateToUse;
     if(!d)return false;
     return localDateStr(d)>=since&&localDateStr(d)<=until;
   });
