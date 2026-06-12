@@ -2942,28 +2942,33 @@ function initRelDates(fromId, toId){
   document.getElementById(toId).value=localDateStr(now);
 }
 function getRelRows(fromId, toId){
-  const s=new Date(document.getElementById(fromId).value);
-  const u=new Date(document.getElementById(toId).value+'T23:59:59');
-  // Aplica consultaTimestamp do CRM antes de filtrar (mesmo que o dashboard faz)
-  const rowsWithOverrides=allCloudiaRows.map(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph];
-    if(!d)return r;
-    // Aplica consultaTimestamp se existir
-    if(d.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage))){
-      return Object.assign({},r,{timestamp:d.consultaTimestamp});
-    }
-    // Aplica agendTimestamp se existir
-    if(d.agendTimestamp&&r.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(r.stage)){
-      return Object.assign({},r,{timestamp:d.agendTimestamp});
-    }
-    return r;
-  });
-  return rowsWithOverrides.filter(r=>{
+  const since=document.getElementById(fromId).value; // YYYY-MM-DD
+  const until=document.getElementById(toId).value;   // YYYY-MM-DD
+  if(!since||!until)return[];
+  // Usa localDateStr igual ao dashboard — evita problemas de fuso horário
+  return allCloudiaRows.filter(r=>{
+    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const dc=parseCloudiaDate(r.created_at);
     const dt=parseCloudiaDate(r.timestamp);
     const d=dc||dt;
-    return d&&d>=s&&d<=u;
+    if(!d)return false;
+    return localDateStr(d)>=since&&localDateStr(d)<=until;
+  });
+}
+
+// Filtra eventos para relatórios usando timestamp (comp/fechou) ou created_at (leads)
+// Mesma lógica do filterEventsByRange do dashboard
+function getRelEventRows(fromId, toId){
+  const since=document.getElementById(fromId).value;
+  const until=document.getElementById(toId).value;
+  if(!since||!until)return[];
+  return allCloudiaRows.filter(r=>{
+    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
+    const d=r.type==='CUSTOMER_CREATED'
+      ?parseCloudiaDate(r.created_at)
+      :parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
+    if(!d)return false;
+    return localDateStr(d)>=since&&localDateStr(d)<=until;
   });
 }
 
@@ -2995,6 +3000,7 @@ function openROModal(i,type){
 
 function renderRelOrigem(){
   const rows=getRelRows('ro-from','ro-to');
+  const eventRows=getRelEventRows('ro-from','ro-to');
   const origFilt=document.getElementById('ro-origem').value;
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
@@ -3014,22 +3020,27 @@ function renderRelOrigem(){
     if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
     const dc=parseCloudiaDate(r.created_at);
-    const s=new Date(document.getElementById('ro-from').value);
-    const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
-    // Leads: só CUSTOMER_CREATED no período
-    // Também inclui leads importados via _ccData com created_at no período
+    const since_ro=document.getElementById('ro-from').value;
+    const until_ro=document.getElementById('ro-to').value;
+    // Leads: só CUSTOMER_CREATED no período (usa localDateStr igual ao dashboard)
     const isImportado=(!r.type||r.type==='CUSTOMER_CREATED');
-    if(isImportado&&dc&&dc>=s&&dc<=u&&!map[org].leads.has(ph)){
+    if(isImportado&&dc&&localDateStr(dc)>=since_ro&&localDateStr(dc)<=until_ro&&!map[org].leads.has(ph)){
       map[org].leads.add(ph); map[org].leadRows.push(r);
       const v=parseFloat(r.value||0);
       if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
     }
     // Agend/Comp/Fechou: qualquer evento no período (já filtrado por getRelRows via timestamp)
-    const dt=parseCloudiaDate(r.timestamp);
-    const inPeriod=(dt&&dt>=s&&dt<=u)||(dc&&dc>=s&&dc<=u);
-    if(inPeriod&&isAgend(r.stage)&&!map[org].agend.has(ph)){map[org].agend.add(ph);map[org].agendRows.push(r);}
-    if(inPeriod&&isComp(r.stage)&&!map[org].comp.has(ph)){map[org].comp.add(ph);map[org].compRows.push(r);}
-    if(inPeriod&&isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
+    // Para agend/comp/fechou usa eventRows (filtrado por timestamp)
+  });
+  eventRows.forEach(r=>{
+    const org=r.origin||'—';
+    if(origFilt&&org!==origFilt)return;
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    if(!ph)return;
+    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+    if(isAgend(r.stage)&&!map[org].agend.has(ph)){map[org].agend.add(ph);map[org].agendRows.push(r);}
+    if(isComp(r.stage)&&!map[org].comp.has(ph)){map[org].comp.add(ph);map[org].compRows.push(r);}
+    if(isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
       map[org].fechou.add(ph);
       map[org].fechPhones.add(ph);
       map[org].fechRows.push(r);
@@ -3087,7 +3098,8 @@ function initRelComparecidos(){
   if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function renderRelComparecidos(){
-  const rows=getRelRows('rc-from','rc-to');
+  // Usa getRelEventRows para comparecimentos (filtra por timestamp)
+  const rows=getRelEventRows('rc-from','rc-to');
   const origFilt=document.getElementById('rc-origem').value;
   const agendados=rows.filter(r=>(isAgend(r.stage)||isComp(r.stage))&&(!origFilt||(r.origin||'')=== origFilt));
   const distances=[0,1,2,3,4,5,6,17];
