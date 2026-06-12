@@ -288,6 +288,14 @@ tbody tr:hover td{background:#faf7f3;}
             <div style="margin-top:12px;">
               <div class="card">
                 <div class="ctitle">Funil por anúncio</div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                  <select id="ad-filter-campaign" onchange="filterAdTable()" style="border:1px solid #e0d9d0;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:160px;">
+                    <option value="">Todas as campanhas</option>
+                  </select>
+                  <select id="ad-filter-adset" onchange="filterAdTable()" style="border:1px solid #e0d9d0;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:160px;">
+                    <option value="">Todos os conjuntos</option>
+                  </select>
+                </div>
                 <div class="tw">
                   <table>
                     <thead><tr>
@@ -1271,7 +1279,7 @@ async function fetchMeta(){
   try{
     const range=getRange('trafego');
     const tr=encodeURIComponent(JSON.stringify(range));
-    const url=`https://graph.facebook.com/v18.0/${META_ACCOUNT}/insights?fields=ad_id,ad_name,adset_name,spend,impressions,clicks,actions&time_range=${tr}&level=ad&limit=100&access_token=${META_TOKEN}`;
+    const url=`https://graph.facebook.com/v18.0/${META_ACCOUNT}/insights?fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions&time_range=${tr}&level=ad&limit=100&access_token=${META_TOKEN}`;
     const res=await fetch(url);const data=await res.json();
     console.log('[META DEBUG] Status:', res.status, '| data.data length:', data.data?.length, '| error:', data.error?.message||'none', '| range:', range);
     if(data.error)throw new Error(data.error.message);
@@ -1377,7 +1385,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     spend+=parseFloat(ad.spend||0);
     const key=String(ad.ad_id||'').trim();
     if(!key)return;
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',label:ad.ad_name||key,phones:new Set()};
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',campaign:ad.campaign_name||'',label:ad.ad_name||key,phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
     adMap[key].spend+=parseFloat(ad.spend||0);
     if(ad.ad_name)adNameMap[norm(ad.ad_name)]=key;
   });
@@ -1417,25 +1425,26 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const key=findAdKey(r);
     if(key){const ph=String(r.phone||'').replace(/\D/g,'');if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
   });
-  // STEP 5: Conta eventos do período
+  // STEP 5: Conta eventos do período — deduplicado por telefone por anúncio
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
-  const seenEventPhone=new Set();
+  const seenAdPhone={agend:{},comp:{},fechou:{}};
   evtsParaFunil.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
-    // Tenta casar pelo ad_id/ad_name do próprio evento, senão usa o mapa phone→adKey
     let matchKey=null;
     for(const [k,d] of Object.entries(adMap)){if(d.phones&&d.phones.has(ph)){matchKey=k;break;}}
     if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
+    const target=matchKey?adMap[matchKey]:null;
     if(!matchKey){
-      if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',label:'⚠ Sem rastreamento',phones:new Set()};
-      if(isAgend(r.stage)||isFaltou(r.stage))adMap['__sem_rastreio__'].agend++;
-      if(isComp(r.stage))adMap['__sem_rastreio__'].comp++;
-      if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){seenEventPhone.add(ph+'_fechou');adMap['__sem_rastreio__'].fechou++;adMap['__sem_rastreio__'].vendas+=parseFloat(r.value||0);}
-      return;
+      if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
     }
-    if(isAgend(r.stage)||isFaltou(r.stage))adMap[matchKey].agend++;
-    if(isComp(r.stage))adMap[matchKey].comp++;
-    if(isFechou(r.stage)&&!seenEventPhone.has(ph+'_fechou')){seenEventPhone.add(ph+'_fechou');adMap[matchKey].fechou++;adMap[matchKey].vendas+=parseFloat(r.value||0);}
+    const key=matchKey||'__sem_rastreio__';
+    const d=adMap[key];
+    if(!seenAdPhone.agend[key])seenAdPhone.agend[key]=new Set();
+    if(!seenAdPhone.comp[key])seenAdPhone.comp[key]=new Set();
+    if(!seenAdPhone.fechou[key])seenAdPhone.fechou[key]=new Set();
+    if((isAgend(r.stage)||isFaltou(r.stage))&&!seenAdPhone.agend[key].has(ph)){seenAdPhone.agend[key].add(ph);d.agend++;}
+    if(isComp(r.stage)&&!seenAdPhone.comp[key].has(ph)){seenAdPhone.comp[key].add(ph);d.comp++;d.compPhones.add(ph);}
+    if(isFechou(r.stage)&&!seenAdPhone.fechou[key].has(ph)){seenAdPhone.fechou[key].add(ph);d.fechou++;d.fechouPhones.add(ph);d.vendas+=parseFloat(r.value||0);}
   });
   Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p))).size;});
 
@@ -1701,8 +1710,26 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0)delete adMap['__sem_rastreio__'];
 
   window._lastAdMap=adMap;
-  const adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
-  // Linha de totais
+  // Populate filter dropdowns
+  const allCampaigns=[...new Set(Object.values(adMap).map(d=>d.campaign||'').filter(c=>c&&c!=='⚠ Sem rastreamento'))].sort();
+  const allAdsets=[...new Set(Object.values(adMap).map(d=>d.adset||'').filter(a=>a))].sort();
+  const campSel=document.getElementById('ad-filter-campaign');
+  const adsetSel=document.getElementById('ad-filter-adset');
+  if(campSel){const prev=campSel.value;campSel.innerHTML='<option value="">Todas as campanhas</option>'+allCampaigns.map(c=>`<option value="${c}"${c===prev?' selected':''}>${c}</option>`).join('');
+  }
+  if(adsetSel){const prev=adsetSel.value;adsetSel.innerHTML='<option value="">Todos os conjuntos</option>'+allAdsets.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');}
+  // Renderiza respeitando filtros ativos
+  filterAdTable();
+}
+
+// ===== FILTER AD TABLE =====
+function filterAdTable(){
+  const adMap=window._lastAdMap;if(!adMap)return;
+  const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
+  const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
+  let adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
+  if(campFilt)adRows=adRows.filter(([,d])=>d.campaign===campFilt);
+  if(adsetFilt)adRows=adRows.filter(([,d])=>d.adset===adsetFilt);
   const totSpend=adRows.reduce((s,[,d])=>s+(d.spend||0),0);
   const totLeads=adRows.reduce((s,[,d])=>s+(d.leads||0),0);
   const totAgend=adRows.reduce((s,[,d])=>s+(d.agend||0),0);
@@ -1737,17 +1764,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       <td class="tm">${(d.adset||'').substring(0,20)}</td>
       <td style="text-align:right" class="ta">${fmtK(d.spend)}</td>
       <td style="text-align:right" class="ta">${d.leads>0?fmt(adCpl):'—'}</td>
-      <td style="text-align:right">${d.leads>0?d.leads+' <button class="lupa" onclick="lupaAdLeads(\''+name+'\')" title="Ver leads">🔍</button>':'—'}</td>
-      <td style="text-align:right">${d.agend>0?d.agend+' <button class="lupa" onclick="lupaAdAgend(\''+name+'\')" title="Ver agendamentos">🔍</button>':'—'}</td>
+      <td style="text-align:right">${d.leads>0?d.leads+' <button class="lupa" onclick="lupaAdLeads(\''+name+'\')">🔍</button>':'—'}</td>
+      <td style="text-align:right">${d.agend>0?d.agend+' <button class="lupa" onclick="lupaAdAgend(\''+name+'\')">🔍</button>':'—'}</td>
       <td style="text-align:right" class="ta">${d.agend>0?fmt(adCpa):'—'}</td>
-      <td style="text-align:right">${d.comp||'—'}</td>
+      <td style="text-align:right">${d.comp>0?d.comp+' <button class="lupa" onclick="lupaAdComp(\''+name+'\')" title="Ver comparecimentos">🔍</button>':'—'}</td>
       <td style="text-align:right" class="ta">${d.comp>0?fmt(adCpcomp):'—'}</td>
-      <td style="text-align:right" class="tg">${d.fechou||'—'}</td>
+      <td style="text-align:right" class="tg">${d.fechou>0?d.fechou+' <button class="lupa" onclick="lupaAdFechou(\''+name+'\')" title="Ver fechamentos">🔍</button>':'—'}</td>
       <td style="text-align:right" class="ta">${d.fechou>0?fmt(adCpc):'—'}</td>
-      <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas):'—'}</td>
+      <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas)+' <button class="lupa" onclick="lupaAdVendas(\''+name+'\')" title="Ver vendas">🔍</button>':'—'}</td>
       <td style="text-align:right" class="tg">${adTicket>0?fmt(adTicket):'—'}</td>
     </tr>`;
-  }).join('')+totalRow:'<tr><td colspan="13" class="empty-state">Aguardando dados dos anúncios...</td></tr>';
+  }).join('')+totalRow:'<tr><td colspan="13" class="empty-state">Nenhum anúncio encontrado</td></tr>';
 }
 
 // ===== SOCIAL SELLING =====
@@ -2303,6 +2330,57 @@ function lupaAdAgend(adKey){
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
     .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',getStatusAgend(e.stage),fmtDate(e.timestamp)];});
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
+}
+function lupaAdComp(adKey){
+  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
+  const label=adInfo?(adInfo.label||adKey):adKey;
+  const adPhones=adInfo&&adInfo.compPhones?adInfo.compPhones:new Set();
+  const phoneMap={};
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    return (isComp(r.stage)||isFechou(r.stage))&&adPhones.has(ph);
+  }).forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    if(!phoneMap[ph])phoneMap[ph]=r;
+  });
+  const rows=Object.values(phoneMap)
+    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
+    .map(r=>{const e=applyEdits(r);const ph=String(e.phone||'').replace(/\D/g,'');const consultaTs=(_ccData[ph]&&_ccData[ph].consultaTimestamp)||e.timestamp||'';return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(consultaTs)];});
+  openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
+}
+function lupaAdFechou(adKey){
+  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
+  const label=adInfo?(adInfo.label||adKey):adKey;
+  const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
+  const phoneMap={};
+  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    return isFechou(r.stage)&&adPhones.has(ph);
+  }).forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    if(!phoneMap[ph])phoneMap[ph]=r;
+  });
+  const rows=Object.values(phoneMap)
+    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
+    .map(r=>{const e=applyEdits(r);const ph=String(e.phone||'').replace(/\D/g,'');const d=_ccData[ph]||{};const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');const valFech=orc?fmt(Number(orc.valor||0)):'—';return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',valFech];});
+  openModal('Fechamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Valor fechado'],rows);
+}
+function lupaAdVendas(adKey){
+  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
+  const label=adInfo?(adInfo.label||adKey):adKey;
+  const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
+  const rows=[];let total=0;
+  adPhones.forEach(ph=>{
+    const d=_ccData[ph]||{};
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const nome=(d.nomeAtual)||(row&&row.name)||'—';
+    const orcsAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado');
+    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
+    if(val>0){total+=val;rows.push([nome,ph,fmt(val)]);}
+  });
+  rows.sort((a,b)=>parseFloat(b[2].replace(/\D/g,''))-parseFloat(a[2].replace(/\D/g,'')));
+  rows.push(['TOTAL','',fmt(total)]);
+  openModal('Vendas — '+label.substring(0,30),['Nome','Telefone','Valor Fechado'],rows);
 }
 function getStatusAgend(stage){
   if(!stage)return'—';const s=stage.toLowerCase();
