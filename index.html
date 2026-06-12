@@ -246,7 +246,7 @@ tbody tr:hover td{background:#faf7f3;}
               <option value="">Todas as origens</option>
               <option value="instagram ads">#Instagram ADS</option>
               <option value="organico">#Orgânico</option>
-              <option value="facebook ads">#Facebook ADS</option>
+              <option value="indicacao">#Indicação</option>
               <option value="social selling">#Social Selling</option>
             </select>
             <span style="font-size:11px;color:#b5a898;" id="origem-count"></span>
@@ -1563,7 +1563,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       let match=false;
       if(_origemFilter==='instagram ads')match=org.includes('instagram');
       else if(_origemFilter==='organico')match=org.includes('organ');
-      else if(_origemFilter==='facebook ads')match=org.includes('facebook');
+      else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
       else match=true;
       if(!match)return;
@@ -1579,7 +1579,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
           const org=(r.origin||'').toLowerCase();
           if(_origemFilter==='instagram ads')return org.includes('instagram');
           if(_origemFilter==='organico')return org.includes('organ');
-          if(_origemFilter==='facebook ads')return org.includes('facebook');
+          if(_origemFilter==='indicacao')return org.includes('indica');
           if(_origemFilter==='social selling')return org.includes('social');
           return true;
         })
@@ -1864,7 +1864,7 @@ function filterCloudiaByOrigin(rows){
     const org=(r.origin||'').toLowerCase();
     if(_origemFilter==='instagram ads')return org.includes('instagram');
     if(_origemFilter==='organico')return org.includes('organ');
-    if(_origemFilter==='facebook ads')return org.includes('facebook');
+    if(_origemFilter==='indicacao')return org.includes('indica');
     if(_origemFilter==='social selling')return org.includes('social');
     return true;
   });
@@ -2409,10 +2409,18 @@ function salvarDatasCC(){
         }
       });
     }
+    // Atualiza clientesData (tabela de clientes) para refletir nova data
+    clientesData.forEach(row=>{
+      if(String(row.phone||'').replace(/\D/g,'')===ph){
+        row.timestamp=newTs;
+      }
+    });
   }
   // Feedback visual
   const fbEl=document.getElementById('cc-datas-saved');
   if(fbEl){fbEl.style.display='block';setTimeout(()=>fbEl.style.display='none',2000);}
+  // Atualiza a tabela de clientes imediatamente
+  filterClientesTable();
   // Re-renderiza dashboard com os novos timestamps
   if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
     const filt=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
