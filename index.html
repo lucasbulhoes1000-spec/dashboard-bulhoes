@@ -1699,8 +1699,42 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       <span style="font-size:10px;color:#b5a898;width:32px;text-align:right;">${Math.round(n/totalO*100)}%</span>
     </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
 
-  // Funil por anúncio
-  // Leads sem rastreamento (não casaram com nenhum anúncio)
+  // Funil por anúncio — reconcilia comp e fechou com as fontes corretas
+  // (filteredEvents usa timestamp bruto; _lastCompPhones e fechadosPhones já usam
+  //  consultaTimestamp do CRM e orçamentos aprovados — mais precisos)
+
+  // COMP: para cada phone em _lastCompPhones, atribui ao adKey correspondente
+  // Zera comp/compPhones antes de reconciliar
+  Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
+  const _reconCompPhones=window._lastCompPhones||new Set();
+  _reconCompPhones.forEach(ph=>{
+    let key=phoneAdKeyMap[ph]||null;
+    if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
+    if(!key)key='__sem_rastreio__';
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+    adMap[key].comp++;
+    adMap[key].compPhones.add(ph);
+  });
+
+  // FECHOU + VENDAS: para cada phone em fechadosPhones, atribui ao adKey correspondente
+  // Zera fechou/fechouPhones/vendas antes de reconciliar
+  Object.values(adMap).forEach(d=>{d.fechou=0;d.fechouPhones=new Set();d.vendas=0;});
+  fechadosPhones.forEach(ph=>{
+    let key=phoneAdKeyMap[ph]||null;
+    if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
+    if(!key)key='__sem_rastreio__';
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+    adMap[key].fechou++;
+    adMap[key].fechouPhones.add(ph);
+    // Valor real do orçamento aprovado
+    const ccD=_ccData[ph];
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(!o.data||(o.data>=_range.since&&o.data<=_range.until)));
+    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
+    adMap[key].vendas+=val;
+  });
+
+  // Leads sem rastreamento
   const trackeadosPhones=new Set();
   Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__')(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p));});
   const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
@@ -1708,21 +1742,6 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
   adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0&&adMap['__sem_rastreio__'].comp===0)delete adMap['__sem_rastreio__'];
-
-  // Recalcula vendas de todos os anúncios usando _ccData (valor real dos orçamentos aprovados)
-  // r.value do Cloudia é impreciso; o valor correto está nos orçamentos aprovados do CRM
-  const _rngAd=getRange('trafego');
-  Object.entries(adMap).forEach(([k,d])=>{
-    let vendaTotal=0;
-    (d.fechouPhones||new Set()).forEach(ph=>{
-      const ccD=_ccData[ph];
-      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-      const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(!o.data||(o.data>=_rngAd.since&&o.data<=_rngAd.until)));
-      const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
-      vendaTotal+=val;
-    });
-    d.vendas=vendaTotal;
-  });
 
   window._lastAdMap=adMap;
   // Populate filter dropdowns
