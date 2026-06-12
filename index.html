@@ -2956,11 +2956,14 @@ function getRelRows(fromId, toId){
 // ── MÉTRICAS DE ORIGEM ────────────────────────────────────
 function initRelOrigem(){
   initRelDates('ro-from','ro-to');
-  // Popula origens
-  const sel=document.getElementById('ro-origem');
-  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
-  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
-  renderRelOrigem();
+  const doRender=()=>{
+    const sel=document.getElementById('ro-origem');
+    const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+    sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+    populateDynamicSelects();
+    renderRelOrigem();
+  };
+  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function openROModal(i,type){
   if(!window._roData||!window._roData[i]){alert('Dados não encontrados. Clique em Filtrar e tente novamente.');return;}
@@ -3059,10 +3062,13 @@ function renderRelOrigem(){
 // ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
 function initRelComparecidos(){
   initRelDates('rc-from','rc-to');
-  const sel=document.getElementById('rc-origem');
-  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
-  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
-  renderRelComparecidos();
+  const doRender=()=>{
+    const sel=document.getElementById('rc-origem');
+    const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+    sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+    renderRelComparecidos();
+  };
+  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function renderRelComparecidos(){
   const rows=getRelRows('rc-from','rc-to');
@@ -3079,6 +3085,7 @@ function renderRelComparecidos(){
     if(!dc||!dt)return;
     const ph=String(r.phone||'').replace(/\D/g,'');
     const diff=Math.round((dt-dc)/(1000*60*60*24));
+    if(diff<0)return; // ignora distâncias negativas (data consulta antes do cadastro)
     const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
     if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
     if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(r);}
@@ -3112,10 +3119,14 @@ function openRCModal(i,type){
 // ── ORÇAMENTOS FECHADOS ───────────────────────────────────
 function initRelOrcamentos(){
   initRelDates('rof-from','rof-to');
-  const sel=document.getElementById('rof-origem');
-  const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
-  sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
-  renderRelOrcamentos();
+  const doRender=()=>{
+    const sel=document.getElementById('rof-origem');
+    const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
+    sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+    populateDynamicSelects();
+    renderRelOrcamentos();
+  };
+  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function renderRelOrcamentos(){
   const s=new Date(document.getElementById('rof-from').value);
@@ -3128,7 +3139,8 @@ function renderRelOrcamentos(){
   Object.entries(_ccData).forEach(([ph,d])=>{
     (d.orcamentos||[]).forEach(o=>{
       if(o.status!=='Aprovado')return;
-      const dataOrc=new Date(o.data||'');
+      const dataOrcStr=o.fechData||o.data||'';
+      const dataOrc=new Date(dataOrcStr);
       if(isNaN(dataOrc)||dataOrc<s||dataOrc>u)return;
       const av=o.avaliador||'Sem avaliador';
       if(avalFilt&&av!==avalFilt)return;
