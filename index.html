@@ -1352,15 +1352,23 @@ async function fetchCloudia(){
         });
       }
     });
-    // Aplica consultaTimestamp do CRM em allCloudiaRows
+    // Aplica consultaTimestamp e agendTimestamp do CRM em allCloudiaRows
     // Garante que datas corrigidas pelo usuário persistam após recarregar o Cloudia
     Object.entries(_ccData).forEach(([ph,d])=>{
-      if(!d.consultaTimestamp)return;
-      allCloudiaRows.forEach(row=>{
-        if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
-          row.timestamp=d.consultaTimestamp;
-        }
-      });
+      if(d.consultaTimestamp){
+        allCloudiaRows.forEach(row=>{
+          if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
+            row.timestamp=d.consultaTimestamp;
+          }
+        });
+      }
+      if(d.agendTimestamp){
+        allCloudiaRows.forEach(row=>{
+          if(String(row.phone||'').replace(/\D/g,'')=== ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(row.stage)){
+            row.timestamp=d.agendTimestamp;
+          }
+        });
+      }
     });
     sincronizarNomesCRM(rows);
     console.log('[CLOUDIA HEADERS]', h);
@@ -2617,24 +2625,40 @@ function salvarDatasCC(){
     _lastCloudiaFilteredAgend=filtAgend;
     renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
   }
-  // Grava CUSTOMER_STAGE_UPDATED Agendou na planilha se não existir
+  // Atualiza ou cria evento Agendou com a nova data
   if(agendData){
     const agendTimestamp=agendData+'T'+agendHora+':00';
-    const jaTemAgend=allCloudiaRows.some(row=>
+    const agendRow=allCloudiaRows.find(row=>
       String(row.phone||'').replace(/\D/g,'')=== ph &&
       row.type==='CUSTOMER_STAGE_UPDATED' && isAgend(row.stage)
     );
-    if(!jaTemAgend){
-      fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({type:'CUSTOMER_STAGE_UPDATED',_agend_timestamp:agendTimestamp,
-          data:{phone:ph,name:r.name||'',stage:'Agendou',value:0,id:'',
-                created_at:r.created_at||agendTimestamp,ad_data:[],acquisitionOrigin:r.origin||''}
-        })
-      });
+    if(agendRow){
+      // Já existe — só atualiza o timestamp em memória
+      agendRow.timestamp=agendTimestamp;
+      if(_lastCloudiaRows){
+        const lr=_lastCloudiaRows.find(row=>
+          String(row.phone||'').replace(/\D/g,'')=== ph &&
+          row.type==='CUSTOMER_STAGE_UPDATED' && isAgend(row.stage)
+        );
+        if(lr)lr.timestamp=agendTimestamp;
+      }
+    } else {
+      // Não existe — adiciona só em memória (não altera planilha)
       allCloudiaRows.push({name:r.name||'',phone:ph,origin:r.origin||'',
         stage:'Agendou',created_at:r.created_at||agendTimestamp,timestamp:agendTimestamp,
         type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:''});
     }
+    // Re-renderiza o dashboard para refletir a nova data de agendamento
+    if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
+      const filt=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
+      const filtEvts=filterCloudiaByOrigin(filterEventsByRange(_lastCloudiaRows,'trafego'));
+      const filtAgend=filterCloudiaByOrigin(filterAgendByRange(_lastCloudiaRows,'trafego'));
+      _lastCloudiaFiltered=filt;
+      _lastCloudiaFilteredEvents=filtEvts;
+      _lastCloudiaFilteredAgend=filtAgend;
+      renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+    }
+    filterClientesTable();
   }
   salvarCRMDebounced();
 }
