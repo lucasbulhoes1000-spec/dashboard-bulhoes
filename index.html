@@ -1686,20 +1686,26 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   if(_entradaManual!=null){
     totalEntradas=_entradaManual;
   } else {
-    Object.values(_ccData||{}).forEach(d=>(d.orcamentos||[]).filter(o=>{
+    const _entradaRows=[];
+    Object.entries(_ccData||{}).forEach(([ph,d])=>(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
       const dataRef=o.entradaData||o.fechData||o.data||'';
       if(!dataRef)return false;
       return dataRef>=_range.since&&dataRef<=_range.until;
     }).forEach(o=>{
-      // Novo formato: entrada salva em o.entrada (campo direto)
       const entVal=Number(o.entrada||0);
-      if(entVal>0)totalEntradas+=entVal;
+      if(entVal>0){
+        totalEntradas+=entVal;
+        const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        const nome=(d.nomeAtual)||(row&&row.name)||'—';
+        _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||''});
+      }
     }));
+    window._lastEntradaRows=_entradaRows;
   }
   const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
-  document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag;
+  document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
 
   // Funil visual
   const maxF=Math.max(leadsBase,agend,comp,contratos,1);
@@ -2327,6 +2333,13 @@ function lupaVendas(){
   openModal('Vendas — '+sorted.length+' contratos',['Nome','Telefone','Valor Fechado'],tableRows);
 }
 
+function lupaEntradas(){
+  const rows=(window._lastEntradaRows||[]).slice().sort((a,b)=>b.value-a.value);
+  const total=rows.reduce((s,r)=>s+r.value,0);
+  const tableRows=rows.map(r=>[r.data?new Date(r.data+'T12:00').toLocaleDateString('pt-BR'):'—',r.name,r.ph,fmt(r.value),r.pgto||'—']);
+  tableRows.push(['','TOTAL','',fmt(total),'']);
+  openModal('Entradas — '+rows.length+' registros',['Data','Nome','Telefone','Valor','Pgto'],tableRows);
+}
 function lupaContratos(){
   // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
   const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>{
