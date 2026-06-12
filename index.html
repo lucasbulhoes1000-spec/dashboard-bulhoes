@@ -3386,7 +3386,9 @@ function calcComissaoRegras(valorTrat,entrada){
   if(!valorTrat||valorTrat<=0)return{pct:0,comAval:0,comCrc:0,regra:''};
   const pct=entrada/valorTrat;
   let txAval=0,txCrc=0,regra='';
-  if(pct<0.1){txAval=0;txCrc=0;regra='Abaixo de 10% — sem comissão CRC';}
+  // Avaliador: 0-19,99% → 2%, 20-29,99% → 3%, ≥30% → 4%
+  // CRC:       <10% → 0%, 10-19,99% → 0,5%, 20-29,99% → 0,8%, ≥30% → 1%
+  if(pct<0.1){txAval=0.02;txCrc=0;regra='Abaixo de 10% → Aval: 2% | CRC: sem comissão';}
   else if(pct<0.2){txAval=0.02;txCrc=0.005;regra='10-19,99% entrada → Aval: 2% | CRC: 0,5%';}
   else if(pct<0.3){txAval=0.03;txCrc=0.008;regra='20-29,99% entrada → Aval: 3% | CRC: 0,8%';}
   else{txAval=0.04;txCrc=0.01;regra='≥30% entrada → Aval: 4% | CRC: 1%';}
