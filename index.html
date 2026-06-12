@@ -2944,8 +2944,22 @@ function initRelDates(fromId, toId){
 function getRelRows(fromId, toId){
   const s=new Date(document.getElementById(fromId).value);
   const u=new Date(document.getElementById(toId).value+'T23:59:59');
-  // Usa created_at para leads, timestamp para eventos
-  return allCloudiaRows.filter(r=>{
+  // Aplica consultaTimestamp do CRM antes de filtrar (mesmo que o dashboard faz)
+  const rowsWithOverrides=allCloudiaRows.map(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=_ccData[ph];
+    if(!d)return r;
+    // Aplica consultaTimestamp se existir
+    if(d.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage))){
+      return Object.assign({},r,{timestamp:d.consultaTimestamp});
+    }
+    // Aplica agendTimestamp se existir
+    if(d.agendTimestamp&&r.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(r.stage)){
+      return Object.assign({},r,{timestamp:d.agendTimestamp});
+    }
+    return r;
+  });
+  return rowsWithOverrides.filter(r=>{
     const dc=parseCloudiaDate(r.created_at);
     const dt=parseCloudiaDate(r.timestamp);
     const d=dc||dt;
@@ -3002,8 +3016,10 @@ function renderRelOrigem(){
     const dc=parseCloudiaDate(r.created_at);
     const s=new Date(document.getElementById('ro-from').value);
     const u=new Date(document.getElementById('ro-to').value+'T23:59:59');
-    // Leads: só CUSTOMER_CREATED no período, mas aceita qualquer type se phone ainda não foi contado
-    if(r.type==='CUSTOMER_CREATED'&&dc&&dc>=s&&dc<=u&&!map[org].leads.has(ph)){
+    // Leads: só CUSTOMER_CREATED no período
+    // Também inclui leads importados via _ccData com created_at no período
+    const isImportado=(!r.type||r.type==='CUSTOMER_CREATED');
+    if(isImportado&&dc&&dc>=s&&dc<=u&&!map[org].leads.has(ph)){
       map[org].leads.add(ph); map[org].leadRows.push(r);
       const v=parseFloat(r.value||0);
       if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
