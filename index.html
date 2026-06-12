@@ -2477,34 +2477,53 @@ function renderModalRows(){
 
 function abrirCardPorTelefone(phone){
   closeModal();
-  // Tenta abrir como cliente primeiro, depois como lead
   const ph=String(phone||'').replace(/\D/g,'');
-  // Procura em clientesData
-  const ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+
+  // Garante que clientesData e leadsData estão populados
+  if(!clientesData.length)renderClientesTable();
+  if(!leadsData.length)renderLeadsTable();
+
+  // Tenta em clientesData (compareceu/ganho)
+  let ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
   if(ciIdx>=0){
-    // Garante que a aba clientes está visível
-    if(currentPage!=='clientes'){
-      const navEl=document.querySelector('[onclick*="clientes"]');
-      if(navEl)switchPage('clientes',navEl);
-      setTimeout(()=>openClienteCard(ciIdx),300);
-    } else {
-      openClienteCard(ciIdx);
-    }
+    const navEl=document.querySelector('[onclick*=\'clientes\']');
+    if(currentPage!=='clientes'&&navEl)switchPage('clientes',navEl);
+    setTimeout(()=>openClienteCard(ciIdx),currentPage!=='clientes'?350:0);
     return;
   }
-  // Procura em leadsData
-  const liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+
+  // Tenta em leadsData
+  let liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
   if(liIdx>=0){
-    if(currentPage!=='leads'){
-      const navEl=document.querySelector('[onclick*="leads"]');
-      if(navEl)switchPage('leads',navEl);
-      setTimeout(()=>openLeadCard(liIdx),300);
+    const navEl=document.querySelector('[onclick*=\'leads\']');
+    if(currentPage!=='leads'&&navEl)switchPage('leads',navEl);
+    setTimeout(()=>openLeadCard(liIdx),currentPage!=='leads'?350:0);
+    return;
+  }
+
+  // Fallback: busca em allCloudiaRows e popula as listas
+  const rowInCloudia=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  if(rowInCloudia){
+    const isCliente=isComp(rowInCloudia.stage)||isFechou(rowInCloudia.stage);
+    if(isCliente){
+      const navEl=document.querySelector('[onclick*=\'clientes\']');
+      if(navEl)switchPage('clientes',navEl);
+      setTimeout(()=>{
+        ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        if(ciIdx>=0)openClienteCard(ciIdx);
+      },500);
     } else {
-      openLeadCard(liIdx);
+      const navEl=document.querySelector('[onclick*=\'leads\']');
+      if(navEl)switchPage('leads',navEl);
+      setTimeout(()=>{
+        liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        if(liIdx>=0)openLeadCard(liIdx);
+      },500);
     }
     return;
   }
-  alert('Lead/cliente não encontrado. Tente recarregar a página.');
+
+  alert('Lead/cliente não encontrado.');
 }
 function setModalPerPage(n){
   _modalPerPage=n;
