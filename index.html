@@ -3022,9 +3022,9 @@ function renderRelOrigem(){
     const dc=parseCloudiaDate(r.created_at);
     const since_ro=document.getElementById('ro-from').value;
     const until_ro=document.getElementById('ro-to').value;
-    // Leads: só CUSTOMER_CREATED no período (usa localDateStr igual ao dashboard)
-    const isImportado=(!r.type||r.type==='CUSTOMER_CREATED');
-    if(isImportado&&dc&&localDateStr(dc)>=since_ro&&localDateStr(dc)<=until_ro&&!map[org].leads.has(ph)){
+    // Leads: qualquer row com created_at no período, dedup por telefone
+    // (mesmo comportamento que filterByRange do dashboard)
+    if(dc&&localDateStr(dc)>=since_ro&&localDateStr(dc)<=until_ro&&!map[org].leads.has(ph)){
       map[org].leads.add(ph); map[org].leadRows.push(r);
       const v=parseFloat(r.value||0);
       if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
