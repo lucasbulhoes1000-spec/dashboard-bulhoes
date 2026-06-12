@@ -1216,14 +1216,12 @@ function filterAgendByRange(rows,tab){
     const agendDs=localDateStr(agendD);
     if(agendDs<rng.since||agendDs>rng.until)return;
     
-    // Cancela se o último stage for Lead, Perdido, Compareceu ou Ganho
-    // (Compareceu e Ganho já avançaram além do agendamento — não contam como "agendado")
+    // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
     const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
       .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(stageUpdates.length>0){
       const lastStage=stageUpdates[0].stage;
       if(lastStage==='Lead'||lastStage==='Perdido')return;
-      if(isComp(lastStage)||isFechou(lastStage))return;
     }
     result.push(agendRef);
   });
@@ -1353,16 +1351,6 @@ async function fetchCloudia(){
           timestamp:d.timestamp||d.created_at||'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
         });
       }
-    });
-    // Aplica consultaTimestamp do CRM em allCloudiaRows
-    // Garante que datas corrigidas pelo usuário persistam após recarregar o Cloudia
-    Object.entries(_ccData).forEach(([ph,d])=>{
-      if(!d.consultaTimestamp)return;
-      allCloudiaRows.forEach(row=>{
-        if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
-          row.timestamp=d.consultaTimestamp;
-        }
-      });
     });
     sincronizarNomesCRM(rows);
     console.log('[CLOUDIA HEADERS]', h);
@@ -1711,47 +1699,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       <span style="font-size:10px;color:#b5a898;width:32px;text-align:right;">${Math.round(n/totalO*100)}%</span>
     </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
 
-  // Funil por anúncio — reconcilia comp e fechou com as fontes corretas
-  // (filteredEvents usa timestamp bruto; _lastCompPhones e fechadosPhones já usam
-  //  consultaTimestamp do CRM e orçamentos aprovados — mais precisos)
-
-  // COMP: para cada phone em _lastCompPhones, atribui ao adKey correspondente
-  // Zera comp/compPhones antes de reconciliar
-  Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
-  const _reconCompPhones=window._lastCompPhones||new Set();
-  _reconCompPhones.forEach(ph=>{
-    let key=phoneAdKeyMap[ph]||null;
-    if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
-    if(!key)key='__sem_rastreio__';
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
-    adMap[key].comp++;
-    adMap[key].compPhones.add(ph);
-  });
-
-  // FECHOU + VENDAS: para cada phone em fechadosPhones, atribui ao adKey correspondente
-  // Zera fechou/fechouPhones/vendas antes de reconciliar
-  Object.values(adMap).forEach(d=>{d.fechou=0;d.fechouPhones=new Set();d.vendas=0;});
-  fechadosPhones.forEach(ph=>{
-    let key=phoneAdKeyMap[ph]||null;
-    if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
-    if(!key)key='__sem_rastreio__';
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
-    adMap[key].fechou++;
-    adMap[key].fechouPhones.add(ph);
-    // Valor real do orçamento aprovado
-    const ccD=_ccData[ph];
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(!o.data||(o.data>=_range.since&&o.data<=_range.until)));
-    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
-    adMap[key].vendas+=val;
-  });
-
-  // Leads sem rastreamento
+  // Funil por anúncio
+  // Leads sem rastreamento (não casaram com nenhum anúncio)
   const trackeadosPhones=new Set();
   Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__')(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p));});
   const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
   if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
   semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
+  // Vendas do sem rastreio: busca no _ccData pelos fechouPhones acumulados
+  let semRastreioVendas=0;
+  (adMap['__sem_rastreio__'].fechouPhones||new Set()).forEach(ph=>{
+    const d=_ccData[ph];const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
+    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
+    semRastreioVendas+=val;
+  });
+  if(semRastreioVendas>0)adMap['__sem_rastreio__'].vendas=semRastreioVendas;
   adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0&&adMap['__sem_rastreio__'].comp===0)delete adMap['__sem_rastreio__'];
 
@@ -3398,9 +3361,7 @@ function calcComissaoRegras(valorTrat,entrada){
   if(!valorTrat||valorTrat<=0)return{pct:0,comAval:0,comCrc:0,regra:''};
   const pct=entrada/valorTrat;
   let txAval=0,txCrc=0,regra='';
-  // Avaliador: 0-19,99% → 2%, 20-29,99% → 3%, ≥30% → 4%
-  // CRC:       <10% → 0%, 10-19,99% → 0,5%, 20-29,99% → 0,8%, ≥30% → 1%
-  if(pct<0.1){txAval=0.02;txCrc=0;regra='Abaixo de 10% → Aval: 2% | CRC: sem comissão';}
+  if(pct<0.1){txAval=0;txCrc=0;regra='Abaixo de 10% — sem comissão CRC';}
   else if(pct<0.2){txAval=0.02;txCrc=0.005;regra='10-19,99% entrada → Aval: 2% | CRC: 0,5%';}
   else if(pct<0.3){txAval=0.03;txCrc=0.008;regra='20-29,99% entrada → Aval: 3% | CRC: 0,8%';}
   else{txAval=0.04;txCrc=0.01;regra='≥30% entrada → Aval: 4% | CRC: 1%';}
