@@ -1196,6 +1196,8 @@ function filterAgendByRange(rows,tab){
   });
   const result=[];
   Object.values(byPhone).forEach(evts=>{
+    const _dbgPh=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
+    const _isSirleide=_dbgPh==='5513981715462';
     // Agendamentos: usa SEMPRE o timestamp do evento Agendou original
     // Faltou/desmarcou: busca o Agendou correspondente e usa a data dele
     // CUSTOMER_ACQUISITION_ORIGIN_UPDATED é ignorado
@@ -1222,21 +1224,24 @@ function filterAgendByRange(rows,tab){
       const faltouRef=faltouEvts[0];
       agendRef={...faltouRef, timestamp: leadEvt?leadEvt.created_at:faltouRef.timestamp};
     }
-    if(!agendRef)return;
+    if(!agendRef){if(_isSirleide)console.log('[SIRLEIDE] agendRef=null, evts=',JSON.stringify(evts));return;}
     
     // Verifica se a data do agendamento está no período
     const agendD=parseCloudiaDate(agendRef.timestamp)||parseCloudiaDate(agendRef.created_at);
-    if(!agendD)return;
+    if(!agendD){if(_isSirleide)console.log('[SIRLEIDE] agendD=null, timestamp=',agendRef.timestamp);return;}
     const agendDs=localDateStr(agendD);
-    if(agendDs<rng.since||agendDs>rng.until)return;
+    if(_isSirleide)console.log('[SIRLEIDE] agendDs=',agendDs,'rng=',rng.since,rng.until,'agendRef.timestamp=',agendRef.timestamp);
+    if(agendDs<rng.since||agendDs>rng.until){if(_isSirleide)console.log('[SIRLEIDE] FORA DO RANGE');return;}
     
     // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
     const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
       .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(stageUpdates.length>0){
       const lastStage=stageUpdates[0].stage;
-      if(lastStage==='Lead'||lastStage==='Perdido')return;
+      if(_isSirleide)console.log('[SIRLEIDE] lastStage=',lastStage);
+      if(lastStage==='Lead'||lastStage==='Perdido'){if(_isSirleide)console.log('[SIRLEIDE] EXCLUIDA por lastStage');return;}
     }
+    if(_isSirleide)console.log('[SIRLEIDE] PASSOU, adicionada ao result');
     result.push(agendRef);
   });
   return result;
