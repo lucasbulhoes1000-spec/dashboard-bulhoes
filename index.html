@@ -1196,16 +1196,20 @@ function filterAgendByRange(rows,tab){
   });
   const result=[];
   Object.values(byPhone).forEach(evts=>{
-    const _dbgPh=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
-    const _isSirleide=_dbgPh==='5513981715462';
     // Agendamentos: usa SEMPRE o timestamp do evento Agendou original
     // Faltou/desmarcou: busca o Agendou correspondente e usa a data dele
     // CUSTOMER_ACQUISITION_ORIGIN_UPDATED é ignorado
     
     // Pega todos os eventos Agendou (excluindo ACQ)
-    const agendEvts=evts.filter(e=>
-      isAgend(e.stage) && e.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
+    // Se não achar CUSTOMER_STAGE_UPDATED, aceita CUSTOMER_ACQUISITION_ORIGIN_UPDATED com stage Agendou
+    let agendEvts=evts.filter(e=>
+      isAgend(e.stage) && e.type==='CUSTOMER_STAGE_UPDATED'
     ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    if(agendEvts.length===0){
+      agendEvts=evts.filter(e=>
+        isAgend(e.stage) && e.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
+      ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    }
     
     // Pega todos os eventos Faltou (excluindo ACQ)
     const faltouEvts=evts.filter(e=>
@@ -1224,24 +1228,24 @@ function filterAgendByRange(rows,tab){
       const faltouRef=faltouEvts[0];
       agendRef={...faltouRef, timestamp: leadEvt?leadEvt.created_at:faltouRef.timestamp};
     }
-    if(!agendRef){if(_isSirleide)console.log('[SIRLEIDE] agendRef=null, evts=',JSON.stringify(evts));return;}
+    if(!agendRef){return;}
     
     // Verifica se a data do agendamento está no período
     const agendD=parseCloudiaDate(agendRef.timestamp)||parseCloudiaDate(agendRef.created_at);
-    if(!agendD){if(_isSirleide)console.log('[SIRLEIDE] agendD=null, timestamp=',agendRef.timestamp);return;}
+    if(!agendD){return;}
     const agendDs=localDateStr(agendD);
-    if(_isSirleide)console.log('[SIRLEIDE] agendDs=',agendDs,'rng=',rng.since,rng.until,'agendRef.timestamp=',agendRef.timestamp);
-    if(agendDs<rng.since||agendDs>rng.until){if(_isSirleide)console.log('[SIRLEIDE] FORA DO RANGE');return;}
+    
+    if(agendDs<rng.since||agendDs>rng.until){return;}
     
     // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
     const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
       .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(stageUpdates.length>0){
       const lastStage=stageUpdates[0].stage;
-      if(_isSirleide)console.log('[SIRLEIDE] lastStage=',lastStage);
-      if(lastStage==='Lead'||lastStage==='Perdido'){if(_isSirleide)console.log('[SIRLEIDE] EXCLUIDA por lastStage');return;}
+      
+      if(lastStage==='Lead'||lastStage==='Perdido'){return;}
     }
-    if(_isSirleide)console.log('[SIRLEIDE] PASSOU, adicionada ao result');
+    
     result.push(agendRef);
   });
   return result;
