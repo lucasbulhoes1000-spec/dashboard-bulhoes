@@ -1238,12 +1238,26 @@ function filterAgendByRange(rows,tab){
     if(agendDs<rng.since||agendDs>rng.until){return;}
     
     // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
-    const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
-      .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-    if(stageUpdates.length>0){
-      const lastStage=stageUpdates[0].stage;
-      
-      if(lastStage==='Lead'||lastStage==='Perdido'){return;}
+    // MAS respeita edição manual do _ccData (se statusAtual for Agendou, não cancela)
+    const ph_agend=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
+    const ccManual=_ccData&&_ccData[ph_agend];
+    const statusManual=ccManual&&ccManual.statusAtual;
+    if(!statusManual||(!isAgend(statusManual)&&!isComp(statusManual)&&!isFechou(statusManual))){
+      const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
+        .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+      if(stageUpdates.length>0){
+        const lastStage=stageUpdates[0].stage;
+        if(lastStage==='Lead'||lastStage==='Perdido'){return;}
+      }
+    }
+    // Se tem edição manual com agendTimestamp, usa ela como timestamp do agendamento
+    if(ccManual&&ccManual.agendTimestamp){
+      agendRef={...agendRef,timestamp:ccManual.agendTimestamp};
+      const agendDManual=parseCloudiaDate(ccManual.agendTimestamp);
+      if(agendDManual){
+        const agendDsManual=localDateStr(agendDManual);
+        if(agendDsManual<rng.since||agendDsManual>rng.until){return;}
+      }
     }
     
     result.push(agendRef);
