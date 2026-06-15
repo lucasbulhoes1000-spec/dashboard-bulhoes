@@ -2592,6 +2592,7 @@ function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumF
 
 function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
+  _currentLeadIdx=-1;
   _currentClienteIdx=idx;
   var d=ccGet(r);
   const ph_cc=String(r.phone||'').replace(/\D/g,'');
@@ -4119,6 +4120,7 @@ function lcOnStatusChange(val){
 function openLeadCard(idx){
   const r=leadsData[idx];
   if(!r)return;
+  _currentClienteIdx=-1;
   _currentLeadIdx=idx;
   const ph=String(r.phone||'').replace(/\D/g,'');
   // Preenche campos — prioriza edições manuais salvas no CRM
