@@ -3096,13 +3096,50 @@ function renderRelOrigem(){
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
   });
-  // Comp/Fechou
-  eventRows.forEach(r=>{
-    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
+  // Comp — usa _lastCompPhones se disponível (mesma fonte do dashboard)
+  const compSource=window._lastCompPhones&&window._lastCompPhones.size>0?window._lastCompPhones:null;
+  if(compSource){
+    compSource.forEach(ph=>{
+      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      if(!row)return;
+      const actualOrg=row.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+      if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+      if(!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(row);}
+    });
+  } else {
+    eventRows.forEach(r=>{
+      const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+      const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
+      if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+      if(isComp(r.stage)&&!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
+    });
+  }
+
+  // Fechou — usa fechadosPhones do CRM (orçamentos aprovados no período) + stage Ganho Cloudia
+  const _roRange={since,until};
+  const fechadosPhonesRO=new Set();
+  // 1. Orçamentos aprovados no período (CRM)
+  Object.entries(_ccData||{}).forEach(([ph,d])=>{
+    if(!(d.orcamentos||[]).some(o=>o.status==='Aprovado'&&((o.fechData&&o.fechData>=since&&o.fechData<=until)||((!o.fechData)&&o.data&&o.data>=since&&o.data<=until))))return;
+    if(origFilt){const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);if(!row||(row.origin||'')!==origFilt)return;}
+    fechadosPhonesRO.add(ph);
+  });
+  // 2. Stage Ganho no Cloudia no período
+  eventRows.filter(r=>isFechou(r.stage)).forEach(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');if(ph)fechadosPhonesRO.add(ph);
+  });
+  fechadosPhonesRO.forEach(ph=>{
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const actualOrg=(row&&row.origin)||'—';if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(isComp(r.stage)&&!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
-    if(isFechou(r.stage)&&!map[actualOrg].fechPhones.has(ph)){map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);map[actualOrg].valorFech+=parseFloat(r.value||0);}
+    if(!map[actualOrg].fechPhones.has(ph)){
+      map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);
+      const d=_ccData[ph];
+      const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
+      const val=orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)||parseFloat((row&&row.value)||0);
+      map[actualOrg].valorFech+=val;
+      if(row)map[actualOrg].fechRows.push(row);
+    }
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
@@ -3176,40 +3213,49 @@ function renderRelComparecidos(){
 
   Object.entries(byPhone).forEach(([ph,evts])=>{
     const ccD=_ccData[ph]||{};
-    // Data do agendamento: agendTimestamp CRM > timestamp evento Agendou
-    let agendDate=null;
+
+    // Data do agendamento:
+    // 1. agendTimestamp do CRM (editado manualmente)
+    // 2. timestamp do evento CUSTOMER_STAGE_UPDATED com stage Agendou
+    // 3. created_at do lead (fallback — maioria dos leads só tem isso)
+    let agendDate=null, agendRow=null;
     if(ccD.agendTimestamp){
       agendDate=parseCloudiaDate(ccD.agendTimestamp);
+      agendRow=evts[0];
     } else {
       const agendEvt=evts.filter(e=>isAgend(e.stage)&&e.type==='CUSTOMER_STAGE_UPDATED')
         .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
-      if(agendEvt)agendDate=parseCloudiaDate(agendEvt.timestamp);
+      if(agendEvt){agendDate=parseCloudiaDate(agendEvt.timestamp);agendRow=agendEvt;}
+      else {
+        // Fallback: usa created_at do lead (CUSTOMER_CREATED ou qualquer row)
+        const createdRow=evts.find(e=>e.type==='CUSTOMER_CREATED')||evts.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0))[0];
+        if(createdRow){agendDate=parseCloudiaDate(createdRow.created_at);agendRow=createdRow;}
+      }
     }
     if(!agendDate)return;
     const agendDs=localDateStr(agendDate);
     if(agendDs<since||agendDs>until)return;
 
-    // Data da consulta: consultaTimestamp CRM > timestamp Compareceu
-    let compDate=null,compRow=null;
+    // Data da consulta:
+    // 1. consultaTimestamp do CRM
+    // 2. timestamp do evento CUSTOMER_STAGE_UPDATED com Compareceu/Ganho
+    let compDate=null, compRow=null;
     if(ccD.consultaTimestamp){
       compDate=parseCloudiaDate(ccD.consultaTimestamp);
-      compRow=evts.find(e=>isComp(e.stage)||isFechou(e.stage))||evts[0];
+      compRow=evts.find(e=>isComp(e.stage)||isFechou(e.stage))||agendRow;
     } else {
-      const compEvt=evts.filter(e=>(isComp(e.stage)||isFechou(e.stage))&&e.type==='CUSTOMER_STAGE_UPDATED')
+      const compEvt=evts.filter(e=>(isComp(e.stage)||isFechou(e.stage)))
         .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
       if(compEvt){compDate=parseCloudiaDate(compEvt.timestamp);compRow=compEvt;}
     }
 
     const diff=compDate?Math.round((new Date(localDateStr(compDate)+'T12:00:00')-new Date(agendDs+'T12:00:00'))/(1000*60*60*24)):null;
     if(diff!==null&&diff<0)return;
-    const bucket=diff===null?null:(distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff));
-    const refRow=evts.find(e=>isAgend(e.stage)||isComp(e.stage)||isFechou(e.stage))||evts[0];
+    const bucket=diff===null?0:(distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff));
 
-    if(bucket!==null){
-      if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
-      if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(refRow);}
-      if(compDate&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(compRow||refRow);}
-    }
+    if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
+    if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(agendRow||evts[0]);}
+    if(compDate&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(compRow||evts[0]);}
   });
 
   const totalAgend=seenAgend.size;
