@@ -2731,7 +2731,10 @@ function orcOnEntradaChange(val){
 
 function openOrcForm(editIdx){
   populateDynamicSelects();
-  var d=ccGet(clientesData[_currentClienteIdx]);
+  var _orcR=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
+  if(!_orcR)return;
+  var d=ccGet(_orcR);
+  if(!d.orcamentos)d.orcamentos=[];
   document.getElementById('cc-orc-form-title').textContent=editIdx!=null?'Editar Orçamento':'Adicionar Orçamento';
   document.getElementById('orc-edit-idx').value=editIdx!=null?editIdx:'';
   var today=new Date().toISOString().split('T')[0];
@@ -2777,6 +2780,7 @@ function salvarOrcamento(){
   var r=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
   if(!r){alert('Erro: cliente não encontrado. idx='+_currentClienteIdx);return;}
   var d=ccGet(r);
+  if(!d.orcamentos)d.orcamentos=[];
   var editIdx=document.getElementById('orc-edit-idx').value;
   var orc={
     status:document.getElementById('orc-status').value,
