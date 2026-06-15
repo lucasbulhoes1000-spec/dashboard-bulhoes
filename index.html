@@ -1074,7 +1074,21 @@ function switchPage(page,el){
   else if(page==='clientes') renderClientes();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
-  else if(page==='comissoes') setTimeout(()=>initComissoes(),50);
+  else if(page==='comissoes'){
+    // Pede senha antes de entrar em Comissões
+    const senhaOk=sessionStorage.getItem('comissoes_auth');
+    if(senhaOk!=='ok'){
+      const s=prompt('Digite a senha para acessar Comissões:');
+      if(!s||s.trim()!=='bulhoes923'){
+        alert('Senha incorreta.');
+        // Volta para a página anterior
+        const prevNav=document.querySelector('.nav-item.active');
+        return;
+      }
+      sessionStorage.setItem('comissoes_auth','ok');
+    }
+    setTimeout(()=>initComissoes(),50);
+  }
   else if(page==='rel-origem') setTimeout(()=>initRelOrigem(),50);
   else if(page==='rel-comparecidos') setTimeout(()=>initRelComparecidos(),50);
   else if(page==='rel-orcamentos') setTimeout(()=>initRelOrcamentos(),50);
@@ -3141,74 +3155,28 @@ function initRelComparecidos(){
   if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function renderRelComparecidos(){
+  // Usa getRelEventRows para comparecimentos (filtra por timestamp)
+  const rows=getRelEventRows('rc-from','rc-to');
   const origFilt=document.getElementById('rc-origem').value;
-  const since=document.getElementById('rc-from').value;
-  const until=document.getElementById('rc-to').value;
+  const agendados=rows.filter(r=>(isAgend(r.stage)||isComp(r.stage))&&(!origFilt||(r.origin||'')=== origFilt));
   const distances=[0,1,2,3,4,5,6,17];
   const distMap={};
   distances.forEach(d=>distMap[d]={agend:0,comp:0,agendRows:[],compRows:[]});
   const seenAgend=new Set();
   const seenComp=new Set();
-
-  // Agrupa todos os eventos por telefone
-  const byPhone={};
-  allCloudiaRows.forEach(r=>{
-    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
-    if(origFilt&&(r.origin||'')!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
-    if(!ph)return;
-    if(!byPhone[ph])byPhone[ph]=[];
-    byPhone[ph].push(r);
+  agendados.forEach(r=>{
+    const dc=parseCloudiaDate(r.created_at);
+    const dt=parseCloudiaDate(r.timestamp);
+    if(!dc||!dt)return;
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const diff=Math.round((dt-dc)/(1000*60*60*24));
+    if(diff<0)return; // ignora distâncias negativas (data consulta antes do cadastro)
+    const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
+    if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
+    if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(r);}
+    if(isComp(r.stage)&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(r);}
   });
-
-  Object.entries(byPhone).forEach(([ph,evts])=>{
-    const ccD=_ccData[ph]||{};
-
-    // Data do agendamento: agendTimestamp do CRM > timestamp do evento Agendou
-    let agendDate=null;
-    if(ccD.agendTimestamp){
-      agendDate=parseCloudiaDate(ccD.agendTimestamp);
-    } else {
-      const agendEvt=evts.filter(e=>isAgend(e.stage)&&e.type==='CUSTOMER_STAGE_UPDATED')
-        .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
-      if(agendEvt)agendDate=parseCloudiaDate(agendEvt.timestamp);
-    }
-    if(!agendDate)return;
-
-    // Data do agendamento deve estar no período
-    const agendDs=localDateStr(agendDate);
-    if(agendDs<since||agendDs>until)return;
-
-    // Data da consulta: consultaTimestamp do CRM > timestamp do Compareceu
-    let compDate=null;
-    let compRow=null;
-    if(ccD.consultaTimestamp){
-      compDate=parseCloudiaDate(ccD.consultaTimestamp);
-      compRow=evts.find(e=>isComp(e.stage)||isFechou(e.stage));
-    } else {
-      const compEvt=evts.filter(e=>(isComp(e.stage)||isFechou(e.stage))&&e.type==='CUSTOMER_STAGE_UPDATED')
-        .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
-      if(compEvt){compDate=parseCloudiaDate(compEvt.timestamp);compRow=compEvt;}
-    }
-
-    // Distância em dias inteiros (data a data)
-    const agendDay=new Date(agendDs+'T12:00:00');
-    const diff=compDate?Math.round((new Date(localDateStr(compDate)+'T12:00:00')-agendDay)/(1000*60*60*24)):null;
-    if(diff!==null&&diff<0)return;
-
-    const bucket=diff===null?null:(distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff));
-
-    // Referência do row para a lupa
-    const refRow=evts.find(e=>isAgend(e.stage)||isFechou(e.stage)||isComp(e.stage))||evts[0];
-
-    if(bucket!==null){
-      if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
-      if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(refRow);}
-      if(compDate&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(compRow||refRow);}
-    }
-  });
-
-  const totalAgend=seenAgend.size;
+  const totalAgend=agendados.length;
   window._rcData={};
   const thead=document.getElementById('rc-thead');
   thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
@@ -3246,82 +3214,69 @@ function initRelOrcamentos(){
   if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
 function renderRelOrcamentos(){
-  const since=document.getElementById('rof-from').value;
-  const until=document.getElementById('rof-to').value;
+  const s=new Date(document.getElementById('rof-from').value);
+  const u=new Date(document.getElementById('rof-to').value+'T23:59:59');
   const origFilt=document.getElementById('rof-origem').value;
   const avalFilt=document.getElementById('rof-aval').value;
   const tratFilt=document.getElementById('rof-trat').value;
-
-  // Agrupa por avaliador
+  // Agrupa por avaliador via _ccData
   const avalMap={};
-  // Agrupa por forma de pagamento
-  const pgtoMap={};
-
   Object.entries(_ccData).forEach(([ph,d])=>{
     (d.orcamentos||[]).forEach(o=>{
       if(o.status!=='Aprovado')return;
-      const dataRef=o.fechData||o.data||'';
-      if(!dataRef||dataRef<since||dataRef>until)return;
+      const dataOrcStr=o.fechData||o.data||'';
+      const dataOrc=new Date(dataOrcStr);
+      if(isNaN(dataOrc)||dataOrc<s||dataOrc>u)return;
       const av=o.avaliador||'Sem avaliador';
       if(avalFilt&&av!==avalFilt)return;
       if(tratFilt&&o.tratamento!==tratFilt)return;
+      // Verifica origem do lead
       if(origFilt){
         const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
         if(!row||(row.origin||'')!==origFilt)return;
       }
-      const valorFech=Number(o.fechValor||o.valor||0);
-      const entrada=Number(o.entrada||0);
-      const parcelas=o.parcelas||'—';
-      const pgto=o.pagamento||'—';
-      const pgtoEnt=o.entradaPgto||'—';
-
-      // Por avaliador
-      if(!avalMap[av])avalMap[av]={fechados:0,total:0,entradas:0,parcelas:[],pgtos:{}};
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0};
       avalMap[av].fechados++;
-      avalMap[av].total+=valorFech;
-      avalMap[av].entradas+=entrada;
-      if(parcelas&&parcelas!=='—'&&parcelas!=='À vista')avalMap[av].parcelas.push(parseInt(parcelas)||0);
-      if(pgto&&pgto!=='—'){avalMap[av].pgtos[pgto]=(avalMap[av].pgtos[pgto]||0)+valorFech;}
-
-      // Por forma de pagamento (global)
-      if(pgto&&pgto!=='—'){
-        if(!pgtoMap[pgto])pgtoMap[pgto]={fechados:0,total:0};
-        pgtoMap[pgto].fechados++;pgtoMap[pgto].total+=valorFech;
-      }
+      avalMap[av].total+=Number(o.valor)||0;
     });
   });
-
+  // Fallback: usa Cloudia rows se não tiver dados no CRM — deduplicado por telefone
+  if(Object.keys(avalMap).length===0){
+    const seenPhones=new Set();
+    allCloudiaRows.filter(r=>{
+      if(!isFechou(r.stage))return false;
+      const dt=parseCloudiaDate(r.timestamp);
+      return dt&&dt>=s&&dt<=u&&(!origFilt||(r.origin||'')===origFilt);
+    }).sort((a,b)=>parseFloat(b.value||0)-parseFloat(a.value||0))
+    .forEach(r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+      if(seenPhones.has(ph))return; // já contou esse lead
+      seenPhones.add(ph);
+      const d=_ccData[ph]||{orcamentos:[]};
+      const orc=d.orcamentos&&d.orcamentos[0];
+      const av=orc&&orc.avaliador?orc.avaliador:'Sem avaliador';
+      if(avalFilt&&av!==avalFilt)return;
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0};
+      avalMap[av].fechados++;
+      avalMap[av].total+=parseFloat(r.value||0);
+    });
+  }
   const entries=Object.entries(avalMap).sort((a,b)=>b[1].total-a[1].total);
-  let tF=0,tV=0,tE=0;
-  entries.forEach(([,d])=>{tF+=d.fechados;tV+=d.total;tE+=d.entradas;});
-  const avgParc=arr=>{const f=arr.filter(x=>x>0);return f.length?Math.round(f.reduce((a,b)=>a+b,0)/f.length)+'x':'—';};
-
-  // Tabela por avaliador
+  let tF=0,tV=0;
+  entries.forEach(([,d])=>{tF+=d.fechados;tV+=d.total;});
   document.getElementById('rof-tbody').innerHTML=entries.map(([av,d])=>`
     <tr>
       <td style="font-weight:500;">${av}</td>
       <td style="text-align:right" class="tg">${d.fechados}</td>
       <td style="text-align:right" class="tg">${fmt(d.total)}</td>
       <td style="text-align:right" class="tg">${d.fechados>0?fmt(d.total/d.fechados):'—'}</td>
-      <td style="text-align:right" class="ta">${fmt(d.entradas)}</td>
-      <td style="text-align:right" class="tm">${d.total>0?Math.round(d.entradas/d.total*100)+'%':'—'}</td>
-      <td style="text-align:right" class="tm">${avgParc(d.parcelas)}</td>
-      <td style="font-size:11px;color:#8a7a6a;">${Object.entries(d.pgtos).sort((a,b)=>b[1]-a[1]).map(([p,v])=>`${p}: ${fmt(v)}`).join(' | ')||'—'}</td>
     </tr>`).join('')+`
     <tr style="font-weight:600;background:#faf7f3;">
       <td>TOTAL</td>
       <td style="text-align:right" class="tg">${tF}</td>
       <td style="text-align:right" class="tg">${fmt(tV)}</td>
       <td style="text-align:right" class="tg">${tF>0?fmt(tV/tF):'—'}</td>
-      <td style="text-align:right" class="ta">${fmt(tE)}</td>
-      <td style="text-align:right" class="tm">${tV>0?Math.round(tE/tV*100)+'%':'—'}</td>
-      <td colspan="2"></td>
-    </tr>
-    ${Object.keys(pgtoMap).length>0?`<tr><td colspan="8" style="padding-top:14px;"><div style="font-size:10px;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Vendas por forma de pagamento</div><div style="display:flex;gap:10px;flex-wrap:wrap;">${Object.entries(pgtoMap).sort((a,b)=>b[1].total-a[1].total).map(([p,d])=>`<div style="background:#f5f0ea;border-radius:8px;padding:8px 14px;"><div style="font-size:11px;color:#7a6550;font-weight:600;">${p}</div><div style="font-size:14px;font-weight:700;color:#2a2520;">${fmt(d.total)}</div><div style="font-size:10px;color:#9a8c7e;">${d.fechados} contrato(s)</div></div>`).join('')}</div></td></tr>`:''}`;
-
-  // Atualiza cabeçalho da tabela
-  const thead=document.querySelector('#page-rel-orcamentos thead tr');
-  if(thead)thead.innerHTML='<th>Avaliador</th><th style="text-align:right">Fechados</th><th style="text-align:right">Total Fechado</th><th style="text-align:right">Ticket Médio</th><th style="text-align:right">Entradas</th><th style="text-align:right">% Entrada</th><th style="text-align:right">Parcel. Médio</th><th>Por Pagamento</th>';
+    </tr>`;
 }
 
 // ===== EXPORT =====
