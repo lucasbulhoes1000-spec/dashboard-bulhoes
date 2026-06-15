@@ -2772,7 +2772,9 @@ function openOrcForm(editIdx){
   document.getElementById('cc-orc-form').style.display='block';
 }
 function salvarOrcamento(){
-  var r=clientesData[_currentClienteIdx];
+  try{
+  var r=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
+  if(!r){alert('Erro: cliente não encontrado. idx='+_currentClienteIdx);return;}
   var d=ccGet(r);
   var editIdx=document.getElementById('orc-edit-idx').value;
   var orc={
@@ -2801,10 +2803,12 @@ function salvarOrcamento(){
   updateEntradas();
   filterClientesTable();
   salvarCRMDebounced();
+  }catch(e){alert('Erro ao salvar: '+e.message);console.error(e);}
 }
 function excluirOrcamento(idx){
   if(!confirm('Excluir este orçamento?'))return;
-  var d=ccGet(clientesData[_currentClienteIdx]);
+  var _excR=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);if(!_excR)return;
+  var d=ccGet(_excR);
   d.orcamentos.splice(idx,1);
   refreshOrcamentos(d);
   updateEntradas();
