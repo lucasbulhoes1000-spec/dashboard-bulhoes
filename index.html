@@ -3014,53 +3014,81 @@ function openROModal(i,type){
 }
 
 function renderRelOrigem(){
-  const rows=getRelRows('ro-from','ro-to');
-  const eventRows=getRelEventRows('ro-from','ro-to');
+  // Usa os mesmos dados já calculados pelo dashboard para garantir consistência
+  // Se o dashboard ainda não foi carregado, busca o Cloudia e usa filtros do relatório
+  const since=document.getElementById('ro-from').value;
+  const until=document.getElementById('ro-to').value;
   const origFilt=document.getElementById('ro-origem').value;
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
-  // Agrupa por origem
-  const map={};
-  rows.forEach(r=>{
-    const org=r.origin||'—';
-    if(origFilt&&org!==origFilt)return;
-    // Filtro avaliador e tratamento via _ccData
-    if(avalFilt||tratFilt){
+
+  // Usa dados do dashboard se disponíveis e no mesmo período
+  const dashRange=_lastCloudiaFiltered.length>0?getRange('trafego'):null;
+  const useDash=dashRange&&dashRange.since===since&&dashRange.until===until&&!_origemFilter;
+
+  let leadRows, eventRows, agendRows;
+  if(useDash){
+    leadRows=_lastCloudiaFiltered;
+    eventRows=_lastCloudiaFilteredEvents;
+    agendRows=_lastCloudiaFilteredAgend;
+  } else {
+    leadRows=filterByRange(allCloudiaRows,'ro')||getRelRows('ro-from','ro-to');
+    eventRows=filterEventsByRange(allCloudiaRows,'ro')||getRelEventRows('ro-from','ro-to');
+    agendRows=filterAgendByRange(allCloudiaRows,'ro')||[];
+    // Para 'ro' não existe em filters{}, usa os dados calculados manualmente
+    leadRows=allCloudiaRows.filter(r=>{
+      if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
+      const d=parseCloudiaDate(r.created_at);
+      return d&&localDateStr(d)>=since&&localDateStr(d)<=until;
+    });
+    eventRows=allCloudiaRows.filter(r=>{
+      if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
       const ph=String(r.phone||'').replace(/\D/g,'');
-      const d=_ccData[ph]||{orcamentos:[]};
-      const orcs=d.orcamentos||[];
-      if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;
-      if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;
+      const ccD=_ccData[ph];
+      let ts=r.timestamp;
+      if(ccD&&ccD.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage)))ts=ccD.consultaTimestamp;
+      if(ccD&&ccD.agendTimestamp&&r.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(r.stage))ts=ccD.agendTimestamp;
+      const d=r.type==='CUSTOMER_CREATED'
+        ?(((isComp(r.stage)||isFechou(r.stage))&&ccD&&ccD.consultaTimestamp)?parseCloudiaDate(ccD.consultaTimestamp):parseCloudiaDate(r.created_at))
+        :parseCloudiaDate(ts)||parseCloudiaDate(r.created_at);
+      return d&&localDateStr(d)>=since&&localDateStr(d)<=until;
+    });
+    // compPhones via _lastCompPhones se disponível e sem filtro de origem
+    if(window._lastCompPhones&&!_origemFilter){
+      const compSet=window._lastCompPhones;
+      eventRows=eventRows.filter(r=>{
+        const ph=String(r.phone||'').replace(/\D/g,'');
+        return (isComp(r.stage)||isFechou(r.stage))?compSet.has(ph):true;
+      });
     }
-    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+  }
+
+  const map={};
+  // Leads
+  const seenLeads=new Set();
+  leadRows.forEach(r=>{
+    const org=(origFilt?origFilt:null)||r.origin||'—';
+    if(origFilt&&(r.origin||'—')!==origFilt)return;
+    if(avalFilt||tratFilt){const ph2=String(r.phone||'').replace(/\D/g,'');const dd=_ccData[ph2]||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;}
+    const actualOrg=r.origin||'—';
     const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
-    const dc=parseCloudiaDate(r.created_at);
-    const since_ro=document.getElementById('ro-from').value;
-    const until_ro=document.getElementById('ro-to').value;
-    // Leads: qualquer row com created_at no período, dedup por telefone
-    // (mesmo comportamento que filterByRange do dashboard)
-    if(dc&&localDateStr(dc)>=since_ro&&localDateStr(dc)<=until_ro&&!map[org].leads.has(ph)){
-      map[org].leads.add(ph); map[org].leadRows.push(r);
-      const v=parseFloat(r.value||0);
-      if(v>0&&!map[org].orcPhones.has(ph)){map[org].orcPhones.add(ph);map[org].valorOrc+=v;}
-    }
-    // Agend/Comp/Fechou: qualquer evento no período (já filtrado por getRelRows via timestamp)
-    // Para agend/comp/fechou usa eventRows (filtrado por timestamp)
+    if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+    if(!seenLeads.has(ph)){seenLeads.add(ph);map[actualOrg].leads.add(ph);map[actualOrg].leadRows.push(r);const v=parseFloat(r.value||0);if(v>0&&!map[actualOrg].orcPhones.has(ph)){map[actualOrg].orcPhones.add(ph);map[actualOrg].valorOrc+=v;}}
   });
+  // Agend
+  (useDash?agendRows:eventRows.filter(r=>isAgend(r.stage)||isFaltou(r.stage))).forEach(r=>{
+    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
+    if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+    if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
+  });
+  // Comp/Fechou
   eventRows.forEach(r=>{
-    const org=r.origin||'—';
-    if(origFilt&&org!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
-    if(!ph)return;
-    if(!map[org])map[org]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(isAgend(r.stage)&&!map[org].agend.has(ph)){map[org].agend.add(ph);map[org].agendRows.push(r);}
-    if(isComp(r.stage)&&!map[org].comp.has(ph)){map[org].comp.add(ph);map[org].compRows.push(r);}
-    if(isFechou(r.stage)&&!map[org].fechPhones.has(ph)){
-      map[org].fechou.add(ph);
-      map[org].fechPhones.add(ph);
-      map[org].fechRows.push(r);
-      map[org].valorFech+=parseFloat(r.value||0);
-    }
+    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
+    if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+    if(isComp(r.stage)&&!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
+    if(isFechou(r.stage)&&!map[actualOrg].fechPhones.has(ph)){map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);map[actualOrg].valorFech+=parseFloat(r.value||0);}
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
@@ -3500,7 +3528,10 @@ async function carregarCRMRemoto(){
 const USUARIOS_VALIDOS=[
   {email:'lucasbulhoes1000@gmail.com',senha:'bulhoes2026',nome:'Lucas'},
   {email:'vitoria@bulhoes.com.br',senha:'vitoria2026',nome:'Vitória'},
-  {email:'livia@bulhoes.com.br',senha:'livia2026',nome:'Lívia'}
+  {email:'livia@bulhoes.com.br',senha:'livia923',nome:'Lívia'},
+  {email:'larissa@bulhoes',senha:'larissa923',nome:'Larissa'},
+  {email:'gabi@bulhoes',senha:'gabi923',nome:'Gabi'},
+  {email:'raffaella@bulhoes',senha:'raffaella923',nome:'Raffaella'}
 ];
 
 function verificarLogin(){
