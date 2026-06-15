@@ -3004,11 +3004,18 @@ function getRelEventRows(fromId, toId){
 // ── MÉTRICAS DE ORIGEM ────────────────────────────────────
 function initRelOrigem(){
   initRelDates('ro-from','ro-to');
-  const doRender=()=>{
+  const doRender=async()=>{
     const sel=document.getElementById('ro-origem');
     const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
     sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
     populateDynamicSelects();
+    // Garante que _lastCompPhones está populado (mesmo sem passar pelo dashboard)
+    if(!window._lastCompPhones||window._lastCompPhones.size===0){
+      const filtered=filterCloudiaByOrigin(filterByRange(allCloudiaRows,'trafego'));
+      const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
+      const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(allCloudiaRows,'trafego'));
+      renderTrafego(_lastMetaAds||[],filtered,filteredEvents,filteredAgend);
+    }
     renderRelOrigem();
   };
   if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
@@ -3096,37 +3103,14 @@ function renderRelOrigem(){
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
   });
-  // COMP: calcula independente do dashboard
-  // Conta phone como compareceu se tiver evento Compareceu/Ganho com timestamp no período
-  // OU se tiver consultaTimestamp do CRM no período
-  // OU se for CUSTOMER_CREATED com stage Compareceu/Ganho com created_at no período
-  const compPhonesRO=new Set();
-  const compRowMap={};
-  allCloudiaRows.forEach(r=>{
-    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
-    if(!isComp(r.stage)&&!isFechou(r.stage))return;
-    const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
-    if(compPhonesRO.has(ph))return;
-    const ccD=_ccData[ph]||{};
-    // Usa consultaTimestamp do CRM se disponível
-    let dateToCheck=null;
-    if(ccD.consultaTimestamp){
-      dateToCheck=localDateStr(parseCloudiaDate(ccD.consultaTimestamp));
-    } else if(r.type==='CUSTOMER_CREATED'){
-      dateToCheck=localDateStr(parseCloudiaDate(r.created_at));
-    } else {
-      const ts=parseCloudiaDate(r.timestamp);
-      if(ts)dateToCheck=localDateStr(ts);
-    }
-    if(dateToCheck&&dateToCheck>=since&&dateToCheck<=until){
-      compPhonesRO.add(ph);compRowMap[ph]=r;
-    }
-  });
-  compPhonesRO.forEach(ph=>{
-    const r=compRowMap[ph];if(!r)return;
-    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+  // COMP: usa _lastCompPhones (mesma fonte do dashboard — já considera consultaTimestamp e CSV)
+  const compSrc=window._lastCompPhones||new Set();
+  compSrc.forEach(ph=>{
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    if(!row)return;
+    const actualOrg=row.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
+    if(!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(row);}
   });
 
   // FECHOU: orçamentos aprovados no período (CRM) + stage Ganho Cloudia
@@ -3300,25 +3284,25 @@ function renderRelComparecidos(){
     if(compDate&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(compRow||evts[0]);}
   });
 
-  // Agendamentos sem data de consulta — coloca em bucket separado (sem distância)
-  // Para manter o total correto, conta agend sem comp também
+  // Agendamentos sem comparecimento — coloca em bucket próprio (sem distância definida)
+  // Só conta quem tem evento Agendou explícito OU agendTimestamp
   Object.entries(byPhone).forEach(([ph,evts])=>{
-    if(seenAgend.has(ph))return; // já contado
+    if(seenAgend.has(ph))return;
     const ccD=_ccData[ph]||{};
     let agendDate=null, agendRow=null;
     if(ccD.agendTimestamp){agendDate=parseCloudiaDate(ccD.agendTimestamp);agendRow=evts[0];}
     else {
-      const agendEvts=evts.filter(e=>(isAgend(e.stage)||isFaltou(e.stage))&&e.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')
+      const agendEvts=evts.filter(e=>(isAgend(e.stage)||isFaltou(e.stage))&&e.type==='CUSTOMER_STAGE_UPDATED')
         .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
       if(agendEvts.length>0){agendDate=parseCloudiaDate(agendEvts[0].timestamp);agendRow=agendEvts[0];}
     }
     if(!agendDate)return;
     const agendDs=localDateStr(agendDate);
     if(agendDs<since||agendDs>until)return;
-    if(origFilt){const r=evts[0];if((r.origin||'')!==origFilt)return;}
-    // Sem comp — coloca em 0 dias por padrão
-    if(!distMap[0])distMap[0]={agend:0,comp:0,agendRows:[],compRows:[]};
-    seenAgend.add(ph);distMap[0].agend++;distMap[0].agendRows.push(agendRow||evts[0]);
+    if(origFilt){const r=evts.find(e=>true)||evts[0];if((r.origin||'')!==origFilt)return;}
+    // Agendou mas não compareceu — bucket 'pendente'
+    if(!distMap['pendente'])distMap['pendente']={agend:0,comp:0,agendRows:[],compRows:[]};
+    seenAgend.add(ph);distMap['pendente'].agend++;distMap['pendente'].agendRows.push(agendRow||evts[0]);
   });
 
   const totalAgend=seenAgend.size;
@@ -3326,11 +3310,11 @@ function renderRelComparecidos(){
   const thead=document.getElementById('rc-thead');
   thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
   document.getElementById('rc-tbody').innerHTML=Object.entries(distMap)
-    .sort((a,b)=>parseInt(a[0])-parseInt(b[0]))
+    .sort((a,b)=>{if(a[0]==='pendente')return 1;if(b[0]==='pendente')return -1;return parseInt(a[0])-parseInt(b[0]);})
     .map(([dias,d],i)=>{
       window._rcData[i]={dias,d};
       return`<tr>
-      <td>${dias==='17'?'17+ dias':dias+' dia(s)'}</td>
+      <td>${dias==='pendente'?'Pendente (agendou, não compareceu)':dias==='17'?'17+ dias':dias+' dia(s)'}</td>
       <td style="text-align:right">${d.agend} <button class="lupa" onclick="openRCModal(${i},'agend')">🔍</button></td>
       <td style="text-align:right" class="tm">${totalAgend>0?(d.agend/totalAgend*100).toFixed(1)+'%':'—'}</td>
       <td style="text-align:right">${d.comp} <button class="lupa" onclick="openRCModal(${i},'comp')">🔍</button></td>
