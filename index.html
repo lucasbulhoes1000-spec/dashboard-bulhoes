@@ -977,7 +977,7 @@ tbody tr:hover td{background:#faf7f3;}
     <!-- Pagamento restante -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px;">
       <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Forma de pagamento</label>
-        <select id="orc-pagamento" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+        <select id="orc-pagamento" onchange="orcOnPagamentoChange(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
           <option value="">Selecione...</option><option>PIX</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Boleto</option><option>Dinheiro</option>
         </select></div>
       <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Qtd. parcelas</label>
@@ -2729,6 +2729,19 @@ function orcOnEntradaChange(val){
   document.getElementById('orc-entrada-wrap').style.display=val==='sim'?'block':'none';
 }
 
+var _PGTO_AVISTA=['PIX','Cartão de Débito','Dinheiro'];
+function orcOnPagamentoChange(val){
+  if(_PGTO_AVISTA.includes(val)){
+    // À vista: entrada = valor total, mostra campo de entrada preenchido
+    var valorTotal=parseFloat(document.getElementById('orc-valor').value)||0;
+    document.getElementById('orc-tem-entrada').value='sim';
+    orcOnEntradaChange('sim');
+    document.getElementById('orc-entrada').value=valorTotal||'';
+    document.getElementById('orc-entrada-pgto').value=val;
+    document.getElementById('orc-parcelas').value='À vista';
+  }
+}
+
 function openOrcForm(editIdx){
   populateDynamicSelects();
   var _orcR=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
@@ -2781,6 +2794,17 @@ function salvarOrcamento(){
   if(!r){alert('Erro: cliente não encontrado. idx='+_currentClienteIdx);return;}
   var d=ccGet(r);
   if(!d.orcamentos)d.orcamentos=[];
+  // Se pagamento à vista e entrada não preenchida, força entrada = valor total
+  var _pgtoVal=document.getElementById('orc-pagamento').value;
+  if(_PGTO_AVISTA.includes(_pgtoVal)){
+    var _valorTotal=parseFloat(document.getElementById('orc-valor').value)||0;
+    var _entradaAtual=parseFloat(document.getElementById('orc-entrada').value)||0;
+    if(_entradaAtual===0&&_valorTotal>0){
+      document.getElementById('orc-entrada').value=_valorTotal;
+      document.getElementById('orc-tem-entrada').value='sim';
+      document.getElementById('orc-entrada-pgto').value=_pgtoVal;
+    }
+  }
   var editIdx=document.getElementById('orc-edit-idx').value;
   var orc={
     status:document.getElementById('orc-status').value,
