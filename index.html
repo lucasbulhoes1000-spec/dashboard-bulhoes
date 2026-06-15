@@ -3096,13 +3096,76 @@ function renderRelOrigem(){
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
   });
-  // Comp/Fechou
-  eventRows.forEach(r=>{
+  // COMP: calcula independente do dashboard
+  // Conta phone como compareceu se tiver evento Compareceu/Ganho com timestamp no período
+  // OU se tiver consultaTimestamp do CRM no período
+  // OU se for CUSTOMER_CREATED com stage Compareceu/Ganho com created_at no período
+  const compPhonesRO=new Set();
+  const compRowMap={};
+  allCloudiaRows.forEach(r=>{
+    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
+    if(!isComp(r.stage)&&!isFechou(r.stage))return;
+    const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
+    if(compPhonesRO.has(ph))return;
+    const ccD=_ccData[ph]||{};
+    // Usa consultaTimestamp do CRM se disponível
+    let dateToCheck=null;
+    if(ccD.consultaTimestamp){
+      dateToCheck=localDateStr(parseCloudiaDate(ccD.consultaTimestamp));
+    } else if(r.type==='CUSTOMER_CREATED'){
+      dateToCheck=localDateStr(parseCloudiaDate(r.created_at));
+    } else {
+      const ts=parseCloudiaDate(r.timestamp);
+      if(ts)dateToCheck=localDateStr(ts);
+    }
+    if(dateToCheck&&dateToCheck>=since&&dateToCheck<=until){
+      compPhonesRO.add(ph);compRowMap[ph]=r;
+    }
+  });
+  compPhonesRO.forEach(ph=>{
+    const r=compRowMap[ph];if(!r)return;
     const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(isComp(r.stage)&&!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
-    if(isFechou(r.stage)&&!map[actualOrg].fechPhones.has(ph)){map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);map[actualOrg].valorFech+=parseFloat(r.value||0);}
+    if(!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(r);}
+  });
+
+  // FECHOU: orçamentos aprovados no período (CRM) + stage Ganho Cloudia
+  const fechadosPhonesRO=new Set();
+  const fechRowMap={};
+  // 1. Orçamentos aprovados no CRM
+  Object.entries(_ccData||{}).forEach(([ph,d])=>{
+    const temAprov=(d.orcamentos||[]).some(o=>{
+      if(o.status!=='Aprovado')return false;
+      const dr=o.fechData||o.data||'';
+      return dr&&dr>=since&&dr<=until;
+    });
+    if(!temAprov)return;
+    if(origFilt){const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);if(!row||(row.origin||'')!==origFilt)return;}
+    fechadosPhonesRO.add(ph);
+    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    if(row)fechRowMap[ph]=row;
+  });
+  // 2. Stage Ganho no Cloudia no período
+  allCloudiaRows.forEach(r=>{
+    if(!isFechou(r.stage))return;
+    if(r.type==='CUSTOMER_ACQUISITION_ORI')return;
+    const ph=String(r.phone||'').replace(/\D/g,'');if(!ph||fechadosPhonesRO.has(ph))return;
+    const ts=r.type==='CUSTOMER_CREATED'?parseCloudiaDate(r.created_at):parseCloudiaDate(r.timestamp);
+    if(!ts)return;
+    const ds=localDateStr(ts);
+    if(ds>=since&&ds<=until){fechadosPhonesRO.add(ph);fechRowMap[ph]=r;}
+  });
+  fechadosPhonesRO.forEach(ph=>{
+    const r=fechRowMap[ph];if(!r)return;
+    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+    if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
+    if(!map[actualOrg].fechPhones.has(ph)){
+      map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);
+      const d=_ccData[ph];
+      const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
+      const val=orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)||parseFloat(r.value||0);
+      map[actualOrg].valorFech+=val;
+    }
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
