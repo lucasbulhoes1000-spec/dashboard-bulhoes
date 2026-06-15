@@ -4275,7 +4275,25 @@ function salvarLeadCard(){
         row.type==='CUSTOMER_STAGE_UPDATED' && row.stage===novoStatus
       );
       if(stageRow)stageRow.timestamp=agendTimestamp;
+      if(_lastCloudiaRows){
+        const lr=_lastCloudiaRows.find(row=>
+          String(row.phone||'').replace(/\D/g,'')=== ph &&
+          row.type==='CUSTOMER_STAGE_UPDATED' && row.stage===novoStatus
+        );
+        if(lr)lr.timestamp=agendTimestamp;
+      }
     }
+  }
+
+  // Re-renderiza dashboard para refletir mudanças
+  if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
+    const filt=filterCloudiaByOrigin(filterByRange(_lastCloudiaRows,'trafego'));
+    const filtEvts=filterCloudiaByOrigin(filterEventsByRange(_lastCloudiaRows,'trafego'));
+    const filtAgend=filterCloudiaByOrigin(filterAgendByRange(_lastCloudiaRows,'trafego'));
+    _lastCloudiaFiltered=filt;
+    _lastCloudiaFilteredEvents=filtEvts;
+    _lastCloudiaFilteredAgend=filtAgend;
+    renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
   }
 
   salvarCRMDebounced();
