@@ -2503,17 +2503,19 @@ function lupaAdComp(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const adPhones=adInfo&&adInfo.compPhones?adInfo.compPhones:new Set();
-  const phoneMap={};
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
-    const ph=normalizePhone(r.phone);
-    return (isComp(r.stage)||isFechou(r.stage))&&adPhones.has(ph);
-  }).forEach(r=>{
-    const ph=normalizePhone(r.phone)||r.name;
-    if(!phoneMap[ph])phoneMap[ph]=r;
-  });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(info.consultaTs)];});
+  // Constrói a tabela a partir de adPhones (fonte reconciliada — inclui CSV importados),
+  // não apenas de quem tem evento explícito de Comparecimento no Cloudia.
+  const rows=[...adPhones].map(ph=>{
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const e=applyEdits({...row,phone:row.phone||ph});
+    const info=getEffectiveAgendInfo(ph,row);
+    const ccD=ccDataLookup(ph);
+    const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
+    const origem=(ccD&&ccD.origemAtual)||e.origin||'—';
+    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(e.created_at)||new Date(0)};
+  }).sort((a,b)=>b.sortKey-a.sortKey)
+    .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
   openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
 function lupaAdFechou(adKey){
