@@ -1189,7 +1189,7 @@ function filterAgendByRange(rows,tab){
   // Agrupa TODOS os eventos por telefone (qualquer tipo)
   const byPhone={};
   rows.forEach(row=>{
-    const ph=String(row.phone||'').replace(/\D/g,'')||row.name;
+    const ph=normalizePhone(row.phone)||row.name;
     if(!ph)return;
     if(!byPhone[ph])byPhone[ph]=[];
     byPhone[ph].push(row);
@@ -1229,7 +1229,7 @@ function filterAgendByRange(rows,tab){
       agendRef=agendEvts[0];
     }
     const ph_agend0=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
-    const ccManual0=_ccData&&_ccData[ph_agend0];
+    const ccManual0=ccDataLookup(ph_agend0);
     if(!agendRef&&ccManual0&&ccManual0.agendTimestamp){
       // Sem evento Agendou real no Cloudia, mas há edição manual — usa um evento base (Faltou ou qualquer) só como veículo
       const baseEvt=faltouEvts[0]||evts[0];
@@ -1247,7 +1247,7 @@ function filterAgendByRange(rows,tab){
     // Cancela só se o último CUSTOMER_STAGE_UPDATED for Lead ou Perdido
     // MAS respeita edição manual do _ccData (se statusAtual for Agendou, não cancela)
     const ph_agend=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
-    const ccManual=_ccData&&_ccData[ph_agend];
+    const ccManual=ccDataLookup(ph_agend);
     const statusManual=ccManual&&ccManual.statusAtual;
     if(!statusManual||(!isAgend(statusManual)&&!isComp(statusManual)&&!isFechou(statusManual))){
       const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
@@ -1273,6 +1273,28 @@ function filterAgendByRange(rows,tab){
 }
 
 // HELPERS
+// Normaliza telefone BR para uma chave única, removendo variações de DDI (55) e do 9º dígito
+function normalizePhone(phone){
+  let d=String(phone||'').replace(/\D/g,'');
+  if(!d)return'';
+  if(d.startsWith('55')&&(d.length===12||d.length===13)){
+    d=d.slice(2);
+  }
+  if(d.length===10){
+    d=d.slice(0,2)+'9'+d.slice(2);
+  }
+  return d;
+}
+// Busca segura no _ccData: tenta a chave normalizada e, se não achar, varre por chaves
+// que normalizem para o mesmo valor (cobre dados salvos antes da normalização existir)
+function ccDataLookup(phoneOrKey){
+  if(!phoneOrKey)return null;
+  if(_ccData[phoneOrKey])return _ccData[phoneOrKey];
+  const norm=normalizePhone(phoneOrKey);
+  if(_ccData[norm])return _ccData[norm];
+  const found=Object.keys(_ccData).find(k=>normalizePhone(k)===norm);
+  return found?_ccData[found]:null;
+}
 function fmt(n){return'R$ '+parseFloat(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtK(n){return n>=1000?'R$ '+(n/1000).toFixed(1)+'k':fmt(n);}
 function fmtN(n){return parseInt(n).toLocaleString('pt-BR');}
@@ -1370,12 +1392,12 @@ async function fetchCloudia(){
     const createdMap={};
     allCloudiaRows.forEach(r=>{
       if(r.type!=='CUSTOMER_CREATED')return;
-      const ph=String(r.phone||'').replace(/\D/g,'');
+      const ph=normalizePhone(r.phone);
       if(ph&&!createdMap[ph])createdMap[ph]=r;
     });
     allCloudiaRows.forEach(r=>{
       if(r.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
-      const ph=String(r.phone||'').replace(/\D/g,'');
+      const ph=normalizePhone(r.phone);
       if(!ph)return;
       const lead=createdMap[ph];
       if(lead){
@@ -1477,7 +1499,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // --- STEP 3: Conta leads únicos por telefone (filtrado por created_at) ---
   const leadsPhones=new Set();
-  filtered.forEach(r=>{const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsPhones.add(ph);});
+  filtered.forEach(r=>{const ph=normalizePhone(r.phone);if(ph)leadsPhones.add(ph);});
   const cloudiaLeadsCount=leadsPhones.size;
 
   // STEP 4: Casa telefones com anúncios — usa TODOS os rows (não só os filtrados)
@@ -1485,13 +1507,13 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const phoneAdKeyMap={};
   allCloudiaRows.forEach(r=>{
     const key=findAdKey(r);
-    if(key){const ph=String(r.phone||'').replace(/\D/g,'');if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
+    if(key){const ph=normalizePhone(r.phone);if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
   });
   // STEP 5: Conta eventos do período — deduplicado por telefone por anúncio
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenAdPhone={agend:{},comp:{},fechou:{}};
   evtsParaFunil.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');if(!ph)return;
+    const ph=normalizePhone(r.phone);if(!ph)return;
     let matchKey=null;
     for(const [k,d] of Object.entries(adMap)){if(d.phones&&d.phones.has(ph)){matchKey=k;break;}}
     if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
@@ -1514,7 +1536,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const origenPhonesSeen={};
   filtered.forEach(r=>{
     const org=r.origin||'—';
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     if(!origenPhonesSeen[org])origenPhonesSeen[org]=new Set();
     if(ph)origenPhonesSeen[org].add(ph);
   });
@@ -1525,9 +1547,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Comparecimentos/fechamentos: qualquer CUSTOMER_STAGE_UPDATED no período (filteredEvents)
   const evtsGeral=filteredEvents||filtered;
   const agendSrc=filteredAgend||[];
-  const agendPhones=new Set(agendSrc.map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const agendPhones=new Set(agendSrc.map(r=>normalizePhone(r.phone)));
   const agendAuto=agendPhones.size;
-  const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>normalizePhone(r.phone)));
   window._lastCompPhones=compPhones;
   // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho)
   // Usa timestamp (data da consulta) se existir, senão created_at
@@ -1535,13 +1557,13 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   filterCloudiaByOrigin(allCloudiaRows).filter(r=>{
     if(r.type!=='CUSTOMER_CREATED')return false;
     if(!isComp(r.stage)&&!isFechou(r.stage))return false;
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     if(!ph)return false;
     const d=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
     if(!d)return false;
     const ds=localDateStr(d);
     return ds>=_rangeComp.since&&ds<=_rangeComp.until;
-  }).forEach(r=>compPhones.add(String(r.phone||'').replace(/\D/g,'')));
+  }).forEach(r=>compPhones.add(normalizePhone(r.phone)));
   const compAuto=compPhones.size;
   // Usa valor manual se definido, senão usa automático
   const _agendManual=getManualOverride('agend');
@@ -1553,7 +1575,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const fechadosPhones=new Set();
   // 1. Importados via CSV — usa data do orçamento aprovado (filtrado por origem)
   filterCloudiaByOrigin(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage))).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     if(!ph)return;
     const d=_ccData[ph];
     const orc=d&&d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
@@ -1561,9 +1583,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(dataFech&&dataFech>=_rng.since&&dataFech<=_rng.until)fechadosPhones.add(ph);
   });
   // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — só conta se NÃO está no CSV importado
-  const importadosGanhoPhones=new Set(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage)).map(r=>String(r.phone||'').replace(/\D/g,'')));
+  const importadosGanhoPhones=new Set(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage)).map(r=>normalizePhone(r.phone)));
   evtsGeral.filter(r=>isFechou(r.stage)).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     if(!ph||importadosGanhoPhones.has(ph))return;
     fechadosPhones.add(ph);
   });
@@ -1573,7 +1595,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Vendas: valor máximo por telefone
   const vendasMap={};
   fechados.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     const v=parseFloat(r.value||0);
     if(!vendasMap[ph]||v>vendasMap[ph])vendasMap[ph]=v;
   });
@@ -1587,7 +1609,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   filtered.forEach(r=>{
     if((r.origin||'').toLowerCase().includes('instagram ads')||
        (r.ad_name&&String(r.ad_name).trim()!=='')){
-      const ph=String(r.phone||'').replace(/\D/g,'');if(ph)leadsInstagram.add(ph);
+      const ph=normalizePhone(r.phone);if(ph)leadsInstagram.add(ph);
     }
   });
   const leadsBase=cloudiaLeadsCount;
@@ -1630,7 +1652,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!temAprovado)return;
     // Verifica origem do phone
     if(_origemFilter){
-      const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')===ph);
+      const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
       const org=(row&&row.origin||'').toLowerCase();
       let match=false;
       if(_origemFilter==='instagram ads')match=org.includes('instagram');
@@ -1655,7 +1677,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
           if(_origemFilter==='social selling')return org.includes('social');
           return true;
         })
-        .map(r=>String(r.phone||'').replace(/\D/g,''))
+        .map(r=>normalizePhone(r.phone))
         .filter(p=>p)
     );
     fechadosPhones.forEach(ph=>{if(!phonesOrigemOk.has(ph))fechadosPhones.delete(ph);});
@@ -1672,7 +1694,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
     const d=_ccData[ph];
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
       // Filtra por data de FECHAMENTO (fechData), não por data do orçamento
@@ -1692,7 +1714,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Oportunidades — todos os orçamentos de quem compareceu
   compPhonesSet.forEach(ph=>{
     const d=_ccData[ph];
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
       const tot=d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0);
@@ -1740,7 +1762,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       const entVal=Number(o.entrada||0);
       if(entVal>0){
         totalEntradas+=entVal;
-        const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
         const nome=(d.nomeAtual)||(row&&row.name)||'—';
         _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||''});
       }
@@ -1798,7 +1820,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
     if(!key){
       // Tenta casar pela origem do lead (ex: #Instagram ADS → anúncio com mais leads no período)
-      const rowCloudia=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      const rowCloudia=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
       const origLead=(rowCloudia&&rowCloudia.origin||'').toLowerCase();
       if(origLead.includes('instagram')){
         // Atribui ao anúncio com mais leads de Instagram no período
@@ -1813,7 +1835,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     adMap[key].fechouPhones.add(ph);
     // Valor real do orçamento aprovado
     const ccD=_ccData[ph];
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(()=>{const dr=o.fechData||o.data||'';return!dr||(dr>=_range.since&&dr<=_range.until);})());
     const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
     adMap[key].vendas+=val;
@@ -2035,7 +2057,7 @@ function renderLeadsTable(){
     // Mostra Lead, Agendou e Faltou/Desmarcou (não compareceu, não fechou)
     const isLeadStage=s===''||s==='lead'||s.includes('agendou')||s.includes('faltou')||s.includes('desmarcou');
     if(isLeadStage){
-      const ph=String(r.phone||'').replace(/\D/g,'')||r.name||Math.random();
+      const ph=normalizePhone(r.phone)||r.name||Math.random();
       const existing=phoneMap[ph];
       if(!existing){phoneMap[ph]=r;}
       else{
@@ -2175,7 +2197,7 @@ function renderClientesTable(){
   const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;return 1;};
   const phoneMap={};
   allCloudiaRows.filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name||Math.random();
+    const ph=normalizePhone(r.phone)||r.name||Math.random();
     if(!phoneMap[ph]||stageRank(r.stage)>stageRank(phoneMap[ph].stage)){phoneMap[ph]={...r};}
     const v=parseFloat(r.value||0);
     if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
@@ -2330,7 +2352,7 @@ function lupaLeads(){
   // FIX: deduplicar por telefone na lupa — 1 linha por lead único
   const phoneMap={};
   _lastCloudiaFiltered.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name||'_'+Math.random();
+    const ph=normalizePhone(r.phone)||r.name||'_'+Math.random();
     if(!phoneMap[ph]){phoneMap[ph]=r;}
     else{
       const dNew=new Date(r.created_at||r.timestamp||0);
@@ -2347,7 +2369,7 @@ function lupaAgend(){
   // Usa _lastCloudiaFilteredAgend: só CUSTOMER_STAGE_UPDATED com stage Agendou no período
   const phoneMap={};
   (_lastCloudiaFilteredAgend||[]).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
     else{
       const dCur=new Date(r.timestamp||r.created_at||0);
@@ -2363,7 +2385,7 @@ function lupaAgend(){
 function lupaComp(){
   const phoneMap={};
   (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
@@ -2430,7 +2452,7 @@ function lupaAdLeads(adKey){
     }
     return false;
   }).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
@@ -2446,10 +2468,10 @@ function lupaAdAgend(adKey){
   const adPhones=adInfo&&adInfo.phones?adInfo.phones:new Set();
   (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
     if(!isAgend(r.stage)&&!isComp(r.stage)&&!isFechou(r.stage))return false;
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     return adPhones.has(ph);
   }).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
@@ -2463,10 +2485,10 @@ function lupaAdComp(adKey){
   const adPhones=adInfo&&adInfo.compPhones?adInfo.compPhones:new Set();
   const phoneMap={};
   (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     return (isComp(r.stage)||isFechou(r.stage))&&adPhones.has(ph);
   }).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
@@ -2480,10 +2502,10 @@ function lupaAdFechou(adKey){
   const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
   const phoneMap={};
   (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
+    const ph=normalizePhone(r.phone);
     return isFechou(r.stage)&&adPhones.has(ph);
   }).forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!phoneMap[ph])phoneMap[ph]=r;
   });
   const rows=Object.values(phoneMap)
@@ -2497,8 +2519,8 @@ function lupaAdVendas(adKey){
   const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
   const rows=[];let total=0;
   adPhones.forEach(ph=>{
-    const d=_ccData[ph]||{};
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+    const d=ccDataLookup(ph)||{};
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d.nomeAtual)||(row&&row.name)||'—';
     const orcsAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado');
     const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
@@ -2514,12 +2536,12 @@ function lupaAdVendas(adKey){
 // 3) o stage do evento original como fallback
 // Para a data de consulta, prioriza _ccData.consultaTimestamp, senão usa o timestamp do evento Agendou
 function getEffectiveAgendInfo(phone,fallbackEvt){
-  const ph=String(phone||'').replace(/\D/g,'');
-  const ccD=_ccData&&_ccData[ph];
+  const ph=normalizePhone(phone);
+  const ccD=ccDataLookup(phone);
   let stage=fallbackEvt?fallbackEvt.stage:'';
   if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
     const stageUpdates=_lastCloudiaRows.filter(row=>
-      String(row.phone||'').replace(/\D/g,'')===ph && row.type==='CUSTOMER_STAGE_UPDATED'
+      normalizePhone(row.phone)===ph && row.type==='CUSTOMER_STAGE_UPDATED'
     ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(stageUpdates.length>0)stage=stageUpdates[0].stage;
   }
