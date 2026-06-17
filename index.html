@@ -2350,7 +2350,7 @@ function lupaAgend(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(e.stage)];});
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(info.stage)];});
   openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status'],rows);
 }
 function lupaComp(){
@@ -2361,7 +2361,7 @@ function lupaComp(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))
-    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(e.timestamp)];});
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(info.consultaTs)];});
   openModal('Oportunidades — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
 
@@ -2447,7 +2447,7 @@ function lupaAdAgend(adKey){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',getStatusAgend(e.stage),fmtDate(e.timestamp)];});
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',getStatusAgend(info.stage),fmtDate(info.consultaTs)];});
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
 }
 function lupaAdComp(adKey){
@@ -2464,7 +2464,7 @@ function lupaAdComp(adKey){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const ph=String(e.phone||'').replace(/\D/g,'');const consultaTs=(_ccData[ph]&&_ccData[ph].consultaTimestamp)||e.timestamp||'';return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(consultaTs)];});
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',fmtDate(info.consultaTs)];});
   openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
 function lupaAdFechou(adKey){
@@ -2500,6 +2500,25 @@ function lupaAdVendas(adKey){
   rows.sort((a,b)=>parseFloat(b[2].replace(/\D/g,''))-parseFloat(a[2].replace(/\D/g,'')));
   rows.push(['TOTAL','',fmt(total)]);
   openModal('Vendas — '+label.substring(0,30),['Nome','Telefone','Valor Fechado'],rows);
+}
+// Retorna {stage, consultaTs} mais corretos para um telefone, priorizando:
+// 1) statusAtual manual do _ccData (se setado)
+// 2) último CUSTOMER_STAGE_UPDATED real do Cloudia em _lastCloudiaRows
+// 3) o stage do evento original como fallback
+// Para a data de consulta, prioriza _ccData.consultaTimestamp, senão usa o timestamp do evento Agendou
+function getEffectiveAgendInfo(phone,fallbackEvt){
+  const ph=String(phone||'').replace(/\D/g,'');
+  const ccD=_ccData&&_ccData[ph];
+  let stage=fallbackEvt?fallbackEvt.stage:'';
+  if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
+    const stageUpdates=_lastCloudiaRows.filter(row=>
+      String(row.phone||'').replace(/\D/g,'')===ph && row.type==='CUSTOMER_STAGE_UPDATED'
+    ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    if(stageUpdates.length>0)stage=stageUpdates[0].stage;
+  }
+  if(ccD&&ccD.statusAtual)stage=ccD.statusAtual;
+  const consultaTs=(ccD&&ccD.consultaTimestamp)||(fallbackEvt&&fallbackEvt.timestamp)||'';
+  return{stage:stage,consultaTs:consultaTs};
 }
 function getStatusAgend(stage){
   if(!stage)return'—';const s=stage.toLowerCase();
