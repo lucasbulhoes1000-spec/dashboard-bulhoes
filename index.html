@@ -1315,6 +1315,16 @@ function toggleCustosBlock(){
   block.style.display=isHidden?'grid':'none';
   if(icon)icon.style.transform=isHidden?'rotate(90deg)':'rotate(0deg)';
 }
+// Atribui manualmente um anúncio (ad_id) a um telefone, para quando o Cloudia não
+// preencheu ad_id/ad_name no evento original. Uso no console: setAdIdManual('telefone','ad_id')
+function setAdIdManual(phone,adId){
+  const ph=normalizePhone(phone);
+  if(!ph){console.log('Telefone inválido');return;}
+  if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+  _ccData[ph].adIdManual=String(adId);
+  salvarCRMDebounced();
+  console.log('Atribuído ad_id',adId,'para',ph,'— recarregue o dashboard (Atualizar) para refletir.');
+}
 function fmt(n){return'R$ '+parseFloat(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtK(n){return n>=1000?'R$ '+(n/1000).toFixed(1)+'k':fmt(n);}
 function fmtN(n){return parseInt(n).toLocaleString('pt-BR');}
@@ -1526,8 +1536,12 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Monta mapa phone → adKey para usar nos eventos de agendamento/comparecimento
   const phoneAdKeyMap={};
   allCloudiaRows.forEach(r=>{
-    const key=findAdKey(r);
-    if(key){const ph=normalizePhone(r.phone);if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
+    const ph0=normalizePhone(r.phone);
+    // Override manual: se o lead não tem ad_id/ad_name no Cloudia, mas foi atribuído
+    // manualmente a um anúncio via _ccData.adIdManual, usa isso primeiro.
+    const ccManualAd=ph0&&_ccData[ph0]&&_ccData[ph0].adIdManual;
+    const key=ccManualAd?findAdKey({ad_id:ccManualAd}):findAdKey(r);
+    if(key){const ph=ph0;if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
   });
   // STEP 5: Conta eventos do período — deduplicado por telefone por anúncio
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
