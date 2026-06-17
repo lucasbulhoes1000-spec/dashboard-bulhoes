@@ -1250,7 +1250,7 @@ function filterAgendByRange(rows,tab){
     const ccManual=ccDataLookup(ph_agend);
     const statusManual=ccManual&&ccManual.statusAtual;
     if(!statusManual||(!isAgend(statusManual)&&!isComp(statusManual)&&!isFechou(statusManual))){
-      const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
+      const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED'&&e.stage)
         .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
       if(stageUpdates.length>0){
         const lastStage=stageUpdates[0].stage;
@@ -2539,13 +2539,28 @@ function getEffectiveAgendInfo(phone,fallbackEvt){
   const ph=normalizePhone(phone);
   const ccD=ccDataLookup(phone);
   let stage=fallbackEvt?fallbackEvt.stage:'';
+  let stageTs=fallbackEvt?(fallbackEvt.timestamp||fallbackEvt.created_at):null;
   if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
     const stageUpdates=_lastCloudiaRows.filter(row=>
-      normalizePhone(row.phone)===ph && row.type==='CUSTOMER_STAGE_UPDATED'
+      normalizePhone(row.phone)===ph && row.type==='CUSTOMER_STAGE_UPDATED' && row.stage
     ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-    if(stageUpdates.length>0)stage=stageUpdates[0].stage;
+    if(stageUpdates.length>0){stage=stageUpdates[0].stage;stageTs=stageUpdates[0].timestamp;}
   }
-  if(ccD&&ccD.statusAtual)stage=ccD.statusAtual;
+  // Só usa o status manual se ele for mais recente que o último evento real do Cloudia.
+  // Se a edição manual não tiver timestamp registrado (dados antigos), só usa se não houver
+  // nenhum evento do Cloudia mais recente disponível.
+  if(ccD&&ccD.statusAtual){
+    const manualTs=ccD.statusAtualEditedAt?parseCloudiaDate(ccD.statusAtualEditedAt):null;
+    const cloudiaTs=stageTs?parseCloudiaDate(stageTs):null;
+    if(manualTs&&cloudiaTs){
+      if(manualTs>=cloudiaTs)stage=ccD.statusAtual;
+    } else if(manualTs&&!cloudiaTs){
+      stage=ccD.statusAtual;
+    } else if(!manualTs&&!cloudiaTs){
+      stage=ccD.statusAtual;
+    }
+    // se !manualTs && cloudiaTs → mantém o stage do Cloudia (mais confiável que edição manual sem data)
+  }
   const consultaTs=(ccD&&ccD.consultaTimestamp)||(fallbackEvt&&fallbackEvt.timestamp)||'';
   return{stage:stage,consultaTs:consultaTs};
 }
@@ -4292,6 +4307,7 @@ function salvarLeadCard(){
   _ccData[ph].nomeAtual=novoNome||r.name;
   _ccData[ph].origemAtual=novaOrigem||r.origin;
   _ccData[ph].statusAtual=novoStatus;
+  _ccData[ph].statusAtualEditedAt=new Date().toISOString();
   _ccData[ph].telefoneAtual=novoTel||ph;
   _ccData[ph].editadoManualmente=true;
   if(agendTimestamp)_ccData[ph].agendTimestamp=agendTimestamp;
