@@ -1201,13 +1201,18 @@ function filterAgendByRange(rows,tab){
     // CUSTOMER_ACQUISITION_ORIGIN_UPDATED é ignorado
     
     // Pega todos os eventos Agendou (excluindo ACQ)
-    // Se não achar CUSTOMER_STAGE_UPDATED, aceita CUSTOMER_ACQUISITION_ORIGIN_UPDATED com stage Agendou
+    // Prioridade: 1) CUSTOMER_STAGE_UPDATED  2) CUSTOMER_ACQUISITION_ORIGIN_UPDATED  3) CUSTOMER_CREATED (lead já nasce como Agendou)
     let agendEvts=evts.filter(e=>
       isAgend(e.stage) && e.type==='CUSTOMER_STAGE_UPDATED'
     ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     if(agendEvts.length===0){
       agendEvts=evts.filter(e=>
         isAgend(e.stage) && e.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
+      ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    }
+    if(agendEvts.length===0){
+      agendEvts=evts.filter(e=>
+        isAgend(e.stage) && e.type==='CUSTOMER_CREATED'
       ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     }
     
