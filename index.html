@@ -1211,22 +1211,24 @@ function filterAgendByRange(rows,tab){
       ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     }
     
-    // Pega todos os eventos Faltou (excluindo ACQ)
+    // Pega todos os eventos Faltou (excluindo ACQ) — apenas para referência de status, NÃO usado para inventar data
     const faltouEvts=evts.filter(e=>
       isFaltou(e.stage) && e.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
     );
     
     // Determina o evento representativo do agendamento:
-    // Se tem Agendou → usa o mais recente Agendou
-    // Se só tem Faltou (sem Agendou) → usa o Faltou, mas com o created_at do lead como data
+    // Só conta se existir um evento Agendou REAL (CUSTOMER_STAGE_UPDATED ou fallback ACQ),
+    // OU se houver edição manual no _ccData com agendTimestamp salvo.
     let agendRef=null;
     if(agendEvts.length>0){
       agendRef=agendEvts[0];
-    } else if(faltouEvts.length>0){
-      // Não tem Agendou registrado — usa Faltou mas data = created_at do lead
-      const leadEvt=evts.find(e=>e.type==='CUSTOMER_CREATED');
-      const faltouRef=faltouEvts[0];
-      agendRef={...faltouRef, timestamp: leadEvt?leadEvt.created_at:faltouRef.timestamp};
+    }
+    const ph_agend0=String((evts[0]&&evts[0].phone)||'').replace(/\D/g,'');
+    const ccManual0=_ccData&&_ccData[ph_agend0];
+    if(!agendRef&&ccManual0&&ccManual0.agendTimestamp){
+      // Sem evento Agendou real no Cloudia, mas há edição manual — usa um evento base (Faltou ou qualquer) só como veículo
+      const baseEvt=faltouEvts[0]||evts[0];
+      agendRef={...baseEvt, timestamp:ccManual0.agendTimestamp};
     }
     if(!agendRef){return;}
     
