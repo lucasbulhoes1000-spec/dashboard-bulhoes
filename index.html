@@ -1499,7 +1499,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     spend+=parseFloat(ad.spend||0);
     const key=String(ad.ad_id||'').trim();
     if(!key)return;
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',campaign:ad.campaign_name||'',label:ad.ad_name||key,phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',campaign:ad.campaign_name||'',label:ad.ad_name||key,phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
     adMap[key].spend+=parseFloat(ad.spend||0);
     if(ad.ad_name)adNameMap[norm(ad.ad_name)]=key;
   });
@@ -1553,14 +1553,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
     const target=matchKey?adMap[matchKey]:null;
     if(!matchKey){
-      if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+      if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
     }
     const key=matchKey||'__sem_rastreio__';
     const d=adMap[key];
     if(!seenAdPhone.agend[key])seenAdPhone.agend[key]=new Set();
     if(!seenAdPhone.comp[key])seenAdPhone.comp[key]=new Set();
     if(!seenAdPhone.fechou[key])seenAdPhone.fechou[key]=new Set();
-    if((isAgend(r.stage)||isFaltou(r.stage))&&!seenAdPhone.agend[key].has(ph)){seenAdPhone.agend[key].add(ph);d.agend++;}
+    if((isAgend(r.stage)||isFaltou(r.stage))&&!seenAdPhone.agend[key].has(ph)){seenAdPhone.agend[key].add(ph);d.agend++;if(d.agendPhones)d.agendPhones.add(ph);}
     if(isComp(r.stage)&&!seenAdPhone.comp[key].has(ph)){seenAdPhone.comp[key].add(ph);d.comp++;d.compPhones.add(ph);}
     if(isFechou(r.stage)&&!seenAdPhone.fechou[key].has(ph)){seenAdPhone.fechou[key].add(ph);d.fechou++;d.fechouPhones.add(ph);d.vendas+=parseFloat(r.value||0);}
   });
@@ -1582,6 +1582,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const evtsGeral=filteredEvents||filtered;
   const agendSrc=filteredAgend||[];
   const agendPhones=new Set(agendSrc.map(r=>normalizePhone(r.phone)));
+  window._lastAgendPhones=agendPhones;
   const agendAuto=agendPhones.size;
   const compPhones=new Set(evtsGeral.filter(r=>isComp(r.stage)||isFechou(r.stage)).map(r=>normalizePhone(r.phone)));
   window._lastCompPhones=compPhones;
@@ -1829,9 +1830,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       <span style="font-size:10px;color:#b5a898;width:32px;text-align:right;">${Math.round(n/totalO*100)}%</span>
     </div>`).join('')||'<span style="font-size:11px;color:#b5a898;">Aguardando dados...</span>';
 
-  // Funil por anúncio — reconcilia comp e fechou com as fontes corretas
-  // (filteredEvents usa timestamp bruto; _lastCompPhones e fechadosPhones já usam
-  //  consultaTimestamp do CRM e orçamentos aprovados — mais precisos)
+  // Funil por anúncio — reconcilia agend, comp e fechou com as fontes corretas
+  // (filteredEvents usa timestamp bruto; _lastAgendPhones/_lastCompPhones/fechadosPhones já usam
+  //  agendTimestamp/consultaTimestamp do CRM e orçamentos aprovados — mais precisos)
+
+  // AGEND: para cada phone em _lastAgendPhones, atribui ao adKey correspondente
+  // Zera agend/agendPhones antes de reconciliar
+  Object.values(adMap).forEach(d=>{d.agend=0;d.agendPhones=new Set();});
+  const _reconAgendPhones=window._lastAgendPhones||new Set();
+  _reconAgendPhones.forEach(ph=>{
+    let key=phoneAdKeyMap[ph]||null;
+    if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
+    if(!key)key='__sem_rastreio__';
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
+    adMap[key].agend++;
+    adMap[key].agendPhones.add(ph);
+  });
 
   // COMP: para cada phone em _lastCompPhones, atribui ao adKey correspondente
   // Zera comp/compPhones antes de reconciliar
@@ -1841,7 +1855,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     let key=phoneAdKeyMap[ph]||null;
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
     if(!key)key='__sem_rastreio__';
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
     adMap[key].comp++;
     adMap[key].compPhones.add(ph);
   });
@@ -1864,7 +1878,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       }
     }
     if(!key)key='__sem_rastreio__';
-    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+    if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
     adMap[key].fechou++;
     adMap[key].fechouPhones.add(ph);
     // Valor real do orçamento aprovado
@@ -1879,7 +1893,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const trackeadosPhones=new Set();
   Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__')(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p));});
   const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
-  if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set()};
+  if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
   semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
   adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0&&adMap['__sem_rastreio__'].comp===0)delete adMap['__sem_rastreio__'];
@@ -2503,20 +2517,17 @@ function lupaAdLeads(adKey){
 function lupaAdAgend(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
-  const phoneMap={};
-  // Usa os phones já casados no adMap — garante que só mostra quem é desse anúncio
-  const adPhones=adInfo&&adInfo.phones?adInfo.phones:new Set();
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
-    if(!isAgend(r.stage)&&!isComp(r.stage)&&!isFechou(r.stage))return false;
-    const ph=normalizePhone(r.phone);
-    return adPhones.has(ph);
-  }).forEach(r=>{
-    const ph=normalizePhone(r.phone)||r.name;
-    if(!phoneMap[ph])phoneMap[ph]=r;
-  });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',getStatusAgend(info.stage),fmtDate(info.consultaTs)];});
+  const adPhones=adInfo&&adInfo.agendPhones?adInfo.agendPhones:new Set();
+  const rows=[...adPhones].map(ph=>{
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const e=applyEdits({...row,phone:row.phone||ph});
+    const info=getEffectiveAgendInfo(ph,row);
+    const ccD=ccDataLookup(ph);
+    const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
+    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,stage:info.stage,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(e.created_at)||new Date(0)};
+  }).sort((a,b)=>b.sortKey-a.sortKey)
+    .map(r=>[r.dataCadastro,r.nome,r.telefone,getStatusAgend(r.stage),fmtDate(r.consultaTs)]);
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
 }
 function lupaAdComp(adKey){
