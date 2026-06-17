@@ -95,6 +95,14 @@ tbody tr:hover td{background:#faf7f3;}
 .fb2{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;min-width:28px;}
 .fn{font-size:11px;font-weight:500;color:#fff;}
 .fp{font-size:10px;color:#b5a898;width:36px;text-align:right;flex-shrink:0;}
+/* Funil em formato triângulo (trapézios decrescentes, centralizados) */
+.funnel-tri{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0;}
+.funnel-tri-row{position:relative;display:flex;align-items:center;justify-content:center;height:46px;}
+.funnel-tri-shape{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;transition:width .3s ease;min-width:80px;}
+.funnel-tri-label{font-size:11px;font-weight:500;line-height:1.2;}
+.funnel-tri-val{font-size:15px;font-weight:700;line-height:1.2;}
+.funnel-tri-pct{position:absolute;right:0;font-size:10px;color:#b5a898;}
+.funnel-origin-select{font-size:11px;border:1px solid #e0d9d0;border-radius:6px;padding:4px 8px;background:#fff;color:#6b5940;margin-left:auto;}
 .pill{font-size:10px;padding:2px 8px;border-radius:5px;background:#f5efe8;color:#7a6550;border:0.5px solid #CCBCA6;max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle;}
 .ta{color:#A18B6C;} .tg{color:#5a8a6a;} .tm{color:#b5a898;}
 .loading{display:flex;align-items:center;justify-content:center;height:40vh;flex-direction:column;gap:12px;color:#9a8c7e;font-size:13px;}
@@ -267,8 +275,11 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
             </div>
-            <div class="slabel">Custos</div>
-            <div class="row r3">
+            <div class="slabel" style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="toggleCustosBlock()">
+              <span>Custos</span>
+              <span id="custos-toggle-icon" style="font-size:10px;color:#A18B6C;transition:transform .2s;">▶</span>
+            </div>
+            <div class="row r3" id="custos-block" style="display:none;">
               <div class="ccard"><div class="ml">Custo por agendamento</div><div class="mv" id="t-cpa">—</div></div>
               <div class="ccard"><div class="ml">Custo por comparecimento</div><div class="mv" id="t-cpcomp">—</div></div>
               <div class="ccard"><div class="ml">Custo por contrato</div><div class="mv" id="t-cpc2">—</div></div>
@@ -282,7 +293,7 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="sep"></div>
             <div class="two-col">
-              <div class="card no-mb"><div class="ctitle">Funil geral</div><div id="t-funnel"></div></div>
+              <div class="card no-mb"><div class="ctitle" style="display:flex;align-items:center;justify-content:space-between;">Funil geral<span id="t-funnel-origem" style="font-size:10px;color:#b5a898;text-transform:none;font-weight:400;"></span></div><div id="t-funnel"></div></div>
               <div class="card no-mb"><div class="ctitle">Origem dos leads</div><div id="t-origem"></div></div>
             </div>
             <div style="margin-top:12px;">
@@ -1295,6 +1306,14 @@ function ccDataLookup(phoneOrKey){
   const found=Object.keys(_ccData).find(k=>normalizePhone(k)===norm);
   return found?_ccData[found]:null;
 }
+function toggleCustosBlock(){
+  const block=document.getElementById('custos-block');
+  const icon=document.getElementById('custos-toggle-icon');
+  if(!block)return;
+  const isHidden=block.style.display==='none';
+  block.style.display=isHidden?'grid':'none';
+  if(icon)icon.style.transform=isHidden?'rotate(90deg)':'rotate(0deg)';
+}
 function fmt(n){return'R$ '+parseFloat(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtK(n){return n>=1000?'R$ '+(n/1000).toFixed(1)+'k':fmt(n);}
 function fmtN(n){return parseInt(n).toLocaleString('pt-BR');}
@@ -1773,14 +1792,29 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
   document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
 
-  // Funil visual
+  // Funil visual — formato triângulo (trapézios decrescentes)
   const maxF=Math.max(leadsBase,agend,comp,contratos,1);
-  document.getElementById('t-funnel').innerHTML=[
+  const funnelStages=[
     {label:'Leads',val:leadsBase,pct:'',color:'#A18B6C'},
     {label:'Agendamentos',val:agend,pct:pct(agend,leadsBase),color:'#8a7358'},
     {label:'Comparecimentos',val:comp,pct:pct(comp,agend),color:'#6b5940'},
     {label:'Contratos',val:contratos,pct:pct(contratos,comp),color:'#4a3d2b'},
-  ].map(f=>`<div class="frow"><span class="fl">${f.label}</span><div class="fw"><div class="fb2" style="width:${Math.max(f.val/maxF*100,f.val>0?4:0)}%;background:${f.color};"><span class="fn">${f.val||0}</span></div></div><span class="fp">${f.pct}</span></div>`).join('');
+  ];
+  document.getElementById('t-funnel').innerHTML='<div class="funnel-tri">'+funnelStages.map(f=>{
+    const widthPct=Math.max(f.val/maxF*100,f.val>0?14:8);
+    return `<div class="funnel-tri-row" style="width:100%;">
+      <div class="funnel-tri-shape" style="width:${widthPct}%;background:${f.color};border-radius:6px;">
+        <span class="funnel-tri-val">${f.val||0}</span>
+        <span class="funnel-tri-label">${f.label}</span>
+      </div>
+      <span class="funnel-tri-pct">${f.pct}</span>
+    </div>`;
+  }).join('')+'</div>';
+  // Indica a origem ativa no título do card (reaproveita o filtro do topo)
+  const _origemSelEl=document.getElementById('origem-filter');
+  const _origemAtivaTxt=_origemSelEl&&_origemSelEl.selectedOptions[0]?_origemSelEl.selectedOptions[0].textContent:'';
+  const _funnelOrigemEl=document.getElementById('t-funnel-origem');
+  if(_funnelOrigemEl)_funnelOrigemEl.textContent=_origemAtivaTxt&&_origemAtivaTxt!=='Todas as origens'?_origemAtivaTxt:'';
 
   // Origem visual
   const totalO=Object.values(origens).reduce((a,b)=>a+b,0)||1;
@@ -2379,8 +2413,8 @@ function lupaAgend(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(info.stage)];});
-  openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status'],rows);
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(info.stage),fmtDate(info.consultaTs)];});
+  openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status','Data consulta'],rows);
 }
 function lupaComp(){
   const phoneMap={};
