@@ -97,11 +97,12 @@ tbody tr:hover td{background:#faf7f3;}
 .fp{font-size:10px;color:#b5a898;width:36px;text-align:right;flex-shrink:0;}
 /* Funil em formato triângulo (trapézios decrescentes, centralizados) */
 .funnel-tri{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0;}
-.funnel-tri-row{position:relative;display:flex;align-items:center;justify-content:center;height:46px;}
+.funnel-tri-row{position:relative;display:flex;align-items:center;justify-content:center;height:50px;}
 .funnel-tri-shape{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;transition:width .3s ease;min-width:80px;}
 .funnel-tri-label{font-size:11px;font-weight:500;line-height:1.2;}
 .funnel-tri-val{font-size:15px;font-weight:700;line-height:1.2;}
-.funnel-tri-pct{position:absolute;right:0;font-size:10px;color:#b5a898;}
+.funnel-tri-pct{position:absolute;right:0;font-size:15px;font-weight:700;color:#6b5940;background:#f5efe8;border:1px solid #e0d8ce;border-radius:6px;padding:3px 9px;}
+.funnel-tri-pct:empty{display:none;}
 .funnel-origin-select{font-size:11px;border:1px solid #e0d9d0;border-radius:6px;padding:4px 8px;background:#fff;color:#6b5940;margin-left:auto;}
 .pill{font-size:10px;padding:2px 8px;border-radius:5px;background:#f5efe8;color:#7a6550;border:0.5px solid #CCBCA6;max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle;}
 .ta{color:#A18B6C;} .tg{color:#5a8a6a;} .tm{color:#b5a898;}
@@ -1592,23 +1593,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Contratos: usa data do orçamento aprovado no _ccData (mais preciso que timestamp do evento)
   const _rng=getRange('trafego');
   const fechadosPhones=new Set();
-  // 1. Importados via CSV — usa data do orçamento aprovado (filtrado por origem)
-  filterCloudiaByOrigin(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage))).forEach(r=>{
-    const ph=normalizePhone(r.phone);
-    if(!ph)return;
-    const d=_ccData[ph];
-    const orc=d&&d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
-    const dataFech=orc?(orc.fechData||orc.data||''):'';
-    if(dataFech&&dataFech>=_rng.since&&dataFech<=_rng.until)fechadosPhones.add(ph);
-  });
-  // 2. Cloudia (CUSTOMER_STAGE_UPDATED Ganho) — só conta se NÃO está no CSV importado
-  const importadosGanhoPhones=new Set(allCloudiaRows.filter(r=>r.type==='CUSTOMER_CREATED'&&isFechou(r.stage)).map(r=>normalizePhone(r.phone)));
-  evtsGeral.filter(r=>isFechou(r.stage)).forEach(r=>{
-    const ph=normalizePhone(r.phone);
-    if(!ph||importadosGanhoPhones.has(ph))return;
-    fechadosPhones.add(ph);
-  });
-  // contratos será recalculado após adicionar manuais (abaixo)
+  // Contratos fechados = SOMENTE orçamentos aprovados manualmente no CRM (fonte única de verdade).
+  // A contagem real acontece abaixo, iterando por todo o _ccData (ver "Adiciona em fechadosPhones...").
   const fechados=evtsGeral.filter(r=>isFechou(r.stage));
 
   // Vendas: valor máximo por telefone
@@ -1807,7 +1793,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         <span class="funnel-tri-val">${f.val||0}</span>
         <span class="funnel-tri-label">${f.label}</span>
       </div>
-      <span class="funnel-tri-pct">${f.pct}</span>
+      <span class="funnel-tri-pct">${f.pct||''}</span>
     </div>`;
   }).join('')+'</div>';
   // Indica a origem ativa no título do card (reaproveita o filtro do topo)
