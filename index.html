@@ -1299,12 +1299,29 @@ function normalizePhone(phone){
 }
 // Busca segura no _ccData: tenta a chave normalizada e, se não achar, varre por chaves
 // que normalizem para o mesmo valor (cobre dados salvos antes da normalização existir)
+// Índice reverso: telefone normalizado -> chave original no _ccData.
+// Construído uma vez e invalidado (null) sempre que _ccData ganha uma chave nova,
+// para evitar Object.keys(_ccData).find(...) — O(N) — em toda chamada de ccDataLookup.
+let _ccDataNormIndex=null;
+function buildCcDataNormIndex(){
+  _ccDataNormIndex={};
+  Object.keys(_ccData).forEach(k=>{
+    const n=normalizePhone(k);
+    if(n&&!_ccDataNormIndex[n])_ccDataNormIndex[n]=k;
+  });
+}
 function ccDataLookup(phoneOrKey){
   if(!phoneOrKey)return null;
   if(_ccData[phoneOrKey])return _ccData[phoneOrKey];
   const norm=normalizePhone(phoneOrKey);
   if(_ccData[norm])return _ccData[norm];
-  const found=Object.keys(_ccData).find(k=>normalizePhone(k)===norm);
+  if(!_ccDataNormIndex)buildCcDataNormIndex();
+  let found=_ccDataNormIndex[norm];
+  if(!found){
+    // Pode ser uma chave nova ainda não indexada — tenta reconstruir o índice uma vez
+    buildCcDataNormIndex();
+    found=_ccDataNormIndex[norm];
+  }
   return found?_ccData[found]:null;
 }
 function toggleCustosBlock(){
@@ -1349,6 +1366,21 @@ async function loadTrafego(){
     const[metaAds,cloudiaRows]=await Promise.all([fetchMeta(),fetchCloudia()]);
     _lastMetaAds=metaAds;
     _lastCloudiaRows=cloudiaRows;
+    // Índice por telefone dos CUSTOMER_STAGE_UPDATED com stage não-vazio, já ordenados por timestamp desc.
+    // Construído uma única vez aqui para evitar que getEffectiveAgendInfo faça um .filter()
+    // completo em _lastCloudiaRows (milhares de linhas) a cada chamada — isso causava lentidão
+    // extrema na tela de Clientes, onde a função é chamada uma vez por cliente para ordenar.
+    window._stageUpdatesByPhone={};
+    cloudiaRows.forEach(row=>{
+      if(row.type!=='CUSTOMER_STAGE_UPDATED'||!row.stage)return;
+      const ph=normalizePhone(row.phone);
+      if(!ph)return;
+      if(!window._stageUpdatesByPhone[ph])window._stageUpdatesByPhone[ph]=[];
+      window._stageUpdatesByPhone[ph].push(row);
+    });
+    Object.values(window._stageUpdatesByPhone).forEach(arr=>{
+      arr.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+    });
     // Usa allCloudiaRows que já inclui importados reconstruídos pelo fetchCloudia
     const filtered=filterCloudiaByOrigin(filterByRange(allCloudiaRows,'trafego'));
     const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
@@ -2250,13 +2282,14 @@ function renderClientesTable(){
     const v=parseFloat(r.value||0);
     if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
   });
-  clientesData=Object.values(phoneMap).sort((a,b)=>{
-    const infoA=getEffectiveAgendInfo(a.phone,a);
-    const infoB=getEffectiveAgendInfo(b.phone,b);
-    const dA=parseCloudiaDate(infoA.consultaTs)||parseCloudiaDate(a.created_at||a.timestamp)||new Date(0);
-    const dB=parseCloudiaDate(infoB.consultaTs)||parseCloudiaDate(b.created_at||b.timestamp)||new Date(0);
-    return dB-dA;
+  // Pré-calcula a data de ordenação uma única vez por cliente (evita recalcular getEffectiveAgendInfo
+  // repetidamente dentro do comparador do sort, o que era O(N log N) chamadas pesadas)
+  const clientesArr=Object.values(phoneMap);
+  clientesArr.forEach(r=>{
+    const info=getEffectiveAgendInfo(r.phone,r);
+    r._sortDate=parseCloudiaDate(info.consultaTs)||parseCloudiaDate(r.created_at||r.timestamp)||new Date(0);
   });
+  clientesData=clientesArr.sort((a,b)=>b._sortDate-a._sortDate);
   // Atualiza selects de filtro
   const fasesSel=document.getElementById('clientes-fase-filter');
   fasesSel.innerHTML='<option value="">Todas as fases</option>';
@@ -2397,7 +2430,7 @@ function importarCRM(){document.getElementById('crm-import-input').click();}
 function loadCRMFile(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=ev=>{try{_ccData=JSON.parse(ev.target.result);filterClientesTable();alert('CRM importado!');}catch(err){alert('Erro ao importar: '+err.message);}};
+  reader.onload=ev=>{try{_ccData=JSON.parse(ev.target.result);_ccDataNormIndex=null;filterClientesTable();alert('CRM importado!');}catch(err){alert('Erro ao importar: '+err.message);}};
   reader.readAsText(file);
 }
 
@@ -2600,12 +2633,8 @@ function getEffectiveAgendInfo(phone,fallbackEvt){
   const ccD=ccDataLookup(phone);
   let stage=fallbackEvt?fallbackEvt.stage:'';
   let stageTs=fallbackEvt?(fallbackEvt.timestamp||fallbackEvt.created_at):null;
-  if(_lastCloudiaRows&&_lastCloudiaRows.length>0){
-    const stageUpdates=_lastCloudiaRows.filter(row=>
-      normalizePhone(row.phone)===ph && row.type==='CUSTOMER_STAGE_UPDATED' && row.stage
-    ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-    if(stageUpdates.length>0){stage=stageUpdates[0].stage;stageTs=stageUpdates[0].timestamp;}
-  }
+  const stageUpdates=(window._stageUpdatesByPhone&&window._stageUpdatesByPhone[ph])||null;
+  if(stageUpdates&&stageUpdates.length>0){stage=stageUpdates[0].stage;stageTs=stageUpdates[0].timestamp;}
   // Só usa o status manual se ele for mais recente que o último evento real do Cloudia.
   // Se a edição manual não tiver timestamp registrado (dados antigos), só usa se não houver
   // nenhum evento do Cloudia mais recente disponível.
@@ -3624,11 +3653,11 @@ function exportTableXLS(tbodyId,headersArr,filename){const tbody=document.getEle
 
 // ===== CRIAR LEAD =====
 function openCriarLead(){const today=new Date().toISOString().split('T')[0];const now=new Date().toTimeString().slice(0,5);document.getElementById('cl-data').value=today;document.getElementById('cl-hora').value=now;document.getElementById('cl-nome').value='';document.getElementById('cl-telefone').value='';document.getElementById('cl-origem').value='';document.getElementById('cl-status').value='Lead';document.getElementById('modal-criar-lead').style.display='flex';}
-async function salvarCriarLead(){const data=document.getElementById('cl-data').value;const hora=document.getElementById('cl-hora').value;const nome=document.getElementById('cl-nome').value.trim();const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cl-origem').value;const status=document.getElementById('cl-status').value;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:data+'T'+hora+':00'}})});const r=await res.json();if(r.status==='ok'){document.getElementById('modal-criar-lead').style.display='none';alert('✅ Lead criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});}}catch(e){alert('Erro: '+e.message);}}
+async function salvarCriarLead(){const data=document.getElementById('cl-data').value;const hora=document.getElementById('cl-hora').value;const nome=document.getElementById('cl-nome').value.trim();const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cl-origem').value;const status=document.getElementById('cl-status').value;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{console.log('[CRIAR LEAD] Tentando POST para:',CLOUDIA_URL);const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:data+'T'+hora+':00'}})});console.log('[CRIAR LEAD] Resposta recebida, status:',res.status);const r=await res.json();console.log('[CRIAR LEAD] Body:',r);if(r.status==='ok'){document.getElementById('modal-criar-lead').style.display='none';alert('✅ Lead criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR LEAD] Erro completo:',e);alert('Erro: '+e.message+'\n\nIsso geralmente é um problema de CORS ou conexão com o Google Apps Script. Verifique o console (F12) para mais detalhes.');}}
 
 // ===== CRIAR CLIENTE =====
 function openCriarCliente(){const today=new Date().toISOString().split('T')[0];const now=new Date().toTimeString().slice(0,5);document.getElementById('cc2-data').value=today;document.getElementById('cc2-hora').value=now;document.getElementById('cc2-nome').value='';document.getElementById('cc2-telefone').value='';document.getElementById('cc2-origem').value='';document.getElementById('cc2-status').value='Compareceu';document.getElementById('cc2-valor').value='';document.getElementById('modal-criar-cliente').style.display='flex';}
-async function salvarCriarCliente(){const data=document.getElementById('cc2-data').value;const hora=document.getElementById('cc2-hora').value;const nome=document.getElementById('cc2-nome').value.trim();const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cc2-origem').value;const status=document.getElementById('cc2-status').value;const valor=parseFloat(document.getElementById('cc2-valor').value)||0;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:data+'T'+hora+':00'}})});const r=await res.json();if(r.status==='ok'){document.getElementById('modal-criar-cliente').style.display='none';alert('✅ Cliente criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});}}catch(e){alert('Erro: '+e.message);}}
+async function salvarCriarCliente(){const data=document.getElementById('cc2-data').value;const hora=document.getElementById('cc2-hora').value;const nome=document.getElementById('cc2-nome').value.trim();const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cc2-origem').value;const status=document.getElementById('cc2-status').value;const valor=parseFloat(document.getElementById('cc2-valor').value)||0;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:data+'T'+hora+':00'}})});const r=await res.json();if(r.status==='ok'){document.getElementById('modal-criar-cliente').style.display='none';alert('✅ Cliente criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR CLIENTE] Erro completo:',e);alert('Erro: '+e.message);}}
 
 // ===== IMPORTAR LEADS =====
 function openImportarLeads(){document.getElementById('importar-leads-csv').value='';document.getElementById('importar-leads-preview').style.display='none';document.getElementById('modal-importar-leads').style.display='flex';}
@@ -3828,7 +3857,7 @@ async function carregarCRMRemoto(){
       if(rows[0].crm_json){
         const parsed=JSON.parse(rows[0].crm_json);
         if(parsed&&typeof parsed==='object'&&Object.keys(parsed).length>0){
-          _ccData=parsed;
+          _ccData=parsed;_ccDataNormIndex=null;_ccDataNormIndex=null;
           localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
           console.log('[CRM] Carregado do Supabase ✅',Object.keys(_ccData).length,'clientes');
           renderClientesTable();
@@ -3862,14 +3891,14 @@ async function carregarCRMRemoto(){
     if(local){
       const parsed=JSON.parse(local);
       if(parsed&&Object.keys(parsed).length>0){
-        _ccData=parsed;
+        _ccData=parsed;_ccDataNormIndex=null;
         console.log('[CRM] Carregado do localStorage:',Object.keys(_ccData).length,'clientes');
       }
     }
   }catch(e){
     console.warn('[CRM] Erro ao carregar:',e);
     const local=localStorage.getItem('bulhoes_crm');
-    if(local)try{_ccData=JSON.parse(local);}catch(e2){}
+    if(local)try{_ccData=JSON.parse(local);_ccDataNormIndex=null;}catch(e2){}
   }
 }
 
