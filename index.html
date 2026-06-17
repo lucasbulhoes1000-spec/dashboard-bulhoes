@@ -3274,27 +3274,29 @@ function renderRelOrigem(){
   leadRows.forEach(r=>{
     const org=(origFilt?origFilt:null)||r.origin||'—';
     if(origFilt&&(r.origin||'—')!==origFilt)return;
-    if(avalFilt||tratFilt){const ph2=String(r.phone||'').replace(/\D/g,'');const dd=_ccData[ph2]||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;}
+    if(avalFilt||tratFilt){const ph2=normalizePhone(r.phone);const dd=ccDataLookup(ph2)||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;}
     const actualOrg=r.origin||'—';
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
+    const ph=normalizePhone(r.phone)||r.name;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!seenLeads.has(ph)){seenLeads.add(ph);map[actualOrg].leads.add(ph);map[actualOrg].leadRows.push(r);const v=parseFloat(r.value||0);if(v>0&&!map[actualOrg].orcPhones.has(ph)){map[actualOrg].orcPhones.add(ph);map[actualOrg].valorOrc+=v;}}
   });
   // Agend
   (useDash?agendRows:eventRows.filter(r=>isAgend(r.stage)||isFaltou(r.stage))).forEach(r=>{
     const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;if(!ph)return;
+    const ph=normalizePhone(r.phone)||r.name;if(!ph)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
   });
   // COMP: usa _lastCompPhones (mesma fonte do dashboard — já considera consultaTimestamp e CSV)
   const compSrc=window._lastCompPhones||new Set();
   compSrc.forEach(ph=>{
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    if(!row)return;
-    const actualOrg=row.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+    const phN=normalizePhone(ph);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
+    const ccD=ccDataLookup(phN);
+    const actualOrg=(ccD&&ccD.origemAtual)||(row&&row.origin)||'—';
+    if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(!map[actualOrg].comp.has(ph)){map[actualOrg].comp.add(ph);map[actualOrg].compRows.push(row);}
+    if(!map[actualOrg].comp.has(phN)){map[actualOrg].comp.add(phN);map[actualOrg].compRows.push(row||{phone:phN,name:(ccD&&ccD.nomeAtual)||'—',origin:actualOrg});}
   });
 
   // FECHOU: orçamentos aprovados no período (CRM) + stage Ganho Cloudia
@@ -3308,16 +3310,18 @@ function renderRelOrigem(){
       return dr&&dr>=since&&dr<=until;
     });
     if(!temAprov)return;
-    if(origFilt){const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);if(!row||(row.origin||'')!==origFilt)return;}
-    fechadosPhonesRO.add(ph);
-    const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    if(row)fechRowMap[ph]=row;
+    const phN=normalizePhone(ph);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
+    const actualOrg=d.origemAtual||(row&&row.origin)||'—';
+    if(origFilt&&actualOrg!==origFilt)return;
+    fechadosPhonesRO.add(phN);
+    fechRowMap[phN]=row||{phone:phN,name:d.nomeAtual||'—',origin:actualOrg};
   });
   // 2. Stage Ganho no Cloudia no período
   allCloudiaRows.forEach(r=>{
     if(!isFechou(r.stage))return;
     if(r.type==='CUSTOMER_ACQUISITION_ORI')return;
-    const ph=String(r.phone||'').replace(/\D/g,'');if(!ph||fechadosPhonesRO.has(ph))return;
+    const ph=normalizePhone(r.phone);if(!ph||fechadosPhonesRO.has(ph))return;
     const ts=r.type==='CUSTOMER_CREATED'?parseCloudiaDate(r.created_at):parseCloudiaDate(r.timestamp);
     if(!ts)return;
     const ds=localDateStr(ts);
@@ -3325,7 +3329,8 @@ function renderRelOrigem(){
   });
   fechadosPhonesRO.forEach(ph=>{
     const r=fechRowMap[ph];if(!r)return;
-    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
+    const ccD=ccDataLookup(ph);
+    const actualOrg=(ccD&&ccD.origemAtual)||r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].fechPhones.has(ph)){
       map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);
