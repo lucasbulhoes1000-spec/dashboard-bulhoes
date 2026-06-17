@@ -3756,12 +3756,15 @@ function executarImportarClientes(){
 // CRM
 const CRM_URL=CLOUDIA_URL;
 let _crmSaveTimer=null;
+// Chave compartilhada para todos os logins da clínica — garante que TODOS os usuários
+// (Lucas, Vitória, Victoria, Lívia, Larissa, Gabi, Raffaella) vejam os mesmos dados do CRM,
+// em vez de cada e-mail de login ter seu próprio CRM isolado no Supabase.
+const CRM_SHARED_KEY='bulhoes-clinica-crm';
 
-// Salva TODO o _ccData no Supabase usando email como chave
+// Salva TODO o _ccData no Supabase usando chave compartilhada da clínica
 async function salvarCRMRemoto(){
   try{
-    const email=localStorage.getItem('bulhoes_email');
-    if(!email){localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));return;}
+    const email=CRM_SHARED_KEY;
     const payload={
       email_clinica: email,
       crm_json: JSON.stringify(_ccData),
@@ -3804,8 +3807,7 @@ function salvarCRMDebounced(){
 // Carrega o CRM do Supabase
 async function carregarCRMRemoto(){
   try{
-    const email=localStorage.getItem('bulhoes_email');
-    if(!email)return;
+    const email=CRM_SHARED_KEY;
     // Busca do Supabase primeiro
     const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(email)+'&select=crm_json,comissoes_json,listas_json',{
       headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
