@@ -1698,7 +1698,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
@@ -1718,7 +1718,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Oportunidades — todos os orçamentos de quem compareceu
   compPhonesSet.forEach(ph=>{
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
@@ -1854,7 +1854,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     adMap[key].fechou++;
     adMap[key].fechouPhones.add(ph);
     // Valor real do orçamento aprovado
-    const ccD=_ccData[ph];
+    const ccD=ccDataLookup(ph);
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(()=>{const dr=o.fechData||o.data||'';return!dr||(dr>=_range.since&&dr<=_range.until);})());
     const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
@@ -2092,7 +2092,7 @@ function renderLeadsTable(){
   // Aplica edições manuais salvas no CRM (_ccData) sobre os dados do Cloudia
   leadsData.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     if(!d)return;
     if(d.nomeAtual)r.name=d.nomeAtual;
     if(d.origemAtual)r.origin=d.origemAtual;
@@ -2262,7 +2262,7 @@ function filterClientesTable(){
     const fechou=isFechou(r.stage);
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph]||{orcamentos:[]};
+    const d=ccDataLookup(ph)||{orcamentos:[]};
     const orcs=d.orcamentos||[];
     const normStr=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
     const tratMatch=!trat||orcs.some(o=>normStr(o.tratamento)===normStr(trat));
@@ -2302,7 +2302,7 @@ function renderClientesPage(){
   const totalF=filtered.filter(r=>{
     if(isFechou(r.stage))return true;
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     return d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado');
   }).length;
   const totalA=totalC-totalF;
@@ -2310,7 +2310,7 @@ function renderClientesPage(){
   let totalOrcado=0;
   filtered.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
     if(orcs)orcs.forEach(o=>totalOrcado+=Number(o.valor||0));
     else totalOrcado+=parseFloat(r.value||0);
@@ -2319,7 +2319,7 @@ function renderClientesPage(){
   let valorF=0;
   filtered.forEach(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph];
+    const d=ccDataLookup(ph);
     const ehFechado=isFechou(r.stage)||(d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado'));
     if(!ehFechado)return;
     const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
@@ -2335,7 +2335,7 @@ function renderClientesPage(){
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=_ccData[ph]||{orcamentos:[]};
+    const d=ccDataLookup(ph)||{orcamentos:[]};
     const orc0=d.orcamentos&&d.orcamentos[0];
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
@@ -2446,12 +2446,12 @@ function lupaEntradas(){
 function lupaContratos(){
   // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
   const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>{
-    const da=_ccData[a.ph]&&_ccData[a.ph].created_at||'';
-    const db=_ccData[b.ph]&&_ccData[b.ph].created_at||'';
+    const da=(ccDataLookup(a.ph)&&ccDataLookup(a.ph).created_at)||'';
+    const db=(ccDataLookup(b.ph)&&ccDataLookup(b.ph).created_at)||'';
     return da.localeCompare(db);
   }).map(r=>{
-    const d=_ccData[r.ph]||{};
-    const row=allCloudiaRows.find(cr=>String(cr.phone||'').replace(/\D/g,'')=== r.ph);
+    const d=ccDataLookup(r.ph)||{};
+    const row=allCloudiaRows.find(cr=>normalizePhone(cr.phone)===r.ph);
     const dataReg=fmtDate(d.created_at||(row&&row.created_at)||'');
     const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
     const valOrc=d.orcamentos&&d.orcamentos.length>0?d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0):r.value;
@@ -2528,17 +2528,18 @@ function lupaAdFechou(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
-  const phoneMap={};
-  (_lastCloudiaFilteredEvents||_lastCloudiaFiltered).filter(r=>{
-    const ph=normalizePhone(r.phone);
-    return isFechou(r.stage)&&adPhones.has(ph);
-  }).forEach(r=>{
-    const ph=normalizePhone(r.phone)||r.name;
-    if(!phoneMap[ph])phoneMap[ph]=r;
-  });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const ph=String(e.phone||'').replace(/\D/g,'');const d=_ccData[ph]||{};const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');const valFech=orc?fmt(Number(orc.valor||0)):'—';return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.origin||'—',valFech];});
+  const rows=[...adPhones].map(ph=>{
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const e=applyEdits({...row,phone:row.phone||ph});
+    const ccD=ccDataLookup(ph)||{};
+    const nome=(ccD.nomeAtual)||e.name||'—';
+    const origem=(ccD.origemAtual)||e.origin||'—';
+    const orc=ccD.orcamentos&&ccD.orcamentos.find(o=>o.status==='Aprovado');
+    const valFech=orc?fmt(Number(orc.valor||0)):'—';
+    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,origem,valFech,sortKey:parseCloudiaDate(e.created_at)||new Date(0)};
+  }).sort((a,b)=>b.sortKey-a.sortKey)
+    .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,r.valFech]);
   openModal('Fechamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Valor fechado'],rows);
 }
 function lupaAdVendas(adKey){
@@ -3126,7 +3127,7 @@ function getRelEventRows(fromId, toId){
   return allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const ccD=_ccData[ph];
+    const ccD=ccDataLookup(ph);
     // Aplica overrides do CRM (consultaTimestamp e agendTimestamp)
     let ts=r.timestamp;
     if(ccD&&ccD.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage)))ts=ccD.consultaTimestamp;
@@ -3212,7 +3213,7 @@ function renderRelOrigem(){
     eventRows=allCloudiaRows.filter(r=>{
       if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
       const ph=String(r.phone||'').replace(/\D/g,'');
-      const ccD=_ccData[ph];
+      const ccD=ccDataLookup(ph);
       let ts=r.timestamp;
       if(ccD&&ccD.consultaTimestamp&&(isComp(r.stage)||isFechou(r.stage)))ts=ccD.consultaTimestamp;
       if(ccD&&ccD.agendTimestamp&&r.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(r.stage))ts=ccD.agendTimestamp;
@@ -3292,7 +3293,7 @@ function renderRelOrigem(){
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].fechPhones.has(ph)){
       map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);
-      const d=_ccData[ph];
+      const d=ccDataLookup(ph);
       const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
       const val=orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)||parseFloat(r.value||0);
       map[actualOrg].valorFech+=val;
@@ -3383,7 +3384,7 @@ function renderRelComparecidos(){
   const seenComp=new Set();
 
   Object.entries(byPhone).forEach(([ph,evts])=>{
-    const ccD=_ccData[ph]||{};
+    const ccD=ccDataLookup(ph)||{};
 
     // Data do agendamento — usa mesma prioridade do filterAgendByRange:
     // 1. agendTimestamp do CRM
@@ -3435,7 +3436,7 @@ function renderRelComparecidos(){
   // Só conta quem tem evento Agendou explícito OU agendTimestamp
   Object.entries(byPhone).forEach(([ph,evts])=>{
     if(seenAgend.has(ph))return;
-    const ccD=_ccData[ph]||{};
+    const ccD=ccDataLookup(ph)||{};
     let agendDate=null, agendRow=null;
     if(ccD.agendTimestamp){agendDate=parseCloudiaDate(ccD.agendTimestamp);agendRow=evts[0];}
     else {
@@ -4475,7 +4476,7 @@ function refreshLeadAnotacoes(d){
 function applyEdits(r){
   if(!r)return r;
   const ph=String(r.phone||'').replace(/\D/g,'');
-  const d=_ccData[ph];
+  const d=ccDataLookup(ph);
   const base=Object.assign({},r,{phone:String(r.phone||'')});
   if(!d)return base;
   return Object.assign(base,{
