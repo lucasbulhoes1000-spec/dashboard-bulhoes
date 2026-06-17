@@ -228,7 +228,7 @@ tbody tr:hover td{background:#faf7f3;}
     <!-- ===== DASHBOARD PAGE ===== -->
     <div class="page active" id="page-dashboard">
       <div class="dash-tabs">
-        <div class="tab active" onclick="switchDashTab('trafego',this)"><span class="tab-dot"></span>Tráfego Pago</div>
+        <div class="tab active" onclick="switchDashTab('trafego',this)"><span class="tab-dot"></span>Dashboard</div>
         <div class="tab" onclick="switchDashTab('social',this)"><span class="tab-dot"></span>Social Selling</div>
       </div>
       <div style="padding-top:20px;">
@@ -2453,7 +2453,7 @@ function lupaOport(){
   const total=sorted.reduce((s,r)=>s+r.value,0);
   const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
   tableRows.push(['TOTAL','',fmt(total)]);
-  openModal('Oportunidades — '+sorted.length+' clientes',['Nome','Telefone','Valor Orçado'],tableRows);
+  openModal('Oportunidades',['Nome','Telefone','Valor Orçado'],tableRows,sorted.length);
 }
 
 function lupaVendas(){
@@ -2461,7 +2461,7 @@ function lupaVendas(){
   const total=sorted.reduce((s,r)=>s+r.value,0);
   const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
   tableRows.push(['TOTAL','',fmt(total)]);
-  openModal('Vendas — '+sorted.length+' contratos',['Nome','Telefone','Valor Fechado'],tableRows);
+  openModal('Vendas',['Nome','Telefone','Valor Fechado'],tableRows,sorted.length);
 }
 
 function lupaEntradas(){
@@ -2469,7 +2469,7 @@ function lupaEntradas(){
   const total=rows.reduce((s,r)=>s+r.value,0);
   const tableRows=rows.map(r=>[r.data?new Date(r.data+'T12:00').toLocaleDateString('pt-BR'):'—',r.name,r.ph,fmt(r.value),r.pgto||'—']);
   tableRows.push(['','TOTAL','',fmt(total),'']);
-  openModal('Entradas — '+rows.length+' registros',['Data','Nome','Telefone','Valor','Pgto'],tableRows);
+  openModal('Entradas',['Data','Nome','Telefone','Valor','Pgto'],tableRows,rows.length);
 }
 function lupaContratos(){
   // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
@@ -2629,13 +2629,18 @@ function getStatusAgend(stage){
 
 // MODAL
 let _modalPerPage=0;
-function openModal(title,headers,rows){
+function openModal(title,headers,rows,customCount){
+  // Sempre acrescenta a contagem real de registros ao título, de forma consistente.
+  // customCount é usado quando rows inclui uma linha de TOTAL que não deve ser contada.
+  const baseTitle=String(title).replace(/\s*—\s*\d+\s*(registros?|únicos no período|clientes|contratos)?\s*$/i,'').trim();
+  const count=customCount!=null?customCount:rows.length;
+  const fullTitle=baseTitle+' — '+count+' registro'+(count===1?'':'s');
   // Detecta coluna de telefone automaticamente (usado para link de card)
   const phoneColIdx=headers.findIndex(h=>/telefone/i.test(h));
   const nameColIdx=headers.findIndex(h=>/nome/i.test(h));
   _modalExportData={headers,rows,allRows:rows,phoneColIdx,nameColIdx};
   _modalPerPage=0;
-  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-title').textContent=fullTitle;
   document.getElementById('modal-thead').innerHTML=headers.map(h=>`<th>${h}</th>`).join('');
   const searchEl=document.getElementById('modal-search');
   if(searchEl)searchEl.value='';
