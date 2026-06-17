@@ -2250,7 +2250,13 @@ function renderClientesTable(){
     const v=parseFloat(r.value||0);
     if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
   });
-  clientesData=Object.values(phoneMap).sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
+  clientesData=Object.values(phoneMap).sort((a,b)=>{
+    const infoA=getEffectiveAgendInfo(a.phone,a);
+    const infoB=getEffectiveAgendInfo(b.phone,b);
+    const dA=parseCloudiaDate(infoA.consultaTs)||parseCloudiaDate(a.created_at||a.timestamp)||new Date(0);
+    const dB=parseCloudiaDate(infoB.consultaTs)||parseCloudiaDate(b.created_at||b.timestamp)||new Date(0);
+    return dB-dA;
+  });
   // Atualiza selects de filtro
   const fasesSel=document.getElementById('clientes-fase-filter');
   fasesSel.innerHTML='<option value="">Todas as fases</option>';
