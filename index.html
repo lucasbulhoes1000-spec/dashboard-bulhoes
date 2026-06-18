@@ -436,13 +436,15 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">💾 CRM</button>
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📂 CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
-        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
-        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="filtrarContatosDoDia()" style="background:#5a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">📞 Contatos do dia</button>
+        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
           <select class="filter-select" id="clientes-origem-filter" onchange="filterClientesTable()"><option value="">Todas as origens</option></select>
           <select class="filter-select" id="clientes-fase-filter" onchange="filterClientesTable()"><option value="">Todas as fases</option></select>
+          <select class="filter-select" id="clientes-fase-atv-filter" onchange="filterClientesTable()"><option value="">Todas as fases ativ.</option></select>
           <select class="filter-select" id="clientes-sit-filter" onchange="filterClientesTable()">
             <option value="">Todas as situações</option>
             <option value="fechado">Fechou tratamento</option>
@@ -463,6 +465,7 @@ tbody tr:hover td{background:#faf7f3;}
             <thead><tr>
               <th>Nome</th><th>Data do registro</th><th>Data comparecimento</th><th>Telefone</th><th>Fase</th>
               <th>Situação</th><th>Tratamento</th><th>Avaliador</th>
+              <th>Próx. contato</th><th>Fase ativ.</th>
               <th style="text-align:right">Valor orçado</th><th style="text-align:right">Valor fechado</th>
             </tr></thead>
             <tbody id="clientes-tbody"></tbody>
@@ -2301,11 +2304,46 @@ function renderClientesTable(){
   const origSel=document.getElementById('clientes-origem-filter');
   origSel.innerHTML='<option value="">Todas as origens</option>';
   [...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));
+  // Popula filtro de fases de atividade (última atividade registrada de cada cliente)
+  const faseAtvSel=document.getElementById('clientes-fase-atv-filter');
+  if(faseAtvSel){
+    const fasesAtv=[...new Set(clientesData.map(r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      const d=ccDataLookup(ph);
+      return d&&d.atividades&&d.atividades.length>0?d.atividades[0].fase:'';
+    }).filter(Boolean))].sort();
+    const curVal=faseAtvSel.value;
+    faseAtvSel.innerHTML='<option value="">Todas as fases ativ.</option>';
+    fasesAtv.forEach(f=>faseAtvSel.add(new Option(f,f)));
+    if(curVal)faseAtvSel.value=curVal;
+  }
   // Popula cards de resumo
   // Cards agora são atualizados pelo filterClientesTable com base no filtered
   populateDynamicSelects();
   filterClientesTable();
 }
+function filtrarContatosDoDia(){
+  // Define as datas de hoje no filtro de data de comparecimento (não temos filtro de próx. contato ainda)
+  // Em vez disso: filtra clientes cujo próximo contato é hoje diretamente nos dados
+  const hoje=localDateStr(new Date());
+  // Reseta outros filtros pra não confundir
+  const el=document.getElementById('clientes-from');if(el)el.value='';
+  const el2=document.getElementById('clientes-to');if(el2)el2.value='';
+  const el3=document.getElementById('clientes-fase-filter');if(el3)el3.value='';
+  const el4=document.getElementById('clientes-sit-filter');if(el4)el4.value='';
+  const el5=document.getElementById('clientes-origem-filter');if(el5)el5.value='';
+  const el6=document.getElementById('clientes-fase-atv-filter');if(el6)el6.value='';
+  // Filtra manualmente por próximo contato = hoje
+  const _clientesContatoHoje=clientesData.filter(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=ccDataLookup(ph);
+    const ultima=d&&d.atividades&&d.atividades.length>0?d.atividades[0]:null;
+    return ultima&&ultima.proximo===hoje;
+  });
+  document.getElementById('clientes-count').textContent=_clientesContatoHoje.length+' contatos de hoje';
+  _clientesFiltrados=_clientesContatoHoje;_clientesPage=1;renderClientesPage();
+}
+
 function clearClientesDates(){document.getElementById('clientes-from').value='';document.getElementById('clientes-to').value='';filterClientesTable();}
 function filterClientesTable(){
   const q=(document.getElementById('clientes-search')||{}).value||'';
@@ -2313,6 +2351,7 @@ function filterClientesTable(){
   const fromV=(document.getElementById('clientes-from')||{}).value||'';
   const toV=(document.getElementById('clientes-to')||{}).value||'';
   const fase=(document.getElementById('clientes-fase-filter')||{}).value||'';
+  const faseAtv=(document.getElementById('clientes-fase-atv-filter')||{}).value||'';
   const orig=(document.getElementById('clientes-origem-filter')||{}).value||'';
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
@@ -2325,6 +2364,13 @@ function filterClientesTable(){
     const phoneMatch2=qDigits2?phoneClean2.includes(qDigits2):phoneClean2.includes(q||'');
     const match=!ql||(nameMatch2||phoneMatch2);
     const faseMatch=!fase||r.stage===fase;
+    const faseAtvMatch=(()=>{
+      if(!faseAtv)return true;
+      const phA=String(r.phone||'').replace(/\D/g,'');
+      const dA=ccDataLookup(phA);
+      const ultimaA=dA&&dA.atividades&&dA.atividades.length>0?dA.atividades[0]:null;
+      return ultimaA&&ultimaA.fase===faseAtv;
+    })();
     const origMatch=!orig||(e.origin||'')===orig;
     const fechou=isFechou(r.stage);
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
@@ -2351,7 +2397,7 @@ function filterClientesTable(){
       if(toV&&ds&&ds>toV)dateMatch=false;
       if(!ds)dateMatch=false;
     }
-    return match&&faseMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dateMatch;
+    return match&&faseMatch&&faseAtvMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dateMatch;
   });
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
   _clientesFiltrados=filtered;_clientesPage=1;renderClientesPage();
@@ -2402,8 +2448,13 @@ function renderClientesPage(){
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph)||{orcamentos:[]};
+    const d=ccDataLookup(ph)||{orcamentos:[],atividades:[]};
     const orc0=d.orcamentos&&d.orcamentos[0];
+    const ultimaAtv=(d.atividades&&d.atividades.length>0)?d.atividades[0]:null;
+    const proxContato=ultimaAtv&&ultimaAtv.proximo?new Date(ultimaAtv.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
+    const faseAtv=ultimaAtv&&ultimaAtv.fase?ultimaAtv.fase:'—';
+    const hoje=localDateStr(new Date());
+    const proxStyle=ultimaAtv&&ultimaAtv.proximo&&ultimaAtv.proximo===hoje?'color:#5a8a6a;font-weight:500;':ultimaAtv&&ultimaAtv.proximo&&ultimaAtv.proximo<hoje?'color:#b5856a;font-weight:500;':'';
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
       <td class="tm">${fmtDate(r.created_at)}</td>
@@ -2413,6 +2464,8 @@ function renderClientesPage(){
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
       <td style="font-size:12px;">${orc0&&orc0.tratamento?orc0.tratamento:'—'}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
+      <td style="font-size:12px;${proxStyle}">${proxContato}</td>
+      <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${faseAtv}">${faseAtv}</td>
       <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
       <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
@@ -2838,6 +2891,13 @@ function salvarDatasCC(){
   // Feedback visual
   const fbEl=document.getElementById('cc-datas-saved');
   if(fbEl){fbEl.style.display='block';setTimeout(()=>fbEl.style.display='none',2000);}
+  else{
+    // Fallback de feedback visual caso o elemento não exista no HTML
+    const btn=event&&event.target;
+    if(btn){const orig=btn.textContent;btn.textContent='✅ Salvo!';setTimeout(()=>btn.textContent=orig,1500);}
+  }
+  // Persiste no Supabase — sem isso, as datas só ficavam em memória e se perdiam ao recarregar
+  salvarCRMDebounced();
   // Atualiza a tabela de clientes imediatamente
   filterClientesTable();
   // Re-renderiza dashboard com os novos timestamps
