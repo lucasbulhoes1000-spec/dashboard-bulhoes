@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Bulhões Odontologia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#EFEFED;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;min-height:100vh;display:flex;flex-direction:column;}
@@ -249,6 +250,7 @@ tbody tr:hover td{background:#faf7f3;}
               <span style="color:#b5a898;font-size:12px;">até</span>
               <input type="date" id="trafego-to" onchange="applyCustom('trafego')">
             </div>
+            <button class="fb" style="margin-left:auto;background:#5a7a9a;color:#fff;border-color:#5a7a9a;" onclick="gerarRelatorioPDF('trafego')">📄 Gerar Relatório</button>
           </div>
           <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
             <select class="filter-select" id="origem-filter" onchange="applyOrigemFilter()">
@@ -341,6 +343,7 @@ tbody tr:hover td{background:#faf7f3;}
               <span style="color:#b5a898;font-size:12px;">até</span>
               <input type="date" id="social-to" onchange="applyCustom('social')">
             </div>
+            <button class="fb" style="margin-left:auto;background:#5a7a9a;color:#fff;border-color:#5a7a9a;" onclick="gerarRelatorioPDF('social')">📄 Gerar Relatório</button>
           </div>
           <div class="error-msg" id="error-social"></div>
           <div class="loading" id="loading-social"><div class="spinner"></div><span>Carregando dados...</span></div>
@@ -701,6 +704,7 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="display:flex;gap:8px;">
           <button onclick="importarFechamentos()" style="background:#f5efe8;border:0.5px solid #A18B6C;color:#7a6550;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">⬇ Importar fechamentos</button>
           <button onclick="openComSDR()" style="background:#f0f5f0;border:0.5px solid #5a8a6a;color:#3a6a4a;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">👤 Comissão SDR</button>
+          <button onclick="gerarRelatorioComissaoIndividual()" style="background:#eaf0f5;border:0.5px solid #5a7a9a;color:#3a5a7a;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;">📄 Relatório individual</button>
           <button onclick="openComForm(null)" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">+ Lançar comissão</button>
         </div>
       </div>
@@ -1348,6 +1352,14 @@ function setAdIdManual(phone,adId){
 function fmt(n){return'R$ '+parseFloat(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtK(n){return n>=1000?'R$ '+(n/1000).toFixed(1)+'k':fmt(n);}
 function fmtN(n){return parseInt(n).toLocaleString('pt-BR');}
+// Extrai o valor textual "limpo" de um elemento do dashboard, descartando botões de lupa e spans extras
+function getCleanMetricText(id){
+  const el=document.getElementById(id);
+  if(!el)return'—';
+  const clone=el.cloneNode(true);
+  clone.querySelectorAll('button,.lupa').forEach(b=>b.remove());
+  return clone.textContent.trim()||'—';
+}
 function pct(a,b){return b>0?Math.round(a/b*100)+'%':'—';}
 function isAgend(s){if(!s)return false;const l=s.toLowerCase();return l==='agendou'||l.includes('agendou');}
 function isComp(s){if(!s)return false;const l=s.toLowerCase();return l==='compareceu'||l.includes('compareceu');}
@@ -2322,6 +2334,319 @@ function renderClientesTable(){
   populateDynamicSelects();
   filterClientesTable();
 }
+// ===== RELATÓRIO PDF =====
+function getPeriodLabel(tab){
+  const rng=getRange(tab);
+  if(!rng)return'';
+  const f=new Date(rng.since+'T12:00').toLocaleDateString('pt-BR');
+  const t=new Date(rng.until+'T12:00').toLocaleDateString('pt-BR');
+  return f===t?f:f+' a '+t;
+}
+
+function gerarRelatorioPDF(tab){
+  if(tab==='trafego')gerarRelatorioTrafegoPDF();
+  else gerarRelatorioSocialPDF();
+}
+
+function gerarRelatorioTrafegoPDF(){
+  const periodo=getPeriodLabel('trafego');
+  const leads=getCleanMetricText('t-leads');
+  const cpl=getCleanMetricText('t-cpl');
+  const invest=getCleanMetricText('t-spend');
+  const agend=getCleanMetricText('t-agend');
+  const comp=getCleanMetricText('t-comp');
+  const contratos=getCleanMetricText('t-contratos');
+  const conv=getCleanMetricText('t-conv');
+  const vendas=getCleanMetricText('t-vendas');
+  const ticket=getCleanMetricText('t-ticket');
+
+  const adMap=window._lastAdMap||{};
+  const adRows=Object.entries(adMap).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0))
+    .filter(([,d])=>(d.leads||0)>0)
+    .map(([key,d])=>{
+      const cplAd=d.leads>0?d.spend/d.leads:0;
+      return{label:(d.label||key).substring(0,40),leads:d.leads||0,cpl:cplAd,agend:d.agend||0,comp:d.comp||0,vendas:d.vendas||0};
+    });
+
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const pageW=doc.internal.pageSize.getWidth();
+  let y=20;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(40,35,30);
+  doc.text('Relatório de desempenho',14,y);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,110,100);
+  doc.text('Bulhões Odontologia — Tráfego pago',14,y+6);
+  doc.setFontSize(9);
+  doc.text(periodo,pageW-14,y,{align:'right'});
+  y+=14;
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=10;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
+  doc.text('Resumo do período',14,y);
+  y+=8;
+
+  const cards1=[['Leads',leads],['Agendaram',agend],['Compareceram',comp],['Fecharam',contratos]];
+  const cardW=(pageW-28)/4;
+  cards1.forEach((c,i)=>{
+    const x=14+i*cardW;
+    doc.setFillColor(245,239,232);
+    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
+    doc.text(c[0],x+4,y+6);
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(40,35,30);
+    doc.text(String(c[1]),x+4,y+14);
+  });
+  y+=24;
+
+  const cards2=[['Investido',invest],['CPL',cpl],['Vendido',vendas],['Ticket médio',ticket]];
+  cards2.forEach((c,i)=>{
+    const x=14+i*cardW;
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
+    doc.text(c[0],x+2,y);
+    doc.setFont('helvetica','bold');doc.setFontSize(11);
+    doc.setTextColor(c[0]==='Vendido'?60:40,c[0]==='Vendido'?120:35,c[0]==='Vendido'?80:30);
+    doc.text(String(c[1]),x+2,y+6);
+  });
+  y+=10;
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
+  doc.text('Taxa de conversão (lead → contrato): '+conv,14,y);
+  y+=12;
+
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=8;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
+  doc.text('Desempenho por anúncio',14,y);
+  y+=8;
+
+  const colX=[14,84,104,128,150,172];
+  const headers=['Anúncio','Leads','CPL','Agend.','Comp.','Vendas'];
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(120,110,100);
+  headers.forEach((h,i)=>doc.text(h,colX[i],y));
+  y+=2;
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=6;
+
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(50,45,40);
+  adRows.forEach(r=>{
+    if(y>270){doc.addPage();y=20;}
+    doc.text(r.label,colX[0],y);
+    doc.text(String(r.leads),colX[1],y);
+    doc.text(r.cpl>0?fmt(r.cpl):'—',colX[2],y);
+    doc.text(r.agend>0?String(r.agend):'—',colX[3],y);
+    doc.text(r.comp>0?String(r.comp):'—',colX[4],y);
+    doc.text(r.vendas>0?fmt(r.vendas):'—',colX[5],y);
+    y+=6;
+  });
+
+  y=Math.max(y+10,280);
+  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);
+  doc.text('Gerado em '+new Date().toLocaleString('pt-BR')+' — dashboard Bulhões Odontologia',14,290);
+
+  doc.save('relatorio-trafego-pago-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
+function gerarRelatorioSocialPDF(){
+  const periodo=getPeriodLabel('social');
+  const abord=getCleanMetricText('ss-abord');
+  const resp=getCleanMetricText('ss-resp');
+  const respSub=getCleanMetricText('ss-resp-sub');
+  const follow=getCleanMetricText('ss-follow');
+  const desq=getCleanMetricText('ss-desq');
+  const agend=getCleanMetricText('ss-agend');
+  const agendSub=getCleanMetricText('ss-agend-sub');
+  const comp=getCleanMetricText('ss-comp');
+  const compSub=getCleanMetricText('ss-comp-sub');
+  const vendasN=getCleanMetricText('ss-vendas');
+  const vendasSub=getCleanMetricText('ss-vendas-sub');
+  const conv=getCleanMetricText('ss-conv');
+
+  const tiposEl=document.getElementById('ss-tipos');
+  const tiposRows=[];
+  if(tiposEl){
+    tiposEl.querySelectorAll(':scope > div').forEach(row=>{
+      const spans=row.querySelectorAll('span');
+      if(spans.length<2)return;
+      const labelSpan=spans[0].cloneNode(true);
+      labelSpan.querySelectorAll('span').forEach(s=>s.remove());
+      const label=labelSpan.textContent.trim();
+      const pct=spans[spans.length-1].textContent.trim();
+      if(label)tiposRows.push({label,pct});
+    });
+  }
+
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const pageW=doc.internal.pageSize.getWidth();
+  let y=20;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(40,35,30);
+  doc.text('Relatório de desempenho',14,y);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,110,100);
+  doc.text('Bulhões Odontologia — Social Selling',14,y+6);
+  doc.setFontSize(9);
+  doc.text(periodo,pageW-14,y,{align:'right'});
+  y+=14;
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=10;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
+  doc.text('Resumo do período',14,y);
+  y+=8;
+
+  const cards1=[['Abordagens',abord,''],['Respostas',resp,respSub],['Follow-ups',follow,''],['Desqualif.',desq,'']];
+  const cardW=(pageW-28)/4;
+  cards1.forEach((c,i)=>{
+    const x=14+i*cardW;
+    doc.setFillColor(245,239,232);
+    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
+    doc.text(c[0],x+4,y+6);
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(40,35,30);
+    doc.text(String(c[1]),x+4,y+14);
+    if(c[2]){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);doc.text(String(c[2]),x+4,y+18);}
+  });
+  y+=26;
+
+  const cards2=[['Agendamentos',agend,agendSub],['Comparecim.',comp,compSub],['Vendas',vendasN,vendasSub],['Conv. geral',conv,'']];
+  cards2.forEach((c,i)=>{
+    const x=14+i*cardW;
+    doc.setFillColor(232,243,236);
+    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,120,80);
+    doc.text(c[0],x+4,y+6);
+    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(60,120,80);
+    doc.text(String(c[1]),x+4,y+14);
+    if(c[2]){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(String(c[2]),x+4,y+18);}
+  });
+  y+=26;
+
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=8;
+
+  if(tiposRows.length>0){
+    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
+    doc.text('Comparecimento por tipo de interação',14,y);
+    y+=8;
+    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(120,110,100);
+    doc.text('Tipo',14,y);doc.text('Conversão',pageW-14,y,{align:'right'});
+    y+=2;
+    doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+    y+=6;
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(50,45,40);
+    tiposRows.forEach(r=>{
+      if(y>270){doc.addPage();y=20;}
+      doc.text(r.label,14,y);
+      doc.text(r.pct,pageW-14,y,{align:'right'});
+      y+=6;
+    });
+  }
+
+  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);
+  doc.text('Gerado em '+new Date().toLocaleString('pt-BR')+' — dashboard Bulhões Odontologia',14,290);
+
+  doc.save('relatorio-social-selling-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
+function gerarRelatorioComissaoIndividual(){
+  const membroFil=(document.getElementById('com-membro-fil')||{}).value||'';
+  if(!membroFil){alert('Selecione um membro no filtro "Todos os membros" antes de gerar o relatório individual.');return;}
+  const mesFil=(document.getElementById('com-mes-sel')||{}).value||'';
+  const statusFil=(document.getElementById('com-status-fil')||{}).value||'';
+
+  const filtered=_comissoes.filter(c=>{
+    const mesMatch=!mesFil||(c.data||'').substring(0,7)===mesFil;
+    const memMatch=c.avaliador===membroFil||c.crc===membroFil;
+    const stMatch=!statusFil||c.status===statusFil;
+    return mesMatch&&memMatch&&stMatch;
+  }).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+
+  if(filtered.length===0){alert('Nenhum lançamento encontrado para '+membroFil+' no período selecionado.');return;}
+
+  const mesLabel=mesFil?(document.getElementById('com-mes-sel').selectedOptions[0].textContent):'Todos os meses';
+
+  let totalAval=0,totalCrc=0,totalPago=0,totalPendente=0;
+  filtered.forEach(c=>{
+    const valAval=Number(c.comAval||0),valCrc=Number(c.comCrc||0);
+    if(c.avaliador===membroFil)totalAval+=valAval;
+    if(c.crc===membroFil)totalCrc+=valCrc;
+    const valTotal=(c.avaliador===membroFil?valAval:0)+(c.crc===membroFil?valCrc:0);
+    if(c.status==='pago')totalPago+=valTotal;else totalPendente+=valTotal;
+  });
+  const totalGeral=totalAval+totalCrc;
+
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const pageW=doc.internal.pageSize.getWidth();
+  let y=20;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(40,35,30);
+  doc.text('Relatório de comissão',14,y);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,110,100);
+  doc.text('Bulhões Odontologia',14,y+6);
+  doc.setFontSize(9);
+  doc.text(mesLabel,pageW-14,y,{align:'right'});
+  y+=14;
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=10;
+
+  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(40,35,30);
+  doc.text(membroFil,14,y);
+  y+=10;
+
+  const cardW=(pageW-28)/3;
+  const cards=[['Total a receber',fmt(totalGeral)],['Já pago',fmt(totalPago)],['Pendente',fmt(totalPendente)]];
+  cards.forEach((c,i)=>{
+    const x=14+i*cardW;
+    doc.setFillColor(i===1?232:245,i===1?243:239,i===1?236:232);
+    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(i===1?60:120,i===1?120:110,i===1?80:100);
+    doc.text(c[0],x+4,y+6);
+    doc.setFont('helvetica','bold');doc.setFontSize(13);
+    doc.setTextColor(i===1?60:40,i===1?120:35,i===1?80:30);
+    doc.text(c[1],x+4,y+14);
+  });
+  y+=26;
+
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=8;
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
+  doc.text('Lançamentos',14,y);
+  y+=8;
+
+  const colX=[14,42,84,108,134,160,182];
+  const headers=['Data','Paciente','Vl. tratamento','Entrada','Comissão','Status'];
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(120,110,100);
+  headers.forEach((h,i)=>doc.text(h,colX[i],y));
+  y+=2;
+  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
+  y+=6;
+
+  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(50,45,40);
+  filtered.forEach(c=>{
+    if(y>270){doc.addPage();y=20;}
+    const dataF=c.data?new Date(c.data+'T12:00').toLocaleDateString('pt-BR'):'—';
+    const valComissao=(c.avaliador===membroFil?Number(c.comAval||0):0)+(c.crc===membroFil?Number(c.comCrc||0):0);
+    doc.text(dataF,colX[0],y);
+    doc.text(String(c.paciente||'—').substring(0,22),colX[1],y);
+    doc.text(c.valorTrat>0?fmt(c.valorTrat):'—',colX[2],y);
+    doc.text(c.entrada>0?fmt(c.entrada):'—',colX[3],y);
+    doc.setTextColor(60,120,80);
+    doc.text(valComissao>0?fmt(valComissao):'—',colX[4],y);
+    doc.setTextColor(50,45,40);
+    doc.text(c.status==='pago'?'Pago':'Pendente',colX[5],y);
+    y+=6;
+  });
+
+  y=Math.max(y+10,280);
+  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);
+  doc.text('Gerado em '+new Date().toLocaleString('pt-BR')+' — dashboard Bulhões Odontologia',14,290);
+
+  const nomeArquivo=membroFil.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  doc.save('comissao-'+nomeArquivo+'-'+new Date().toISOString().slice(0,10)+'.pdf');
+}
+
 function filtrarContatosDoDia(){
   // Define as datas de hoje no filtro de data de comparecimento (não temos filtro de próx. contato ainda)
   // Em vez disso: filtra clientes cujo próximo contato é hoje diretamente nos dados
