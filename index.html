@@ -166,6 +166,10 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-icon">💵</span>
       <span class="nav-label">Comissões</span>
     </div>
+    <div class="nav-item" onclick="switchPage('estoque',this)">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Estoque</span>
+    </div>
     <div class="nav-section">Relatórios</div>
     <div class="nav-item" onclick="switchPage('rel-origem',this)">
       <span class="nav-icon">📈</span>
@@ -805,8 +809,122 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
       </div>
     </div>
+
+    <!-- ===== ESTOQUE PAGE ===== -->
+    <div class="page" id="page-estoque">
+      <!-- CARDS RESUMO -->
+      <div class="row r4" style="margin-bottom:16px;">
+        <div class="mc"><div class="ml">Produtos cadastrados</div><div class="mv" id="est-total-produtos">—</div><div class="ms">itens no estoque</div></div>
+        <div class="mc"><div class="ml">Valor total em estoque</div><div class="mv ta" id="est-valor-total">—</div><div class="ms">saldo × preço unitário</div></div>
+        <div class="mc"><div class="ml">Abaixo do mínimo</div><div class="mv" id="est-total-comprar" style="color:#c0392b;">—</div><div class="ms">precisam de compra</div></div>
+        <div class="mc"><div class="ml">Acima do máximo</div><div class="mv" id="est-total-excesso" style="color:#b8860b;">—</div><div class="ms">em excesso</div></div>
+      </div>
+
+      <div class="search-bar">
+        <input class="search-input" type="text" placeholder="Buscar produto ou código..." id="estoque-search" oninput="filterEstoqueTable()">
+        <select class="filter-select" id="estoque-status-filter" onchange="filterEstoqueTable()">
+          <option value="">Todos os status</option>
+          <option value="COMPRAR">Precisa comprar</option>
+          <option value="EXCESSO">Excesso</option>
+          <option value="OK">Normal</option>
+        </select>
+        <span class="count-badge" id="estoque-count"></span>
+        <button onclick="exportTableXLS('estoque-tbody',['Código','Produto','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Comprar','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('estoque-tbody',['Código','Produto','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Comprar','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="openEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↑ Entrada</button>
+        <button onclick="openSaidaEstoque()" style="background:#a85a4a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↓ Saída</button>
+        <button onclick="openCadastrarProduto()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Produto</button>
+      </div>
+
+      <div class="table-card">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Código</th><th>Produto</th>
+              <th style="text-align:right">Entrada</th><th style="text-align:right">Saída</th>
+              <th style="text-align:right">Saldo</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Máximo</th>
+              <th>Status</th><th style="text-align:right">Comprar</th>
+              <th style="text-align:right">Valor unit.</th><th style="text-align:right">Valor total</th>
+              <th>Últ. atualização</th><th></th>
+            </tr></thead>
+            <tbody id="estoque-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div><!-- /content -->
 </div><!-- /main -->
+
+  <!-- MODAL CADASTRAR PRODUTO -->
+  <div id="modal-cadastrar-produto" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;width:400px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="font-size:15px;font-weight:700;color:#2a2520;" id="prod-modal-title">+ Cadastrar Produto</div>
+        <button onclick="document.getElementById('modal-cadastrar-produto').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+      </div>
+      <input type="hidden" id="prod-codigo-original">
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Código *</label>
+        <input id="prod-codigo" type="text" placeholder="Ex: RES001" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Nome do produto *</label>
+        <input id="prod-nome" type="text" placeholder="Ex: Resina Tokuyama" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div style="display:flex;gap:10px;margin-bottom:11px;">
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Estoque mínimo</label>
+          <input id="prod-minimo" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Estoque máximo</label>
+          <input id="prod-maximo" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      </div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Preço unitário (R$)</label>
+        <input id="prod-preco" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade inicial em estoque</label>
+        <input id="prod-qtd-inicial" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div style="display:flex;gap:10px;margin-top:6px;">
+        <button onclick="salvarProduto()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
+        <button onclick="document.getElementById('modal-cadastrar-produto').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+        <button id="prod-btn-excluir" onclick="excluirProduto()" style="display:none;background:#fee2e2;color:#991b1b;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;margin-left:auto;">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ENTRADA DE ESTOQUE -->
+  <div id="modal-entrada-estoque" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;width:380px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="font-size:15px;font-weight:700;color:#2a2520;">↑ Registrar Entrada</div>
+        <button onclick="document.getElementById('modal-entrada-estoque').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+      </div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
+        <select id="ent-produto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"><option value="">Selecione...</option></select></div>
+      <div style="display:flex;gap:10px;margin-bottom:11px;">
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
+          <input id="ent-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor total (R$)</label>
+          <input id="ent-valor" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="salvarEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Registrar</button>
+        <button onclick="document.getElementById('modal-entrada-estoque').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL SAÍDA DE ESTOQUE -->
+  <div id="modal-saida-estoque" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;width:380px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="font-size:15px;font-weight:700;color:#2a2520;">↓ Registrar Saída</div>
+        <button onclick="document.getElementById('modal-saida-estoque').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+      </div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
+        <select id="sai-produto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"><option value="">Selecione...</option></select></div>
+      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
+        <input id="sai-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div id="sai-saldo-info" style="font-size:11px;color:#9a8c7e;margin-bottom:14px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="salvarSaidaEstoque()" style="background:#a85a4a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Registrar</button>
+        <button onclick="document.getElementById('modal-saida-estoque').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
 
 
@@ -1090,12 +1208,13 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
+  else if(page==='estoque') setTimeout(()=>initEstoque(),50);
   else if(page==='comissoes'){
     // Pede senha antes de entrar em Comissões
     const senhaOk=sessionStorage.getItem('comissoes_auth');
@@ -4289,6 +4408,296 @@ async function carregarCRMRemoto(){
     if(local)try{_ccData=JSON.parse(local);_ccDataNormIndex=null;}catch(e2){}
   }
 }
+
+// ===================================================================
+// ===== MÓDULO ESTOQUE =====
+// ===================================================================
+const ESTOQUE_SHARED_KEY='bulhoes-clinica-estoque';
+let _estoqueProdutos={};   // { codigo: {codigo,nome,minimo,maximo,preco} }
+let _estoqueMovs=[];       // [ {codigo,tipo:'entrada'|'saida',qtd,valor,data} ]
+let _estoqueSaveTimer=null;
+let _estoqueLoaded=false;
+
+function calcularEstoque(){
+  // Agrega entradas/saídas por código e calcula saldo/status
+  const agg={};
+  Object.values(_estoqueProdutos).forEach(p=>{
+    agg[p.codigo]={
+      codigo:p.codigo,nome:p.nome,minimo:Number(p.minimo)||0,maximo:Number(p.maximo)||0,
+      preco:Number(p.preco)||0,entrada:0,valorEntrada:0,saida:0,valorSaida:0,ultimaMov:null
+    };
+  });
+  _estoqueMovs.forEach(m=>{
+    const a=agg[m.codigo];
+    if(!a)return;
+    if(m.tipo==='entrada'){a.entrada+=Number(m.qtd)||0;a.valorEntrada+=Number(m.valor)||0;}
+    else{a.saida+=Number(m.qtd)||0;a.valorSaida+=Number(m.valor)||0;}
+    if(!a.ultimaMov||new Date(m.data)>new Date(a.ultimaMov))a.ultimaMov=m.data;
+  });
+  return Object.values(agg).map(a=>{
+    const saldo=a.entrada-a.saida;
+    let status='OK';
+    let comprar=0;
+    if(saldo<a.minimo){status='COMPRAR';comprar=Math.max(a.maximo-saldo,0);}
+    else if(a.maximo>0&&saldo>a.maximo){status='EXCESSO';}
+    return {...a,saldo,status,comprar,valorTotal:saldo*a.preco};
+  }).sort((x,y)=>x.nome.localeCompare(y.nome));
+}
+
+async function salvarEstoqueRemoto(){
+  try{
+    const payload={
+      email_clinica: ESTOQUE_SHARED_KEY,
+      crm_json: JSON.stringify({produtos:_estoqueProdutos,movs:_estoqueMovs}),
+      atualizado_em: new Date().toISOString()
+    };
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_KEY,
+        'Authorization':'Bearer '+SUPABASE_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify(payload)
+    });
+    if(res.ok){
+      console.log('[ESTOQUE] Salvo no Supabase ✅',Object.keys(_estoqueProdutos).length,'produtos');
+    }else{
+      console.warn('[ESTOQUE] Erro Supabase:',await res.text());
+    }
+  }catch(e){
+    console.warn('[ESTOQUE] Erro ao salvar:',e);
+  }finally{
+    localStorage.setItem('bulhoes_estoque',JSON.stringify({produtos:_estoqueProdutos,movs:_estoqueMovs}));
+  }
+}
+
+function salvarEstoqueDebounced(){
+  clearTimeout(_estoqueSaveTimer);
+  _estoqueSaveTimer=setTimeout(()=>salvarEstoqueRemoto(),1200);
+}
+
+async function carregarEstoqueRemoto(){
+  try{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(ESTOQUE_SHARED_KEY)+'&select=crm_json',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    const rows=await res.json();
+    if(rows&&rows[0]&&rows[0].crm_json){
+      const parsed=JSON.parse(rows[0].crm_json);
+      _estoqueProdutos=parsed.produtos||{};
+      _estoqueMovs=parsed.movs||[];
+      localStorage.setItem('bulhoes_estoque',JSON.stringify({produtos:_estoqueProdutos,movs:_estoqueMovs}));
+      console.log('[ESTOQUE] Carregado do Supabase ✅',Object.keys(_estoqueProdutos).length,'produtos');
+      return;
+    }
+  }catch(e){
+    console.warn('[ESTOQUE] Erro ao carregar do Supabase:',e);
+  }
+  // Fallback localStorage
+  try{
+    const local=localStorage.getItem('bulhoes_estoque');
+    if(local){
+      const parsed=JSON.parse(local);
+      _estoqueProdutos=parsed.produtos||{};
+      _estoqueMovs=parsed.movs||[];
+      console.log('[ESTOQUE] Carregado do localStorage:',Object.keys(_estoqueProdutos).length,'produtos');
+    }
+  }catch(e2){console.warn('[ESTOQUE] Erro ao ler localStorage:',e2);}
+}
+
+async function initEstoque(){
+  if(!_estoqueLoaded){
+    await carregarEstoqueRemoto();
+    _estoqueLoaded=true;
+  }
+  renderEstoqueTable();
+  populateEstoqueSelects();
+}
+
+function fmtMoeda(v){
+  return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+function fmtDataHora(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  if(isNaN(d))return '—';
+  return d.toLocaleDateString('pt-BR')+' - '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderEstoqueTable(){
+  const dados=calcularEstoque();
+  const tbody=document.getElementById('estoque-tbody');
+  if(!tbody)return;
+  const busca=(document.getElementById('estoque-search')?.value||'').toLowerCase().trim();
+  const statusFiltro=document.getElementById('estoque-status-filter')?.value||'';
+  const filtrados=dados.filter(d=>{
+    if(busca&&!(d.nome.toLowerCase().includes(busca)||d.codigo.toLowerCase().includes(busca)))return false;
+    if(statusFiltro&&d.status!==statusFiltro)return false;
+    return true;
+  });
+  const statusBadge={
+    COMPRAR:'<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;">COMPRAR</span>',
+    EXCESSO:'<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;">EXCESSO</span>',
+    OK:'<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;">OK</span>'
+  };
+  tbody.innerHTML=filtrados.map(d=>`
+    <tr>
+      <td>${d.codigo}</td>
+      <td>${d.nome}</td>
+      <td style="text-align:right">${d.entrada}</td>
+      <td style="text-align:right">${d.saida}</td>
+      <td style="text-align:right;font-weight:600;">${d.saldo}</td>
+      <td style="text-align:right">${d.minimo}</td>
+      <td style="text-align:right">${d.maximo}</td>
+      <td>${statusBadge[d.status]||d.status}</td>
+      <td style="text-align:right">${d.comprar||''}</td>
+      <td style="text-align:right">${fmtMoeda(d.preco)}</td>
+      <td style="text-align:right">${fmtMoeda(d.valorTotal)}</td>
+      <td>${fmtDataHora(d.ultimaMov)}</td>
+      <td><button onclick="editarProduto('${d.codigo}')" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:3px 8px;cursor:pointer;">✎</button></td>
+    </tr>
+  `).join('')||'<tr><td colspan="13" style="text-align:center;color:#b5a898;padding:20px;">Nenhum produto cadastrado ainda.</td></tr>';
+
+  document.getElementById('estoque-count').textContent=filtrados.length+' produto(s)';
+  document.getElementById('est-total-produtos').textContent=dados.length;
+  document.getElementById('est-valor-total').textContent=fmtMoeda(dados.reduce((s,d)=>s+d.valorTotal,0));
+  document.getElementById('est-total-comprar').textContent=dados.filter(d=>d.status==='COMPRAR').length;
+  document.getElementById('est-total-excesso').textContent=dados.filter(d=>d.status==='EXCESSO').length;
+}
+
+function filterEstoqueTable(){renderEstoqueTable();}
+
+function populateEstoqueSelects(){
+  const dados=Object.values(_estoqueProdutos).sort((a,b)=>a.nome.localeCompare(b.nome));
+  const opts='<option value="">Selecione...</option>'+dados.map(p=>`<option value="${p.codigo}">${p.nome} (${p.codigo})</option>`).join('');
+  const selEnt=document.getElementById('ent-produto');
+  const selSai=document.getElementById('sai-produto');
+  if(selEnt)selEnt.innerHTML=opts;
+  if(selSai)selSai.innerHTML=opts;
+}
+
+// ---- Cadastro de produto ----
+function openCadastrarProduto(){
+  document.getElementById('prod-modal-title').textContent='+ Cadastrar Produto';
+  document.getElementById('prod-codigo-original').value='';
+  document.getElementById('prod-codigo').value='';
+  document.getElementById('prod-codigo').disabled=false;
+  document.getElementById('prod-nome').value='';
+  document.getElementById('prod-minimo').value='';
+  document.getElementById('prod-maximo').value='';
+  document.getElementById('prod-preco').value='';
+  document.getElementById('prod-qtd-inicial').value='';
+  document.getElementById('prod-btn-excluir').style.display='none';
+  document.getElementById('modal-cadastrar-produto').style.display='flex';
+}
+
+function editarProduto(codigo){
+  const p=_estoqueProdutos[codigo];
+  if(!p)return;
+  document.getElementById('prod-modal-title').textContent='✎ Editar Produto';
+  document.getElementById('prod-codigo-original').value=codigo;
+  document.getElementById('prod-codigo').value=p.codigo;
+  document.getElementById('prod-codigo').disabled=true;
+  document.getElementById('prod-nome').value=p.nome;
+  document.getElementById('prod-minimo').value=p.minimo;
+  document.getElementById('prod-maximo').value=p.maximo;
+  document.getElementById('prod-preco').value=p.preco;
+  document.getElementById('prod-qtd-inicial').value='';
+  document.getElementById('prod-btn-excluir').style.display='block';
+  document.getElementById('modal-cadastrar-produto').style.display='flex';
+}
+
+function salvarProduto(){
+  const codigoOriginal=document.getElementById('prod-codigo-original').value.trim();
+  const codigo=document.getElementById('prod-codigo').value.trim();
+  const nome=document.getElementById('prod-nome').value.trim();
+  const minimo=Number(document.getElementById('prod-minimo').value)||0;
+  const maximo=Number(document.getElementById('prod-maximo').value)||0;
+  const preco=Number(document.getElementById('prod-preco').value)||0;
+  const qtdInicial=Number(document.getElementById('prod-qtd-inicial').value)||0;
+
+  if(!codigo||!nome){alert('Código e nome do produto são obrigatórios.');return;}
+  if(!codigoOriginal&&_estoqueProdutos[codigo]){alert('Já existe um produto com esse código.');return;}
+
+  _estoqueProdutos[codigo]={codigo,nome,minimo,maximo,preco};
+
+  if(!codigoOriginal&&qtdInicial>0){
+    _estoqueMovs.push({codigo,tipo:'entrada',qtd:qtdInicial,valor:qtdInicial*preco,data:new Date().toISOString()});
+  }
+
+  document.getElementById('modal-cadastrar-produto').style.display='none';
+  renderEstoqueTable();
+  populateEstoqueSelects();
+  salvarEstoqueDebounced();
+}
+
+function excluirProduto(){
+  const codigo=document.getElementById('prod-codigo-original').value.trim();
+  if(!codigo)return;
+  if(!confirm('Excluir este produto e todo o seu histórico de movimentações?'))return;
+  delete _estoqueProdutos[codigo];
+  _estoqueMovs=_estoqueMovs.filter(m=>m.codigo!==codigo);
+  document.getElementById('modal-cadastrar-produto').style.display='none';
+  renderEstoqueTable();
+  populateEstoqueSelects();
+  salvarEstoqueDebounced();
+}
+
+// ---- Entrada ----
+function openEntradaEstoque(){
+  populateEstoqueSelects();
+  document.getElementById('ent-produto').value='';
+  document.getElementById('ent-qtd').value='';
+  document.getElementById('ent-valor').value='';
+  document.getElementById('modal-entrada-estoque').style.display='flex';
+}
+
+function salvarEntradaEstoque(){
+  const codigo=document.getElementById('ent-produto').value;
+  const qtd=Number(document.getElementById('ent-qtd').value)||0;
+  const valor=Number(document.getElementById('ent-valor').value)||0;
+  if(!codigo){alert('Selecione um produto.');return;}
+  if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+  _estoqueMovs.push({codigo,tipo:'entrada',qtd,valor,data:new Date().toISOString()});
+  document.getElementById('modal-entrada-estoque').style.display='none';
+  renderEstoqueTable();
+  salvarEstoqueDebounced();
+}
+
+// ---- Saída ----
+function openSaidaEstoque(){
+  populateEstoqueSelects();
+  document.getElementById('sai-produto').value='';
+  document.getElementById('sai-qtd').value='';
+  document.getElementById('sai-saldo-info').textContent='';
+  document.getElementById('modal-saida-estoque').style.display='flex';
+}
+
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='sai-produto'){
+    const codigo=e.target.value;
+    const info=document.getElementById('sai-saldo-info');
+    if(!codigo||!info)return;
+    const item=calcularEstoque().find(d=>d.codigo===codigo);
+    info.textContent=item?`Saldo atual: ${item.saldo} unidade(s)`:'';
+  }
+});
+
+function salvarSaidaEstoque(){
+  const codigo=document.getElementById('sai-produto').value;
+  const qtd=Number(document.getElementById('sai-qtd').value)||0;
+  if(!codigo){alert('Selecione um produto.');return;}
+  if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+  const p=_estoqueProdutos[codigo];
+  const valor=qtd*(Number(p?.preco)||0);
+  _estoqueMovs.push({codigo,tipo:'saida',qtd,valor,data:new Date().toISOString()});
+  document.getElementById('modal-saida-estoque').style.display='none';
+  renderEstoqueTable();
+  salvarEstoqueDebounced();
+}
+// ===== FIM MÓDULO ESTOQUE =====
 
 // ===== LOGIN =====
 const USUARIOS_VALIDOS=[
