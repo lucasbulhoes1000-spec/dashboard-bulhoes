@@ -832,8 +832,8 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="OK">Normal</option>
         </select>
         <span class="count-badge" id="estoque-count"></span>
-        <button onclick="exportTableXLS('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Comprar','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
-        <button onclick="exportTableCSV('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Comprar','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableXLS('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↑ Entrada</button>
         <button onclick="openSaidaEstoque()" style="background:#a85a4a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↓ Saída</button>
         <button onclick="openGerenciarTags()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">🏷 Categorias</button>
@@ -847,7 +847,7 @@ tbody tr:hover td{background:#faf7f3;}
               <th>Produto</th><th>Categoria</th>
               <th style="text-align:right">Entrada</th><th style="text-align:right">Saída</th>
               <th style="text-align:right">Saldo</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Máximo</th>
-              <th>Status</th><th style="text-align:right">Comprar</th>
+              <th>Status</th>
               <th style="text-align:right">Valor unit.</th><th style="text-align:right">Valor total</th>
               <th>Últ. atualização</th><th></th>
             </tr></thead>
@@ -912,8 +912,12 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="font-size:15px;font-weight:700;color:#2a2520;">↑ Registrar Entrada</div>
         <button onclick="document.getElementById('modal-entrada-estoque').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
       </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
-        <select id="ent-produto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"><option value="">Selecione...</option></select></div>
+      <div style="margin-bottom:11px;position:relative;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
+        <input type="hidden" id="ent-produto">
+        <input id="ent-produto-busca" type="text" autocomplete="off" placeholder="Digite para buscar..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="filtrarComboProduto('ent')" onfocus="abrirComboProduto('ent')">
+        <div id="ent-produto-lista" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:50;"></div>
+      </div>
       <div style="display:flex;gap:10px;margin-bottom:11px;">
         <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
           <input id="ent-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
@@ -934,8 +938,12 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="font-size:15px;font-weight:700;color:#2a2520;">↓ Registrar Saída</div>
         <button onclick="document.getElementById('modal-saida-estoque').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
       </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
-        <select id="sai-produto" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"><option value="">Selecione...</option></select></div>
+      <div style="margin-bottom:11px;position:relative;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Produto *</label>
+        <input type="hidden" id="sai-produto">
+        <input id="sai-produto-busca" type="text" autocomplete="off" placeholder="Digite para buscar..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="filtrarComboProduto('sai')" onfocus="abrirComboProduto('sai')">
+        <div id="sai-produto-lista" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:50;"></div>
+      </div>
       <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
         <input id="sai-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       <div id="sai-saldo-info" style="font-size:11px;color:#9a8c7e;margin-bottom:14px;"></div>
@@ -4458,10 +4466,9 @@ function calcularEstoque(){
   return Object.values(agg).map(a=>{
     const saldo=a.entrada-a.saida;
     let status='OK';
-    let comprar=0;
-    if(saldo<a.minimo){status='COMPRAR';comprar=Math.max(a.maximo-saldo,0);}
-    else if(a.maximo>0&&saldo>a.maximo){status='EXCESSO';}
-    return {...a,saldo,status,comprar,valorTotal:saldo*a.preco};
+    if(saldo<a.minimo)status='COMPRAR';
+    else if(a.maximo>0&&saldo>a.maximo)status='EXCESSO';
+    return {...a,saldo,status,valorTotal:saldo*a.preco};
   }).sort((x,y)=>x.nome.localeCompare(y.nome));
 }
 
@@ -4574,17 +4581,16 @@ function renderEstoqueTable(){
       <td>${d.tag?`<span style="background:#f5f0ea;color:#7a6550;padding:2px 8px;border-radius:5px;font-size:11px;">${d.tag}</span>`:'<span style="color:#cfc4b8;">—</span>'}</td>
       <td style="text-align:right">${d.entrada}</td>
       <td style="text-align:right">${d.saida}</td>
-      <td style="text-align:right;font-weight:600;">${d.saldo}</td>
+      <td style="text-align:right;font-weight:700;font-size:14px;color:#2a2520;">${d.saldo}</td>
       <td style="text-align:right">${d.minimo}</td>
       <td style="text-align:right">${d.maximo}</td>
       <td>${statusBadge[d.status]||d.status}</td>
-      <td style="text-align:right">${d.comprar||''}</td>
       <td style="text-align:right">${fmtMoeda(d.preco)}</td>
       <td style="text-align:right">${fmtMoeda(d.valorTotal)}</td>
       <td>${fmtDataHora(d.ultimaMov)}</td>
       <td><button onclick="editarProduto('${d.nome.replace(/'/g,"\\'")}')" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:3px 8px;cursor:pointer;">✎</button></td>
     </tr>
-  `).join('')||'<tr><td colspan="13" style="text-align:center;color:#b5a898;padding:20px;">Nenhum produto cadastrado ainda.</td></tr>';
+  `).join('')||'<tr><td colspan="12" style="text-align:center;color:#b5a898;padding:20px;">Nenhum produto cadastrado ainda.</td></tr>';
 
   document.getElementById('estoque-count').textContent=filtrados.length+' produto(s)';
   document.getElementById('est-total-produtos').textContent=dados.length;
@@ -4596,13 +4602,57 @@ function renderEstoqueTable(){
 function filterEstoqueTable(){renderEstoqueTable();}
 
 function populateEstoqueSelects(){
-  const dados=Object.values(_estoqueProdutos).sort((a,b)=>a.nome.localeCompare(b.nome));
-  const opts='<option value="">Selecione...</option>'+dados.map(p=>`<option value="${p.nome}">${p.nome}${p.tag?' — '+p.tag:''}</option>`).join('');
-  const selEnt=document.getElementById('ent-produto');
-  const selSai=document.getElementById('sai-produto');
-  if(selEnt)selEnt.innerHTML=opts;
-  if(selSai)selSai.innerHTML=opts;
+  // Mantido por compatibilidade (limpa os inputs hidden); a lista em si é montada dinamicamente pelo combobox.
 }
+
+// ---- Combobox de busca de produto (Entrada/Saída) ----
+function _comboProdutosOrdenados(){
+  return Object.values(_estoqueProdutos).sort((a,b)=>a.nome.localeCompare(b.nome));
+}
+
+function abrirComboProduto(prefixo){
+  filtrarComboProduto(prefixo);
+}
+
+function filtrarComboProduto(prefixo){
+  const inputBusca=document.getElementById(prefixo+'-produto-busca');
+  const lista=document.getElementById(prefixo+'-produto-lista');
+  if(!inputBusca||!lista)return;
+  const termo=inputBusca.value.toLowerCase().trim();
+  const produtos=_comboProdutosOrdenados().filter(p=>!termo||p.nome.toLowerCase().includes(termo));
+  if(!produtos.length){
+    lista.innerHTML='<div style="padding:10px;font-size:12px;color:#b5a898;">Nenhum produto encontrado.</div>';
+  }else{
+    lista.innerHTML=produtos.map(p=>`
+      <div onclick="selecionarComboProduto('${prefixo}','${p.nome.replace(/'/g,"\\'")}')" style="padding:8px 10px;font-size:13px;color:#2a2520;cursor:pointer;" onmouseover="this.style.background='#f5f0ea'" onmouseout="this.style.background='#fff'">
+        ${p.nome}${p.tag?`<span style="color:#9a8c7e;font-size:11px;"> — ${p.tag}</span>`:''}
+      </div>
+    `).join('');
+  }
+  lista.style.display='block';
+}
+
+function selecionarComboProduto(prefixo,nome){
+  document.getElementById(prefixo+'-produto').value=nome;
+  document.getElementById(prefixo+'-produto-busca').value=nome;
+  document.getElementById(prefixo+'-produto-lista').style.display='none';
+  if(prefixo==='sai'){
+    const info=document.getElementById('sai-saldo-info');
+    const item=calcularEstoque().find(d=>d.nome===nome);
+    if(info)info.textContent=item?`Saldo atual: ${item.saldo} unidade(s)`:'';
+  }
+}
+
+document.addEventListener('click',function(e){
+  ['ent','sai'].forEach(prefixo=>{
+    const wrap=document.getElementById(prefixo+'-produto-busca');
+    const lista=document.getElementById(prefixo+'-produto-lista');
+    if(!wrap||!lista)return;
+    if(e.target!==wrap&&!lista.contains(e.target)){
+      lista.style.display='none';
+    }
+  });
+});
 
 // ---- Tags / Categorias ----
 function populateTagSelects(){
@@ -4745,8 +4795,9 @@ function excluirProduto(){
 
 // ---- Entrada ----
 function openEntradaEstoque(){
-  populateEstoqueSelects();
   document.getElementById('ent-produto').value='';
+  document.getElementById('ent-produto-busca').value='';
+  document.getElementById('ent-produto-lista').style.display='none';
   document.getElementById('ent-qtd').value='';
   document.getElementById('ent-valor').value='';
   document.getElementById('modal-entrada-estoque').style.display='flex';
@@ -4756,7 +4807,7 @@ function salvarEntradaEstoque(){
   const nome=document.getElementById('ent-produto').value;
   const qtd=Number(document.getElementById('ent-qtd').value)||0;
   const valor=Number(document.getElementById('ent-valor').value)||0;
-  if(!nome){alert('Selecione um produto.');return;}
+  if(!nome||!_estoqueProdutos[nome]){alert('Selecione um produto válido na lista.');return;}
   if(qtd<=0){alert('Informe uma quantidade válida.');return;}
   _estoqueMovs.push({nome,tipo:'entrada',qtd,valor,data:new Date().toISOString()});
   document.getElementById('modal-entrada-estoque').style.display='none';
@@ -4766,27 +4817,18 @@ function salvarEntradaEstoque(){
 
 // ---- Saída ----
 function openSaidaEstoque(){
-  populateEstoqueSelects();
   document.getElementById('sai-produto').value='';
+  document.getElementById('sai-produto-busca').value='';
+  document.getElementById('sai-produto-lista').style.display='none';
   document.getElementById('sai-qtd').value='';
   document.getElementById('sai-saldo-info').textContent='';
   document.getElementById('modal-saida-estoque').style.display='flex';
 }
 
-document.addEventListener('change',function(e){
-  if(e.target&&e.target.id==='sai-produto'){
-    const nome=e.target.value;
-    const info=document.getElementById('sai-saldo-info');
-    if(!nome||!info)return;
-    const item=calcularEstoque().find(d=>d.nome===nome);
-    info.textContent=item?`Saldo atual: ${item.saldo} unidade(s)`:'';
-  }
-});
-
 function salvarSaidaEstoque(){
   const nome=document.getElementById('sai-produto').value;
   const qtd=Number(document.getElementById('sai-qtd').value)||0;
-  if(!nome){alert('Selecione um produto.');return;}
+  if(!nome||!_estoqueProdutos[nome]){alert('Selecione um produto válido na lista.');return;}
   if(qtd<=0){alert('Informe uma quantidade válida.');return;}
   const p=_estoqueProdutos[nome];
   const valor=qtd*(Number(p?.preco)||0);
