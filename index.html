@@ -746,8 +746,11 @@ tbody tr:hover td{background:#faf7f3;}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Data</label>
               <input id="com-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
-            <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Paciente</label>
-              <input id="com-paciente" type="text" placeholder="Nome do paciente" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+            <div style="position:relative;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Paciente</label>
+              <input id="com-paciente" type="text" placeholder="Buscar cliente..." autocomplete="off" oninput="buscarClienteCom(this.value)" onfocus="buscarClienteCom(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+              <input type="hidden" id="com-paciente-phone" value="">
+              <div id="com-paciente-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0d9d0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;z-index:900;margin-top:2px;"></div>
+            </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
             <div><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Avaliador</label>
@@ -4455,6 +4458,41 @@ function renderComissoes(){
       </td></tr>`;
   }).join('');
 }
+function buscarClienteCom(termo){
+  const box=document.getElementById('com-paciente-suggestions');
+  const t=(termo||'').trim().toLowerCase();
+  if(t.length<2){box.style.display='none';box.innerHTML='';return;}
+  const vistos=new Set();
+  const matches=allCloudiaRows.filter(r=>{
+    const nome=(r.name||'').trim();
+    if(!nome||!nome.toLowerCase().includes(t))return false;
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const chave=nome.toLowerCase()+'|'+ph;
+    if(vistos.has(chave))return false;
+    vistos.add(chave);
+    return true;
+  }).slice(0,8);
+  if(!matches.length){box.style.display='none';box.innerHTML='';return;}
+  box.innerHTML=matches.map(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const nomeEsc=(r.name||'').replace(/'/g,"\\'");
+    return `<div onclick="selecionarClienteCom('${nomeEsc}','${ph}')" style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0ece6;" onmouseover="this.style.background='#f5f0ea'" onmouseout="this.style.background='#fff'">
+      <div style="font-weight:500;color:#2a2520;">${r.name||'—'}</div>
+      ${ph?`<div style="font-size:11px;color:#9a8c7e;">${ph}</div>`:''}
+    </div>`;
+  }).join('');
+  box.style.display='block';
+}
+function selecionarClienteCom(nome,phone){
+  document.getElementById('com-paciente').value=nome;
+  document.getElementById('com-paciente-phone').value=phone||'';
+  document.getElementById('com-paciente-suggestions').style.display='none';
+}
+document.addEventListener('click',function(e){
+  const box=document.getElementById('com-paciente-suggestions');
+  const input=document.getElementById('com-paciente');
+  if(box&&input&&!input.contains(e.target)&&!box.contains(e.target))box.style.display='none';
+});
 function openComForm(idx){
   document.getElementById('com-form-overlay').style.display='flex';
   document.getElementById('com-edit-idx').value=idx!=null?idx:'';
@@ -4476,6 +4514,7 @@ function openComForm(idx){
     calcComissoes();
   } else {
     ['com-paciente','com-crc','com-obs'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('com-paciente-phone').value='';
     document.getElementById('com-data').value=today;
     document.getElementById('com-avaliador').value='';
     document.getElementById('com-valor-trat').value='';
