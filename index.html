@@ -526,7 +526,7 @@ tbody tr:hover td{background:#faf7f3;}
           <table>
             <thead><tr>
               <th>Nome</th><th>Data do procedimento</th><th>Há quanto tempo</th>
-              <th>Intervalo</th><th>Status</th>
+              <th>Intervalo</th><th>Status</th><th>WhatsApp</th>
             </tr></thead>
             <tbody id="pacientes-tbody"></tbody>
           </table>
@@ -1043,7 +1043,10 @@ tbody tr:hover td{background:#faf7f3;}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
           <div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
-          <div id="cc-phone" style="font-size:12px;color:#8a7a6a;margin-top:2px;"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+            <div id="cc-phone" style="font-size:12px;color:#8a7a6a;"></div>
+            <a id="cc-whatsapp-btn" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+          </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button onclick="excluirCliente()" title="Excluir cliente" style="background:none;border:none;cursor:pointer;font-size:16px;color:#c0776a;">🗑️</button>
@@ -1509,6 +1512,12 @@ function normalizePhone(phone){
   }
   return d;
 }
+// Monta link wa.me a partir de qualquer formato de telefone (com ou sem 55, com ou sem 9º dígito)
+function linkWhatsapp(phone){
+  const n=normalizePhone(phone);
+  if(!n)return'';
+  return 'https://wa.me/55'+n;
+}
 // Busca segura no _ccData: tenta a chave normalizada e, se não achar, varre por chaves
 // que normalizem para o mesmo valor (cobre dados salvos antes da normalização existir)
 // Índice reverso: telefone normalizado -> chave original no _ccData.
@@ -1671,6 +1680,7 @@ async function fetchCloudia(){
       return r;
     });
     allCloudiaRows=rows;
+    _nomeParaTelefoneIndex=null;
     // Mescla CUSTOMER_ACQUISITION_ORIGIN_UPDATED na linha do lead original (mesmo telefone)
     // Atualiza origin, ad_name, ad_id do CUSTOMER_CREATED correspondente — sem criar linha nova
     const createdMap={};
@@ -3385,6 +3395,21 @@ var _catAtivaPacientes = 'lentesResina';
 
 // Mescla o seed (carga única vinda da planilha) com edições feitas no dashboard (_ccData[key].manutPlanilha).
 // Edições do dashboard sempre vencem o seed original.
+// Índice nome normalizado -> telefone, construído a partir de allCloudiaRows.
+// Usado para tentar achar o WhatsApp de pacientes vindos da planilha (que não tem telefone).
+let _nomeParaTelefoneIndex=null;
+function buildNomeParaTelefoneIndex(){
+  _nomeParaTelefoneIndex={};
+  (allCloudiaRows||[]).forEach(r=>{
+    const n=normStr(r.name);
+    const ph=normalizePhone(r.phone);
+    if(n&&ph&&!_nomeParaTelefoneIndex[n])_nomeParaTelefoneIndex[n]=ph;
+  });
+}
+function getTelefonePorNome(nome){
+  if(!_nomeParaTelefoneIndex)buildNomeParaTelefoneIndex();
+  return _nomeParaTelefoneIndex[normStr(nome)]||'';
+}
 function getRegistrosPaciente(cat){
   const seed = (window._seedPacientesPlanilha && window._seedPacientesPlanilha[cat]) || [];
   return seed.map(s=>{
@@ -3392,7 +3417,8 @@ function getRegistrosPaciente(cat){
     const override = _ccData[key] && _ccData[key].manutPlanilha;
     const dataBase = override&&override.dataBase!==undefined ? override.dataBase : s.dataBase;
     const agendado = override&&override.agendado!==undefined ? override.agendado : s.agendado;
-    return {...s, dataBase, agendado, _key:key};
+    const telefone = (override&&override.telefone)||getTelefonePorNome(s.nome);
+    return {...s, dataBase, agendado, telefone, _key:key};
   });
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
@@ -3524,14 +3550,24 @@ function renderTabelaPacientes(){
       const base=new Date(r.dataBase+'T12:00');
       if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=dm+' meses atrás';}
     }
+    const waLink=linkWhatsapp(r.telefone);
+    const waBtn=waLink
+      ?`<a href="${waLink}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 Chamar</a>`
+      :`<button onclick="definirTelefonePaciente('${cat}','${r._key}','${r.nome.replace(/'/g,"\\'")}')" style="background:#f0ece4;color:#7a6550;font-size:11px;border:none;padding:3px 9px;border-radius:20px;cursor:pointer;">+ Telefone</button>`;
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
       <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;"></td>
       <td style="font-size:12px;color:#9a8c7e;">${infoTempo}</td>
       <td style="font-size:12px;color:#9a8c7e;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
+      <td>${waBtn}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+}
+function definirTelefonePaciente(cat,key,nome){
+  const tel=prompt('Telefone de '+nome+' (com DDD, ex: 13981234567):');
+  if(!tel)return;
+  salvarOverridePaciente(cat,key,'telefone',tel.replace(/\D/g,''));
 }
 
 // ===================== RELATÓRIO DE PACIENTES =====================
@@ -3594,6 +3630,12 @@ function openClienteCard(idx){
   const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
   document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
+  const ccWaBtn=document.getElementById('cc-whatsapp-btn');
+  if(ccWaBtn){
+    const link=linkWhatsapp(r.phone);
+    if(link){ccWaBtn.href=link;ccWaBtn.style.display='inline-flex';}
+    else ccWaBtn.style.display='none';
+  }
   document.getElementById('cc-stage-tag').textContent=r.stage||'—';
   const e_cc=applyEdits(r);
   document.getElementById('cc-origin-tag').textContent=e_cc.origin||'—';
@@ -5594,6 +5636,14 @@ function lcOnStatusChange(val){
   valorWrap.style.display=['Compareceu','Ganho'].includes(val)?'block':'none';
 }
 
+function atualizarLcWhatsappBtn(){
+  const btn=document.getElementById('lc-whatsapp-btn');
+  if(!btn)return;
+  const tel=document.getElementById('lc-telefone').value;
+  const link=linkWhatsapp(tel);
+  if(link){btn.href=link;btn.style.display='inline-flex';}
+  else btn.style.display='none';
+}
 function openLeadCard(idx){
   const r=leadsData[idx];
   if(!r)return;
@@ -5604,6 +5654,7 @@ function openLeadCard(idx){
   const d_lc=_ccData[ph]||{};
   document.getElementById('lc-nome').value=d_lc.nomeAtual||r.name||'';
   document.getElementById('lc-telefone').value=r.phone||'';
+  atualizarLcWhatsappBtn();
   // Origem — prioriza edição manual do CRM
   const origSel=document.getElementById('lc-origem');
   const origVal=d_lc.origemAtual||r.origin||'';
@@ -6023,8 +6074,11 @@ window.addEventListener('load',()=>{
       </div>
       <!-- Telefone -->
       <div style="margin-bottom:11px;">
-        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Telefone</label>
-        <input id="lc-telefone" type="text" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#fff;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;">
+          <span>Telefone</span>
+          <a id="lc-whatsapp-btn" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+        </label>
+        <input id="lc-telefone" type="text" oninput="atualizarLcWhatsappBtn()" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#fff;">
       </div>
       <!-- Origem -->
       <div style="margin-bottom:11px;">
