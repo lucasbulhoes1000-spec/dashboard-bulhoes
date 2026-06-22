@@ -3471,7 +3471,13 @@ function renderDiagnosticoPacientes(){
     </div>`;
   }).join('');
 
-  wrap.innerHTML=cardsGerais+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">${cardsCategorias}</div>`;
+  wrap.innerHTML=cardsGerais+`
+    <details id="pac-categorias-details" style="margin-bottom:16px;background:#fff;border:1px solid #e0d8ce;border-radius:12px;overflow:hidden;">
+      <summary style="cursor:pointer;list-style:none;padding:14px 18px;font-size:13px;font-weight:600;color:#7a6550;display:flex;align-items:center;gap:8px;background:#faf7f2;">
+        📊 Diagnóstico por categoria
+      </summary>
+      <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">${cardsCategorias}</div>
+    </details>`;
 }
 function switchCatPacientes(cat){
   _catAtivaPacientes=cat;
