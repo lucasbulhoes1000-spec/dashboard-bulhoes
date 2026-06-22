@@ -156,6 +156,10 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-icon">👥</span>
       <span class="nav-label">Clientes</span>
     </div>
+    <div class="nav-item" onclick="switchPage('pacientes',this)">
+      <span class="nav-icon">🦷</span>
+      <span class="nav-label">Pacientes</span>
+    </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
       <span class="nav-icon">⚙️</span>
@@ -480,6 +484,48 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
       </div>
       <div id="clientes-pagination"></div>
+    </div>
+
+    <!-- ===== PACIENTES PAGE (Manutenção) ===== -->
+    <div class="page" id="page-pacientes">
+      <div class="row r4" style="margin-bottom:16px;">
+        <div class="mc"><div class="ml">Pacientes elegíveis</div><div class="mv ta" id="pac-total">—</div><div class="ms">já fecharam tratamento</div></div>
+        <div class="mc"><div class="ml">Atrasados</div><div class="mv" style="color:#b5483d;" id="pac-atrasados">—</div><div class="ms">manutenção já venceu</div></div>
+        <div class="mc"><div class="ml">Próximos 30 dias</div><div class="mv" style="color:#b08a2e;" id="pac-proximos">—</div><div class="ms">vencem em breve</div></div>
+        <div class="mc"><div class="ml">Em dia</div><div class="mv green" id="pac-emdia">—</div><div class="ms">sem necessidade imediata</div></div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="pacientes-search" oninput="renderPacientesTable()">
+        <select id="pacientes-status-filter" class="filter-select" onchange="renderPacientesTable()">
+          <option value="">Todos os status</option>
+          <option value="atrasado">Atrasado</option>
+          <option value="proximo">Próximo (30 dias)</option>
+          <option value="emdia">Em dia</option>
+          <option value="semdata">Sem data cadastrada</option>
+        </select>
+        <select id="pacientes-trat-filter" class="filter-select" onchange="renderPacientesTable()">
+          <option value="">Todos os tratamentos</option>
+          <option value="Lentes em Resina">Lentes em Resina</option>
+          <option value="Botox">Botox</option>
+          <option value="Preenchimento">Preenchimento</option>
+          <option value="Clareamento">Clareamento</option>
+        </select>
+        <span class="count-badge" id="pacientes-count"></span>
+        <button onclick="abrirConfigIntervalos()" style="margin-left:auto;background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">⚙️ Intervalos</button>
+      </div>
+      <div class="table-card">
+        <div class="tw">
+          <table>
+            <thead><tr>
+              <th>Nome</th><th>Telefone</th><th>Tratamento</th>
+              <th>Data do procedimento</th><th>Intervalo</th>
+              <th>Próxima manutenção</th><th>Status</th>
+            </tr></thead>
+            <tbody id="pacientes-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="pacientes-pagination" style="padding:10px 14px;font-size:11px;color:#9a8c7e;"></div>
     </div>
 
     <!-- ===== GERENCIAR PAGE ===== -->
@@ -1236,10 +1282,11 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
+  else if(page==='pacientes') renderPacientesPage();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
   else if(page==='estoque') setTimeout(()=>initEstoque(),50);
@@ -3307,6 +3354,155 @@ function closeModalOutside(e){if(e.target===document.getElementById('modal-overl
 function ccKey(r){var ph=String(r.phone||'').replace(/\D/g,'');return ph.length>6?ph:(r.name||'unknown');}
 function ccGet(r){var k=ccKey(r);if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]};return _ccData[k];}
 function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+// ===================== PACIENTES / MANUTENÇÃO =====================
+// Intervalo padrão de retorno por tratamento, em meses. Editável via "⚙️ Intervalos".
+var _intervalosManutencao = JSON.parse(localStorage.getItem('bulhoes_intervalos')||'null') || {
+  'Lentes em Resina': 6,
+  'Botox': 6,
+  'Preenchimento': 10,
+  'Clareamento': 12
+};
+function salvarIntervalosManutencao(){
+  localStorage.setItem('bulhoes_intervalos',JSON.stringify(_intervalosManutencao));
+}
+function abrirConfigIntervalos(){
+  const linhas=Object.keys(_intervalosManutencao).map(trat=>{
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:0.5px solid #ece4d8;">
+      <span style="font-size:13px;color:#2a2520;">${trat}</span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <input type="number" min="1" max="36" value="${_intervalosManutencao[trat]}" id="int-${trat.replace(/\s/g,'_')}" style="width:60px;padding:5px 8px;border:0.5px solid #d4c9bc;border-radius:6px;font-size:12px;text-align:center;">
+        <span style="font-size:11px;color:#9a8c7e;">meses</span>
+      </span>
+    </div>`;
+  }).join('');
+  document.getElementById('modal-body').innerHTML=`
+    <h3 style="margin:0 0 12px;font-size:15px;color:#2a2520;">Intervalos de manutenção por tratamento</h3>
+    <p style="font-size:12px;color:#9a8c7e;margin:0 0 14px;">Define a cada quantos meses o paciente deve retornar para manutenção, contando a partir da data do procedimento.</p>
+    ${linhas}
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+      <button onclick="closeModal()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;color:#7a6550;">Cancelar</button>
+      <button onclick="salvarConfigIntervalos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">Salvar</button>
+    </div>`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function salvarConfigIntervalos(){
+  Object.keys(_intervalosManutencao).forEach(trat=>{
+    const el=document.getElementById('int-'+trat.replace(/\s/g,'_'));
+    if(el){const v=parseInt(el.value,10);if(v>0)_intervalosManutencao[trat]=v;}
+  });
+  salvarIntervalosManutencao();
+  closeModal();
+  renderPacientesTable();
+}
+
+// Retorna a lista de pacientes elegíveis (já fecharam ao menos um orçamento aprovado),
+// com os dados de manutenção mesclados a partir de _ccData[telefone].manutencao
+function getPacientesElegiveis(){
+  const fechados=(clientesData||[]).filter(r=>{
+    const d=ccDataLookup(r.phone);
+    return isFechou(r.stage)||(d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado'));
+  });
+  // Deduplica por telefone (clientesData já é deduplicado, mas por segurança)
+  const seen={};
+  const lista=[];
+  fechados.forEach(r=>{
+    const key=normalizePhone(r.phone)||r.name;
+    if(seen[key])return;
+    seen[key]=true;
+    const d=ccGet(r);
+    if(!d.manutencao)d.manutencao={};
+    const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
+    const tratamentoPadrao=(d.manutencao.tratamento)||(orc&&orc.tratamento)||'';
+    lista.push({
+      nome:r.name||'(sem nome)',
+      telefone:r.phone||'',
+      key:key,
+      tratamento:tratamentoPadrao,
+      dataProcedimento:d.manutencao.dataProcedimento||''
+    });
+  });
+  return lista.sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
+}
+function calcProximaManutencao(dataProcedimento,tratamento){
+  if(!dataProcedimento||!tratamento||!_intervalosManutencao[tratamento])return null;
+  const meses=_intervalosManutencao[tratamento];
+  const dt=new Date(dataProcedimento+'T12:00');
+  if(isNaN(dt))return null;
+  dt.setMonth(dt.getMonth()+meses);
+  return dt;
+}
+function statusManutencao(dataProcedimento,tratamento){
+  if(!dataProcedimento||!tratamento)return 'semdata';
+  const prox=calcProximaManutencao(dataProcedimento,tratamento);
+  if(!prox)return 'semdata';
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const diffDias=Math.round((prox-hoje)/86400000);
+  if(diffDias<0)return 'atrasado';
+  if(diffDias<=30)return 'proximo';
+  return 'emdia';
+}
+function renderPacientesPage(){
+  if(allCloudiaRows.length===0){fetchCloudia().then(()=>{renderClientesTable();renderPacientesTable();});}
+  else if(!clientesData||clientesData.length===0){renderClientesTable();renderPacientesTable();}
+  else{renderPacientesTable();}
+}
+function salvarManutencaoPaciente(key,campo,valor){
+  if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  if(!_ccData[key].manutencao)_ccData[key].manutencao={};
+  _ccData[key].manutencao[campo]=valor;
+  _ccDataNormIndex=null;
+  salvarCRMDebounced();
+  renderPacientesTable();
+}
+function renderPacientesTable(){
+  const busca=(document.getElementById('pacientes-search').value||'').toLowerCase();
+  const statusFiltro=document.getElementById('pacientes-status-filter').value;
+  const tratFiltro=document.getElementById('pacientes-trat-filter').value;
+  let lista=getPacientesElegiveis();
+  if(busca)lista=lista.filter(p=>(p.nome||'').toLowerCase().includes(busca)||(p.telefone||'').includes(busca));
+  if(tratFiltro)lista=lista.filter(p=>p.tratamento===tratFiltro);
+  lista=lista.map(p=>({...p,_status:statusManutencao(p.dataProcedimento,p.tratamento)}));
+  if(statusFiltro)lista=lista.filter(p=>p._status===statusFiltro);
+  // Ordena: atrasado > proximo > semdata > emdia
+  const rank={atrasado:0,proximo:1,semdata:2,emdia:3};
+  lista.sort((a,b)=>rank[a._status]-rank[b._status]);
+
+  const todos=getPacientesElegiveis().map(p=>statusManutencao(p.dataProcedimento,p.tratamento));
+  document.getElementById('pac-total').textContent=todos.length;
+  document.getElementById('pac-atrasados').textContent=todos.filter(s=>s==='atrasado').length;
+  document.getElementById('pac-proximos').textContent=todos.filter(s=>s==='proximo').length;
+  document.getElementById('pac-emdia').textContent=todos.filter(s=>s==='emdia').length;
+  document.getElementById('pacientes-count').textContent=lista.length+' paciente'+(lista.length!==1?'s':'');
+
+  const statusBadge={
+    atrasado:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado</span>',
+    proximo:'<span style="background:#faf0d8;color:#b08a2e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⏰ Próximo</span>',
+    emdia:'<span style="background:#e2f0e2;color:#4a7a4a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">✓ Em dia</span>',
+    semdata:'<span style="background:#f0ece4;color:#9a8c7e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Sem data</span>'
+  };
+  const opcoesTrat=Object.keys(_intervalosManutencao);
+
+  document.getElementById('pacientes-tbody').innerHTML=lista.map(p=>{
+    const prox=calcProximaManutencao(p.dataProcedimento,p.tratamento);
+    const proxStr=prox?prox.toLocaleDateString('pt-BR'):'—';
+    const intervalo=_intervalosManutencao[p.tratamento]?_intervalosManutencao[p.tratamento]+' meses':'—';
+    const selectTrat=`<select onchange="salvarManutencaoPaciente('${p.key}','tratamento',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;">
+      <option value="">—</option>
+      ${opcoesTrat.map(t=>`<option value="${t}" ${p.tratamento===t?'selected':''}>${t}</option>`).join('')}
+    </select>`;
+    return `<tr>
+      <td style="font-weight:600;">${p.nome}</td>
+      <td style="font-size:12px;">${p.telefone}</td>
+      <td>${selectTrat}</td>
+      <td><input type="date" value="${p.dataProcedimento||''}" onchange="salvarManutencaoPaciente('${p.key}','dataProcedimento',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;"></td>
+      <td style="font-size:12px;color:#9a8c7e;">${intervalo}</td>
+      <td style="font-size:12px;">${proxStr}</td>
+      <td>${statusBadge[p._status]}</td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="7" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+}
+// ===================== FIM PACIENTES / MANUTENÇÃO =====================
 
 function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
