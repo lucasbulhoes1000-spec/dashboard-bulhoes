@@ -496,7 +496,6 @@ tbody tr:hover td{background:#faf7f3;}
 
       <div style="display:flex;gap:6px;margin:20px 0 12px;flex-wrap:wrap;">
         <button class="pac-cat-tab active" id="pac-cat-lentesResina" onclick="switchCatPacientes('lentesResina')" style="background:#A18B6C;color:#fff;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Resina</button>
-        <button class="pac-cat-tab" id="pac-cat-clareamentoInferior" onclick="switchCatPacientes('clareamentoInferior')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento Inferior</button>
         <button class="pac-cat-tab" id="pac-cat-harmonizacao" onclick="switchCatPacientes('harmonizacao')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Harmonização</button>
         <button class="pac-cat-tab" id="pac-cat-clareamento" onclick="switchCatPacientes('clareamento')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento</button>
         <button class="pac-cat-tab" id="pac-cat-lentesPorcelana" onclick="switchCatPacientes('lentesPorcelana')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Porcelana</button>
@@ -508,9 +507,10 @@ tbody tr:hover td{background:#faf7f3;}
         <input class="search-input" type="text" placeholder="Buscar por nome..." id="pacientes-search" oninput="renderTabelaPacientes()">
         <select id="pacientes-status-filter" class="filter-select" onchange="renderTabelaPacientes()">
           <option value="">Todos os status</option>
-          <option value="atrasado">Atrasado</option>
+          <option value="atrasado6_12">Atrasado 6-12 meses</option>
+          <option value="atrasado1_2anos">Atrasado 1-2 anos</option>
+          <option value="atrasadomais2anos">Atrasado +2 anos</option>
           <option value="nuncafez">Nunca fez</option>
-          <option value="agendado">Agendado</option>
           <option value="emdia">Em dia</option>
         </select>
         <span class="count-badge" id="pacientes-count"></span>
@@ -520,7 +520,7 @@ tbody tr:hover td{background:#faf7f3;}
           <table>
             <thead><tr>
               <th>Nome</th><th>Data do procedimento</th><th>Há quanto tempo</th>
-              <th>Intervalo</th><th>Agendado para</th><th>Status</th>
+              <th>Intervalo</th><th>Status</th>
             </tr></thead>
             <tbody id="pacientes-tbody"></tbody>
           </table>
@@ -3362,7 +3362,6 @@ function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumF
 // Categorias de procedimento, intervalo de manutenção (meses) e rótulos.
 var _categoriasPacientes = {
   lentesResina:        {label:'Lentes em Resina',     intervalo:6,  unidadeRotulo:'meses'},
-  clareamentoInferior: {label:'Clareamento Inferior', intervalo:12, unidadeRotulo:'meses'},
   harmonizacao:        {label:'Harmonização (Preenchimento)', intervalo:10, unidadeRotulo:'meses'},
   clareamento:         {label:'Clareamento',           intervalo:12, unidadeRotulo:'meses'},
   lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'},
@@ -3383,15 +3382,22 @@ function getRegistrosPaciente(cat){
   });
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
+// Status detalhado por faixa de tempo, não apenas "atrasado".
+// Faixas: emdia (< intervalo, ou agendado) | atrasado6_12 (intervalo–12m) | atrasado1_2anos (12–24m) | atrasadomais2anos (>24m)
 function statusPaciente(reg,intervalo){
-  if(reg.agendado)return 'agendado';
+  if(reg.agendado)return 'emdia';
   if(intervalo==null)return 'semdado';
   if(!reg.dataBase)return 'nuncafez';
   const base=new Date(reg.dataBase+'T12:00');
   if(isNaN(base))return 'nuncafez';
   const dm=diffMeses(base,new Date());
-  return dm<intervalo?'emdia':'atrasado';
+  if(dm<intervalo)return 'emdia';
+  if(dm<12)return 'atrasado6_12';
+  if(dm<24)return 'atrasado1_2anos';
+  return 'atrasadomais2anos';
 }
+// Agrupador: todas as faixas de atraso somadas, usado para "precisa de contato" e ordenação.
+function ehAtrasado(status){return status==='atrasado6_12'||status==='atrasado1_2anos'||status==='atrasadomais2anos';}
 function salvarOverridePaciente(cat,key,campo,valor){
   if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
   if(!_ccData[key].manutPlanilha)_ccData[key].manutPlanilha={};
@@ -3405,17 +3411,17 @@ function renderPacientesPage(){
 }
 function renderDiagnosticoPacientes(){
   const cats=Object.keys(_categoriasPacientes);
-  let totalGeral=0,emDiaGeral=0,atrasadoGeral=0,nuncaGeral=0;
+  let totalGeral=0,emDiaGeral=0,precisamContatoGeral=0,nuncaGeral=0;
   const porCategoria={};
   cats.forEach(cat=>{
     const intervalo=_categoriasPacientes[cat].intervalo;
     const regs=getRegistrosPaciente(cat);
-    const c={emdia:0,atrasado:0,nuncafez:0,agendado:0,semdado:0};
+    const c={emdia:0,atrasado6_12:0,atrasado1_2anos:0,atrasadomais2anos:0,nuncafez:0,agendado:0,semdado:0};
     regs.forEach(r=>{c[statusPaciente(r,intervalo)]++;});
     porCategoria[cat]=c;
     totalGeral+=regs.length;
     emDiaGeral+=c.emdia;
-    atrasadoGeral+=c.atrasado+c.nuncafez; // "precisam de contato" = atrasados + nunca fizeram
+    precisamContatoGeral+=c.atrasado6_12+c.atrasado1_2anos+c.atrasadomais2anos+c.nuncafez;
     nuncaGeral+=c.nuncafez;
   });
 
@@ -3427,22 +3433,23 @@ function renderDiagnosticoPacientes(){
     <div class="row r4" style="margin-bottom:16px;">
       <div class="mc"><div class="ml">Total na base</div><div class="mv ta">${totalGeral}</div><div class="ms">pacientes em todas as categorias</div></div>
       <div class="mc"><div class="ml">Em dia</div><div class="mv green">${emDiaGeral}</div><div class="ms">${totalGeral?Math.round(emDiaGeral/totalGeral*100):0}% da base</div></div>
-      <div class="mc"><div class="ml">Precisam de contato</div><div class="mv" style="color:#b5483d;">${atrasadoGeral}</div><div class="ms">atrasados ou nunca fizeram</div></div>
+      <div class="mc"><div class="ml">Precisam de contato</div><div class="mv" style="color:#b5483d;">${precisamContatoGeral}</div><div class="ms">atrasados em qualquer faixa ou nunca fizeram</div></div>
       <div class="mc"><div class="ml">Nunca fizeram</div><div class="mv" style="color:#b08a2e;">${nuncaGeral}</div><div class="ms">${totalGeral?Math.round(nuncaGeral/totalGeral*100):0}% da base</div></div>
     </div>`;
 
-  // Cards por categoria (grid 2 colunas)
+  // Cards por categoria (grid 2 colunas), com as 3 faixas de atraso detalhadas
   const cardsCategorias=cats.map(cat=>{
     const cfg=_categoriasPacientes[cat];
     const c=porCategoria[cat];
     const total=Object.values(c).reduce((a,b)=>a+b,0);
     const linhas=[];
     if(c.emdia!==undefined)linhas.push(['Em dia ('+(cfg.intervalo?'< '+cfg.intervalo+'m':'—')+')',c.emdia,'#e2f0e2','#4a7a4a']);
-    if(c.agendado)linhas.push(['Agendados',c.agendado,'#dce8f5','#3a5a8a']);
-    if(c.atrasado)linhas.push(['Atrasados',c.atrasado,'#faf0d8','#b08a2e']);
-    if(c.nuncafez)linhas.push(['Nunca fizeram',c.nuncafez,'#f7e2de','#b5483d']);
+    if(c.atrasado6_12)linhas.push(['Atrasados '+(cfg.intervalo||0)+'-12 meses',c.atrasado6_12,'#faf0d8','#b08a2e']);
+    if(c.atrasado1_2anos)linhas.push(['Atrasados 1-2 anos',c.atrasado1_2anos,'#f7e0c8','#a8682e']);
+    if(c.atrasadomais2anos)linhas.push(['Atrasados +2 anos',c.atrasadomais2anos,'#f7e2de','#b5483d']);
+    if(c.nuncafez)linhas.push(['Nunca fizeram',c.nuncafez,'#f3d6d6','#9a3a3a']);
     if(c.semdado)linhas.push(['Sem dado registrado',c.semdado,'#f0ece4','#9a8c7e']);
-    const precisamContato=c.atrasado+c.nuncafez;
+    const precisamContato=c.atrasado6_12+c.atrasado1_2anos+c.atrasadomais2anos+c.nuncafez;
     return `<div style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:18px;">
       <div style="font-size:12px;font-weight:700;letter-spacing:0.04em;color:#7a6550;text-transform:uppercase;margin-bottom:12px;">${cfg.label} · ${total} pacientes</div>
       ${linhas.map(([label,val,bg,fg])=>`
@@ -3476,16 +3483,17 @@ function renderTabelaPacientes(){
   regs=regs.map(r=>({...r,_status:statusPaciente(r,cfg.intervalo)}));
   if(busca)regs=regs.filter(r=>r.nome.toLowerCase().includes(busca));
   if(statusFiltro)regs=regs.filter(r=>r._status===statusFiltro);
-  const rank={atrasado:0,nuncafez:1,semdado:2,agendado:3,emdia:4};
+  const rank={atrasadomais2anos:0,atrasado1_2anos:1,atrasado6_12:2,nuncafez:3,semdado:4,emdia:5};
   regs.sort((a,b)=>(rank[a._status]-rank[b._status])||a.nome.localeCompare(b.nome));
 
   document.getElementById('pacientes-count').textContent=regs.length+' paciente'+(regs.length!==1?'s':'');
 
   const statusBadge={
-    atrasado:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado</span>',
-    nuncafez:'<span style="background:#faf0d8;color:#b08a2e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Nunca fez</span>',
+    atrasado6_12:'<span style="background:#faf0d8;color:#b08a2e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado 6-12m</span>',
+    atrasado1_2anos:'<span style="background:#f7e0c8;color:#a8682e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado 1-2 anos</span>',
+    atrasadomais2anos:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado +2 anos</span>',
+    nuncafez:'<span style="background:#f3d6d6;color:#9a3a3a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Nunca fez</span>',
     emdia:'<span style="background:#e2f0e2;color:#4a7a4a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">✓ Em dia</span>',
-    agendado:'<span style="background:#dce8f5;color:#3a5a8a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 Agendado</span>',
     semdado:'<span style="background:#f0ece4;color:#9a8c7e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Sem dado</span>'
   };
 
@@ -3496,16 +3504,14 @@ function renderTabelaPacientes(){
       const base=new Date(r.dataBase+'T12:00');
       if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=dm+' meses atrás';}
     }
-    const agendadoStr=r.agendado?new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'}):'';
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
       <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;"></td>
       <td style="font-size:12px;color:#9a8c7e;">${infoTempo}</td>
       <td style="font-size:12px;color:#9a8c7e;">${meses?meses+' meses':'—'}</td>
-      <td><input type="month" value="${r.agendado?r.agendado.slice(0,7):''}" onchange="salvarOverridePaciente('${cat}','${r._key}','agendado',this.value?this.value+'-01':'')" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;" title="${agendadoStr}"></td>
       <td>${statusBadge[r._status]}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="6" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+  }).join('')||'<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
 }
 
 // ===================== RELATÓRIO DE PACIENTES =====================
@@ -3514,26 +3520,29 @@ function gerarRelatorioPacientes(){
   const agora=new Date().toLocaleDateString('pt-BR');
   let totalGeral=0,emDiaGeral=0,precisamContatoGeral=0;
   let blocos='';
+  const labelStatus={atrasado6_12:'atrasado 6-12 meses',atrasado1_2anos:'atrasado 1-2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:'nunca fez'};
   cats.forEach(cat=>{
     const cfg=_categoriasPacientes[cat];
     const regs=getRegistrosPaciente(cat).map(r=>({...r,_status:statusPaciente(r,cfg.intervalo)}));
     const total=regs.length;
     const emdia=regs.filter(r=>r._status==='emdia').length;
-    const atrasado=regs.filter(r=>r._status==='atrasado').length;
+    const atrasado6_12=regs.filter(r=>r._status==='atrasado6_12').length;
+    const atrasado1_2anos=regs.filter(r=>r._status==='atrasado1_2anos').length;
+    const atrasadomais2anos=regs.filter(r=>r._status==='atrasadomais2anos').length;
     const nuncafez=regs.filter(r=>r._status==='nuncafez').length;
-    const agendado=regs.filter(r=>r._status==='agendado').length;
     const semdado=regs.filter(r=>r._status==='semdado').length;
-    const precisamContato=atrasado+nuncafez;
+    const precisamContato=atrasado6_12+atrasado1_2anos+atrasadomais2anos+nuncafez;
     totalGeral+=total;emDiaGeral+=emdia;precisamContatoGeral+=precisamContato;
-    const listaContato=regs.filter(r=>r._status==='atrasado'||r._status==='nuncafez')
+    const listaContato=regs.filter(r=>ehAtrasado(r._status)||r._status==='nuncafez')
       .sort((a,b)=>a.nome.localeCompare(b.nome))
-      .map(r=>`<li>${r.nome} <span style="color:#9a8c7e;">— ${r._status==='nuncafez'?'nunca fez':'atrasado'}</span></li>`).join('');
+      .map(r=>`<li>${r.nome} <span style="color:#9a8c7e;">— ${labelStatus[r._status]}</span></li>`).join('');
     blocos+=`
       <h3 style="margin:22px 0 8px;font-size:15px;color:#2a2520;">${cfg.label} — ${total} pacientes</h3>
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;">
         <tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Em dia</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${emdia}</td></tr>
-        ${agendado?`<tr><td style="padding:6px 10px;">Agendados</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${agendado}</td></tr>`:''}
-        ${atrasado?`<tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Atrasados</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasado}</td></tr>`:''}
+        ${atrasado6_12?`<tr><td style="padding:6px 10px;">Atrasados ${cfg.intervalo||0}-12 meses</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasado6_12}</td></tr>`:''}
+        ${atrasado1_2anos?`<tr><td style="padding:6px 10px;">Atrasados 1-2 anos</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasado1_2anos}</td></tr>`:''}
+        ${atrasadomais2anos?`<tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Atrasados +2 anos</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasadomais2anos}</td></tr>`:''}
         ${nuncafez?`<tr><td style="padding:6px 10px;">Nunca fizeram</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${nuncafez}</td></tr>`:''}
         ${semdado?`<tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Sem dado registrado</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${semdado}</td></tr>`:''}
       </table>
