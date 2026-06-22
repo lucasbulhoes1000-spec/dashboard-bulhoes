@@ -431,8 +431,8 @@ tbody tr:hover td{background:#faf7f3;}
       <div class="row r4" style="margin-bottom:16px;">
         <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms">valor total em orçamentos</div></div>
         <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms">em aberto</div></div>
-        <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms">contratos</div></div>
-        <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms">de receita</div></div>
+        <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
+        <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
       </div>
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
@@ -2918,6 +2918,16 @@ function renderClientesPage(){
   document.getElementById('cc-total-abertos').textContent=totalA;
   document.getElementById('cc-total-fechados').textContent=totalF;
   document.getElementById('cc-valor-fechado').textContent=valorF>0?fmt(valorF):'—';
+  // % de pacientes que compareceram e fecharam (totalF / totalC)
+  const pctPacientes=totalC>0?(totalF/totalC*100):0;
+  const elFechSub=document.getElementById('cc-total-fechados-sub');
+  elFechSub.textContent='contratos · '+pctPacientes.toFixed(1)+'%';
+  elFechSub.title=totalF+' de '+totalC+' pacientes que compareceram fecharam ('+pctPacientes.toFixed(1)+'%)';
+  // % do valor orçado que virou venda (valorF / totalOrcado)
+  const pctValor=totalOrcado>0?(valorF/totalOrcado*100):0;
+  const elValSub=document.getElementById('cc-valor-fechado-sub');
+  elValSub.textContent='de receita · '+pctValor.toFixed(1)+'%';
+  elValSub.title=fmt(valorF)+' de '+fmt(totalOrcado)+' orçados converteram em venda ('+pctValor.toFixed(1)+'%)';
   document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const fechou=isFechou(r.stage);
     const val=parseFloat(r.value||0);
