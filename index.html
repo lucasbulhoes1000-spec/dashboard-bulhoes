@@ -1602,9 +1602,11 @@ async function loadTrafego(){
       arr.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     });
     // Usa allCloudiaRows que já inclui importados reconstruídos pelo fetchCloudia
-    const filtered=filterCloudiaByOrigin(filterByRange(allCloudiaRows,'trafego'));
-    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
-    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(allCloudiaRows,'trafego'));
+    // Exclui Social Selling do Dashboard Principal: esses já são contabilizados na aba própria.
+    const semSocial=excluirSocialSelling(allCloudiaRows);
+    const filtered=filterCloudiaByOrigin(filterByRange(semSocial,'trafego'));
+    const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(semSocial,'trafego'));
+    const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(semSocial,'trafego'));
     _lastCloudiaFiltered=filtered;
     _lastCloudiaFilteredEvents=filteredEvents;
     _lastCloudiaFilteredAgend=filteredAgend;
@@ -1841,7 +1843,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Inclui importados via CSV (type=CUSTOMER_CREATED, stage=Compareceu ou Ganho)
   // Usa timestamp (data da consulta) se existir, senão created_at
   const _rangeComp=getRange('trafego');
-  filterCloudiaByOrigin(allCloudiaRows).filter(r=>{
+  filterCloudiaByOrigin(excluirSocialSelling(allCloudiaRows)).filter(r=>{
     if(r.type!=='CUSTOMER_CREATED')return false;
     if(!isComp(r.stage)&&!isFechou(r.stage))return false;
     const ph=normalizePhone(r.phone);
@@ -1940,7 +1942,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Filtra fechadosPhones vindos do Cloudia pela origem também
   if(_origemFilter){
     const phonesOrigemOk=new Set(
-      allCloudiaRows
+      excluirSocialSelling(allCloudiaRows)
         .filter(r=>{
           const org=(r.origin||'').toLowerCase();
           if(_origemFilter==='instagram ads')return org.includes('instagram');
@@ -2325,6 +2327,12 @@ function applyOrigemFilter(){
     renderTrafego(_lastMetaAds,filtered,filteredEvents,filteredAgend);
     updateOrigemCount(filtered);
   }
+}
+// Remove registros de origem Social Selling — usado apenas no Dashboard Principal,
+// pois esses leads/clientes já são contabilizados separadamente na aba Social Selling
+// e não devem ser duplicados nos números gerais.
+function excluirSocialSelling(rows){
+  return (rows||[]).filter(r=>!(r.origin||'').toLowerCase().includes('social'));
 }
 function filterCloudiaByOrigin(rows){
   if(!_origemFilter)return rows;
