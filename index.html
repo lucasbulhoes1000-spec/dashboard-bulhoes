@@ -943,18 +943,23 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Estoque máximo</label>
           <input id="prod-maximo" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Preço unitário (R$)</label>
-        <input id="prod-preco" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       <div style="margin-bottom:11px;background:#faf7f3;border:0.5px solid #e0d8ce;border-radius:8px;padding:10px;">
         <label style="font-size:11px;color:#8a7a6a;display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;">
-          <input id="prod-vem-caixa" type="checkbox" onchange="document.getElementById('prod-unid-caixa-wrap').style.display=this.checked?'block':'none';" style="margin:0;">
+          <input id="prod-vem-caixa" type="checkbox" onchange="toggleProdVemCaixa()" style="margin:0;">
           Este produto é comprado em caixa
         </label>
         <div id="prod-unid-caixa-wrap" style="display:none;">
           <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Unidades por caixa</label>
-          <input id="prod-unid-caixa" type="number" min="1" placeholder="Ex: 12" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-          <div style="font-size:11px;color:#9a8c7e;margin-top:4px;">O preço da caixa muda a cada compra — você informa isso na hora de registrar a entrada.</div>
+          <input id="prod-unid-caixa" type="number" min="1" placeholder="Ex: 12" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewPrecoUnitCadastro()">
         </div>
+      </div>
+      <div id="prod-preco-normal-wrap" style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Preço unitário (R$)</label>
+        <input id="prod-preco" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div id="prod-preco-caixa-wrap" style="display:none;margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor da caixa (R$)</label>
+        <input id="prod-valor-caixa" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewPrecoUnitCadastro()">
+        <div id="prod-preview-preco-unit" style="font-size:11px;color:#5a8a6a;margin-top:5px;"></div>
+        <div style="font-size:11px;color:#9a8c7e;margin-top:4px;">Da próxima vez que comprar, informe o novo valor direto na Entrada de Estoque — o preço médio se ajusta automaticamente.</div>
       </div>
       <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade inicial em estoque</label>
         <input id="prod-qtd-inicial" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
@@ -3969,13 +3974,19 @@ function marcarStageGanho(ph,nome,origem,valor){
   );
   if(jaTemGanho)return;
   const agora=new Date().toISOString();
-  // Busca created_at do lead original, se existir, senão usa agora
   const original=allCloudiaRows.find(row=>String(row.phone||'').replace(/\D/g,'')===ph);
   const createdAt=(original&&original.created_at)||agora;
+  // Usa o timestamp do evento mais recente já existente (ex: Compareceu) para não
+  // "puxar" a data de comparecimento exibida na tabela para hoje. Só usa "agora"
+  // se realmente não houver nenhum evento de stage anterior para esse telefone.
+  const eventoAnterior=allCloudiaRows.filter(row=>
+    String(row.phone||'').replace(/\D/g,'')===ph && row.type==='CUSTOMER_STAGE_UPDATED'
+  ).sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))[0];
+  const timestampGanho=(eventoAnterior&&eventoAnterior.timestamp)||agora;
   fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       type:'CUSTOMER_STAGE_UPDATED',
-      _agend_timestamp:agora,
+      _agend_timestamp:timestampGanho,
       data:{phone:ph,name:nome||(original&&original.name)||'',stage:'Ganho',
             value:valor||0,id:'',created_at:createdAt,
             ad_data:[],acquisitionOrigin:origem||(original&&original.origin)||''}
@@ -3984,9 +3995,47 @@ function marcarStageGanho(ph,nome,origem,valor){
   // Reflete em memória imediatamente, sem esperar resposta
   allCloudiaRows.push({
     name:nome||(original&&original.name)||'',phone:ph,origin:origem||(original&&original.origin)||'',
-    stage:'Ganho',created_at:createdAt,timestamp:agora,
+    stage:'Ganho',created_at:createdAt,timestamp:timestampGanho,
     type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:'',value:valor||0
   });
+}
+// CORREÇÃO DO BUG — os eventos "Ganho" criados por corrigirFasesRetroativo() usaram
+// a hora atual como timestamp, fazendo a coluna "Data Comparecimento" mostrar hoje
+// para todos. Esta função corrige isso: acha o evento Ganho de cada telefone e
+// reescreve seu timestamp para bater com o evento anterior (Compareceu) mais recente.
+async function corrigirTimestampGanhoErrado(){
+  const eventosGanho=allCloudiaRows.filter(row=>row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage==='Ganho');
+  let corrigidos=0,jaCertos=0;
+  console.log('[CORRIGIR TIMESTAMP] '+eventosGanho.length+' evento(s) Ganho encontrados para checar.');
+  for(let i=0;i<eventosGanho.length;i++){
+    const evGanho=eventosGanho[i];
+    const ph=String(evGanho.phone||'').replace(/\D/g,'');
+    if(!ph)continue;
+    // Acha o evento de stage mais recente desse telefone que NÃO seja Ganho (ex: Compareceu)
+    const eventoAnterior=allCloudiaRows.filter(row=>
+      String(row.phone||'').replace(/\D/g,'')===ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage!=='Ganho'
+    ).sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))[0];
+    if(!eventoAnterior){jaCertos++;continue;}
+    const timestampCorreto=eventoAnterior.timestamp;
+    if(evGanho.timestamp===timestampCorreto){jaCertos++;continue;}
+    // Reescreve o timestamp na planilha (mesma rota usada em todo o dashboard: POST com _agend_timestamp)
+    fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        type:'CUSTOMER_STAGE_UPDATED',
+        _agend_timestamp:timestampCorreto,
+        data:{phone:ph,name:evGanho.name||'',stage:'Ganho',
+              value:evGanho.value||0,id:'',created_at:evGanho.created_at||timestampCorreto,
+              ad_data:[],acquisitionOrigin:evGanho.origin||''}
+      })
+    });
+    evGanho.timestamp=timestampCorreto; // reflete em memória
+    corrigidos++;
+    console.log('[CORRIGIR TIMESTAMP] ('+(i+1)+'/'+eventosGanho.length+') '+evGanho.name+' -> '+timestampCorreto);
+    await new Promise(r=>setTimeout(r,1000));
+  }
+  console.log('[CORRIGIR TIMESTAMP] Concluído! Atualizando tabela...');
+  renderClientesTable();
+  alert('✅ Correção de timestamp concluída!\n\nCorrigidos: '+corrigidos+'\nJá estavam certos: '+jaCertos+'\n\nRecomendo dar F5 em ~10 segundos para confirmar.');
 }
 // CORREÇÃO RETROATIVA — roda uma vez via console (corrigirFasesRetroativo())
 // Marca Fase=Ganho para todos os clientes que já têm orçamento Aprovado no _ccData
@@ -5314,12 +5363,28 @@ function openCadastrarProduto(){
   document.getElementById('prod-minimo').value='';
   document.getElementById('prod-maximo').value='';
   document.getElementById('prod-preco').value='';
+  document.getElementById('prod-valor-caixa').value='';
   document.getElementById('prod-qtd-inicial').value='';
   document.getElementById('prod-vem-caixa').checked=false;
   document.getElementById('prod-unid-caixa').value='';
-  document.getElementById('prod-unid-caixa-wrap').style.display='none';
+  toggleProdVemCaixa();
   document.getElementById('prod-btn-excluir').style.display='none';
   document.getElementById('modal-cadastrar-produto').style.display='flex';
+}
+function toggleProdVemCaixa(){
+  const vemCaixa=document.getElementById('prod-vem-caixa').checked;
+  document.getElementById('prod-unid-caixa-wrap').style.display=vemCaixa?'block':'none';
+  document.getElementById('prod-preco-normal-wrap').style.display=vemCaixa?'none':'block';
+  document.getElementById('prod-preco-caixa-wrap').style.display=vemCaixa?'block':'none';
+  atualizarPreviewPrecoUnitCadastro();
+}
+function atualizarPreviewPrecoUnitCadastro(){
+  const unid=Number(document.getElementById('prod-unid-caixa').value)||0;
+  const valorCaixa=Number(document.getElementById('prod-valor-caixa').value)||0;
+  const preview=document.getElementById('prod-preview-preco-unit');
+  if(unid<=0||valorCaixa<=0){preview.textContent='';return;}
+  const precoUnit=valorCaixa/unid;
+  preview.textContent='= '+fmtMoeda(precoUnit)+' por unidade';
 }
 
 function editarProduto(nome){
@@ -5337,7 +5402,9 @@ function editarProduto(nome){
   document.getElementById('prod-qtd-inicial').value='';
   document.getElementById('prod-vem-caixa').checked=!!p.unidPorCaixa;
   document.getElementById('prod-unid-caixa').value=p.unidPorCaixa||'';
-  document.getElementById('prod-unid-caixa-wrap').style.display=p.unidPorCaixa?'block':'none';
+  // Reconstrói o "valor da caixa" a partir do preço unitário atual, só para referência inicial editável
+  document.getElementById('prod-valor-caixa').value=p.unidPorCaixa?Math.round((p.preco*p.unidPorCaixa)*100)/100:'';
+  toggleProdVemCaixa();
   document.getElementById('prod-btn-excluir').style.display='block';
   document.getElementById('modal-cadastrar-produto').style.display='flex';
 }
@@ -5348,7 +5415,6 @@ function salvarProduto(){
   const tag=document.getElementById('prod-tag').value.trim();
   const minimo=Number(document.getElementById('prod-minimo').value)||0;
   const maximo=Number(document.getElementById('prod-maximo').value)||0;
-  const preco=Number(document.getElementById('prod-preco').value)||0;
   const qtdInicial=Number(document.getElementById('prod-qtd-inicial').value)||0;
   const vemCaixa=document.getElementById('prod-vem-caixa').checked;
   const unidPorCaixa=vemCaixa?(Number(document.getElementById('prod-unid-caixa').value)||0):0;
@@ -5356,6 +5422,15 @@ function salvarProduto(){
   if(!nome){alert('O nome do produto é obrigatório.');return;}
   if(!nomeOriginal&&_estoqueProdutos[nome]){alert('Já existe um produto com esse nome.');return;}
   if(vemCaixa&&unidPorCaixa<=0){alert('Informe quantas unidades vêm em cada caixa.');return;}
+
+  let preco;
+  if(vemCaixa){
+    const valorCaixa=Number(document.getElementById('prod-valor-caixa').value)||0;
+    if(valorCaixa<=0){alert('Informe o valor da caixa.');return;}
+    preco=Math.round((valorCaixa/unidPorCaixa)*100)/100;
+  }else{
+    preco=Number(document.getElementById('prod-preco').value)||0;
+  }
 
   _estoqueProdutos[nome]={nome,tag,minimo,maximo,preco,unidPorCaixa};
 
