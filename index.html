@@ -2954,11 +2954,13 @@ function filterClientesTable(){
       return ultimaA&&ultimaA.fase===faseAtv;
     })();
     const origMatch=!orig||(e.origin||'')===orig;
-    const fechou=isFechou(r.stage);
-    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=ccDataLookup(ph)||{orcamentos:[]};
     const orcs=d.orcamentos||[];
+    // Fechado = Fase "Ganho" no Cloudia OU orçamento aprovado manualmente no dashboard
+    // (mesma regra usada no resto do dashboard — orçamento aprovado é fonte de verdade).
+    const fechou=isFechou(r.stage)||orcs.some(o=>o.status==='Aprovado');
+    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const normStr=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
     const tratMatch=!trat||orcs.some(o=>normStr(o.tratamento)===normStr(trat));
     const avalMatch=!aval||orcs.some(o=>normStr(o.avaliador)===normStr(aval));
@@ -3036,11 +3038,12 @@ function renderClientesPage(){
   elValSub.textContent='de receita · '+pctValor.toFixed(1)+'%';
   elValSub.title=fmt(valorF)+' de '+fmt(totalOrcado)+' orçados converteram em venda ('+pctValor.toFixed(1)+'%)';
   document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
-    const fechou=isFechou(r.stage);
-    const val=parseFloat(r.value||0);
-    const idx=clientesData.indexOf(r);
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=ccDataLookup(ph)||{orcamentos:[],atividades:[]};
+    // Fechado = Fase "Ganho" no Cloudia OU orçamento aprovado manualmente no dashboard.
+    const fechou=isFechou(r.stage)||(d.orcamentos||[]).some(o=>o.status==='Aprovado');
+    const val=parseFloat(r.value||0);
+    const idx=clientesData.indexOf(r);
     const orc0=d.orcamentos&&d.orcamentos[0];
     const ultimaAtv=(d.atividades&&d.atividades.length>0)?d.atividades[0]:null;
     const proxContato=ultimaAtv&&ultimaAtv.proximo?new Date(ultimaAtv.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
