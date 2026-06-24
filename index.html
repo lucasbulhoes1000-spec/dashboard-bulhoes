@@ -128,9 +128,18 @@ tbody tr:hover td{background:#faf7f3;}
 .modal-empty{text-align:center;padding:32px;color:#b5a898;font-size:13px;}
 .lupa{background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:13px;padding:0 0 0 6px;vertical-align:middle;transition:color .2s;}
 .lupa:hover{color:#A18B6C;}
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:10px;}
+.toast{background:#2a2520;color:#fff;border-radius:10px;padding:14px 18px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.18);min-width:260px;max-width:360px;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.toast-success{border-left:3px solid #4a7a4a;}
+.toast.toast-error{border-left:3px solid #b5483d;}
+.toast-title{font-weight:700;margin-bottom:4px;}
+.toast-body{color:#d8d0c5;font-size:12px;line-height:1.5;white-space:pre-line;}
 </style>
 </head>
 <body>
+
+<div id="toast-container"></div>
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -3486,6 +3495,21 @@ function atualizarBadgeUltimaSync(){
   const d=new Date(window._seedPacientesUltimaSync);
   el.textContent='Última sincronização com o Clinicorp: '+d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
+function showToast(tipo,titulo,corpo){
+  const container=document.getElementById('toast-container');
+  if(!container)return;
+  const el=document.createElement('div');
+  el.className='toast toast-'+(tipo==='error'?'error':'success');
+  el.innerHTML='<div class="toast-title">'+titulo+'</div>'+(corpo?'<div class="toast-body"></div>':'');
+  if(corpo)el.querySelector('.toast-body').textContent=corpo;
+  container.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  const duracao=tipo==='error'?7000:5000;
+  setTimeout(()=>{
+    el.classList.remove('show');
+    setTimeout(()=>el.remove(),300);
+  },duracao);
+}
 async function sincronizarClinicorp(){
   const btn=document.getElementById('btn-sync-clinicorp');
   const textoOriginal=btn.textContent;
@@ -3503,13 +3527,13 @@ async function sincronizarClinicorp(){
       atualizarBadgeUltimaSync();
       renderDiagnosticoPacientes();
       renderTabelaPacientes();
-      alert('✅ Sincronizado!\n\nPeríodo: '+r.periodo.from+' a '+r.periodo.to+'\nAgendamentos encontrados: '+r.totalAgendamentos+'\nPacientes atualizados: '+r.atualizados+'\nPacientes novos: '+r.criados);
+      showToast('success','✅ Sincronizado!','Período: '+r.periodo.from+' a '+r.periodo.to+'\nAgendamentos encontrados: '+r.totalAgendamentos+'\nPacientes atualizados: '+r.atualizados+'\nPacientes novos: '+r.criados);
     }else{
-      alert('Erro na sincronização: '+(r.mensagem||JSON.stringify(r)));
+      showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
     }
   }catch(e){
     console.error('[SYNC CLINICORP] Erro:',e);
-    alert('Erro de conexão: '+e.message+'\n\nVerifique o console (F12) para mais detalhes.');
+    showToast('error','Erro de conexão',e.message+'\nVerifique o console (F12) para mais detalhes.');
   }finally{
     btn.disabled=false;
     btn.textContent=textoOriginal;
