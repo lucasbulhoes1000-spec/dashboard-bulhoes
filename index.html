@@ -945,6 +945,17 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
       <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Preço unitário (R$)</label>
         <input id="prod-preco" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div style="margin-bottom:11px;background:#faf7f3;border:0.5px solid #e0d8ce;border-radius:8px;padding:10px;">
+        <label style="font-size:11px;color:#8a7a6a;display:flex;align-items:center;gap:6px;margin-bottom:6px;cursor:pointer;">
+          <input id="prod-vem-caixa" type="checkbox" onchange="document.getElementById('prod-unid-caixa-wrap').style.display=this.checked?'block':'none';" style="margin:0;">
+          Este produto é comprado em caixa
+        </label>
+        <div id="prod-unid-caixa-wrap" style="display:none;">
+          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Unidades por caixa</label>
+          <input id="prod-unid-caixa" type="number" min="1" placeholder="Ex: 12" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          <div style="font-size:11px;color:#9a8c7e;margin-top:4px;">O preço da caixa muda a cada compra — você informa isso na hora de registrar a entrada.</div>
+        </div>
+      </div>
       <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade inicial em estoque</label>
         <input id="prod-qtd-inicial" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       <div style="display:flex;gap:10px;margin-top:6px;">
@@ -981,12 +992,22 @@ tbody tr:hover td{background:#faf7f3;}
         <input id="ent-produto-busca" type="text" autocomplete="off" placeholder="Digite para buscar..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="filtrarComboProduto('ent')" onfocus="abrirComboProduto('ent')">
         <div id="ent-produto-lista" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:50;"></div>
       </div>
-      <div style="display:flex;gap:10px;margin-bottom:11px;">
+      <div id="ent-modo-caixa-aviso" style="display:none;background:#f5f0ea;border-radius:8px;padding:8px 10px;margin-bottom:11px;font-size:12px;color:#7a6550;">
+        📦 Este produto vem em caixa com <strong id="ent-unid-caixa-label">—</strong> unidades.
+      </div>
+      <div id="ent-campos-normais" style="display:flex;gap:10px;margin-bottom:11px;">
         <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
-          <input id="ent-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+          <input id="ent-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewEntradaCaixa()"></div>
         <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor total (R$)</label>
           <input id="ent-valor" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       </div>
+      <div id="ent-campos-caixa" style="display:none;gap:10px;margin-bottom:11px;">
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantas caixas? *</label>
+          <input id="ent-num-caixas" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewEntradaCaixa()"></div>
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor por caixa (R$) *</label>
+          <input id="ent-valor-caixa" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewEntradaCaixa()"></div>
+      </div>
+      <div id="ent-preview-caixa" style="display:none;font-size:12px;color:#5a8a6a;margin-bottom:11px;margin-top:-4px;"></div>
       <div style="display:flex;gap:10px;">
         <button onclick="salvarEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Registrar</button>
         <button onclick="document.getElementById('modal-entrada-estoque').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
@@ -5174,6 +5195,31 @@ function selecionarComboProduto(prefixo,nome){
     const item=calcularEstoque().find(d=>d.nome===nome);
     if(info)info.textContent=item?`Saldo atual: ${item.saldo} unidade(s)`:'';
   }
+  if(prefixo==='ent'){
+    const p=_estoqueProdutos[nome];
+    const vemCaixa=p&&p.unidPorCaixa>0;
+    document.getElementById('ent-modo-caixa-aviso').style.display=vemCaixa?'block':'none';
+    document.getElementById('ent-campos-normais').style.display=vemCaixa?'none':'flex';
+    document.getElementById('ent-campos-caixa').style.display=vemCaixa?'flex':'none';
+    document.getElementById('ent-preview-caixa').style.display='none';
+    if(vemCaixa)document.getElementById('ent-unid-caixa-label').textContent=p.unidPorCaixa;
+    document.getElementById('ent-num-caixas').value='';
+    document.getElementById('ent-valor-caixa').value='';
+  }
+}
+
+function atualizarPreviewEntradaCaixa(){
+  const nome=document.getElementById('ent-produto').value;
+  const p=_estoqueProdutos[nome];
+  if(!p||!p.unidPorCaixa)return;
+  const numCaixas=Number(document.getElementById('ent-num-caixas').value)||0;
+  const valorCaixa=Number(document.getElementById('ent-valor-caixa').value)||0;
+  const preview=document.getElementById('ent-preview-caixa');
+  if(numCaixas<=0||valorCaixa<=0){preview.style.display='none';return;}
+  const totalUnidades=numCaixas*p.unidPorCaixa;
+  const precoUnit=valorCaixa/p.unidPorCaixa;
+  preview.style.display='block';
+  preview.textContent=`= ${totalUnidades} unidade(s) · ${fmtMoeda(precoUnit)} por unidade · total ${fmtMoeda(numCaixas*valorCaixa)}`;
 }
 
 document.addEventListener('click',function(e){
@@ -5269,6 +5315,9 @@ function openCadastrarProduto(){
   document.getElementById('prod-maximo').value='';
   document.getElementById('prod-preco').value='';
   document.getElementById('prod-qtd-inicial').value='';
+  document.getElementById('prod-vem-caixa').checked=false;
+  document.getElementById('prod-unid-caixa').value='';
+  document.getElementById('prod-unid-caixa-wrap').style.display='none';
   document.getElementById('prod-btn-excluir').style.display='none';
   document.getElementById('modal-cadastrar-produto').style.display='flex';
 }
@@ -5286,6 +5335,9 @@ function editarProduto(nome){
   document.getElementById('prod-maximo').value=p.maximo;
   document.getElementById('prod-preco').value=p.preco;
   document.getElementById('prod-qtd-inicial').value='';
+  document.getElementById('prod-vem-caixa').checked=!!p.unidPorCaixa;
+  document.getElementById('prod-unid-caixa').value=p.unidPorCaixa||'';
+  document.getElementById('prod-unid-caixa-wrap').style.display=p.unidPorCaixa?'block':'none';
   document.getElementById('prod-btn-excluir').style.display='block';
   document.getElementById('modal-cadastrar-produto').style.display='flex';
 }
@@ -5298,11 +5350,14 @@ function salvarProduto(){
   const maximo=Number(document.getElementById('prod-maximo').value)||0;
   const preco=Number(document.getElementById('prod-preco').value)||0;
   const qtdInicial=Number(document.getElementById('prod-qtd-inicial').value)||0;
+  const vemCaixa=document.getElementById('prod-vem-caixa').checked;
+  const unidPorCaixa=vemCaixa?(Number(document.getElementById('prod-unid-caixa').value)||0):0;
 
   if(!nome){alert('O nome do produto é obrigatório.');return;}
   if(!nomeOriginal&&_estoqueProdutos[nome]){alert('Já existe um produto com esse nome.');return;}
+  if(vemCaixa&&unidPorCaixa<=0){alert('Informe quantas unidades vêm em cada caixa.');return;}
 
-  _estoqueProdutos[nome]={nome,tag,minimo,maximo,preco};
+  _estoqueProdutos[nome]={nome,tag,minimo,maximo,preco,unidPorCaixa};
 
   if(!nomeOriginal&&qtdInicial>0){
     _estoqueMovs.push({nome,tipo:'entrada',qtd:qtdInicial,valor:qtdInicial*preco,data:new Date().toISOString()});
@@ -5333,15 +5388,43 @@ function openEntradaEstoque(){
   document.getElementById('ent-produto-lista').style.display='none';
   document.getElementById('ent-qtd').value='';
   document.getElementById('ent-valor').value='';
+  document.getElementById('ent-num-caixas').value='';
+  document.getElementById('ent-valor-caixa').value='';
+  document.getElementById('ent-modo-caixa-aviso').style.display='none';
+  document.getElementById('ent-campos-normais').style.display='flex';
+  document.getElementById('ent-campos-caixa').style.display='none';
+  document.getElementById('ent-preview-caixa').style.display='none';
   document.getElementById('modal-entrada-estoque').style.display='flex';
 }
 
 function salvarEntradaEstoque(){
   const nome=document.getElementById('ent-produto').value;
-  const qtd=Number(document.getElementById('ent-qtd').value)||0;
-  const valor=Number(document.getElementById('ent-valor').value)||0;
   if(!nome||!_estoqueProdutos[nome]){alert('Selecione um produto válido na lista.');return;}
-  if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+  const p=_estoqueProdutos[nome];
+  const vemCaixa=p.unidPorCaixa>0;
+
+  let qtd,valor;
+  if(vemCaixa){
+    const numCaixas=Number(document.getElementById('ent-num-caixas').value)||0;
+    const valorCaixa=Number(document.getElementById('ent-valor-caixa').value)||0;
+    if(numCaixas<=0){alert('Informe quantas caixas estão entrando.');return;}
+    if(valorCaixa<=0){alert('Informe o valor pago pela caixa.');return;}
+    qtd=numCaixas*p.unidPorCaixa;
+    valor=numCaixas*valorCaixa;
+    // Custo médio ponderado: combina o saldo/preço atual com a nova entrada.
+    const saldoAtual=calcularEstoque().find(d=>d.nome===nome)?.saldo||0;
+    const precoEntrada=valor/qtd;
+    const novoSaldoTotal=saldoAtual+qtd;
+    const novoPrecoMedio=novoSaldoTotal>0
+      ?((saldoAtual*(Number(p.preco)||0))+(qtd*precoEntrada))/novoSaldoTotal
+      :precoEntrada;
+    p.preco=Math.round(novoPrecoMedio*100)/100;
+  }else{
+    qtd=Number(document.getElementById('ent-qtd').value)||0;
+    valor=Number(document.getElementById('ent-valor').value)||0;
+    if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+  }
+
   _estoqueMovs.push({nome,tipo:'entrada',qtd,valor,data:new Date().toISOString()});
   document.getElementById('modal-entrada-estoque').style.display='none';
   renderEstoqueTable();
