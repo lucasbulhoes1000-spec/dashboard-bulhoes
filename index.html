@@ -469,6 +469,8 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="">Todas as situações</option>
             <option value="fechado">Fechou tratamento</option>
             <option value="aberto">Não fechou</option>
+            <option value="agendado-futuro">Agendado (data futura)</option>
+            <option value="sem-agendamento-futuro">Sem agendamento futuro</option>
           </select>
           <select class="filter-select" id="clientes-trat-filter" onchange="filterClientesTable()">
             <option value="">Todos os tratamentos</option>
@@ -2954,7 +2956,7 @@ function filterClientesTable(){
     })();
     const origMatch=!orig||(e.origin||'')===orig;
     const fechou=isFechou(r.stage);
-    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
+    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou)||(sit==='agendado-futuro'&&temAgendamentoFuturo(r))||(sit==='sem-agendamento-futuro'&&!temAgendamentoFuturo(r));
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=ccDataLookup(ph)||{orcamentos:[]};
     const orcs=d.orcamentos||[];
@@ -3272,6 +3274,14 @@ function lupaAdVendas(adKey){
 // 2) último CUSTOMER_STAGE_UPDATED real do Cloudia em _lastCloudiaRows
 // 3) o stage do evento original como fallback
 // Para a data de consulta, prioriza _ccData.consultaTimestamp, senão usa o timestamp do evento Agendou
+function temAgendamentoFuturo(r){
+  // Usa _sortDate (já calculado em renderClientesTable a partir de getEffectiveAgendInfo().consultaTs)
+  // quando disponível; senão recalcula na hora.
+  const d=r._sortDate||(()=>{const info=getEffectiveAgendInfo(r.phone,r);return parseCloudiaDate(info.consultaTs);})();
+  if(!d||isNaN(d))return false;
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  return d>hoje;
+}
 function getEffectiveAgendInfo(phone,fallbackEvt){
   const ph=normalizePhone(phone);
   const ccD=ccDataLookup(phone);
