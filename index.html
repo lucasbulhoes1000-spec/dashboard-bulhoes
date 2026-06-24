@@ -3937,6 +3937,51 @@ function openOrcForm(editIdx){
   }
   document.getElementById('cc-orc-form').style.display='block';
 }
+// Marca um telefone como stage="Ganho" no Cloudia, se ainda não estiver.
+// Usado quando um orçamento é aprovado manualmente no dashboard, para manter
+// a Fase do cliente coerente com a Situação exibida (evita "Em aberto" com orçamento aprovado).
+function marcarStageGanho(ph,nome,origem,valor){
+  if(!ph)return;
+  const jaTemGanho=allCloudiaRows.some(row=>
+    String(row.phone||'').replace(/\D/g,'')===ph &&
+    row.type==='CUSTOMER_STAGE_UPDATED' && row.stage==='Ganho'
+  );
+  if(jaTemGanho)return;
+  const agora=new Date().toISOString();
+  // Busca created_at do lead original, se existir, senão usa agora
+  const original=allCloudiaRows.find(row=>String(row.phone||'').replace(/\D/g,'')===ph);
+  const createdAt=(original&&original.created_at)||agora;
+  fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      type:'CUSTOMER_STAGE_UPDATED',
+      _agend_timestamp:agora,
+      data:{phone:ph,name:nome||(original&&original.name)||'',stage:'Ganho',
+            value:valor||0,id:'',created_at:createdAt,
+            ad_data:[],acquisitionOrigin:origem||(original&&original.origin)||''}
+    })
+  });
+  // Reflete em memória imediatamente, sem esperar resposta
+  allCloudiaRows.push({
+    name:nome||(original&&original.name)||'',phone:ph,origin:origem||(original&&original.origin)||'',
+    stage:'Ganho',created_at:createdAt,timestamp:agora,
+    type:'CUSTOMER_STAGE_UPDATED',ad_id:'',ad_name:'',value:valor||0
+  });
+}
+// Desfaz o stage="Ganho" de um telefone (usado quando um orçamento aprovado é desaprovado).
+// Remove a linha CUSTOMER_STAGE_UPDATED/Ganho na planilha e reflete em memória.
+function desfazerStageGanho(ph){
+  if(!ph)return;
+  fetch(CLOUDIA_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'desfazerStageGanho',phone:ph})
+  });
+  // Remove em memória imediatamente, sem esperar resposta
+  for(let i=allCloudiaRows.length-1;i>=0;i--){
+    const row=allCloudiaRows[i];
+    if(String(row.phone||'').replace(/\D/g,'')===ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage==='Ganho'){
+      allCloudiaRows.splice(i,1);
+    }
+  }
+}
 function salvarOrcamento(){
   try{
   var r=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
@@ -3979,6 +4024,19 @@ function salvarOrcamento(){
   document.getElementById('cc-orc-form').style.display='none';
   refreshOrcamentos(d);
   updateEntradas();
+  // Mantém Fase coerente com Situação: Ganho se algum orçamento estiver Aprovado, senão desfaz.
+  const ph=String(r.phone||'').replace(/\D/g,'');
+  const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado');
+  if(temAprovado){
+    marcarStageGanho(ph,applyEdits(r).name||r.name,r.origin,orc.valor);
+    r.stage='Ganho';
+  }else{
+    desfazerStageGanho(ph);
+    // Restaura a fase mais recente que não seja Ganho (ex: Compareceu), se existir no histórico
+    const outroEvento=allCloudiaRows.filter(row=>String(row.phone||'').replace(/\D/g,'')===ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage!=='Ganho')
+      .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))[0];
+    r.stage=outroEvento?outroEvento.stage:r.stage;
+  }
   filterClientesTable();
   salvarCRMDebounced();
   }catch(e){alert('Erro ao salvar: '+e.message);console.error(e);}
@@ -3990,6 +4048,17 @@ function excluirOrcamento(idx){
   d.orcamentos.splice(idx,1);
   refreshOrcamentos(d);
   updateEntradas();
+  // Mantém Fase coerente: se não restou nenhum orçamento Aprovado, desfaz o Ganho.
+  const ph=String(_excR.phone||'').replace(/\D/g,'');
+  const temAprovado=(d.orcamentos||[]).some(o=>o.status==='Aprovado');
+  if(!temAprovado){
+    desfazerStageGanho(ph);
+    const outroEvento=allCloudiaRows.filter(row=>String(row.phone||'').replace(/\D/g,'')===ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage!=='Ganho')
+      .sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0))[0];
+    _excR.stage=outroEvento?outroEvento.stage:_excR.stage;
+  }
+  filterClientesTable();
+  salvarCRMDebounced();
 }
 function refreshOrcamentos(d){
   var orcs=d.orcamentos||[];
