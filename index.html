@@ -4003,6 +4003,24 @@ function marcarStageGanho(ph,nome,origem,valor){
 // a hora atual como timestamp, fazendo a coluna "Data Comparecimento" mostrar hoje
 // para todos. Esta função corrige isso: acha o evento Ganho de cada telefone e
 // reescreve seu timestamp para bater com o evento anterior (Compareceu) mais recente.
+// DIAGNÓSTICO PURO — SOMENTE LEITURA, não escreve nada.
+// Busca os dados direto da planilha (ignorando cache em memória) e mostra
+// TODAS as linhas CUSTOMER_STAGE_UPDATED de um telefone, para entender
+// se há duplicação ou inconsistência real nos dados.
+async function diagnosticarTelefoneRaw(telefoneOuNome){
+  const res=await fetch(CLOUDIA_URL);
+  const raw=await res.json();
+  const h=raw[0];
+  const rows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});
+  const termo=String(telefoneOuNome).replace(/\D/g,'');
+  const filtradas=termo?rows.filter(r=>String(r.phone||'').replace(/\D/g,'')===termo):
+    rows.filter(r=>String(r.name||'').toLowerCase().includes(String(telefoneOuNome).toLowerCase()));
+  console.log('[DIAGNÓSTICO RAW] '+filtradas.length+' linha(s) encontrada(s) para "'+telefoneOuNome+'":');
+  filtradas.forEach(r=>{
+    console.log('  type='+r.type+' | stage='+r.stage+' | timestamp='+r.timestamp+' | created_at='+r.created_at+' | name='+r.name+' | phone='+r.phone);
+  });
+  return filtradas;
+}
 async function corrigirTimestampGanhoErrado(){
   const eventosGanho=allCloudiaRows.filter(row=>row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage==='Ganho');
   let corrigidos=0,jaCertos=0;
