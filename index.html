@@ -469,8 +469,6 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="">Todas as situações</option>
             <option value="fechado">Fechou tratamento</option>
             <option value="aberto">Não fechou</option>
-            <option value="agendado-futuro">Agendado (data futura)</option>
-            <option value="sem-agendamento-futuro">Sem agendamento futuro</option>
           </select>
           <select class="filter-select" id="clientes-trat-filter" onchange="filterClientesTable()">
             <option value="">Todos os tratamentos</option>
@@ -525,6 +523,7 @@ tbody tr:hover td{background:#faf7f3;}
         <input class="search-input" type="text" placeholder="Buscar por nome..." id="pacientes-search" oninput="renderTabelaPacientes()">
         <select id="pacientes-status-filter" class="filter-select" onchange="renderTabelaPacientes()">
           <option value="">Todos os status</option>
+          <option value="agendado">Agendado</option>
           <option value="atrasado6_12">Atrasado 6-12 meses</option>
           <option value="atrasado1_2anos">Atrasado 1-2 anos</option>
           <option value="atrasadomais2anos">Atrasado +2 anos</option>
@@ -2956,7 +2955,7 @@ function filterClientesTable(){
     })();
     const origMatch=!orig||(e.origin||'')===orig;
     const fechou=isFechou(r.stage);
-    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou)||(sit==='agendado-futuro'&&temAgendamentoFuturo(r))||(sit==='sem-agendamento-futuro'&&!temAgendamentoFuturo(r));
+    const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=ccDataLookup(ph)||{orcamentos:[]};
     const orcs=d.orcamentos||[];
@@ -3466,9 +3465,9 @@ function getRegistrosPaciente(cat){
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
 // Status detalhado por faixa de tempo, não apenas "atrasado".
-// Faixas: emdia (< intervalo, ou agendado) | atrasado6_12 (intervalo–12m) | atrasado1_2anos (12–24m) | atrasadomais2anos (>24m)
+// Faixas: agendado (já tem retorno marcado) | emdia (< intervalo) | atrasado6_12 (intervalo–12m) | atrasado1_2anos (12–24m) | atrasadomais2anos (>24m)
 function statusPaciente(reg,intervalo){
-  if(reg.agendado)return 'emdia';
+  if(reg.agendado)return 'agendado';
   if(intervalo==null)return 'semdado';
   if(!reg.dataBase)return 'nuncafez';
   const base=new Date(reg.dataBase+'T12:00');
@@ -3551,7 +3550,7 @@ async function sincronizarClinicorp(){
 }
 function renderDiagnosticoPacientes(){
   const cats=Object.keys(_categoriasPacientes);
-  let totalGeral=0,emDiaGeral=0,precisamContatoGeral=0,nuncaGeral=0;
+  let totalGeral=0,emDiaGeral=0,agendadoGeral=0,precisamContatoGeral=0,nuncaGeral=0;
   const porCategoria={};
   cats.forEach(cat=>{
     const intervalo=_categoriasPacientes[cat].intervalo;
@@ -3561,6 +3560,7 @@ function renderDiagnosticoPacientes(){
     porCategoria[cat]=c;
     totalGeral+=regs.length;
     emDiaGeral+=c.emdia;
+    agendadoGeral+=c.agendado;
     precisamContatoGeral+=c.atrasado6_12+c.atrasado1_2anos+c.atrasadomais2anos+c.nuncafez;
     nuncaGeral+=c.nuncafez;
   });
@@ -3573,8 +3573,8 @@ function renderDiagnosticoPacientes(){
     <div class="row r4" style="margin-bottom:16px;">
       <div class="mc"><div class="ml">Total na base</div><div class="mv ta">${totalGeral}</div><div class="ms">pacientes em todas as categorias</div></div>
       <div class="mc"><div class="ml">Em dia</div><div class="mv green">${emDiaGeral}</div><div class="ms">${totalGeral?Math.round(emDiaGeral/totalGeral*100):0}% da base</div></div>
+      <div class="mc"><div class="ml">Agendado</div><div class="mv" style="color:#3a6a8a;">${agendadoGeral}</div><div class="ms">${totalGeral?Math.round(agendadoGeral/totalGeral*100):0}% da base</div></div>
       <div class="mc"><div class="ml">Precisam de contato</div><div class="mv" style="color:#b5483d;">${precisamContatoGeral}</div><div class="ms">atrasados em qualquer faixa ou nunca fizeram</div></div>
-      <div class="mc"><div class="ml">Nunca fizeram</div><div class="mv" style="color:#b08a2e;">${nuncaGeral}</div><div class="ms">${totalGeral?Math.round(nuncaGeral/totalGeral*100):0}% da base</div></div>
     </div>`;
 
   // Cards por categoria (grid 2 colunas), com as 3 faixas de atraso detalhadas
@@ -3583,6 +3583,7 @@ function renderDiagnosticoPacientes(){
     const c=porCategoria[cat];
     const total=Object.values(c).reduce((a,b)=>a+b,0);
     const linhas=[];
+    if(c.agendado)linhas.push(['Agendado',c.agendado,'#e2ecf0','#3a6a8a']);
     if(c.emdia!==undefined)linhas.push(['Em dia ('+(cfg.intervalo?'< '+cfg.intervalo+'m':'—')+')',c.emdia,'#e2f0e2','#4a7a4a']);
     if(c.atrasado6_12)linhas.push(['Atrasados '+(cfg.intervalo||0)+'-12 meses',c.atrasado6_12,'#faf0d8','#b08a2e']);
     if(c.atrasado1_2anos)linhas.push(['Atrasados 1-2 anos',c.atrasado1_2anos,'#f7e0c8','#a8682e']);
@@ -3629,7 +3630,7 @@ function renderTabelaPacientes(){
   regs=regs.map(r=>({...r,_status:statusPaciente(r,cfg.intervalo)}));
   if(busca)regs=regs.filter(r=>r.nome.toLowerCase().includes(busca));
   if(statusFiltro)regs=regs.filter(r=>r._status===statusFiltro);
-  const rank={atrasadomais2anos:0,atrasado1_2anos:1,atrasado6_12:2,nuncafez:3,semdado:4,emdia:5};
+  const rank={atrasadomais2anos:0,atrasado1_2anos:1,atrasado6_12:2,nuncafez:3,semdado:4,emdia:5,agendado:6};
   regs.sort((a,b)=>(rank[a._status]-rank[b._status])||a.nome.localeCompare(b.nome));
 
   document.getElementById('pacientes-count').textContent=regs.length+' paciente'+(regs.length!==1?'s':'');
@@ -3640,6 +3641,7 @@ function renderTabelaPacientes(){
     atrasadomais2anos:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado +2 anos</span>',
     nuncafez:'<span style="background:#f3d6d6;color:#9a3a3a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Nunca fez</span>',
     emdia:'<span style="background:#e2f0e2;color:#4a7a4a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">✓ Em dia</span>',
+    agendado:'<span style="background:#e2ecf0;color:#3a6a8a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 Agendado</span>',
     semdado:'<span style="background:#f0ece4;color:#9a8c7e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Sem dado</span>'
   };
 
