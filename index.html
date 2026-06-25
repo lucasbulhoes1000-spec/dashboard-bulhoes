@@ -2182,7 +2182,21 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       if(o.status!=='Aprovado')return false;
       const dataRef=o.entradaData||o.fechData||o.data||'';
       if(!dataRef)return false;
-      return dataRef>=_range.since&&dataRef<=_range.until;
+      if(dataRef<_range.since||dataRef>_range.until)return false;
+      // Respeita o filtro de origem do Dashboard, usando a origem reconciliada
+      // (origemAtual editado manualmente, ou a mais recente entre todas as linhas
+      // do telefone na planilha) — mesma lógica usada em Contratos Fechados.
+      if(_origemFilter){
+        const org=(d.origemAtual||getOrigemReal(ph)||'').toLowerCase();
+        let match=false;
+        if(_origemFilter==='instagram ads')match=org.includes('instagram');
+        else if(_origemFilter==='organico')match=org.includes('organ');
+        else if(_origemFilter==='indicacao')match=org.includes('indica');
+        else if(_origemFilter==='social selling')match=org.includes('social');
+        else match=true;
+        if(!match)return false;
+      }
+      return true;
     }).forEach(o=>{
       const entVal=Number(o.entrada||0);
       if(entVal>0){
