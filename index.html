@@ -1947,12 +1947,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!seenAdPhone.fechou[key])seenAdPhone.fechou[key]=new Set();
     if((isAgend(r.stage)||isFaltou(r.stage))&&!seenAdPhone.agend[key].has(ph)){seenAdPhone.agend[key].add(ph);d.agend++;if(d.agendPhones)d.agendPhones.add(ph);}
     if(isComp(r.stage)&&!seenAdPhone.comp[key].has(ph)){seenAdPhone.comp[key].add(ph);d.comp++;d.compPhones.add(ph);}
-    if(isFechou(r.stage)&&!seenAdPhone.fechou[key].has(ph)){
-      if(ph==='13988829556')console.log('[DEBUG ARIANNE]',{ph,key,stage:r.stage,jaViu:seenAdPhone.fechou[key].has(ph),targetExiste:!!d});
-      seenAdPhone.fechou[key].add(ph);d.fechou++;d.fechouPhones.add(ph);d.vendas+=parseFloat(r.value||0);
-    }else if(ph==='13988829556'){
-      console.log('[DEBUG ARIANNE - NÃO ENTROU]',{ph,key,stage:r.stage,isFechou:isFechou(r.stage),jaViu:seenAdPhone.fechou[key]?seenAdPhone.fechou[key].has(ph):'(set não existe)'});
-    }
+    if(isFechou(r.stage)&&!seenAdPhone.fechou[key].has(ph)){seenAdPhone.fechou[key].add(ph);d.fechou++;d.fechouPhones.add(ph);d.vendas+=parseFloat(r.value||0);}
   });
   Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p))).size;});
 
@@ -2063,6 +2058,26 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     // Verifica origem do phone
     if(_origemFilter){
       const org=(d.origemAtual||getOrigemReal(ph)||'').toLowerCase();
+      let match=false;
+      if(_origemFilter==='instagram ads')match=org.includes('instagram');
+      else if(_origemFilter==='organico')match=org.includes('organ');
+      else if(_origemFilter==='indicacao')match=org.includes('indica');
+      else if(_origemFilter==='social selling')match=org.includes('social');
+      else match=true;
+      if(!match)return;
+    }
+    fechadosPhones.add(ph);
+  });
+
+  // Adiciona também quem tem evento "Ganho" REAL no Cloudia dentro do período, mesmo
+  // sem nenhum orçamento cadastrado manualmente no CRM (ex: leads que fecharam direto
+  // pelo Cloudia/SDR, sem passar pelo card de orçamento do dashboard).
+  evtsGeral.forEach(r=>{
+    if(!isFechou(r.stage))return;
+    const ph=normalizePhone(r.phone);if(!ph||fechadosPhones.has(ph))return;
+    if(_origemFilter){
+      const ccD=ccDataLookup(ph);
+      const org=((ccD&&ccD.origemAtual)||getOrigemReal(ph)||r.origin||'').toLowerCase();
       let match=false;
       if(_origemFilter==='instagram ads')match=org.includes('instagram');
       else if(_origemFilter==='organico')match=org.includes('organ');
