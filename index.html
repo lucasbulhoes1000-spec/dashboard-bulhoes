@@ -1458,10 +1458,13 @@ function filterEventsByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
     if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
-    // Para importados (CUSTOMER_CREATED), usa created_at (data da consulta)
-    // Para eventos do Cloudia (CUSTOMER_STAGE_UPDATED), usa timestamp
+    // Para CUSTOMER_CREATED: usa timestamp quando ele existir e for diferente de created_at
+    // (caso de leads reconstruídos via leadImportado, onde timestamp = data real de consulta,
+    // possivelmente editada manualmente, e created_at = só a data de importação do lead).
+    // Senão, cai para created_at (comportamento original, leads sem data de consulta própria).
+    // Para eventos reais do Cloudia (CUSTOMER_STAGE_UPDATED), usa timestamp.
     const d=row.type==='CUSTOMER_CREATED'
-      ?parseCloudiaDate(row.created_at)
+      ?(row.timestamp&&row.timestamp!==row.created_at?parseCloudiaDate(row.timestamp):parseCloudiaDate(row.created_at))
       :parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at);
     if(!d)return false;
     return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
