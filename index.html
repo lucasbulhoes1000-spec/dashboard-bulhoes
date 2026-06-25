@@ -2992,16 +2992,11 @@ function filterClientesTable(){
     const avalMatch=!aval||orcs.some(o=>normStr(o.avaliador)===normStr(aval));
     let dateMatch=true;
     if(fromV||toV){
-      // Busca o timestamp do CUSTOMER_STAGE_UPDATED com Compareceu ou Ganho
-      const ph_dt=String(r.phone||'').replace(/\D/g,'');
-      const compRow=allCloudiaRows.find(row=>
-        String(row.phone||'').replace(/\D/g,'')=== ph_dt &&
-        row.type==='CUSTOMER_STAGE_UPDATED' &&
-        (isComp(row.stage)||isFechou(row.stage)) &&
-        parseCloudiaDate(row.timestamp)
-      );
-      // Fallback: usa timestamp do próprio row (importados via CSV)
-      const dd=compRow?parseCloudiaDate(compRow.timestamp):parseCloudiaDate(r.timestamp||r.created_at);
+      // Usa r._sortDate (já calculado via getEffectiveAgendInfo em renderClientesTable),
+      // a MESMA fonte de verdade usada para exibir a coluna "Data Comparecimento" e para
+      // ordenar a tabela. Antes este filtro recalculava com allCloudiaRows.find(), que podia
+      // pegar um evento diferente do exibido (causa de "mês passado" trazer gente de junho).
+      const dd=r._sortDate&&r._sortDate.getTime()>0?r._sortDate:null;
       const ds=dd?localDateStr(dd):'';
       if(fromV&&ds&&ds<fromV)dateMatch=false;
       if(toV&&ds&&ds>toV)dateMatch=false;
