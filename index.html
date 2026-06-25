@@ -2057,8 +2057,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!temAprovado)return;
     // Verifica origem do phone
     if(_origemFilter){
-      const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
-      const org=(row&&row.origin||'').toLowerCase();
+      const org=(d.origemAtual||getOrigemReal(ph)||'').toLowerCase();
       let match=false;
       if(_origemFilter==='instagram ads')match=org.includes('instagram');
       else if(_origemFilter==='organico')match=org.includes('organ');
@@ -2071,21 +2070,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
 
   // Filtra fechadosPhones vindos do Cloudia pela origem também
+  // Usa a origem RECONCILIADA por telefone (origemAtual editado manualmente, ou a mais
+  // recente entre todas as linhas daquele telefone) — não apenas a primeira linha
+  // encontrada, que pode estar com origin vazio mesmo quando o telefone tem origem
+  // real registrada em outro evento mais recente.
   if(_origemFilter){
-    const phonesOrigemOk=new Set(
-      excluirSocialSelling(allCloudiaRows)
-        .filter(r=>{
-          const org=(r.origin||'').toLowerCase();
-          if(_origemFilter==='instagram ads')return org.includes('instagram');
-          if(_origemFilter==='organico')return org.includes('organ');
-          if(_origemFilter==='indicacao')return org.includes('indica');
-          if(_origemFilter==='social selling')return org.includes('social');
-          return true;
-        })
-        .map(r=>normalizePhone(r.phone))
-        .filter(p=>p)
-    );
-    fechadosPhones.forEach(ph=>{if(!phonesOrigemOk.has(ph))fechadosPhones.delete(ph);});
+    fechadosPhones.forEach(ph=>{
+      const d=ccDataLookup(ph);
+      const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
+      let match=false;
+      if(_origemFilter==='instagram ads')match=org.includes('instagram');
+      else if(_origemFilter==='organico')match=org.includes('organ');
+      else if(_origemFilter==='indicacao')match=org.includes('indica');
+      else if(_origemFilter==='social selling')match=org.includes('social');
+      else match=true;
+      if(!match)fechadosPhones.delete(ph);
+    });
   }
 
   // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
