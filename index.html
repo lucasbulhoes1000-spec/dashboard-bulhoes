@@ -1594,6 +1594,20 @@ function buildCcDataNormIndex(){
     if(n&&!_ccDataNormIndex[n])_ccDataNormIndex[n]=k;
   });
 }
+// Busca a origem mais recente e não-vazia de um telefone, olhando TODAS as linhas
+// dele em allCloudiaRows (não só a primeira encontrada via .find()). Isso corrige
+// casos onde a primeira linha (ex: cadastro inicial ou evento "Ganho" reconstruído)
+// não tem origin preenchido, mas eventos posteriores (CUSTOMER_ACQUISITION_ORIGIN_UPDATED,
+// ou o próprio Compareceu/Agendou) têm a origem real registrada.
+function getOrigemReal(ph){
+  if(!ph)return'';
+  const linhasComOrigem=allCloudiaRows.filter(r=>
+    String(r.phone||'').replace(/\D/g,'')===ph&&r.origin&&String(r.origin).trim()!==''
+  );
+  if(linhasComOrigem.length===0)return'';
+  linhasComOrigem.sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0));
+  return linhasComOrigem[0].origin;
+}
 function ccDataLookup(phoneOrKey){
   if(!phoneOrKey)return null;
   if(_ccData[phoneOrKey])return _ccData[phoneOrKey];
@@ -3162,7 +3176,7 @@ function lupaComp(){
     const info=getEffectiveAgendInfo(ph,row);
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const origem=(ccD&&ccD.origemAtual)||e.origin||'—';
+    const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
     const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
     return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(e.created_at)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
@@ -3205,7 +3219,7 @@ function lupaContratos(){
     const dataReg=fmtDate(d.created_at||(row&&row.created_at)||'');
     const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
     const valOrc=d.orcamentos&&d.orcamentos.length>0?d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0):r.value;
-    const origem=(d.origemAtual||(row&&row.origin)||'—');
+    const origem=(d.origemAtual||getOrigemReal(r.ph)||(row&&row.origin)||'—');
     return[dataReg,r.name,r.ph,origem,valOrc>0?fmt(valOrc):'—',fmt(r.value)];
   });
   openModal('Fechamentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Valor orçado','Valor fechado'],rows);
@@ -3264,7 +3278,7 @@ function lupaAdComp(adKey){
     const info=getEffectiveAgendInfo(ph,row);
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const origem=(ccD&&ccD.origemAtual)||e.origin||'—';
+    const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
     const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
     return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(e.created_at)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
