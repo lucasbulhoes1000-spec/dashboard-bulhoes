@@ -1616,6 +1616,21 @@ function buildCcDataNormIndex(){
 // casos onde a primeira linha (ex: cadastro inicial ou evento "Ganho" reconstruído)
 // não tem origin preenchido, mas eventos posteriores (CUSTOMER_ACQUISITION_ORIGIN_UPDATED,
 // ou o próprio Compareceu/Agendou) têm a origem real registrada.
+// Busca o created_at mais antigo e válido de um telefone, olhando TODAS as linhas
+// dele em allCloudiaRows (não só a primeira via .find()). Mesma lógica de
+// getOrigemReal, mas para "Data de cadastro" — o created_at do PRIMEIRO evento
+// real (Lead/Agendou/Compareceu) costuma ser mais confiável que o de um evento
+// "Ganho" criado depois (reconstruído ou manual), que pode estar vazio.
+function getDataCadastroReal(ph){
+  if(!ph)return'';
+  const phNorm=normalizePhone(ph);
+  const linhasComData=allCloudiaRows.filter(r=>
+    normalizePhone(r.phone)===phNorm&&r.created_at&&String(r.created_at).trim()!==''
+  );
+  if(linhasComData.length===0)return'';
+  linhasComData.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  return linhasComData[0].created_at;
+}
 function getOrigemReal(ph){
   if(!ph)return'';
   const phNorm=normalizePhone(ph);
@@ -3195,8 +3210,9 @@ function lupaComp(){
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
     const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
-    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(e.created_at)||new Date(0)};
+    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
+    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(dataCadastroVal)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
     .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
   openModal('Oportunidades — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
@@ -3234,7 +3250,7 @@ function lupaContratos(){
   }).map(r=>{
     const d=ccDataLookup(r.ph)||{};
     const row=allCloudiaRows.find(cr=>normalizePhone(cr.phone)===r.ph);
-    const dataReg=fmtDate(d.created_at||(row&&row.created_at)||'');
+    const dataReg=fmtDate(d.created_at||getDataCadastroReal(r.ph)||(row&&row.created_at)||'');
     const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
     const valOrc=d.orcamentos&&d.orcamentos.length>0?d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0):r.value;
     const origem=(d.origemAtual||getOrigemReal(r.ph)||(row&&row.origin)||'—');
@@ -3278,8 +3294,9 @@ function lupaAdAgend(adKey){
     const info=getEffectiveAgendInfo(ph,row);
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,stage:info.stage,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(e.created_at)||new Date(0)};
+    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
+    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,stage:info.stage,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(dataCadastroVal)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
     .map(r=>[r.dataCadastro,r.nome,r.telefone,getStatusAgend(r.stage),fmtDate(r.consultaTs)]);
   openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
@@ -3297,8 +3314,9 @@ function lupaAdComp(adKey){
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
     const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
-    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(e.created_at)||new Date(0)};
+    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
+    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(dataCadastroVal)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
     .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
   openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
@@ -3315,8 +3333,9 @@ function lupaAdFechou(adKey){
     const origem=(ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
     const orc=ccD.orcamentos&&ccD.orcamentos.find(o=>o.status==='Aprovado');
     const valFech=orc?fmt(Number(orc.valor||0)):'—';
-    const dataCadastro=e.created_at?fmtDate(e.created_at):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,origem,valFech,sortKey:parseCloudiaDate(e.created_at)||new Date(0)};
+    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
+    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
+    return{dataCadastro,nome,telefone:e.phone||ph,origem,valFech,sortKey:parseCloudiaDate(dataCadastroVal)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
     .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,r.valFech]);
   openModal('Fechamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Valor fechado'],rows);
