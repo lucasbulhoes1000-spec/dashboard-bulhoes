@@ -370,13 +370,13 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="progress-track"><div class="progress-fill" id="ss-meta-bar" style="width:0%"></div></div>
             </div>
             <div class="row r8">
-              <div class="mc"><div class="ml">Abordagens</div><div class="mv" id="ss-abord">0</div></div>
-              <div class="mc"><div class="ml">Respostas</div><div class="mv" id="ss-resp">0</div><div class="ms" id="ss-resp-sub">0%</div></div>
-              <div class="mc"><div class="ml">Follow-ups</div><div class="mv" id="ss-follow">0</div></div>
-              <div class="mc"><div class="ml">Agendamentos</div><div class="mv green" id="ss-agend">0</div><div class="ms" id="ss-agend-sub">0%</div></div>
-              <div class="mc"><div class="ml">Comparecimentos</div><div class="mv green" id="ss-comp">0</div><div class="ms" id="ss-comp-sub">0%</div></div>
-              <div class="mc"><div class="ml">Vendas</div><div class="mv green" id="ss-vendas">0</div><div class="ms" id="ss-vendas-sub">0%</div></div>
-              <div class="mc"><div class="ml">Desqualificados</div><div class="mv" id="ss-desq">0</div></div>
+              <div class="mc"><div class="ml">Abordagens</div><div class="mv" id="ss-abord">0 <button class="lupa" onclick="lupaSSAbord()" title="Ver abordagens">🔍</button></div></div>
+              <div class="mc"><div class="ml">Respostas</div><div class="mv" id="ss-resp">0 <button class="lupa" onclick="lupaSSResp()" title="Ver respostas">🔍</button></div><div class="ms" id="ss-resp-sub">0%</div></div>
+              <div class="mc"><div class="ml">Follow-ups</div><div class="mv" id="ss-follow">0 <button class="lupa" onclick="lupaSSFollow()" title="Ver follow-ups">🔍</button></div></div>
+              <div class="mc"><div class="ml">Agendamentos</div><div class="mv green" id="ss-agend">0 <button class="lupa" onclick="lupaSSAgend()" title="Ver agendamentos">🔍</button></div><div class="ms" id="ss-agend-sub">0%</div></div>
+              <div class="mc"><div class="ml">Comparecimentos</div><div class="mv green" id="ss-comp">0 <button class="lupa" onclick="lupaSSComp()" title="Ver comparecimentos">🔍</button></div><div class="ms" id="ss-comp-sub">0%</div></div>
+              <div class="mc"><div class="ml">Vendas</div><div class="mv green" id="ss-vendas">0 <button class="lupa" onclick="lupaSSVendas()" title="Ver vendas">🔍</button></div><div class="ms" id="ss-vendas-sub">0%</div></div>
+              <div class="mc"><div class="ml">Desqualificados</div><div class="mv" id="ss-desq">0 <button class="lupa" onclick="lupaSSDesq()" title="Ver desqualificados">🔍</button></div></div>
               <div class="mc"><div class="ml">Conv. geral</div><div class="mv green" id="ss-conv">0%</div></div>
             </div>
             <div class="sep"></div>
@@ -2433,11 +2433,55 @@ function parseDateSS(raw){
   const d=new Date(s);return isNaN(d)?null:d;
 }
 
+// Extrai o username do Instagram a partir do link completo (ex:
+// "https://www.instagram.com/joao.silva/" -> "joao.silva")
+function extrairUsernameInsta(link){
+  if(!link)return'—';
+  const m=String(link).match(/instagram\.com\/([^/?]+)/i);
+  return m?m[1]:link;
+}
+function abrirModalSS(titulo,linhas){
+  const rows=linhas.map(r=>[
+    r['DATA']||r['data']||'—',
+    extrairUsernameInsta(r['LINK DO INSTAGRAM']||r['Link do Instagram']||r['LINK']),
+    r['TIPO']||'—',
+    r['RESULTADO']||'—'
+  ]);
+  openModal(titulo+' — '+rows.length+' registro'+(rows.length!==1?'s':''),['Data','Instagram','Tipo','Resultado'],rows);
+}
+function lupaSSAbord(){
+  abrirModalSS('Abordagens',window._lastSSFiltered||[]);
+}
+function lupaSSResp(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESPONDEU?']||'').toString().toUpperCase()==='SIM');
+  abrirModalSS('Respostas',linhas);
+}
+function lupaSSFollow(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>parseFloat(r['Tentativas de Follow']||0)>0);
+  abrirModalSS('Follow-ups',linhas);
+}
+function lupaSSAgend(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('AGENDADO'));
+  abrirModalSS('Agendamentos',linhas);
+}
+function lupaSSComp(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('COMPARECEU'));
+  abrirModalSS('Comparecimentos',linhas);
+}
+function lupaSSVendas(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('VENDA'));
+  abrirModalSS('Vendas',linhas);
+}
+function lupaSSDesq(){
+  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('DESQUALIFICADO'));
+  abrirModalSS('Desqualificados',linhas);
+}
 function renderSocial(rows){
   const metaAgend=22;
   const range=getRange('social');
   const s=new Date(range.since),u=new Date(range.until+'T23:59:59');
   const filtered=rows.filter(r=>{const d=parseDateSS(r['DATA']||r['data']);return d&&d>=s&&d<=u;});
+  window._lastSSFiltered=filtered;
   let abord=0,resp=0,follow=0,agend=0,comp=0,vendas=0,desq=0;
   const tipos={},tipoAgend={},tipoComp={},resultados={};
   filtered.forEach(r=>{
