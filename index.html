@@ -2050,14 +2050,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Adiciona em fechadosPhones quem tem orçamento Aprovado no período (mesmo sem Ganho no Cloudia)
   // Só adiciona se o phone bate com o filtro de origem
-  Object.entries(_ccData||{}).forEach(([ph,d])=>{
+  Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
     if(!d||!d.orcamentos)return;
+    const ph=normalizePhone(phRaw)||phRaw; // normaliza para evitar duplicação com a chave usada no bloco seguinte
     // Usa fechData (data do fechamento) se disponível, senão data do orçamento
     const temAprovado=d.orcamentos.some(o=>o.status==='Aprovado'&&((o.fechData&&o.fechData>=_range.since&&o.fechData<=_range.until)||((!o.fechData)&&o.data&&o.data>=_range.since&&o.data<=_range.until)));
     if(!temAprovado)return;
     // Verifica origem do phone
     if(_origemFilter){
-      const org=(d.origemAtual||getOrigemReal(ph)||'').toLowerCase();
+      const org=(d.origemAtual||getOrigemReal(phRaw)||'').toLowerCase();
       let match=false;
       if(_origemFilter==='instagram ads')match=org.includes('instagram');
       else if(_origemFilter==='organico')match=org.includes('organ');
