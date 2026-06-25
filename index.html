@@ -1706,6 +1706,15 @@ function fmtDate(str){
   if(isNaN(d))return String(str);
   return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
+// Formata uma data "pura" (yyyy-mm-dd, sem horário real) SEM mostrar hora e sem
+// sofrer o deslocamento de fuso horário que ocorre ao fazer new Date("yyyy-mm-dd")
+// (essa forma é interpretada como UTC e pode exibir o dia anterior no fuso de Brasília).
+function fmtDateOnly(str){
+  if(!str)return'—';
+  const m=String(str).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m)return fmtDate(str);
+  return m[3]+'/'+m[2]+'/'+m[1];
+}
 
 // ===== TRÁFEGO =====
 async function loadTrafego(){
@@ -3656,7 +3665,10 @@ function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getM
 // Status detalhado por faixa de tempo, não apenas "atrasado".
 // Faixas: agendado (já tem retorno marcado) | emdia (< intervalo) | atrasado6_12 (intervalo–12m) | atrasado1_2anos (12–24m) | atrasadomais2anos (>24m)
 function statusPaciente(reg,intervalo){
-  if(reg.agendado)return 'agendado';
+  // Só considera "agendado" se a data marcada ainda não passou (comparação por string
+  // yyyy-mm-dd, sem conversão de fuso horário — evita o bug de "21:00" visto antes).
+  const hojeStr=localDateStr(new Date());
+  if(reg.agendado&&reg.agendado>=hojeStr)return 'agendado';
   if(intervalo==null)return 'semdado';
   if(!reg.dataBase)return 'nuncafez';
   const base=new Date(reg.dataBase+'T12:00');
@@ -3845,8 +3857,9 @@ function renderTabelaPacientes(){
     const waBtn=waLink
       ?`<a href="${waLink}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 Chamar</a>`
       :`<button onclick="definirTelefonePaciente('${cat}','${r._key}','${r.nome.replace(/'/g,"\\'")}')" style="background:#f0ece4;color:#7a6550;font-size:11px;border:none;padding:3px 9px;border-radius:20px;cursor:pointer;">+ Telefone</button>`;
-    const agendadoCell=r.agendado
-      ?`<span style="background:#e2ecf0;color:#3a6a8a;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 ${fmtDate(r.agendado)}</span>`
+    const hojeStrCell=localDateStr(new Date());
+    const agendadoCell=(r.agendado&&r.agendado>=hojeStrCell)
+      ?`<span style="background:#e2ecf0;color:#3a6a8a;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 ${fmtDateOnly(r.agendado)}</span>`
       :'<span style="color:#b5a898;font-size:12px;">—</span>';
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
