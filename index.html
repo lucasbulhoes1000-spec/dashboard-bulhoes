@@ -1631,6 +1631,16 @@ function getDataCadastroReal(ph){
   linhasComData.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
   return linhasComData[0].created_at;
 }
+// Busca o valor (value) da linha "Ganho" específica de um telefone — não a
+// primeira linha qualquer via .find(), que pode ser um evento antigo sem
+// valor (ex: CUSTOMER_CREATED inicial). Mesma família de getOrigemReal/
+// getDataCadastroReal: reconcilia entre todas as linhas do telefone.
+function getValorGanhoReal(ph){
+  if(!ph)return 0;
+  const phNorm=normalizePhone(ph);
+  const linhaGanho=allCloudiaRows.find(r=>normalizePhone(r.phone)===phNorm&&isFechou(r.stage)&&parseFloat(r.value||0)>0);
+  return linhaGanho?parseFloat(linhaGanho.value||0):0;
+}
 function getOrigemReal(ph){
   if(!ph)return'';
   const phNorm=normalizePhone(ph);
@@ -2130,9 +2140,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         return dataRef>=_range.since&&dataRef<=_range.until;
       });
       orcsAprov.forEach(o=>{totalVendasCRM+=Number(o.fechValor||o.valor||0);});
-      if(orcsAprov.length>0){contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)});}
+      if(orcsAprov.length>0){
+        contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)});
+      }else{
+        // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
+        // mesmo assim o cliente está em fechadosPhones (ex: via evento Ganho do Cloudia).
+        // Usa o valor do evento Ganho real como fallback, para não desaparecer silenciosamente.
+        const vFallback=getValorGanhoReal(ph)||parseFloat((row&&row.value)||0);
+        if(vFallback>0){totalVendasCRM+=vFallback;contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback});}
+      }
     } else if(row){
-      const v=parseFloat(row.value||0);
+      const v=parseFloat(row.value||0)||getValorGanhoReal(ph);
       if(v>0){totalVendasCRM+=v;contratosComValor++;_vendaRows.push({name:nome,ph,value:v});}
     }
   });
