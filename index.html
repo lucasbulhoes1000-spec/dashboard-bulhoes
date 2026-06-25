@@ -1777,11 +1777,22 @@ async function fetchCloudia(){
     });
     // Aplica consultaTimestamp e agendTimestamp do CRM em allCloudiaRows
     // Garante que datas corrigidas pelo usuário persistam após recarregar o Cloudia
+    // Considera DOIS campos com o mesmo propósito (datas de comparecimento editadas
+    // manualmente), gravados por mecanismos diferentes do dashboard:
+    // - consultaTimestamp: gravado pela edição pontual no card do cliente
+    // - timestamp: gravado pela importação/edição em massa de Clientes
+    // Usa o mais recente entre os dois quando ambos existem.
     Object.entries(_ccData).forEach(([ph,d])=>{
-      if(d.consultaTimestamp){
+      const dataManualComparecimento=(()=>{
+        if(d.consultaTimestamp&&d.timestamp){
+          return parseCloudiaDate(d.consultaTimestamp)>=parseCloudiaDate(d.timestamp)?d.consultaTimestamp:d.timestamp;
+        }
+        return d.consultaTimestamp||d.timestamp||null;
+      })();
+      if(dataManualComparecimento){
         allCloudiaRows.forEach(row=>{
           if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
-            row.timestamp=d.consultaTimestamp;
+            row.timestamp=dataManualComparecimento;
           }
         });
       }
