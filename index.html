@@ -896,8 +896,8 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="OK">Normal</option>
         </select>
         <span class="count-badge" id="estoque-count"></span>
-        <button onclick="exportTableXLS('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
-        <button onclick="exportTableCSV('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor total','Últ. atualização'],'estoque')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableXLS('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor da caixa','Valor total','Últ. atualização'],'estoque')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableCSV('estoque-tbody',['Produto','Categoria','Entrada','Saída','Saldo','Mínimo','Máximo','Status','Valor unit.','Valor da caixa','Valor total','Últ. atualização'],'estoque')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↑ Entrada</button>
         <button onclick="openSaidaEstoque()" style="background:#a85a4a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">↓ Saída</button>
         <button onclick="openGerenciarTags()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">🏷 Categorias</button>
@@ -912,7 +912,7 @@ tbody tr:hover td{background:#faf7f3;}
               <th style="text-align:right">Entrada</th><th style="text-align:right">Saída</th>
               <th style="text-align:right">Saldo</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Máximo</th>
               <th>Status</th>
-              <th style="text-align:right">Valor unit.</th><th style="text-align:right">Valor total</th>
+              <th style="text-align:right">Valor unit.</th><th style="text-align:right">Valor da caixa</th><th style="text-align:right">Valor total</th>
               <th>Últ. atualização</th><th></th>
             </tr></thead>
             <tbody id="estoque-tbody"></tbody>
@@ -5202,7 +5202,7 @@ function calcularEstoque(){
   Object.values(_estoqueProdutos).forEach(p=>{
     agg[p.nome]={
       nome:p.nome,tag:p.tag||'',minimo:Number(p.minimo)||0,maximo:Number(p.maximo)||0,
-      preco:Number(p.preco)||0,entrada:0,valorEntrada:0,saida:0,valorSaida:0,ultimaMov:null
+      preco:Number(p.preco)||0,unidPorCaixa:Number(p.unidPorCaixa)||0,entrada:0,valorEntrada:0,saida:0,valorSaida:0,ultimaMov:null
     };
   });
   _estoqueMovs.forEach(m=>{
@@ -5335,11 +5335,12 @@ function renderEstoqueTable(){
       <td style="text-align:right">${d.maximo}</td>
       <td>${statusBadge[d.status]||d.status}</td>
       <td style="text-align:right">${fmtMoeda(d.preco)}</td>
+      <td style="text-align:right">${d.unidPorCaixa>0?fmtMoeda(d.preco*d.unidPorCaixa):'<span style="color:#cfc4b8;">—</span>'}</td>
       <td style="text-align:right">${fmtMoeda(d.valorTotal)}</td>
       <td>${fmtDataHora(d.ultimaMov)}</td>
       <td><button onclick="editarProduto('${d.nome.replace(/'/g,"\\'")}')" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:3px 8px;cursor:pointer;">✎</button></td>
     </tr>
-  `).join('')||'<tr><td colspan="12" style="text-align:center;color:#b5a898;padding:20px;">Nenhum produto cadastrado ainda.</td></tr>';
+  `).join('')||'<tr><td colspan="13" style="text-align:center;color:#b5a898;padding:20px;">Nenhum produto cadastrado ainda.</td></tr>';
 
   document.getElementById('estoque-count').textContent=filtrados.length+' produto(s)';
   document.getElementById('est-total-produtos').textContent=dados.length;
