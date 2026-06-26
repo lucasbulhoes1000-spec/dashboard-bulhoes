@@ -318,7 +318,7 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div style="margin-top:12px;">
               <div class="card">
-                <div class="ctitle">Funil por anúncio</div>
+                <div class="ctitle" style="display:flex;align-items:center;justify-content:space-between;">Funil por anúncio<button class="fb" style="background:#5a7a9a;color:#fff;border-color:#5a7a9a;font-size:11px;padding:4px 10px;" onclick="gerarRelatorioFunilAnuncioJPG()">📄 Gerar Relatório</button></div>
                 <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
                   <select id="ad-filter-campaign" onchange="filterAdTable()" style="border:1px solid #e0d9d0;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:160px;">
                     <option value="">Todas as campanhas</option>
@@ -2792,6 +2792,131 @@ function getPeriodLabel(tab){
   const f=new Date(rng.since+'T12:00').toLocaleDateString('pt-BR');
   const t=new Date(rng.until+'T12:00').toLocaleDateString('pt-BR');
   return f===t?f:f+' a '+t;
+}
+
+function gerarRelatorioFunilAnuncioJPG(){
+  const periodo=getPeriodLabel('trafego');
+  const adMap=window._lastAdMap||{};
+  const adRowsRaw=Object.entries(adMap).filter(([,d])=>(d.leads||0)>0).sort((a,b)=>(b[1].spend||0)-(a[1].spend||0));
+
+  const rows=adRowsRaw.map(([name,d])=>{
+    const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
+    const adCpcomp=d.comp>0?d.spend/d.comp:0,adCpc=d.fechou>0?d.spend/d.fechou:0;
+    const adTicket=d.fechou>0?d.vendas/d.fechou:0;
+    return{
+      label:(d.label||name).substring(0,28),adset:(d.adset||'').substring(0,18),
+      spend:fmtK(d.spend),cpl:d.leads>0?fmt(adCpl):'—',leads:d.leads||'—',
+      agend:d.agend||'—',cpa:d.agend>0?fmt(adCpa):'—',
+      comp:d.comp||'—',cpcomp:d.comp>0?fmt(adCpcomp):'—',
+      fechou:d.fechou||'—',cpc:d.fechou>0?fmt(adCpc):'—',
+      vendas:d.vendas>0?fmtK(d.vendas):'—',ticket:adTicket>0?fmt(adTicket):'—'
+    };
+  });
+
+  const totSpend=adRowsRaw.reduce((s,[,d])=>s+(d.spend||0),0);
+  const totLeads=adRowsRaw.reduce((s,[,d])=>s+(d.leads||0),0);
+  const totAgend=adRowsRaw.reduce((s,[,d])=>s+(d.agend||0),0);
+  const totComp=adRowsRaw.reduce((s,[,d])=>s+(d.comp||0),0);
+  const totFechou=adRowsRaw.reduce((s,[,d])=>s+(d.fechou||0),0);
+  const totVendas=adRowsRaw.reduce((s,[,d])=>s+(d.vendas||0),0);
+  const totalRow={
+    label:'TOTAL / MÉDIA',adset:'',spend:fmtK(totSpend),
+    cpl:totLeads>0?fmt(totSpend/totLeads):'—',leads:totLeads||'—',
+    agend:totAgend||'—',cpa:totAgend>0?fmt(totSpend/totAgend):'—',
+    comp:totComp||'—',cpcomp:totComp>0?fmt(totSpend/totComp):'—',
+    fechou:totFechou||'—',cpc:totFechou>0?fmt(totSpend/totFechou):'—',
+    vendas:totVendas>0?fmtK(totVendas):'—',ticket:totFechou>0?fmt(totVendas/totFechou):'—'
+  };
+
+  const headers=['Anúncio','Conjunto','Invest.','CPL','Leads','Agend.','C/agend.','Comp.','C/comp.','Fechou','C/contr.','Vendas','Ticket'];
+  const colW=[170,130,75,65,55,60,65,55,65,55,65,75,70];
+  const colAlign=headers.map((h,i)=>i<2?'left':'right');
+  const rowH=26;
+  const headerH=30;
+  const titleH=70;
+  const padX=20;
+  const tableW=colW.reduce((a,b)=>a+b,0);
+  const canvasW=tableW+padX*2;
+  const canvasH=titleH+headerH+(rows.length+1)*rowH+20;
+
+  const canvas=document.createElement('canvas');
+  const scale=2; // resolução maior para ficar nítido no WhatsApp
+  canvas.width=canvasW*scale;
+  canvas.height=canvasH*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+
+  // Fundo
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,canvasW,canvasH);
+
+  // Cabeçalho
+  ctx.fillStyle='#2a2520';
+  ctx.font='bold 18px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Funil por anúncio',padX,30);
+  ctx.fillStyle='#7a6550';
+  ctx.font='12px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Bulhões Odontologia — Tráfego pago',padX,48);
+  ctx.textAlign='right';
+  ctx.font='11px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText(periodo,canvasW-padX,30);
+  ctx.textAlign='left';
+
+  ctx.strokeStyle='#e0d8ce';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padX,titleH-10);ctx.lineTo(canvasW-padX,titleH-10);ctx.stroke();
+
+  // Cabeçalho da tabela
+  let y=titleH+headerH;
+  let x=padX;
+  ctx.font='bold 10px -apple-system,Segoe UI,sans-serif';
+  ctx.fillStyle='#9a8c7e';
+  headers.forEach((h,i)=>{
+    ctx.textAlign=colAlign[i];
+    const tx=colAlign[i]==='right'?x+colW[i]-6:x+6;
+    ctx.fillText(h,tx,y-headerH+20);
+    x+=colW[i];
+  });
+  ctx.beginPath();ctx.moveTo(padX,y-6);ctx.lineTo(canvasW-padX,y-6);ctx.stroke();
+
+  // Linhas de dados
+  ctx.font='10px -apple-system,Segoe UI,sans-serif';
+  rows.forEach((r,idx)=>{
+    x=padX;
+    ctx.fillStyle='#2a2520';
+    const vals=[r.label,r.adset,r.spend,r.cpl,r.leads,r.agend,r.cpa,r.comp,r.cpcomp,r.fechou,r.cpc,r.vendas,r.ticket];
+    vals.forEach((v,i)=>{
+      ctx.textAlign=colAlign[i];
+      const tx=colAlign[i]==='right'?x+colW[i]-6:x+6;
+      ctx.fillText(String(v),tx,y+18);
+      x+=colW[i];
+    });
+    y+=rowH;
+  });
+
+  // Linha de total
+  ctx.fillStyle='#f0ebe4';
+  ctx.fillRect(padX-4,y-4,tableW+8,rowH+4);
+  ctx.font='bold 10px -apple-system,Segoe UI,sans-serif';
+  ctx.fillStyle='#5a4a3a';
+  x=padX;
+  const totVals=[totalRow.label,totalRow.adset,totalRow.spend,totalRow.cpl,totalRow.leads,totalRow.agend,totalRow.cpa,totalRow.comp,totalRow.cpcomp,totalRow.fechou,totalRow.cpc,totalRow.vendas,totalRow.ticket];
+  totVals.forEach((v,i)=>{
+    ctx.textAlign=colAlign[i];
+    const tx=colAlign[i]==='right'?x+colW[i]-6:x+6;
+    ctx.fillText(String(v),tx,y+18);
+    x+=colW[i];
+  });
+
+  ctx.textAlign='left';
+  ctx.font='9px -apple-system,Segoe UI,sans-serif';
+  ctx.fillStyle='#b5a898';
+  ctx.fillText('Gerado em '+new Date().toLocaleString('pt-BR')+' — backoffice Bulhões Odontologia',padX,canvasH-8);
+
+  const link=document.createElement('a');
+  link.download='funil-por-anuncio-'+new Date().toISOString().slice(0,10)+'.jpg';
+  link.href=canvas.toDataURL('image/jpeg',0.92);
+  link.click();
 }
 
 function gerarRelatorioPDF(tab){
