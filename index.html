@@ -2924,6 +2924,71 @@ function gerarRelatorioPDF(tab){
   else gerarRelatorioSocialPDF();
 }
 
+// Helper genérico: cria um canvas de relatório (escala 2x para boa resolução no WhatsApp)
+function criarCanvasRelatorio(width,height){
+  const canvas=document.createElement('canvas');
+  const scale=2;
+  canvas.width=width*scale;
+  canvas.height=height*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(scale,scale);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,width,height);
+  return{canvas,ctx};
+}
+function baixarCanvasComoJPG(canvas,nomeArquivo){
+  const link=document.createElement('a');
+  link.download=nomeArquivo;
+  link.href=canvas.toDataURL('image/jpeg',0.92);
+  link.click();
+}
+// Desenha um cabeçalho padrão de relatório (título, subtítulo, período, linha divisória)
+function desenharCabecalhoRelatorio(ctx,canvasW,subtitulo,periodo){
+  ctx.fillStyle='#2a2520';
+  ctx.textAlign='left';
+  ctx.font='bold 18px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Relatório de desempenho',20,30);
+  ctx.fillStyle='#7a6550';
+  ctx.font='12px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText(subtitulo,20,48);
+  ctx.textAlign='right';
+  ctx.font='11px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText(periodo,canvasW-20,30);
+  ctx.textAlign='left';
+  ctx.strokeStyle='#e0d8ce';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(20,60);ctx.lineTo(canvasW-20,60);ctx.stroke();
+}
+// Desenha uma linha de cards de métricas (label + valor + sublabel opcional)
+function desenharCardsRelatorio(ctx,canvasW,y,cards,corFundo,corTexto){
+  const padX=20,gap=8;
+  const cardW=(canvasW-padX*2-gap*3)/4;
+  cards.forEach((c,i)=>{
+    const x=padX+i*(cardW+gap);
+    ctx.fillStyle=corFundo;
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(x,y,cardW,40,4);else ctx.rect(x,y,cardW,40);
+    ctx.fill();
+    ctx.fillStyle=corTexto||'#7a6550';
+    ctx.font='10px -apple-system,Segoe UI,sans-serif';
+    ctx.fillText(c[0],x+8,y+14);
+    ctx.fillStyle=corTexto==='#3a7a50'?'#3a7a50':'#2a2520';
+    ctx.font='bold 15px -apple-system,Segoe UI,sans-serif';
+    ctx.fillText(String(c[1]),x+8,y+30);
+    if(c[2]){
+      ctx.fillStyle='#b5a898';
+      ctx.font='9px -apple-system,Segoe UI,sans-serif';
+      ctx.fillText(String(c[2]),x+8,y+38);
+    }
+  });
+  return y+48;
+}
+function desenharRodapeRelatorio(ctx,canvasW,canvasH){
+  ctx.fillStyle='#b5a898';
+  ctx.font='9px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Gerado em '+new Date().toLocaleString('pt-BR')+' — backoffice Bulhões Odontologia',20,canvasH-10);
+}
+
 function gerarRelatorioTrafegoPDF(){
   const periodo=getPeriodLabel('trafego');
   const leads=getCleanMetricText('t-leads');
@@ -2941,86 +3006,66 @@ function gerarRelatorioTrafegoPDF(){
     .filter(([,d])=>(d.leads||0)>0)
     .map(([key,d])=>{
       const cplAd=d.leads>0?d.spend/d.leads:0;
-      return{label:(d.label||key).substring(0,40),leads:d.leads||0,cpl:cplAd,agend:d.agend||0,comp:d.comp||0,vendas:d.vendas||0};
+      return{label:(d.label||key).substring(0,32),leads:d.leads||0,cpl:cplAd,agend:d.agend||0,comp:d.comp||0,vendas:d.vendas||0};
     });
 
-  const { jsPDF }=window.jspdf;
-  const doc=new jsPDF();
-  const pageW=doc.internal.pageSize.getWidth();
-  let y=20;
+  const canvasW=560;
+  const canvasH=200+30+adRows.length*20+40;
+  const{canvas,ctx}=criarCanvasRelatorio(canvasW,canvasH);
 
-  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(40,35,30);
-  doc.text('Relatório de desempenho',14,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,110,100);
-  doc.text('Bulhões Odontologia — Tráfego pago',14,y+6);
-  doc.setFontSize(9);
-  doc.text(periodo,pageW-14,y,{align:'right'});
+  desenharCabecalhoRelatorio(ctx,canvasW,'Bulhões Odontologia — Tráfego pago',periodo);
+
+  let y=78;
+  ctx.fillStyle='#2a2520';
+  ctx.font='bold 13px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Resumo do período',20,y);
   y+=14;
-  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-  y+=10;
 
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
-  doc.text('Resumo do período',14,y);
-  y+=8;
+  y=desenharCardsRelatorio(ctx,canvasW,y,[['Leads',leads],['Agendaram',agend],['Compareceram',comp],['Fecharam',contratos]],'#f5efe8');
+  y=desenharCardsRelatorio(ctx,canvasW,y,[['Investido',invest],['CPL',cpl],['Vendido',vendas],['Ticket médio',ticket]],'#fff','#2a2520');
 
-  const cards1=[['Leads',leads],['Agendaram',agend],['Compareceram',comp],['Fecharam',contratos]];
-  const cardW=(pageW-28)/4;
-  cards1.forEach((c,i)=>{
-    const x=14+i*cardW;
-    doc.setFillColor(245,239,232);
-    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
-    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
-    doc.text(c[0],x+4,y+6);
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(40,35,30);
-    doc.text(String(c[1]),x+4,y+14);
-  });
-  y+=24;
+  ctx.fillStyle='#7a6550';
+  ctx.font='10px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Taxa de conversão (lead → contrato): '+conv,20,y+4);
+  y+=16;
 
-  const cards2=[['Investido',invest],['CPL',cpl],['Vendido',vendas],['Ticket médio',ticket]];
-  cards2.forEach((c,i)=>{
-    const x=14+i*cardW;
-    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
-    doc.text(c[0],x+2,y);
-    doc.setFont('helvetica','bold');doc.setFontSize(11);
-    doc.setTextColor(c[0]==='Vendido'?60:40,c[0]==='Vendido'?120:35,c[0]==='Vendido'?80:30);
-    doc.text(String(c[1]),x+2,y+6);
-  });
-  y+=10;
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
-  doc.text('Taxa de conversão (lead → contrato): '+conv,14,y);
-  y+=12;
+  ctx.strokeStyle='#e0d8ce';
+  ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(canvasW-20,y);ctx.stroke();
+  y+=18;
 
-  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-  y+=8;
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
-  doc.text('Desempenho por anúncio',14,y);
-  y+=8;
+  ctx.fillStyle='#2a2520';
+  ctx.font='bold 13px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Desempenho por anúncio',20,y);
+  y+=14;
 
-  const colX=[14,84,104,128,150,172];
+  const colX=[20,260,330,400,460,510];
   const headers=['Anúncio','Leads','CPL','Agend.','Comp.','Vendas'];
-  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(120,110,100);
-  headers.forEach((h,i)=>doc.text(h,colX[i],y));
-  y+=2;
-  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-  y+=6;
+  ctx.font='bold 9px -apple-system,Segoe UI,sans-serif';
+  ctx.fillStyle='#9a8c7e';
+  headers.forEach((h,i)=>{ctx.textAlign=i===0?'left':'right';ctx.fillText(h,i===0?colX[i]:colX[i]+45,y);});
+  ctx.textAlign='left';
+  y+=4;
+  ctx.strokeStyle='#e0d8ce';
+  ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(canvasW-20,y);ctx.stroke();
+  y+=16;
 
-  doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(50,45,40);
+  ctx.font='9px -apple-system,Segoe UI,sans-serif';
+  ctx.fillStyle='#322d28';
   adRows.forEach(r=>{
-    if(y>270){doc.addPage();y=20;}
-    doc.text(r.label,colX[0],y);
-    doc.text(String(r.leads),colX[1],y);
-    doc.text(r.cpl>0?fmt(r.cpl):'—',colX[2],y);
-    doc.text(r.agend>0?String(r.agend):'—',colX[3],y);
-    doc.text(r.comp>0?String(r.comp):'—',colX[4],y);
-    doc.text(r.vendas>0?fmt(r.vendas):'—',colX[5],y);
-    y+=6;
+    ctx.textAlign='left';
+    ctx.fillText(r.label,colX[0],y);
+    ctx.textAlign='right';
+    ctx.fillText(String(r.leads),colX[1]+45,y);
+    ctx.fillText(r.cpl>0?fmt(r.cpl):'—',colX[2]+45,y);
+    ctx.fillText(r.agend>0?String(r.agend):'—',colX[3]+45,y);
+    ctx.fillText(r.comp>0?String(r.comp):'—',colX[4]+45,y);
+    ctx.fillText(r.vendas>0?fmt(r.vendas):'—',colX[5]+45,y);
+    y+=20;
   });
+  ctx.textAlign='left';
 
-  y=Math.max(y+10,280);
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);
-  doc.text('Gerado em '+new Date().toLocaleString('pt-BR')+' — backoffice Bulhões Odontologia',14,290);
-
-  doc.save('relatorio-trafego-pago-'+new Date().toISOString().slice(0,10)+'.pdf');
+  desenharRodapeRelatorio(ctx,canvasW,canvasH);
+  baixarCanvasComoJPG(canvas,'relatorio-trafego-pago-'+new Date().toISOString().slice(0,10)+'.jpg');
 }
 
 function gerarRelatorioSocialPDF(){
@@ -3052,77 +3097,51 @@ function gerarRelatorioSocialPDF(){
     });
   }
 
-  const { jsPDF }=window.jspdf;
-  const doc=new jsPDF();
-  const pageW=doc.internal.pageSize.getWidth();
-  let y=20;
+  const canvasW=560;
+  const canvasH=240+(tiposRows.length>0?40+tiposRows.length*20:0)+30;
+  const{canvas,ctx}=criarCanvasRelatorio(canvasW,canvasH);
 
-  doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(40,35,30);
-  doc.text('Relatório de desempenho',14,y);
-  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(120,110,100);
-  doc.text('Bulhões Odontologia — Social Selling',14,y+6);
-  doc.setFontSize(9);
-  doc.text(periodo,pageW-14,y,{align:'right'});
+  desenharCabecalhoRelatorio(ctx,canvasW,'Bulhões Odontologia — Social Selling',periodo);
+
+  let y=78;
+  ctx.fillStyle='#2a2520';
+  ctx.font='bold 13px -apple-system,Segoe UI,sans-serif';
+  ctx.fillText('Resumo do período',20,y);
   y+=14;
-  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-  y+=10;
 
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
-  doc.text('Resumo do período',14,y);
-  y+=8;
+  y=desenharCardsRelatorio(ctx,canvasW,y,[['Abordagens',abord],['Respostas',resp,respSub],['Follow-ups',follow],['Desqualif.',desq]],'#f5efe8');
+  y=desenharCardsRelatorio(ctx,canvasW,y,[['Agendamentos',agend,agendSub],['Comparecim.',comp,compSub],['Vendas',vendasN,vendasSub],['Conv. geral',conv]],'#e8f3ec','#3a7a50');
 
-  const cards1=[['Abordagens',abord,''],['Respostas',resp,respSub],['Follow-ups',follow,''],['Desqualif.',desq,'']];
-  const cardW=(pageW-28)/4;
-  cards1.forEach((c,i)=>{
-    const x=14+i*cardW;
-    doc.setFillColor(245,239,232);
-    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
-    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,110,100);
-    doc.text(c[0],x+4,y+6);
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(40,35,30);
-    doc.text(String(c[1]),x+4,y+14);
-    if(c[2]){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);doc.text(String(c[2]),x+4,y+18);}
-  });
-  y+=26;
-
-  const cards2=[['Agendamentos',agend,agendSub],['Comparecim.',comp,compSub],['Vendas',vendasN,vendasSub],['Conv. geral',conv,'']];
-  cards2.forEach((c,i)=>{
-    const x=14+i*cardW;
-    doc.setFillColor(232,243,236);
-    doc.roundedRect(x,y,cardW-4,18,2,2,'F');
-    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(60,120,80);
-    doc.text(c[0],x+4,y+6);
-    doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(60,120,80);
-    doc.text(String(c[1]),x+4,y+14);
-    if(c[2]){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(String(c[2]),x+4,y+18);}
-  });
-  y+=26;
-
-  doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-  y+=8;
+  ctx.strokeStyle='#e0d8ce';
+  ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(canvasW-20,y);ctx.stroke();
+  y+=18;
 
   if(tiposRows.length>0){
-    doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(40,35,30);
-    doc.text('Comparecimento por tipo de interação',14,y);
-    y+=8;
-    doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(120,110,100);
-    doc.text('Tipo',14,y);doc.text('Conversão',pageW-14,y,{align:'right'});
-    y+=2;
-    doc.setDrawColor(220,212,200);doc.line(14,y,pageW-14,y);
-    y+=6;
-    doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(50,45,40);
+    ctx.fillStyle='#2a2520';
+    ctx.font='bold 13px -apple-system,Segoe UI,sans-serif';
+    ctx.fillText('Comparecimento por tipo de interação',20,y);
+    y+=14;
+    ctx.font='bold 9px -apple-system,Segoe UI,sans-serif';
+    ctx.fillStyle='#9a8c7e';
+    ctx.textAlign='left';ctx.fillText('Tipo',20,y);
+    ctx.textAlign='right';ctx.fillText('Conversão',canvasW-20,y);
+    ctx.textAlign='left';
+    y+=4;
+    ctx.strokeStyle='#e0d8ce';
+    ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(canvasW-20,y);ctx.stroke();
+    y+=16;
+    ctx.font='9px -apple-system,Segoe UI,sans-serif';
+    ctx.fillStyle='#322d28';
     tiposRows.forEach(r=>{
-      if(y>270){doc.addPage();y=20;}
-      doc.text(r.label,14,y);
-      doc.text(r.pct,pageW-14,y,{align:'right'});
-      y+=6;
+      ctx.textAlign='left';ctx.fillText(r.label,20,y);
+      ctx.textAlign='right';ctx.fillText(r.pct,canvasW-20,y);
+      y+=20;
     });
+    ctx.textAlign='left';
   }
 
-  doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(150,140,130);
-  doc.text('Gerado em '+new Date().toLocaleString('pt-BR')+' — backoffice Bulhões Odontologia',14,290);
-
-  doc.save('relatorio-social-selling-'+new Date().toISOString().slice(0,10)+'.pdf');
+  desenharRodapeRelatorio(ctx,canvasW,canvasH);
+  baixarCanvasComoJPG(canvas,'relatorio-social-selling-'+new Date().toISOString().slice(0,10)+'.jpg');
 }
 
 function gerarRelatorioComissaoIndividual(){
