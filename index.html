@@ -3643,7 +3643,13 @@ function getEffectiveAgendInfo(phone,fallbackEvt){
     }
     // se !manualTs && cloudiaTs → mantém o stage do Cloudia (mais confiável que edição manual sem data)
   }
-  const consultaTs=(ccD&&ccD.consultaTimestamp)||(fallbackEvt&&fallbackEvt.timestamp)||'';
+  // Data da consulta: prioriza a edição manual no card (consultaTimestamp). Na ausência dela,
+  // se o paciente já tem Compareceu/Ganho registrado, usa o timestamp REAL desse evento mais
+  // recente (stageTs, vindo de stageUpdates) — não o timestamp do evento Agendou original
+  // (fallbackEvt), que é o que causava "Pendente" mesmo para quem já tinha comparecido.
+  const stageFinal=(stage||'').toLowerCase();
+  const usarStageTsComoConsulta=stageTs&&(stageFinal.includes('compareceu')||stageFinal.includes('ganho'));
+  const consultaTs=(ccD&&ccD.consultaTimestamp)||(usarStageTsComoConsulta?stageTs:'')||(fallbackEvt&&fallbackEvt.timestamp)||'';
   return{stage:stage,consultaTs:consultaTs};
 }
 function getStatusAgend(stage){
