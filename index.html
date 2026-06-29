@@ -2693,8 +2693,13 @@ function filterLeadsTable(){
     const origMatch2=(e.origin||'').toLowerCase().includes(q);
     const match=!q||(nameMatch||phoneMatch||origMatch2);
     const origFilter=!orig||(e.origin||'')===orig;
+    // Filtro de status "Agendado" sempre ignora o filtro de data de inclusão:
+    // o que importa aqui é "quem tem uma consulta marcada agora", não "quem
+    // entrou no funil dentro de tal período" — a pessoa pode ter entrado há
+    // meses e só ter sido agendada agora, e ainda assim deve contar. Datas de
+    // inclusão e status de agendamento respondem perguntas diferentes.
     let dateMatch=true;
-    if(fromV||toV){
+    if((fromV||toV)&&statusFil!=='agendado'){
       const d=parseCloudiaDate(r.created_at||r.timestamp);
       const ds=d?localDateStr(d):'';
       if(fromV&&ds&&ds<fromV)dateMatch=false;
