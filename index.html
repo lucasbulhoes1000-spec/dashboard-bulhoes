@@ -2655,7 +2655,22 @@ function renderLeadsTable(){
     if(!d)return;
     if(d.nomeAtual)r.name=d.nomeAtual;
     if(d.origemAtual)r.origin=d.origemAtual;
-    if(d.statusAtual)r.stage=d.statusAtual;
+    // Só aplica statusAtual se a edição manual for mais recente que o evento real
+    // escolhido (r.stage já é o vencedor calculado acima). Sem essa checagem, um
+    // statusAtual antigo gravado há muito tempo (ex: "Lead", sem statusAtualEditedAt)
+    // sobrescrevia incondicionalmente um evento real bem mais recente (ex: "Agendou"
+    // de hoje), fazendo a pessoa parecer não-agendada mesmo tendo agendamento ativo.
+    if(d.statusAtual){
+      const manualTs=d.statusAtualEditedAt?parseCloudiaDate(d.statusAtualEditedAt):null;
+      const eventoTs=parseCloudiaDate(r.timestamp||r.created_at);
+      if(manualTs&&eventoTs){
+        if(manualTs>=eventoTs)r.stage=d.statusAtual;
+      } else if(manualTs&&!eventoTs){
+        r.stage=d.statusAtual;
+      }
+      // se !manualTs (edição sem data registrada) → não sobrescreve; mantém o
+      // evento real do Cloudia, que é mais confiável que uma edição sem timestamp.
+    }
   });
   const origens=[...new Set(leadsData.map(r=>r.origin||'—').filter(Boolean))].sort();
   const sel=document.getElementById('leads-origem-filter');
