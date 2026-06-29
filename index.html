@@ -1975,23 +1975,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p))).size;});
 
-  // Origens: deduplicar por telefone dentro de cada origem (usa created_at).
-  // Prioridade: edição manual no card (_ccData.origemAtual) > origem mais recente
-  // não-vazia entre TODAS as linhas daquele telefone (getOrigemReal) > origin bruto
-  // da linha específica. Sem o passo do meio, leads cuja primeira/única linha
-  // capturada aqui estava com origin vazio apareciam como "—" mesmo quando o
-  // telefone tinha origem real registrada em outra linha (ex: evento de
-  // CUSTOMER_ACQUISITION_ORIGIN_UPDATED posterior).
-  const origenPhonesSeen={};
-  filtered.forEach(r=>{
-    const ph=normalizePhone(r.phone);
-    const ccD=ph?ccDataLookup(ph):null;
-    const org=(ccD&&ccD.origemAtual)||(ph&&getOrigemReal(ph))||r.origin||'—';
-    if(!origenPhonesSeen[org])origenPhonesSeen[org]=new Set();
-    if(ph)origenPhonesSeen[org].add(ph);
-  });
+  // Origens: usa getLeadsUnicosComOrigem — a MESMA função/fonte usada pela lupa de
+  // Leads (lupaLeads), garantindo que o gráfico e a lupa NUNCA divirjam entre si,
+  // por construção (mesma dedupe por telefone, mesma reconciliação de origem via
+  // applyEdits). Antes, o gráfico tinha sua própria lógica paralela (getOrigemReal
+  // + Set de telefones), que podia produzir números levemente diferentes da lupa.
+  const leadsUnicos=getLeadsUnicosComOrigem(filtered);
   const origens={};
-  Object.keys(origenPhonesSeen).forEach(org=>{origens[org]=origenPhonesSeen[org].size;});
+  leadsUnicos.forEach(e=>{origens[e._origemFinal]=(origens[e._origemFinal]||0)+1;});
 
   // Agendamentos: só CUSTOMER_STAGE_UPDATED com stage Agendou (filteredAgend)
   // Comparecimentos/fechamentos: qualquer CUSTOMER_STAGE_UPDATED no período (filteredEvents)
@@ -3427,10 +3418,13 @@ function loadCRMFile(e){
 }
 
 // LUPA FUNCTIONS
-function lupaLeads(){
-  // FIX: deduplicar por telefone na lupa — 1 linha por lead único
+// Deduplica leads do Cloudia por telefone (mantém a linha mais ANTIGA — data real
+// de entrada) e calcula a origem reconciliada de cada um. Fonte única de verdade
+// usada tanto pelo gráfico "Origem dos leads" quanto pela lupa de Leads — para que
+// os dois NUNCA divirjam entre si, por construção (mesma função, mesmos critérios).
+function getLeadsUnicosComOrigem(rows){
   const phoneMap={};
-  _lastCloudiaFiltered.forEach(r=>{
+  (rows||[]).forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name||'_'+Math.random();
     if(!phoneMap[ph]){phoneMap[ph]=r;}
     else{
@@ -3439,9 +3433,15 @@ function lupaLeads(){
       if(dNew<dOld)phoneMap[ph]=r; // mantém o mais antigo (data de entrada)
     }
   });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0))
-    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—'];});
+  return Object.values(phoneMap).map(r=>{
+    const e=applyEdits(r);
+    return {...e,_origemFinal:e.origin||'—'};
+  });
+}
+function lupaLeads(){
+  const unicos=getLeadsUnicosComOrigem(_lastCloudiaFiltered)
+    .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
+  const rows=unicos.map(e=>[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e._origemFinal]);
   openModal('Leads — '+rows.length+' únicos no período',['Data de cadastro','Nome','Telefone','Origem'],rows);
 }
 function lupaAgend(){
