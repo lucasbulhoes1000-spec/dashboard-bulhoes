@@ -4915,7 +4915,12 @@ function renderRelComparecidos(){
       .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
     // NÃO cancela por Compareceu/Ganho aqui — queremos mostrar a distância
 
-    // Data da consulta
+    // Data da consulta — prioriza consultaTimestamp manual, depois evento real
+    // Compareceu/Ganho na planilha, e por último (novo) a data do orçamento mais
+    // antigo cadastrado no card do cliente. Sem esse último fallback, pacientes que
+    // compareceram de verdade mas só têm o orçamento registrado no CRM (sem ninguém
+    // ter marcado "Compareceu" na planilha do Cloudia) caíam incorretamente em
+    // "Pendente (agendou, não compareceu)".
     let compDate=null, compRow=null;
     if(ccD.consultaTimestamp){
       compDate=parseCloudiaDate(ccD.consultaTimestamp);
@@ -4924,6 +4929,10 @@ function renderRelComparecidos(){
       const compEvt=evts.filter(e=>isComp(e.stage)||isFechou(e.stage))
         .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
       if(compEvt){compDate=parseCloudiaDate(compEvt.timestamp);compRow=compEvt;}
+      else if(ccD.orcamentos&&ccD.orcamentos.length>0){
+        const datasOrc=ccD.orcamentos.map(o=>o.data).filter(Boolean).sort();
+        if(datasOrc.length>0){compDate=parseCloudiaDate(datasOrc[0]+'T08:00:00');compRow=agendRow;}
+      }
     }
 
     const diff=compDate?Math.round((new Date(localDateStr(compDate)+'T12:00:00')-new Date(agendDs+'T12:00:00'))/(1000*60*60*24)):null;
