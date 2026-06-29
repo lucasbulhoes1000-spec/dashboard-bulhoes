@@ -1975,10 +1975,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p))).size;});
 
-  // Origens: deduplicar por telefone dentro de cada origem (usa created_at)
+  // Origens: deduplicar por telefone dentro de cada origem (usa created_at).
+  // Usa applyEdits(r).origin — a mesma reconciliação que a lupa de Leads já usa
+  // (prioriza _ccData[ph].origemAtual sobre o origin bruto da linha) — sem isso,
+  // o gráfico mostrava "—" para leads que JÁ TÊM origem real registrada/editada,
+  // só porque a primeira linha bruta daquele telefone estava sem o campo origin.
   const origenPhonesSeen={};
   filtered.forEach(r=>{
-    const org=r.origin||'—';
+    const org=applyEdits(r).origin||'—';
     const ph=normalizePhone(r.phone);
     if(!origenPhonesSeen[org])origenPhonesSeen[org]=new Set();
     if(ph)origenPhonesSeen[org].add(ph);
