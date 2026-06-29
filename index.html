@@ -2709,9 +2709,19 @@ function filterLeadsTable(){
     const s=(e.stage||'').toLowerCase();
     const isAgendado=s.includes('agendou');
     const isFaltouStage=s.includes('faltou')||s.includes('desmarcou');
+    // Leads importados manualmente (via CSV, em massa) nunca recebem eventos novos
+    // do Cloudia depois da importação — o status deles fica "congelado" no que foi
+    // verdade no dia da importação. Quando esse status congelado é "Agendou", ele é
+    // sabidamente obsoleto (o lead provavelmente já teve resultado real desde então,
+    // mas não temos como saber qual). Por isso, leads importados são excluídos do
+    // filtro "Agendado" — mostrar um número inflado e não confiável é peor que não
+    // mostrar nada.
+    const ph=String(e.phone||'').replace(/\D/g,'');
+    const ccD=ccDataLookup(ph);
+    const ehImportadoObsoleto=statusFil==='agendado'&&ccD&&ccD.leadImportado;
     const statusMatch=!statusFil||(
       (statusFil==='nao_agendado'&&!isAgendado&&!isFaltouStage)||
-      (statusFil==='agendado'&&isAgendado)||
+      (statusFil==='agendado'&&isAgendado&&!ehImportadoObsoleto)||
       (statusFil==='faltou'&&isFaltouStage)
     );
     return match&&origFilter&&dateMatch&&statusMatch;
