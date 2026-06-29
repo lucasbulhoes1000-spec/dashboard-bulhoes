@@ -2599,12 +2599,22 @@ function renderLeads(){
 }
 function renderLeadsTable(){
   // Primeiro agrupa TODAS as linhas por telefone (sem pré-filtrar por stage),
-  // pra poder achar o evento mais recente de cada pessoa de verdade. O bug antigo
-  // pré-filtrava linha a linha por isLeadStage ANTES de agrupar — então um
+  // pra poder achar o evento mais recente de cada pessoa de verdade. O bug
+  // antigo pré-filtrava linha a linha por isLeadStage ANTES de agrupar — então um
   // telefone com uma linha "Agendou" antiga e uma linha "Compareceu" mais recente
-  // nunca via a linha "Compareceu" entrar no cálculo (ela não bate isLeadStage),
-  // e a pessoa ficava presa em "Agendado" pra sempre, mesmo já tendo comparecido
-  // ou faltado de verdade.
+  // nunca via a linha "Compareceu" entrar no cálculo, e a pessoa ficava presa em
+  // "Agendado" pra sempre, mesmo já tendo comparecido ou faltado de verdade.
+  //
+  // Observado nos dados reais: o Cloudia às vezes grava dois eventos com MENOS
+  // DE 1 SEGUNDO de diferença ao registrar um agendamento (ex: "Agendou" seguido,
+  // 0.04-0.9s depois, de um "Lead" residual de algum efeito colateral da
+  // integração). Isso é tecnicamente "mais recente", mas é ruído técnico, não uma
+  // correção humana real — uma SDR percebendo e corrigindo um clique errado leva
+  // bem mais que poucos segundos. Por isso, ignoramos qualquer evento que regrida
+  // o stage e esteja a MENOS de 3 segundos do evento anterior; qualquer diferença
+  // maior que isso é tratada como decisão real (inclusive uma correção genuína da
+  // SDR), e o evento mais recente vence normalmente, sem hierarquia de estágio.
+  const JANELA_RUIDO_MS=3000;
   const porTelefone={};
   allCloudiaRows.forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name||Math.random();
@@ -2614,14 +2624,27 @@ function renderLeadsTable(){
 
   const phoneMap={};
   Object.entries(porTelefone).forEach(([ph,evts])=>{
-    // Evento mais recente de fato (qualquer stage), por timestamp/created_at
-    const maisRecente=evts.slice().sort((a,b)=>
+    const ordenados=evts.slice().sort((a,b)=>
       new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0)
-    )[0];
-    const s=(maisRecente.stage||'').toLowerCase();
+    );
+    let vencedor=ordenados[0];
+    // Se o evento "mais recente" está a menos de 3s do anterior e o anterior tem
+    // um stage diferente, isso é o padrão de ruído observado — usa o evento
+    // anterior (mais antigo dos dois, mas fora da janela de ruído) como vencedor.
+    for(let i=1;i<ordenados.length;i++){
+      const atual=ordenados[i-1];
+      const anterior=ordenados[i];
+      const diffMs=new Date(atual.timestamp||atual.created_at||0)-new Date(anterior.timestamp||anterior.created_at||0);
+      if(diffMs<JANELA_RUIDO_MS&&(anterior.stage||'')!==(atual.stage||'')){
+        vencedor=anterior;
+      }else{
+        break; // saiu da cadeia de ruído — para aqui
+      }
+    }
+    const s=(vencedor.stage||'').toLowerCase();
     const isLeadStage=s===''||s==='lead'||s.includes('agendou')||s.includes('faltou')||s.includes('desmarcou');
     if(!isLeadStage)return; // já compareceu/fechou de verdade — não é mais "lead"
-    phoneMap[ph]=maisRecente;
+    phoneMap[ph]=vencedor;
   });
 
   leadsData=Object.values(phoneMap).sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
