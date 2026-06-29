@@ -694,6 +694,10 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== REL COMPARECIDOS x AGENDAMENTO ===== -->
     <div class="page" id="page-rel-comparecidos">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
+        <div style="font-size:12px;color:#9a8c7e;">Data da consulta puxada automaticamente do Clinicorp (categoria Avaliação).</div>
+        <button id="btn-sync-consultas-aval" onclick="sincronizarConsultasAvaliacao()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Atualizar datas de consulta (Clinicorp)</button>
+      </div>
       <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
         <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="rc-from" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
         <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data final</label><input type="date" id="rc-to" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
@@ -704,7 +708,7 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="renderRelComparecidos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
       </div>
       <div style="background:#f5f0ea;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7a6550;">
-        <strong>Legenda:</strong> Distância em dias entre a data de criação do agendamento e a data da consulta. % Comp. = Comparecidos / Agendados. % Agend. Dist. = Agendados nessa distância / Total de agendamentos.
+        <strong>Legenda:</strong> Distância em dias entre a data em que a SDR criou o agendamento e a data real marcada da consulta (puxada do Clinicorp). Essa distância existe independente de comparecimento ou falta. % Comp. = Comparecidos / Agendados dentro dessa faixa de distância.
       </div>
       <div class="table-card" id="rc-table-wrap">
         <div class="tw"><table id="rc-table"><thead><tr id="rc-thead"></tr></thead><tbody id="rc-tbody"></tbody></table></div>
@@ -3899,6 +3903,33 @@ async function sincronizarClinicorp(){
     btn.textContent=textoOriginal;
   }
 }
+async function sincronizarConsultasAvaliacao(){
+  const btn=document.getElementById('btn-sync-consultas-aval');
+  const textoOriginal=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='⏳ Sincronizando...';
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'sincronizarConsultasAvaliacao'})
+    });
+    const r=await res.json();
+    if(r.status==='ok'){
+      await carregarCRMRemoto(); // recarrega _ccData com as novas datas gravadas pelo Apps Script
+      renderRelComparecidos();
+      showToast('success','✅ Datas atualizadas!','Agendamentos de Avaliação no Clinicorp: '+r.totalAgendamentosAvaliacao+'\nDatas de consulta atualizadas: '+r.atualizados+'\nJá tinham data manual (preservadas): '+r.jaTinhamDataManual+'\nSem correspondência no CRM: '+r.semCorrespondenciaNoCRM);
+    }else{
+      showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
+    }
+  }catch(e){
+    console.error('[SYNC CONSULTAS AVALIAÇÃO] Erro:',e);
+    showToast('error','Erro de conexão',e.message+'\nVerifique o console (F12) para mais detalhes.');
+  }finally{
+    btn.disabled=false;
+    btn.textContent=textoOriginal;
+  }
+}
 function renderDiagnosticoPacientes(){
   const cats=Object.keys(_categoriasPacientes);
   let totalGeral=0,emDiaGeral=0,agendadoGeral=0,precisamContatoGeral=0,nuncaGeral=0;
@@ -4167,6 +4198,9 @@ function salvarDatasCC(){
   if(consultaData){
     const newTs=consultaData+'T'+consultaHora+':00';
     _ccData[ph].consultaTimestamp=newTs;
+    // Marca que essa data foi editada manualmente (não veio da sincronização automática
+    // com o Clinicorp) — protege contra a sincronização sobrescrever essa correção.
+    _ccData[ph].consultaTimestampViaClinicorp=false;
     // Atualiza o timestamp do evento Compareceu/Ganho em allCloudiaRows para refletir a nova data
     allCloudiaRows.forEach(row=>{
       if(String(row.phone||'').replace(/\D/g,'')===ph&&(isComp(row.stage)||isFechou(row.stage))){
@@ -4858,19 +4892,6 @@ function renderRelComparecidos(){
   const since=document.getElementById('rc-from').value;
   const until=document.getElementById('rc-to').value;
 
-  // Usa filterAgendByRange com período do relatório — mesma função do dashboard
-  // Temporariamente define filtros para o período do relatório
-  const savedFilters=JSON.parse(JSON.stringify(filters));
-  const savedCustom=JSON.parse(JSON.stringify(customDates));
-  filters['_rc']='personalizado';
-  customDates['_rc']={from:new Date(since+'T00:00:00'),to:new Date(until+'T23:59:59')};
-
-  // Função auxiliar para usar o período do relatório
-  function getRCRange(){return{since,until};}
-
-  // Pega agendamentos no período usando a lógica do dashboard
-  const agendRows=allCloudiaRows;
-  // Filtra manualmente seguindo a mesma lógica do filterAgendByRange
   const byPhone={};
   allCloudiaRows.forEach(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
@@ -4885,21 +4906,16 @@ function renderRelComparecidos(){
   const distMap={};
   distances.forEach(d=>distMap[d]={agend:0,comp:0,agendRows:[],compRows:[]});
   const seenAgend=new Set();
-  const seenComp=new Set();
 
   Object.entries(byPhone).forEach(([ph,evts])=>{
     const ccD=ccDataLookup(ph)||{};
 
-    // Data do agendamento — usa mesma prioridade do filterAgendByRange:
-    // 1. agendTimestamp do CRM
-    // 2. Evento CUSTOMER_STAGE_UPDATED com Agendou/Faltou no período
-    // NÃO usa created_at como fallback (isso gerava os 214)
+    // Data do agendamento — quando a SDR criou o registro de Agendou no Cloudia.
     let agendDate=null, agendRow=null;
     if(ccD.agendTimestamp){
       agendDate=parseCloudiaDate(ccD.agendTimestamp);
       agendRow=evts[0];
     } else {
-      // Pega o evento Agendou ou Faltou mais recente
       const agendEvts=evts.filter(e=>
         (isAgend(e.stage)||isFaltou(e.stage)) &&
         e.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
@@ -4910,60 +4926,38 @@ function renderRelComparecidos(){
     const agendDs=localDateStr(agendDate);
     if(agendDs<since||agendDs>until)return;
 
-    // Cancela se último stage é Lead/Perdido (igual filterAgendByRange)
-    const stageUpdates=evts.filter(e=>e.type==='CUSTOMER_STAGE_UPDATED')
-      .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-    // NÃO cancela por Compareceu/Ganho aqui — queremos mostrar a distância
+    // Data REAL da consulta marcada: vem do Clinicorp via consultaTimestamp
+    // (campo gravado pela sincronização "Atualizar datas de consulta (Clinicorp)",
+    // ou editado manualmente no card). Essa data existe SEMPRE que há um
+    // agendamento real — independente de a pessoa ter comparecido ou faltado —
+    // porque é a data marcada na agenda da clínica, não o resultado.
+    const consultaDate=ccD.consultaTimestamp?parseCloudiaDate(ccD.consultaTimestamp):null;
 
-    // Data da consulta — prioriza consultaTimestamp manual, depois evento real
-    // Compareceu/Ganho na planilha, e por último (novo) a data do orçamento mais
-    // antigo cadastrado no card do cliente. Sem esse último fallback, pacientes que
-    // compareceram de verdade mas só têm o orçamento registrado no CRM (sem ninguém
-    // ter marcado "Compareceu" na planilha do Cloudia) caíam incorretamente em
-    // "Pendente (agendou, não compareceu)".
-    let compDate=null, compRow=null;
-    if(ccD.consultaTimestamp){
-      compDate=parseCloudiaDate(ccD.consultaTimestamp);
-      compRow=evts.find(e=>isComp(e.stage)||isFechou(e.stage))||agendRow;
-    } else {
-      const compEvt=evts.filter(e=>isComp(e.stage)||isFechou(e.stage))
-        .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)))[0];
-      if(compEvt){compDate=parseCloudiaDate(compEvt.timestamp);compRow=compEvt;}
-      else if(ccD.orcamentos&&ccD.orcamentos.length>0){
-        const datasOrc=ccD.orcamentos.map(o=>o.data).filter(Boolean).sort();
-        if(datasOrc.length>0){compDate=parseCloudiaDate(datasOrc[0]+'T08:00:00');compRow=agendRow;}
-      }
+    // Comparecimento real: usado só para a % de comparecimento dentro da faixa,
+    // nunca para decidir se a linha de distância existe.
+    const compareceu=evts.some(e=>isComp(e.stage)||isFechou(e.stage))
+      ||(ccD.orcamentos&&ccD.orcamentos.length>0);
+
+    if(!consultaDate){
+      // Sem data de consulta sincronizada ainda do Clinicorp — não dá pra calcular
+      // a distância real. Conta como agendamento, mas fica fora dos buckets de
+      // distância até a sincronização trazer a data. Não cria mais uma linha de
+      // "pendente" — isso era a confusão anterior entre "sem dado" e "não compareceu".
+      return;
     }
 
-    const diff=compDate?Math.round((new Date(localDateStr(compDate)+'T12:00:00')-new Date(agendDs+'T12:00:00'))/(1000*60*60*24)):null;
-    if(diff!==null&&diff<0)return;
-    const bucket=diff===null?null:(distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff));
-    if(bucket===null)return; // sem data de consulta — conta agend mas sem comp
+    const consultaDs=localDateStr(consultaDate);
+    const diff=Math.round((new Date(consultaDs+'T12:00:00')-new Date(agendDs+'T12:00:00'))/(1000*60*60*24));
+    if(diff<0)return; // data de consulta antes do agendamento não faz sentido — ignora
+    const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
 
     if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
-    if(!seenAgend.has(ph)){seenAgend.add(ph);distMap[bucket].agend++;distMap[bucket].agendRows.push(agendRow||evts[0]);}
-    if(compDate&&!seenComp.has(ph)){seenComp.add(ph);distMap[bucket].comp++;distMap[bucket].compRows.push(compRow||evts[0]);}
-  });
-
-  // Agendamentos sem comparecimento — coloca em bucket próprio (sem distância definida)
-  // Só conta quem tem evento Agendou explícito OU agendTimestamp
-  Object.entries(byPhone).forEach(([ph,evts])=>{
-    if(seenAgend.has(ph))return;
-    const ccD=ccDataLookup(ph)||{};
-    let agendDate=null, agendRow=null;
-    if(ccD.agendTimestamp){agendDate=parseCloudiaDate(ccD.agendTimestamp);agendRow=evts[0];}
-    else {
-      const agendEvts=evts.filter(e=>(isAgend(e.stage)||isFaltou(e.stage))&&e.type==='CUSTOMER_STAGE_UPDATED')
-        .sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-      if(agendEvts.length>0){agendDate=parseCloudiaDate(agendEvts[0].timestamp);agendRow=agendEvts[0];}
+    if(!seenAgend.has(ph)){
+      seenAgend.add(ph);
+      distMap[bucket].agend++;
+      distMap[bucket].agendRows.push(agendRow||evts[0]);
+      if(compareceu){distMap[bucket].comp++;distMap[bucket].compRows.push(evts.find(e=>isComp(e.stage)||isFechou(e.stage))||agendRow||evts[0]);}
     }
-    if(!agendDate)return;
-    const agendDs=localDateStr(agendDate);
-    if(agendDs<since||agendDs>until)return;
-    if(origFilt){const r=evts.find(e=>true)||evts[0];if((r.origin||'')!==origFilt)return;}
-    // Agendou mas não compareceu — bucket 'pendente'
-    if(!distMap['pendente'])distMap['pendente']={agend:0,comp:0,agendRows:[],compRows:[]};
-    seenAgend.add(ph);distMap['pendente'].agend++;distMap['pendente'].agendRows.push(agendRow||evts[0]);
   });
 
   const totalAgend=seenAgend.size;
@@ -4971,16 +4965,17 @@ function renderRelComparecidos(){
   const thead=document.getElementById('rc-thead');
   thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
   document.getElementById('rc-tbody').innerHTML=Object.entries(distMap)
-    .sort((a,b)=>{if(a[0]==='pendente')return 1;if(b[0]==='pendente')return -1;return parseInt(a[0])-parseInt(b[0]);})
+    .filter(([,d])=>d.agend>0)
+    .sort((a,b)=>parseInt(a[0])-parseInt(b[0]))
     .map(([dias,d],i)=>{
       window._rcData[i]={dias,d};
       return`<tr>
-      <td>${dias==='pendente'?'Pendente (agendou, não compareceu)':dias==='17'?'17+ dias':dias+' dia(s)'}</td>
+      <td>${dias==='17'?'17+ dias':dias+' dia(s)'}</td>
       <td style="text-align:right">${d.agend} <button class="lupa" onclick="openRCModal(${i},'agend')">🔍</button></td>
       <td style="text-align:right" class="tm">${totalAgend>0?(d.agend/totalAgend*100).toFixed(1)+'%':'—'}</td>
       <td style="text-align:right">${d.comp} <button class="lupa" onclick="openRCModal(${i},'comp')">🔍</button></td>
       <td style="text-align:right" class="tm">${d.agend>0?(d.comp/d.agend*100).toFixed(1)+'%':'—'}</td>
-    </tr>`;}).join('');
+    </tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Nenhum agendamento com data de consulta sincronizada do Clinicorp neste período. Clique em "Atualizar datas de consulta (Clinicorp)" acima.</td></tr>';
 }
 function openRCModal(i,type){
   if(!window._rcData||!window._rcData[i]){alert('Clique em Filtrar primeiro.');return;}
