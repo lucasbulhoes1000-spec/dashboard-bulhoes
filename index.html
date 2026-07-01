@@ -461,6 +461,7 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
         <button onclick="exportarParaCloudia('clientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📤 Cloudia</button>
         <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button id="btn-proximos-contatos" onclick="toggleProximosContatos()" style="background:#7a5a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📅 Próximos contatos</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
@@ -3339,6 +3340,45 @@ function filtrarContatosDoDia(){
 }
 
 function clearClientesDates(){document.getElementById('clientes-from').value='';document.getElementById('clientes-to').value='';filterClientesTable();}
+let _proximosContatosAtivo=false;
+function toggleProximosContatos(){
+  _proximosContatosAtivo=!_proximosContatosAtivo;
+  const btn=document.getElementById('btn-proximos-contatos');
+  if(!_proximosContatosAtivo){
+    // Desativa — volta ao filtro normal
+    btn.style.background='#7a5a9a';
+    btn.textContent='📅 Próximos contatos';
+    filterClientesTable();
+    return;
+  }
+  // Ativa — filtra só quem tem próximo contato preenchido, ordena por data (mais próxima primeiro)
+  btn.style.background='#4a2a7a';
+  btn.textContent='📅 Próximos contatos ✓';
+  const hoje=localDateStr(new Date());
+  const comProximo=clientesData.filter(r=>{
+    const ph=String(r.phone||'').replace(/\D/g,'');
+    const d=ccDataLookup(ph);
+    const atv=d&&d.atividades&&d.atividades.length>0?d.atividades[0]:null;
+    return atv&&atv.proximo&&atv.proximo.trim()!=='';
+  });
+  // Ordena: vencidos (passado) depois de futuros, ambos por data crescente
+  comProximo.sort((a,b)=>{
+    const getProx=r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      const d=ccDataLookup(ph);
+      const atv=d&&d.atividades&&d.atividades.length>0?d.atividades[0]:null;
+      return atv&&atv.proximo?atv.proximo:'';
+    };
+    const pa=getProx(a),pb=getProx(b);
+    // Futuros/hoje primeiro, vencidos por último
+    const aVencido=pa<hoje,bVencido=pb<hoje;
+    if(aVencido&&!bVencido)return 1;
+    if(!aVencido&&bVencido)return -1;
+    return pa.localeCompare(pb);
+  });
+  document.getElementById('clientes-count').textContent=comProximo.length+' clientes com próx. contato';
+  _clientesFiltrados=comProximo;_clientesPage=1;renderClientesPage();
+}
 function filterClientesTable(){
   const q=(document.getElementById('clientes-search')||{}).value||'';
   const ql=q.toLowerCase();
