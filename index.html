@@ -1087,7 +1087,15 @@ tbody tr:hover td{background:#faf7f3;}
     <div style="padding:20px 22px 14px;border-bottom:1px solid #e0d9d0;background:#fff;flex-shrink:0;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <div>
-          <div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div id="cc-name" style="font-size:17px;font-weight:700;color:#2a2520;"></div>
+            <button onclick="editarNomeCard()" title="Editar nome" style="background:none;border:none;cursor:pointer;font-size:13px;color:#a0906a;padding:2px 4px;border-radius:4px;" id="btn-editar-nome">✏️</button>
+          </div>
+          <div id="cc-name-edit" style="display:none;margin-top:4px;">
+            <input id="cc-name-input" type="text" style="border:1.5px solid #A18B6C;border-radius:6px;padding:5px 10px;font-size:15px;font-weight:600;color:#2a2520;width:280px;outline:none;" onkeydown="if(event.key==='Enter')salvarNomeCard();if(event.key==='Escape')cancelarEditarNomeCard();">
+            <button onclick="salvarNomeCard()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:4px;">Salvar</button>
+            <button onclick="cancelarEditarNomeCard()" style="background:none;border:1px solid #ccc;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;margin-left:2px;">Cancelar</button>
+          </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
             <div id="cc-phone" style="font-size:12px;color:#8a7a6a;"></div>
             <a id="cc-whatsapp-btn" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
@@ -4190,6 +4198,7 @@ function openClienteCard(idx){
   const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
   document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
+  document.getElementById('cc-phone').dataset.phone=ph;
   const ccWaBtn=document.getElementById('cc-whatsapp-btn');
   if(ccWaBtn){
     const link=linkWhatsapp(r.phone);
@@ -6622,6 +6631,33 @@ function excluirLead(){
   renderLeadsTable();
 }
 
+function editarNomeCard(){
+  const nomeAtual=document.getElementById('cc-name').textContent||'';
+  document.getElementById('cc-name-input').value=nomeAtual==='—'?'':nomeAtual;
+  document.getElementById('cc-name').parentElement.style.display='none';
+  document.getElementById('cc-name-edit').style.display='flex';
+  document.getElementById('cc-name-input').focus();
+}
+function cancelarEditarNomeCard(){
+  document.getElementById('cc-name').parentElement.style.display='flex';
+  document.getElementById('cc-name-edit').style.display='none';
+}
+function salvarNomeCard(){
+  const ph=document.getElementById('cc-phone')&&document.getElementById('cc-phone').dataset&&document.getElementById('cc-phone').dataset.phone
+    || (window._ccCurrentPhone||'');
+  const novoNome=document.getElementById('cc-name-input').value.trim();
+  if(!novoNome){showToast('error','Nome inválido','O nome não pode ficar em branco.');return;}
+  if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
+  _ccData[ph].nomeAtual=novoNome;
+  document.getElementById('cc-name').textContent=novoNome;
+  cancelarEditarNomeCard();
+  salvarCCData();
+  // Atualiza nome também no allCloudiaRows e leadsData pra refletir imediatamente na tabela
+  allCloudiaRows.forEach(r=>{if(String(r.phone||'').replace(/\D/g,'')===ph)r._nomeEditado=novoNome;});
+  if(typeof renderLeadsTable==='function')renderLeadsTable();
+  if(typeof filterClientesTable==='function')filterClientesTable();
+  showToast('success','✅ Nome atualizado!','');
+}
 function excluirCliente(){
   const r=clientesData[_currentClienteIdx];if(!r)return;
   if(!confirm('Excluir o cliente "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
