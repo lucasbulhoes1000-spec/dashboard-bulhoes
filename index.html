@@ -421,6 +421,7 @@ tbody tr:hover td{background:#faf7f3;}
           <button onclick="setLeadsPerPage(0)" id="lpb-0" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">Todos</button>
         </span>
         <button onclick="exportTableXLS('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportarParaCloudia('leads')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📤 Cloudia</button>
         <button onclick="exportTableCSV('leads-tbody',['Nome','Data','Telefone','Origem','Status'],'leads')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarLead()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Lead</button>
         <button onclick="openImportarLeads()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
@@ -458,6 +459,7 @@ tbody tr:hover td{background:#faf7f3;}
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
         <button onclick="filtrarContatosDoDia()" style="background:#5a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">📞 Contatos do dia</button>
         <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportarParaCloudia('clientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📤 Cloudia</button>
         <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
@@ -532,6 +534,7 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="emdia">Em dia</option>
         </select>
         <span class="count-badge" id="pacientes-count"></span>
+        <button onclick="exportarParaCloudia('pacientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;margin-left:6px;">📤 Cloudia</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -5156,6 +5159,76 @@ function exportModalCSV(){const {headers,rows}=_modalExportData;if(!rows.length)
 function exportModalXLSX(){const {headers,rows}=_modalExportData;if(!rows.length)return;_downloadBlob(_buildXLS(headers,rows),document.getElementById('modal-title').textContent.replace(/[^a-zA-Z0-9]/g,'_')+'.xls','application/vnd.ms-excel');}
 function exportTableCSV(tbodyId,headersArr,filename){const tbody=document.getElementById(tbodyId);if(!tbody)return;const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));_downloadBlob('\uFEFF'+_buildCSV(headersArr,rows),filename+'.csv','text/csv;charset=utf-8;');}
 function exportTableXLS(tbodyId,headersArr,filename){const tbody=document.getElementById(tbodyId);if(!tbody)return;const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.innerText.trim()));_downloadBlob(_buildXLS(headersArr,rows),filename+'.xls','application/vnd.ms-excel');}
+
+// Exporta os dados filtrados da aba indicada no formato de importação da Cloudia:
+// CSV com cabeçalho "Nome,Email,Telefone,Cpf,DataNascimento,Etapa,Observação,Tags"
+// — telefone no formato DDD+número (sem DDI 55), pra colar direto no campo
+// "DDD + Telefone" da tela de importação da Cloudia.
+function exportarParaCloudia(aba) {
+  var linhas = [];
+  // Cabeçalho exato do modelo de importação da Cloudia
+  linhas.push('"Nome","Email","Telefone","Cpf","DataNascimento","Etapa","Observação","Tags"');
+
+  function normTelCloudia(tel) {
+    var d = String(tel||'').replace(/\D/g,'');
+    // Remove DDI 55 se presente (Cloudia quer DDD+número, não DDI)
+    if (d.startsWith('55') && (d.length === 12 || d.length === 13)) d = d.slice(2);
+    return d;
+  }
+
+  function linha(nome, tel) {
+    var n = String(nome||'').replace(/"/g,'""');
+    var t = normTelCloudia(tel);
+    if (!n || !t) return null;
+    return '"' + n + '","","' + t + '","","","","",""';
+  }
+
+  if (aba === 'leads') {
+    // Usa _leadsFiltered — já reflete os filtros ativos (status, origem, data, busca)
+    (_leadsFiltered||[]).forEach(function(r) {
+      var e = applyEdits(r);
+      var l = linha(e.name, e.phone);
+      if (l) linhas.push(l);
+    });
+  } else if (aba === 'clientes') {
+    // Usa _clientesFiltrados — já reflete os filtros ativos na aba de Clientes
+    (_clientesFiltrados||[]).forEach(function(r) {
+      var l = linha(r.name||r.nome, r.phone||r.telefone);
+      if (l) linhas.push(l);
+    });
+  } else if (aba === 'pacientes') {
+    // Lê direto da tbody de pacientes (já filtrada por categoria/status/busca)
+    var tbody = document.getElementById('pacientes-tbody');
+    if (tbody) {
+      [...tbody.querySelectorAll('tr')].forEach(function(tr) {
+        var tds = [...tr.querySelectorAll('td')];
+        if (tds.length < 1) return;
+        var nome = tds[0] ? tds[0].innerText.trim() : '';
+        // Telefone: busca no dataset ou no link de WhatsApp da linha
+        var telLink = tr.querySelector('a[href*="wa.me"]');
+        var tel = '';
+        if (telLink) {
+          var m = telLink.href.match(/wa\.me\/(\d+)/);
+          if (m) tel = m[1];
+        }
+        // Se não tem link WhatsApp, tenta pegar do dataset da linha
+        if (!tel && tr.dataset && tr.dataset.phone) tel = tr.dataset.phone;
+        var l = linha(nome, tel);
+        if (l) linhas.push(l);
+      });
+    }
+  }
+
+  if (linhas.length <= 1) {
+    showToast('error', 'Nenhum dado para exportar', 'Aplique os filtros desejados antes de exportar.');
+    return;
+  }
+
+  var csv = '\uFEFF' + linhas.join('\n'); // BOM pra Excel reconhecer UTF-8
+  var nomeArquivo = 'importacao-cloudia-' + aba + '-' + new Date().toISOString().slice(0,10) + '.csv';
+  _downloadBlob(csv, nomeArquivo, 'text/csv;charset=utf-8;');
+  showToast('success', '✅ Exportado!', (linhas.length - 1) + ' contatos exportados. Importe o arquivo na Cloudia.');
+}
 
 // ===== CRIAR LEAD =====
 function openCriarLead(){const today=new Date().toISOString().split('T')[0];const now=new Date().toTimeString().slice(0,5);document.getElementById('cl-data').value=today;document.getElementById('cl-hora').value=now;document.getElementById('cl-nome').value='';document.getElementById('cl-telefone').value='';document.getElementById('cl-origem').value='';document.getElementById('cl-status').value='Lead';document.getElementById('modal-criar-lead').style.display='flex';}
