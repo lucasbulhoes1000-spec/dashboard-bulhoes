@@ -4198,7 +4198,7 @@ function openClienteCard(idx){
   const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
   document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
-  document.getElementById('cc-phone').dataset.phone=ph;
+  document.getElementById('cc-phone').dataset.phone=ph_cc;
   const ccWaBtn=document.getElementById('cc-whatsapp-btn');
   if(ccWaBtn){
     const link=linkWhatsapp(r.phone);
