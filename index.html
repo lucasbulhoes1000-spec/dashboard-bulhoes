@@ -1042,8 +1042,16 @@ tbody tr:hover td{background:#faf7f3;}
         <input id="sai-produto-busca" type="text" autocomplete="off" placeholder="Digite para buscar..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="filtrarComboProduto('sai')" onfocus="abrirComboProduto('sai')">
         <div id="sai-produto-lista" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:180px;overflow-y:auto;z-index:50;"></div>
       </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade *</label>
-        <input id="sai-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
+      <div id="sai-modo-caixa-aviso" style="display:none;background:#f5f0ea;border-radius:8px;padding:8px 12px;font-size:12px;color:#7a6550;margin-bottom:10px;">📦 Este produto é vendido por caixa</div>
+      <div id="sai-campos-normais" style="margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade (unidades) *</label>
+        <input id="sai-qtd" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+      </div>
+      <div id="sai-campos-caixa" style="display:none;margin-bottom:11px;">
+        <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Número de caixas *</label>
+        <input id="sai-num-caixas" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewSaidaCaixa()">
+        <div id="sai-preview-caixa" style="display:none;margin-top:6px;font-size:12px;color:#5a8a6a;background:#f0f7f0;border-radius:6px;padding:6px 10px;"></div>
+      </div>
       <div id="sai-saldo-info" style="font-size:11px;color:#9a8c7e;margin-bottom:14px;"></div>
       <div style="display:flex;gap:10px;">
         <button onclick="salvarSaidaEstoque()" style="background:#a85a4a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Registrar</button>
@@ -1051,6 +1059,8 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
     </div>
   </div>
+
+  <!-- Modal editar nome produto removido — usa modal-cadastrar-produto com nome habilitado -->
 
 
 
@@ -5731,9 +5741,7 @@ function selecionarComboProduto(prefixo,nome){
   document.getElementById(prefixo+'-produto-busca').value=nome;
   document.getElementById(prefixo+'-produto-lista').style.display='none';
   if(prefixo==='sai'){
-    const info=document.getElementById('sai-saldo-info');
-    const item=calcularEstoque().find(d=>d.nome===nome);
-    if(info)info.textContent=item?`Saldo atual: ${item.saldo} unidade(s)`:'';
+    onSelecionarProdutoSaida(nome);
   }
   if(prefixo==='ent'){
     const p=_estoqueProdutos[nome];
@@ -5885,7 +5893,7 @@ function editarProduto(nome){
   document.getElementById('prod-modal-title').textContent='✎ Editar Produto';
   document.getElementById('prod-nome-original').value=nome;
   document.getElementById('prod-nome').value=p.nome;
-  document.getElementById('prod-nome').disabled=true;
+  document.getElementById('prod-nome').disabled=false;
   document.getElementById('prod-tag').value=p.tag||'';
   document.getElementById('prod-minimo').value=p.minimo;
   document.getElementById('prod-maximo').value=p.maximo;
@@ -5925,7 +5933,12 @@ function salvarProduto(){
 
   _estoqueProdutos[nome]={nome,tag,minimo,maximo,preco,unidPorCaixa};
 
-  if(!nomeOriginal&&qtdInicial>0){
+  if(nomeOriginal&&nomeOriginal!==nome){
+    // Renomeação: remove entrada antiga e atualiza histórico de movimentos
+    delete _estoqueProdutos[nomeOriginal];
+    _estoqueMovs.forEach(m=>{if(m.nome===nomeOriginal)m.nome=nome;});
+  } else if(!nomeOriginal&&qtdInicial>0){
+    // Novo produto com estoque inicial
     _estoqueMovs.push({nome,tipo:'entrada',qtd:qtdInicial,valor:qtdInicial*preco,data:new Date().toISOString()});
   }
 
@@ -6003,22 +6016,69 @@ function openSaidaEstoque(){
   document.getElementById('sai-produto-busca').value='';
   document.getElementById('sai-produto-lista').style.display='none';
   document.getElementById('sai-qtd').value='';
+  document.getElementById('sai-num-caixas').value='';
   document.getElementById('sai-saldo-info').textContent='';
+  document.getElementById('sai-modo-caixa-aviso').style.display='none';
+  document.getElementById('sai-campos-normais').style.display='block';
+  document.getElementById('sai-campos-caixa').style.display='none';
+  document.getElementById('sai-preview-caixa').style.display='none';
   document.getElementById('modal-saida-estoque').style.display='flex';
+}
+
+// Chamada quando produto é selecionado no combo de saída — mostra campos certos
+function onSelecionarProdutoSaida(nome){
+  const p=_estoqueProdutos[nome];
+  if(!p)return;
+  const vemCaixa=p.unidPorCaixa>0;
+  document.getElementById('sai-modo-caixa-aviso').style.display=vemCaixa?'block':'none';
+  document.getElementById('sai-campos-normais').style.display=vemCaixa?'none':'block';
+  document.getElementById('sai-campos-caixa').style.display=vemCaixa?'block':'none';
+  document.getElementById('sai-preview-caixa').style.display='none';
+  // Saldo info
+  const saldo=calcularEstoque().find(d=>d.nome===nome)?.saldo||0;
+  const unidStr=vemCaixa?`${saldo} unid. (${Math.floor(saldo/p.unidPorCaixa)} cx. de ${p.unidPorCaixa} unid.)`:`${saldo} unid.`;
+  document.getElementById('sai-saldo-info').textContent='Saldo atual: '+unidStr;
+}
+
+function atualizarPreviewSaidaCaixa(){
+  const nome=document.getElementById('sai-produto').value;
+  if(!nome||!_estoqueProdutos[nome])return;
+  const p=_estoqueProdutos[nome];
+  const numCaixas=Number(document.getElementById('sai-num-caixas').value)||0;
+  const prev=document.getElementById('sai-preview-caixa');
+  if(numCaixas>0&&p.unidPorCaixa>0){
+    const totalUnid=numCaixas*p.unidPorCaixa;
+    prev.textContent=`= ${totalUnid} unidades saindo`;
+    prev.style.display='block';
+  } else {
+    prev.style.display='none';
+  }
 }
 
 function salvarSaidaEstoque(){
   const nome=document.getElementById('sai-produto').value;
-  const qtd=Number(document.getElementById('sai-qtd').value)||0;
   if(!nome||!_estoqueProdutos[nome]){alert('Selecione um produto válido na lista.');return;}
-  if(qtd<=0){alert('Informe uma quantidade válida.');return;}
   const p=_estoqueProdutos[nome];
-  const valor=qtd*(Number(p?.preco)||0);
+  const vemCaixa=p.unidPorCaixa>0;
+
+  let qtd,valor;
+  if(vemCaixa){
+    const numCaixas=Number(document.getElementById('sai-num-caixas').value)||0;
+    if(numCaixas<=0){alert('Informe quantas caixas estão saindo.');return;}
+    qtd=numCaixas*p.unidPorCaixa;
+    valor=qtd*(Number(p.preco)||0);
+  } else {
+    qtd=Number(document.getElementById('sai-qtd').value)||0;
+    if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+    valor=qtd*(Number(p?.preco)||0);
+  }
+
   _estoqueMovs.push({nome,tipo:'saida',qtd,valor,data:new Date().toISOString()});
   document.getElementById('modal-saida-estoque').style.display='none';
   renderEstoqueTable();
   salvarEstoqueDebounced();
 }
+
 // ===== FIM MÓDULO ESTOQUE =====
 
 
