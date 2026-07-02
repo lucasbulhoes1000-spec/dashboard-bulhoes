@@ -562,8 +562,8 @@ tbody tr:hover td{background:#faf7f3;}
           <input id="fluxo-add-data" type="date" style="width:200px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
         </div>
         <div style="margin-bottom:16px;">
-          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:8px;font-weight:600;">Planejamento de tratamento</label>
-          <div style="font-size:11px;color:#9a8c7e;margin-bottom:8px;">Selecione os procedimentos e edite as subetapas se necessário:</div>
+          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:8px;font-weight:600;">Procedimentos do planejamento</label>
+          <div style="font-size:11px;color:#9a8c7e;margin-bottom:8px;">Selecione os procedimentos realizados neste paciente. As subetapas vêm do modelo mas podem ser editadas:</div>
           <div id="fluxo-add-procedimentos"></div>
           <button onclick="adicionarProcedimentoCustom()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;margin-top:8px;">+ Procedimento personalizado</button>
         </div>
@@ -6327,10 +6327,15 @@ function renderFluxoAddProcedimentos() {
   // Seletor de modelo
   if (modelosDisponiveis.length > 0) {
     html += `
-    <select onchange="adicionarProcDeModelo(this.value);this.value=''" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:7px 10px;font-size:12px;background:#fff;outline:none;margin-bottom:4px;color:#5a4a3a;">
-      <option value="">+ Adicionar procedimento do modelo...</option>
-      ${modelosDisponiveis.map(m => `<option value="${m}">${m}</option>`).join('')}
-    </select>`;
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;">
+      <select id="fluxo-proc-select" style="flex:1;border:1px solid #A18B6C;border-radius:8px;padding:7px 10px;font-size:12px;background:#fff;outline:none;color:#2a2520;">
+        <option value="">Selecionar procedimento...</option>
+        ${modelosDisponiveis.map(m => `<option value="${m}">${m}</option>`).join('')}
+      </select>
+      <button onclick="adicionarProcDeModelo(document.getElementById('fluxo-proc-select').value)" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600;">+ Adicionar</button>
+    </div>`;
+  } else if (_fluxoAddProcedimentos.length === 0) {
+    html += `<div style="font-size:12px;color:#b5a898;padding:10px;background:#faf8f6;border-radius:8px;text-align:center;">Nenhum modelo cadastrado ainda.<br>Use "Personalizado" abaixo ou crie modelos em ⚙️ Modelos de Procedimentos.</div>`;
   }
 
   container.innerHTML = html;
