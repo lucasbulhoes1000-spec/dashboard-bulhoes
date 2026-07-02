@@ -508,70 +508,66 @@ tbody tr:hover td{background:#faf7f3;}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
         <div>
           <div style="font-size:18px;font-weight:700;color:#2a2520;">🔄 Fluxo de Tratamento</div>
-          <div style="font-size:12px;color:#9a8c7e;margin-top:2px;">Controle de etapas por paciente</div>
+          <div style="font-size:12px;color:#9a8c7e;margin-top:2px;">Planejamento individual por paciente</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="abrirModalModelos()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;">⚙️ Modelos de Etapas</button>
-          <button onclick="abrirAdicionarFluxo()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Adicionar Paciente</button>
+          <button onclick="abrirModalModelos()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;">⚙️ Modelos de Procedimentos</button>
+          <button onclick="abrirAdicionarFluxo()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente</button>
         </div>
       </div>
-
-      <!-- Filtros -->
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
         <input type="text" id="fluxo-search" placeholder="Buscar por nome..." oninput="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
-        <select id="fluxo-tipo-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
-          <option value="">Todos os tratamentos</option>
-        </select>
         <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
           <option value="">Todos os status</option>
           <option value="em_andamento">Em andamento</option>
           <option value="concluido">Concluído</option>
         </select>
-        <span id="fluxo-count" style="font-size:12px;color:#9a8c7e;margin-left:4px;"></span>
+        <span id="fluxo-count" style="font-size:12px;color:#9a8c7e;"></span>
       </div>
-
-      <!-- Cards -->
-      <div id="fluxo-cards" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <div id="fluxo-cards" style="display:flex;flex-direction:column;gap:14px;"></div>
     </div>
 
-    <!-- Modal: Modelos de Etapas -->
+    <!-- Modal: Modelos de Procedimentos -->
     <div id="modal-fluxo-modelos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:900;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:14px;width:560px;max-width:96vw;max-height:88vh;overflow-y:auto;padding:28px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+      <div style="background:#fff;border-radius:14px;width:540px;max-width:96vw;max-height:88vh;overflow-y:auto;padding:28px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <div style="font-size:16px;font-weight:700;color:#2a2520;">⚙️ Modelos de Etapas</div>
+          <div style="font-size:16px;font-weight:700;color:#2a2520;">⚙️ Modelos de Procedimentos</div>
           <button onclick="document.getElementById('modal-fluxo-modelos').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
         </div>
+        <div style="font-size:12px;color:#9a8c7e;margin-bottom:14px;">Defina os procedimentos e suas subetapas padrão. Ao adicionar um paciente, você pode editar as subetapas de cada procedimento individualmente.</div>
         <div id="fluxo-modelos-lista"></div>
-        <button onclick="adicionarModeloTratamento()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;margin-top:14px;">+ Novo tipo de tratamento</button>
+        <button onclick="adicionarModeloProcedimento()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;margin-top:14px;">+ Novo procedimento</button>
       </div>
     </div>
 
     <!-- Modal: Adicionar paciente ao fluxo -->
-    <div id="modal-adicionar-fluxo" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:900;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:14px;width:420px;max-width:96vw;padding:28px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+    <div id="modal-adicionar-fluxo" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:900;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;">
+      <div style="background:#fff;border-radius:14px;width:560px;max-width:96vw;padding:28px;box-shadow:0 8px 40px rgba(0,0,0,.18);margin:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <div style="font-size:16px;font-weight:700;color:#2a2520;">+ Adicionar ao Fluxo</div>
+          <div style="font-size:16px;font-weight:700;color:#2a2520;">+ Novo Paciente no Fluxo</div>
           <button onclick="document.getElementById('modal-adicionar-fluxo').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:20px;color:#8a7a6a;">✕</button>
         </div>
-        <div style="margin-bottom:14px;">
-          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Nome do paciente *</label>
-          <input id="fluxo-add-nome" type="text" placeholder="Nome completo..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div>
+            <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Nome do paciente *</label>
+            <input id="fluxo-add-nome" type="text" placeholder="Nome completo..." style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Telefone</label>
+            <input id="fluxo-add-tel" type="text" placeholder="(13) 99999-9999" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          </div>
         </div>
-        <div style="margin-bottom:14px;">
-          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Telefone</label>
-          <input id="fluxo-add-tel" type="text" placeholder="(13) 99999-9999" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
-        </div>
-        <div style="margin-bottom:14px;">
-          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Tipo de tratamento *</label>
-          <select id="fluxo-add-tipo" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#fff;">
-            <option value="">Selecione...</option>
-          </select>
-        </div>
-        <div style="margin-bottom:18px;">
+        <div style="margin-bottom:16px;">
           <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:4px;">Data de início</label>
-          <input id="fluxo-add-data" type="date" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
+          <input id="fluxo-add-data" type="date" style="width:200px;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;">
         </div>
-        <div style="display:flex;gap:10px;">
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:8px;font-weight:600;">Planejamento de tratamento</label>
+          <div style="font-size:11px;color:#9a8c7e;margin-bottom:8px;">Selecione os procedimentos e edite as subetapas se necessário:</div>
+          <div id="fluxo-add-procedimentos"></div>
+          <button onclick="adicionarProcedimentoCustom()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;margin-top:8px;">+ Procedimento personalizado</button>
+        </div>
+        <div style="display:flex;gap:10px;padding-top:12px;border-top:1px solid #f0ebe4;">
           <button onclick="confirmarAdicionarFluxo()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Adicionar</button>
           <button onclick="document.getElementById('modal-adicionar-fluxo').style.display='none'" style="background:#e8e2da;color:#2a2520;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;">Cancelar</button>
         </div>
@@ -6162,8 +6158,9 @@ function salvarSaidaEstoque(){
 
 
 // ===== FLUXO DE TRATAMENTO =====
-// Estrutura: _fluxoModelos = { "Lentes em Resina": ["Avaliação","Moldagem","Instalação","Revisão"], ... }
-//            _fluxoPacientes = [ { id, nome, tel, tipo, dataInicio, etapas: [{nome, ok, data}], concluido }, ... ]
+// _fluxoModelos: { "Lentes em Resina": ["Moldagem","Instalação","Revisão 30 dias"], ... }
+// _fluxoPacientes: [{ id, nome, tel, dataInicio, concluido,
+//   procedimentos: [{ nome, subetapas: [{nome, ok, data}] }] }, ...]
 
 let _fluxoModelos = {};
 let _fluxoPacientes = [];
@@ -6173,7 +6170,6 @@ async function initFluxoTratamento() {
   if (_fluxoIniciado) { renderFluxoCards(); return; }
   _fluxoIniciado = true;
   try {
-    // Carrega via GET do Apps Script, que retorna o fluxo_json salvo no Google Sheets
     const resp = await fetch(CLOUDIA_URL + '?action=loadFluxo');
     if (resp.ok) {
       const data = await resp.json();
@@ -6181,107 +6177,98 @@ async function initFluxoTratamento() {
       _fluxoPacientes = data.pacientes || [];
     }
   } catch(e) { console.warn('[FLUXO] Erro ao carregar:', e); }
-  populateFluxoSelects();
   renderFluxoCards();
 }
 
 async function salvarFluxoRemoto() {
   try {
-    // Salva junto com o _ccData existente, usando a mesma chave compartilhada da clínica
-    // num campo separado dentro do mesmo registro do Supabase — via Apps Script (saveCRM),
-    // que tem a SERVICE_KEY com permissão de escrita, diferente da SUPABASE_KEY pública.
-    const payload = { action: 'saveFluxo', data: { modelos: _fluxoModelos, pacientes: _fluxoPacientes } };
-    await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+    await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveFluxo', data: { modelos: _fluxoModelos, pacientes: _fluxoPacientes } }) });
   } catch(e) { console.warn('[FLUXO] Erro ao salvar:', e); }
 }
 
-// Adiciona paciente automaticamente quando orçamento é aprovado
-function fluxoOnOrcamentoAprovado(nome, tel, tipoTratamento) {
-  if (!tipoTratamento || !_fluxoModelos[tipoTratamento]) return;
-  const jaExiste = _fluxoPacientes.find(p => p.nome === nome && p.tipo === tipoTratamento && !p.concluido);
-  if (jaExiste) return;
-  const etapas = _fluxoModelos[tipoTratamento].map(e => ({ nome: e, ok: false, data: null }));
-  _fluxoPacientes.push({ id: Date.now().toString(), nome, tel: tel || '', tipo: tipoTratamento, dataInicio: new Date().toISOString().slice(0, 10), etapas, concluido: false });
-  salvarFluxoRemoto();
-}
-
-function populateFluxoSelects() {
-  const tipos = Object.keys(_fluxoModelos);
-  ['fluxo-tipo-filter', 'fluxo-add-tipo'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const isFilter = id.includes('filter');
-    el.innerHTML = (isFilter ? '<option value="">Todos os tratamentos</option>' : '<option value="">Selecione...</option>') + tipos.map(t => `<option value="${t}">${t}</option>`).join('');
-  });
-}
-
+// ---- Render cards ----
 function renderFluxoCards() {
   const busca = (document.getElementById('fluxo-search')?.value || '').toLowerCase();
-  const tipoFil = document.getElementById('fluxo-tipo-filter')?.value || '';
   const statusFil = document.getElementById('fluxo-status-filter')?.value || '';
   const filtrados = _fluxoPacientes.filter(p => {
     if (busca && !p.nome.toLowerCase().includes(busca)) return false;
-    if (tipoFil && p.tipo !== tipoFil) return false;
     if (statusFil === 'em_andamento' && p.concluido) return false;
     if (statusFil === 'concluido' && !p.concluido) return false;
     return true;
   }).sort((a, b) => (a.concluido ? 1 : 0) - (b.concluido ? 1 : 0) || a.dataInicio.localeCompare(b.dataInicio));
 
   document.getElementById('fluxo-count').textContent = filtrados.length + ' paciente(s)';
-
   const container = document.getElementById('fluxo-cards');
+
   if (!filtrados.length) {
-    container.innerHTML = '<div style="text-align:center;color:#b5a898;padding:40px;font-size:13px;">Nenhum paciente no fluxo. Clique em "+ Adicionar Paciente" para começar.</div>';
+    container.innerHTML = '<div style="text-align:center;color:#b5a898;padding:40px;font-size:13px;">Nenhum paciente no fluxo ainda.<br>Clique em "+ Novo Paciente" para começar.</div>';
     return;
   }
 
   container.innerHTML = filtrados.map(p => {
-    const idx = _fluxoPacientes.indexOf(p);
-    const total = p.etapas.length;
-    const feitas = p.etapas.filter(e => e.ok).length;
-    const pct = total > 0 ? Math.round(feitas / total * 100) : 0;
-    const corBarra = p.concluido ? '#5a8a6a' : '#A18B6C';
+    const pIdx = _fluxoPacientes.indexOf(p);
+    const totalSubs = p.procedimentos.reduce((s, pr) => s + pr.subetapas.length, 0);
+    const feitasSubs = p.procedimentos.reduce((s, pr) => s + pr.subetapas.filter(e => e.ok).length, 0);
+    const pct = totalSubs > 0 ? Math.round(feitasSubs / totalSubs * 100) : 0;
 
-    const etapasHtml = p.etapas.map((e, ei) => `
-      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${e.ok ? '#f0f7f0' : '#faf8f6'};border-radius:8px;border:1px solid ${e.ok ? '#b8dfc0' : '#ede8e3'};">
-        <input type="checkbox" ${e.ok ? 'checked' : ''} onchange="toggleEtapaFluxo(${idx},${ei},this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:#5a8a6a;">
-        <div style="flex:1;">
-          <div style="font-size:12px;font-weight:${e.ok ? '600' : '400'};color:${e.ok ? '#2a5a3a' : '#4a3a2a'};${e.ok ? 'text-decoration:line-through;' : ''}">${e.nome}</div>
-          ${e.ok && e.data ? `<div style="font-size:10px;color:#7a9a7a;">✓ ${new Date(e.data+'T12:00').toLocaleDateString('pt-BR')}</div>` : ''}
-        </div>
-      </div>`).join('');
+    const procsHtml = p.procedimentos.map((proc, prIdx) => {
+      const feitasProc = proc.subetapas.filter(e => e.ok).length;
+      const totalProc = proc.subetapas.length;
+      const procConcluido = feitasProc === totalProc && totalProc > 0;
+
+      const subetapasHtml = proc.subetapas.map((sub, subIdx) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${sub.ok ? '#f0f7f0' : '#fdfcfb'};border-radius:6px;border:1px solid ${sub.ok ? '#c8e6c8' : '#f0ebe4'};">
+          <input type="checkbox" ${sub.ok ? 'checked' : ''} onchange="toggleSubetapaFluxo(${pIdx},${prIdx},${subIdx},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#5a8a6a;flex-shrink:0;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;color:${sub.ok ? '#2a5a3a' : '#4a3a2a'};${sub.ok ? 'text-decoration:line-through;' : ''}">${sub.nome}</div>
+            ${sub.ok && sub.data ? `<div style="font-size:10px;color:#7a9a7a;">✓ ${new Date(sub.data+'T12:00').toLocaleDateString('pt-BR')}</div>` : ''}
+          </div>
+        </div>`).join('');
+
+      return `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${procConcluido ? '#5a8a6a' : '#A18B6C'};flex-shrink:0;"></div>
+            <span style="font-size:13px;font-weight:600;color:#2a2520;">${proc.nome}</span>
+            <span style="font-size:11px;color:#9a8c7e;margin-left:auto;">${feitasProc}/${totalProc}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:5px;padding-left:14px;">${subetapasHtml}</div>
+        </div>`;
+    }).join('');
 
     return `
     <div style="background:#fff;border-radius:12px;border:1px solid ${p.concluido ? '#b8dfc0' : '#e8e2da'};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px;">
         <div>
           <div style="font-size:15px;font-weight:700;color:#2a2520;">${p.nome}</div>
           <div style="font-size:12px;color:#9a8c7e;margin-top:2px;">
-            ${p.tipo} · Início: ${p.dataInicio ? new Date(p.dataInicio+'T12:00').toLocaleDateString('pt-BR') : '—'}
+            Início: ${p.dataInicio ? new Date(p.dataInicio+'T12:00').toLocaleDateString('pt-BR') : '—'}
             ${p.tel ? ` · <a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="color:#5a8a6a;text-decoration:none;">📱 WhatsApp</a>` : ''}
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
-          ${!p.concluido ? `<button onclick="concluirFluxoPaciente(${idx})" title="Marcar como concluído" style="background:#f0f7f0;border:1px solid #b8dfc0;border-radius:6px;color:#2a5a3a;font-size:11px;padding:4px 10px;cursor:pointer;">✓ Concluir</button>` : `<span style="background:#dcfce7;color:#166534;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>`}
-          <button onclick="removerFluxoPaciente(${idx})" title="Remover" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:4px 10px;cursor:pointer;">✕</button>
+          ${!p.concluido
+            ? `<button onclick="concluirFluxoPaciente(${pIdx})" style="background:#f0f7f0;border:1px solid #b8dfc0;border-radius:6px;color:#2a5a3a;font-size:11px;padding:4px 10px;cursor:pointer;">✓ Concluir</button>`
+            : `<span style="background:#dcfce7;color:#166534;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>`}
+          <button onclick="removerFluxoPaciente(${pIdx})" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:4px 10px;cursor:pointer;">✕</button>
         </div>
       </div>
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9a8c7e;margin-bottom:4px;"><span>${feitas} de ${total} etapas</span><span>${pct}%</span></div>
-        <div style="height:5px;background:#f0ebe4;border-radius:3px;"><div style="height:100%;width:${pct}%;background:${corBarra};border-radius:3px;transition:width .3s;"></div></div>
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9a8c7e;margin-bottom:4px;"><span>${feitasSubs}/${totalSubs} subetapas concluídas</span><span>${pct}%</span></div>
+        <div style="height:5px;background:#f0ebe4;border-radius:3px;"><div style="height:100%;width:${pct}%;background:${p.concluido ? '#5a8a6a' : '#A18B6C'};border-radius:3px;transition:width .3s;"></div></div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;">${etapasHtml}</div>
+      ${procsHtml}
     </div>`;
   }).join('');
 }
 
-function toggleEtapaFluxo(pIdx, eIdx, checked) {
+function toggleSubetapaFluxo(pIdx, prIdx, subIdx, checked) {
   const p = _fluxoPacientes[pIdx];
   if (!p) return;
-  p.etapas[eIdx].ok = checked;
-  p.etapas[eIdx].data = checked ? new Date().toISOString().slice(0, 10) : null;
-  // Auto-concluir se todas as etapas estiverem feitas
-  if (p.etapas.every(e => e.ok)) p.concluido = true;
+  p.procedimentos[prIdx].subetapas[subIdx].ok = checked;
+  p.procedimentos[prIdx].subetapas[subIdx].data = checked ? new Date().toISOString().slice(0, 10) : null;
+  if (p.procedimentos.every(pr => pr.subetapas.every(s => s.ok))) p.concluido = true;
   salvarFluxoRemoto();
   renderFluxoCards();
 }
@@ -6299,32 +6286,102 @@ function removerFluxoPaciente(idx) {
   renderFluxoCards();
 }
 
-// ---- Adicionar paciente manualmente ----
+// ---- Modal adicionar paciente ----
+let _fluxoAddProcedimentos = []; // estado temporário do modal
+
 function abrirAdicionarFluxo() {
-  populateFluxoSelects();
+  _fluxoAddProcedimentos = [];
   document.getElementById('fluxo-add-nome').value = '';
   document.getElementById('fluxo-add-tel').value = '';
-  document.getElementById('fluxo-add-tipo').value = '';
   document.getElementById('fluxo-add-data').value = new Date().toISOString().slice(0, 10);
+  renderFluxoAddProcedimentos();
   document.getElementById('modal-adicionar-fluxo').style.display = 'flex';
+}
+
+function renderFluxoAddProcedimentos() {
+  const container = document.getElementById('fluxo-add-procedimentos');
+  const modelosDisponiveis = Object.keys(_fluxoModelos).filter(m => !_fluxoAddProcedimentos.find(p => p.nome === m));
+
+  let html = '';
+
+  // Procedimentos já adicionados
+  _fluxoAddProcedimentos.forEach((proc, pi) => {
+    html += `
+    <div style="background:#faf8f6;border-radius:10px;border:1px solid #e8e2da;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <input value="${proc.nome}" oninput="_fluxoAddProcedimentos[${pi}].nome=this.value" style="flex:1;font-size:13px;font-weight:600;color:#2a2520;border:none;border-bottom:1px solid #e0d9d0;background:transparent;outline:none;padding:2px 0;">
+        <button onclick="removerProcAddFluxo(${pi})" style="background:none;border:none;color:#b5a898;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div style="padding-left:4px;">
+        ${proc.subetapas.map((sub, si) => `
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+            <span style="color:#9a8c7e;font-size:11px;min-width:16px;">${si+1}.</span>
+            <input value="${sub.nome}" oninput="_fluxoAddProcedimentos[${pi}].subetapas[${si}].nome=this.value" style="flex:1;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;outline:none;">
+            <button onclick="removerSubAddFluxo(${pi},${si})" style="background:none;border:none;color:#c5b9b0;cursor:pointer;font-size:14px;">✕</button>
+          </div>`).join('')}
+        <button onclick="adicionarSubAddFluxo(${pi})" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:#7a6550;margin-top:4px;">+ subetapa</button>
+      </div>
+    </div>`;
+  });
+
+  // Seletor de modelo
+  if (modelosDisponiveis.length > 0) {
+    html += `
+    <select onchange="adicionarProcDeModelo(this.value);this.value=''" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:7px 10px;font-size:12px;background:#fff;outline:none;margin-bottom:4px;color:#5a4a3a;">
+      <option value="">+ Adicionar procedimento do modelo...</option>
+      ${modelosDisponiveis.map(m => `<option value="${m}">${m}</option>`).join('')}
+    </select>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function adicionarProcDeModelo(nome) {
+  if (!nome) return;
+  const subetapas = (_fluxoModelos[nome] || []).map(s => ({ nome: s, ok: false, data: null }));
+  _fluxoAddProcedimentos.push({ nome, subetapas });
+  renderFluxoAddProcedimentos();
+}
+
+function adicionarProcedimentoCustom() {
+  _fluxoAddProcedimentos.push({ nome: 'Novo procedimento', subetapas: [{ nome: 'Etapa 1', ok: false, data: null }] });
+  renderFluxoAddProcedimentos();
+}
+
+function removerProcAddFluxo(pi) {
+  _fluxoAddProcedimentos.splice(pi, 1);
+  renderFluxoAddProcedimentos();
+}
+
+function adicionarSubAddFluxo(pi) {
+  _fluxoAddProcedimentos[pi].subetapas.push({ nome: 'Nova subetapa', ok: false, data: null });
+  renderFluxoAddProcedimentos();
+}
+
+function removerSubAddFluxo(pi, si) {
+  _fluxoAddProcedimentos[pi].subetapas.splice(si, 1);
+  renderFluxoAddProcedimentos();
 }
 
 function confirmarAdicionarFluxo() {
   const nome = document.getElementById('fluxo-add-nome').value.trim();
   const tel = document.getElementById('fluxo-add-tel').value.trim();
-  const tipo = document.getElementById('fluxo-add-tipo').value;
   const data = document.getElementById('fluxo-add-data').value;
   if (!nome) { alert('Informe o nome do paciente.'); return; }
-  if (!tipo || !_fluxoModelos[tipo]) { alert('Selecione um tipo de tratamento válido.'); return; }
-  const etapas = _fluxoModelos[tipo].map(e => ({ nome: e, ok: false, data: null }));
-  _fluxoPacientes.push({ id: Date.now().toString(), nome, tel, tipo, dataInicio: data || new Date().toISOString().slice(0, 10), etapas, concluido: false });
+  if (!_fluxoAddProcedimentos.length) { alert('Adicione pelo menos um procedimento ao planejamento.'); return; }
+  _fluxoPacientes.push({
+    id: Date.now().toString(), nome, tel,
+    dataInicio: data || new Date().toISOString().slice(0, 10),
+    procedimentos: JSON.parse(JSON.stringify(_fluxoAddProcedimentos)),
+    concluido: false
+  });
   document.getElementById('modal-adicionar-fluxo').style.display = 'none';
   salvarFluxoRemoto();
   renderFluxoCards();
   showToast('success', '✅ Paciente adicionado!', '');
 }
 
-// ---- Modelos de etapas ----
+// ---- Modelos de procedimentos ----
 function abrirModalModelos() {
   renderModelosList();
   document.getElementById('modal-fluxo-modelos').style.display = 'flex';
@@ -6334,74 +6391,66 @@ function renderModelosList() {
   const lista = document.getElementById('fluxo-modelos-lista');
   const tipos = Object.keys(_fluxoModelos);
   if (!tipos.length) {
-    lista.innerHTML = '<div style="color:#9a8c7e;font-size:13px;margin-bottom:14px;">Nenhum modelo cadastrado ainda. Clique em "+ Novo tipo de tratamento" para começar.</div>';
+    lista.innerHTML = '<div style="color:#9a8c7e;font-size:13px;margin-bottom:14px;">Nenhum procedimento cadastrado ainda.</div>';
     return;
   }
   lista.innerHTML = tipos.map((tipo, ti) => `
-    <div style="background:#faf8f6;border-radius:10px;border:1px solid #e8e2da;padding:14px 16px;margin-bottom:12px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <input value="${tipo}" onblur="renomearModeloTratamento(${ti},this.value)" style="font-size:14px;font-weight:700;color:#2a2520;border:none;background:transparent;outline:none;flex:1;" title="Clique para editar o nome">
-        <button onclick="removerModeloTratamento(${ti})" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:4px 10px;cursor:pointer;margin-left:8px;">Remover</button>
+    <div style="background:#faf8f6;border-radius:10px;border:1px solid #e8e2da;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <input value="${tipo}" onblur="renomearModeloProcedimento(${ti},this.value)" style="font-size:14px;font-weight:700;color:#2a2520;border:none;background:transparent;outline:none;flex:1;" title="Clique para editar o nome">
+        <button onclick="removerModeloProcedimento(${ti})" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:4px 10px;cursor:pointer;margin-left:8px;">Remover</button>
       </div>
-      <div id="etapas-lista-${ti}">
-        ${_fluxoModelos[tipo].map((etapa, ei) => `
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span style="color:#9a8c7e;font-size:11px;min-width:18px;">${ei+1}.</span>
-            <input value="${etapa}" onblur="editarEtapaModelo('${tipo}',${ei},this.value)" style="flex:1;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;outline:none;">
-            <button onclick="removerEtapaModelo('${tipo}',${ei})" style="background:none;border:none;color:#b5a898;cursor:pointer;font-size:14px;padding:2px 4px;" title="Remover etapa">✕</button>
-          </div>`).join('')}
-      </div>
-      <button onclick="adicionarEtapaModelo('${tipo}')" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;color:#5a4a3a;margin-top:4px;">+ Etapa</button>
+      ${_fluxoModelos[tipo].map((sub, si) => `
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+          <span style="color:#9a8c7e;font-size:11px;min-width:18px;">${si+1}.</span>
+          <input value="${sub}" onblur="editarSubModelo('${tipo}',${si},this.value)" style="flex:1;border:1px solid #e0d9d0;border-radius:6px;padding:5px 8px;font-size:12px;background:#fff;outline:none;">
+          <button onclick="removerSubModelo('${tipo}',${si})" style="background:none;border:none;color:#c5b9b0;cursor:pointer;font-size:14px;">✕</button>
+        </div>`).join('')}
+      <button onclick="adicionarSubModelo('${tipo}')" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;padding:5px 12px;font-size:11px;cursor:pointer;color:#5a4a3a;margin-top:4px;">+ subetapa</button>
     </div>`).join('');
 }
 
-function adicionarModeloTratamento() {
-  const nome = prompt('Nome do tipo de tratamento (ex: Lentes em Resina):');
+function adicionarModeloProcedimento() {
+  const nome = prompt('Nome do procedimento (ex: Lentes em Resina):');
   if (!nome || !nome.trim()) return;
-  if (_fluxoModelos[nome.trim()]) { alert('Já existe um modelo com esse nome.'); return; }
-  _fluxoModelos[nome.trim()] = ['Avaliação'];
-  populateFluxoSelects();
+  if (_fluxoModelos[nome.trim()]) { alert('Já existe um procedimento com esse nome.'); return; }
+  _fluxoModelos[nome.trim()] = ['Etapa 1'];
   salvarFluxoRemoto();
   renderModelosList();
 }
 
-function renomearModeloTratamento(tiIdx, novoNome) {
+function renomearModeloProcedimento(ti, novoNome) {
   const tipos = Object.keys(_fluxoModelos);
-  const nomeAntigo = tipos[tiIdx];
+  const nomeAntigo = tipos[ti];
   if (!novoNome.trim() || novoNome === nomeAntigo) return;
-  if (_fluxoModelos[novoNome]) { alert('Já existe um modelo com esse nome.'); return; }
+  if (_fluxoModelos[novoNome]) { alert('Já existe um procedimento com esse nome.'); return; }
   _fluxoModelos[novoNome] = _fluxoModelos[nomeAntigo];
   delete _fluxoModelos[nomeAntigo];
-  // Atualiza pacientes que usavam esse tipo
-  _fluxoPacientes.forEach(p => { if (p.tipo === nomeAntigo) p.tipo = novoNome; });
-  populateFluxoSelects();
   salvarFluxoRemoto();
   renderModelosList();
 }
 
-function removerModeloTratamento(tiIdx) {
+function removerModeloProcedimento(ti) {
   const tipos = Object.keys(_fluxoModelos);
-  const tipo = tipos[tiIdx];
-  if (!confirm(`Remover o modelo "${tipo}"? Os pacientes já em tratamento com esse tipo não serão afetados.`)) return;
-  delete _fluxoModelos[tipo];
-  populateFluxoSelects();
+  if (!confirm('Remover o procedimento "' + tipos[ti] + '"?')) return;
+  delete _fluxoModelos[tipos[ti]];
   salvarFluxoRemoto();
   renderModelosList();
 }
 
-function adicionarEtapaModelo(tipo) {
-  _fluxoModelos[tipo].push('Nova etapa');
+function adicionarSubModelo(tipo) {
+  _fluxoModelos[tipo].push('Nova subetapa');
   salvarFluxoRemoto();
   renderModelosList();
 }
 
-function editarEtapaModelo(tipo, idx, novoNome) {
+function editarSubModelo(tipo, idx, novoNome) {
   if (!novoNome.trim()) return;
   _fluxoModelos[tipo][idx] = novoNome.trim();
   salvarFluxoRemoto();
 }
 
-function removerEtapaModelo(tipo, idx) {
+function removerSubModelo(tipo, idx) {
   _fluxoModelos[tipo].splice(idx, 1);
   salvarFluxoRemoto();
   renderModelosList();
