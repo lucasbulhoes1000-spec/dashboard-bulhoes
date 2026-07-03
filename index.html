@@ -4737,10 +4737,17 @@ function openAtvForm(){
 function salvarAtividade(){
   var fase=document.getElementById('atv-fase').value;
   if(!fase){alert('Selecione a fase atual');return;}
-  var r=clientesData[_currentClienteIdx];
-  var d=ccGet(r);
+  // Usa o telefone do card atual como chave (mais confiável que _currentClienteIdx,
+  // que pode ser -1 se o card foi aberto via abrirCardPorTelefone no contexto de lead)
+  const ph=document.getElementById('cc-phone')&&document.getElementById('cc-phone').dataset.phone||'';
+  const key=ph||'_unknown';
+  if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  const d=_ccData[key];
+  if(!d.atividades)d.atividades=[];
   d.atividades.unshift({fase,data:document.getElementById('atv-data').value,hora:document.getElementById('atv-hora').value,prob:document.getElementById('atv-prob').value,proximo:document.getElementById('atv-proximo').value,obs:document.getElementById('atv-obs').value});
   document.getElementById('cc-atv-form').style.display='none';
+  // Tenta usar o registro original se disponível, senão passa um objeto mínimo
+  var r=(_currentClienteIdx>=0?clientesData[_currentClienteIdx]:null)||allCloudiaRows.find(row=>String(row.phone||'').replace(/\D/g,'')===ph)||{phone:ph,origin:'',stage:'',created_at:'',timestamp:''};
   refreshAtividades(r,d);
   switchCCTab('atividades',document.querySelectorAll('.cc-tab')[1]);
   salvarCRMDebounced();
