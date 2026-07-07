@@ -4159,29 +4159,67 @@ async function sincronizarOrcamentosClinicorp(){
   const btn=document.getElementById('btn-sync-orcamentos');
   const textoOriginal=btn.textContent;
   btn.disabled=true;
-  btn.textContent='⏳ Sincronizando...';
+  btn.textContent='⏳ Verificando...';
   try{
+    // --- ETAPA 1: busca no Clinicorp UMA VEZ (dry-run) — não grava nada ainda ---
+    const resPreview=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'syncOrcamentosClinicorp',dryRun:true})
+    });
+    const p=await resPreview.json();
+    if(p.status!=='ok'){
+      showToast('error','Erro na verificação',p.mensagem||JSON.stringify(p));
+      return;
+    }
+    if(p.novos===0&&p.atualizados===0){
+      showToast('success','Tudo em dia','Nenhum orçamento novo encontrado no Clinicorp para importar.\nSem correspondência: '+p.semCorrespondencia);
+      return;
+    }
+
+    let confirmMsg='Encontrado no Clinicorp (últimos 30 dias):\n\n'+
+      '• '+p.novos+' orçamento(s) novo(s) pra importar\n'+
+      '• '+p.atualizados+' já importado(s) antes, com status/valor atualizado\n'+
+      (p.semCorrespondencia>0?'• '+p.semCorrespondencia+' sem telefone correspondente no CRM\n':'');
+
+    if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
+      confirmMsg+='\n⚠️ ATENÇÃO: '+p.possiveisDuplicatas.length+' desses novos têm o MESMO VALOR de um orçamento já lançado manualmente pro mesmo telefone — pode ser duplicata:\n';
+      p.possiveisDuplicatas.slice(0,10).forEach(d=>{
+        confirmMsg+='  - '+d.nome+' (R$ '+d.valor+')\n';
+      });
+      confirmMsg+='\nSe confirmar, esses SERÃO importados mesmo assim (não temos certeza se é duplicata ou coincidência de valor) — revise manualmente depois na tela do lead.\n';
+    }
+
+    confirmMsg+='\nConfirmar importação?';
+
+    const confirmar=confirm(confirmMsg);
+    if(!confirmar){
+      showToast('success','Cancelado','Nenhuma alteração foi feita.');
+      return;
+    }
+
+    // --- ETAPA 2: aplica os candidatos JÁ BUSCADOS na etapa 1 — não chama o Clinicorp de novo ---
+    btn.textContent='⏳ Gravando...';
     const res=await fetch(CLOUDIA_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'syncOrcamentosClinicorp'})
+      body:JSON.stringify({
+        action:'syncOrcamentosClinicorp',
+        candidatos:{novos:p.candidatosNovos||[],atualizados:p.candidatosAtualizados||[]}
+      })
     });
     const r=await res.json();
     if(r.status==='ok'){
       await carregarCRMRemoto(); // recarrega _ccData com os orçamentos novos gravados pelo Apps Script
       renderRelOrcamentos();
-      let msg='Período: '+r.periodo.from+' a '+r.periodo.to+
-        '\nOrçamentos encontrados no Clinicorp: '+r.totalOrcamentos+
-        '\nNovos importados: '+r.novos+
-        '\nAtualizados (mudança de status): '+r.atualizados+
-        '\nSem correspondência de telefone: '+r.semCorrespondencia;
-      if(r.semCorrespondencia>0){
-        msg+='\n\n⚠️ '+r.semCorrespondencia+' orçamento(s) não puderam ser vinculados a nenhum lead (nome não bateu com nenhum telefone do CRM). Veja o console (F12) pra detalhes.';
-        console.warn('[SYNC ORÇAMENTOS] Sem correspondência:',r.detalheSemCorrespondencia);
+      let msg='Novos importados: '+r.novos+
+        '\nAtualizados (mudança de status): '+r.atualizados;
+      if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
+        msg+='\n\n⚠️ '+p.possiveisDuplicatas.length+' importado(s) com valor igual a um orçamento manual existente — revise manualmente.';
       }
       showToast('success','✅ Orçamentos sincronizados!',msg);
     }else{
-      showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
+      showToast('error','Erro ao gravar',r.mensagem||JSON.stringify(r));
     }
   }catch(e){
     console.error('[SYNC ORÇAMENTOS CLINICORP] Erro:',e);
