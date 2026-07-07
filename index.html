@@ -295,7 +295,7 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="slabel">Captação</div>
             <div class="row r4">
               <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">dos leads</div></div>
-              <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div></div>
+              <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
             </div>
@@ -813,6 +813,7 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="">Todos</option>
           </select></div>
         <button onclick="renderRelOrcamentos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
+        <button id="btn-sync-orcamentos" onclick="sincronizarOrcamentosClinicorp()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Puxar orçamentos (Clinicorp)</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -1419,7 +1420,7 @@ const META_ACCOUNT='act_830126674734657';
 const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
 const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
 const CLINICA_ID=null; // será preenchido após login
-const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbwx0cYT1SDYc1Oln5HxG7T5LGosNWf3M_8JsULTaSRGyTGxgHo5a0MT41UbL7OylVM/exec';
+const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbykaZnJfZBI5M7PQWdU3KSno5lf4OyjU8IaERmjh2kMXA5npUNz_5WXMwdfcix9Nw17/exec';
 const SS_SOCIAL='https://script.google.com/macros/s/AKfycbzWcVTrS7K3L9eA3Ei_erMPFT5i75mHT4B_roP7W6ENC-XHSFFQq8pUhxUjgljb1y6u/exec';
 const SS_URL='https://script.google.com/macros/s/AKfycbya5tJt56XgbOjzPje_5K2td3rFlb5qV4fcNV70zwWvrEV8upLVsDwJjLVaH-9MZrH0/exec';
 
@@ -1818,6 +1819,25 @@ function fmtDateOnly(str){
 }
 
 // ===== TRÁFEGO =====
+async function carregarComparecimentoClinicorp(){
+  const el=document.getElementById('t-comp-clinicorp');
+  if(!el)return;
+  try{
+    const range=getRange('trafego');
+    const url=CLOUDIA_URL+'?action=analyticsClinicorp&from='+range.since+'&to='+range.until;
+    const res=await fetch(url);
+    const r=await res.json();
+    if(r.status==='ok'&&r.appointmentsTotal>0){
+      el.textContent='Clinicorp: '+r.appointmentsFinished+'/'+r.appointmentsTotal+' ('+r.pctComparecimento+'% comparecimento oficial)';
+      el.title='Fonte: Clinicorp /analytics/list_results — período '+r.periodo.from+' a '+r.periodo.to+'. Faltas: '+r.appointmentsMissed;
+    }else{
+      el.textContent='';
+    }
+  }catch(e){
+    console.warn('[COMPARECIMENTO CLINICORP] Erro (não bloqueia o dashboard):',e);
+    el.textContent='';
+  }
+}
 async function loadTrafego(){
   document.getElementById('loading-trafego').style.display='flex';
   document.getElementById('content-trafego').style.display='none';
@@ -1852,6 +1872,7 @@ async function loadTrafego(){
     _lastCloudiaFilteredAgend=filteredAgend;
     updateOrigemCount(filtered);
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
+    carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
     console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
@@ -4128,6 +4149,42 @@ async function sincronizarConsultasAvaliacao(){
     }
   }catch(e){
     console.error('[SYNC CONSULTAS AVALIAÇÃO] Erro:',e);
+    showToast('error','Erro de conexão',e.message+'\nVerifique o console (F12) para mais detalhes.');
+  }finally{
+    btn.disabled=false;
+    btn.textContent=textoOriginal;
+  }
+}
+async function sincronizarOrcamentosClinicorp(){
+  const btn=document.getElementById('btn-sync-orcamentos');
+  const textoOriginal=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='⏳ Sincronizando...';
+  try{
+    const res=await fetch(CLOUDIA_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'syncOrcamentosClinicorp'})
+    });
+    const r=await res.json();
+    if(r.status==='ok'){
+      await carregarCRMRemoto(); // recarrega _ccData com os orçamentos novos gravados pelo Apps Script
+      renderRelOrcamentos();
+      let msg='Período: '+r.periodo.from+' a '+r.periodo.to+
+        '\nOrçamentos encontrados no Clinicorp: '+r.totalOrcamentos+
+        '\nNovos importados: '+r.novos+
+        '\nAtualizados (mudança de status): '+r.atualizados+
+        '\nSem correspondência de telefone: '+r.semCorrespondencia;
+      if(r.semCorrespondencia>0){
+        msg+='\n\n⚠️ '+r.semCorrespondencia+' orçamento(s) não puderam ser vinculados a nenhum lead (nome não bateu com nenhum telefone do CRM). Veja o console (F12) pra detalhes.';
+        console.warn('[SYNC ORÇAMENTOS] Sem correspondência:',r.detalheSemCorrespondencia);
+      }
+      showToast('success','✅ Orçamentos sincronizados!',msg);
+    }else{
+      showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
+    }
+  }catch(e){
+    console.error('[SYNC ORÇAMENTOS CLINICORP] Erro:',e);
     showToast('error','Erro de conexão',e.message+'\nVerifique o console (F12) para mais detalhes.');
   }finally{
     btn.disabled=false;
