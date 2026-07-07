@@ -4177,18 +4177,23 @@ async function sincronizarOrcamentosClinicorp(){
       showToast('error','Erro na verificação',p.mensagem||JSON.stringify(p));
       return;
     }
-    if(p.semCorrespondencia>0){
-      console.warn('[SYNC ORÇAMENTOS] '+p.semCorrespondencia+' sem correspondência de telefone no CRM (amostra abaixo, F12 pra copiar):',p.detalheSemCorrespondencia);
+    if(p.semTelefone>0){
+      console.warn('[SYNC ORÇAMENTOS] '+p.semTelefone+' sem NENHUM telefone cadastrado no Clinicorp (não dá pra criar cliente sem telefone; amostra abaixo, F12 pra copiar):',p.detalheSemTelefone);
     }
     if(p.novos===0&&p.atualizados===0){
-      showToast('success','Tudo em dia','Nenhum orçamento novo encontrado no Clinicorp para importar no período '+p.periodo.from+' a '+p.periodo.to+'.\nSem correspondência: '+p.semCorrespondencia);
+      showToast('success','Tudo em dia','Nenhum orçamento novo encontrado no Clinicorp para importar no período '+p.periodo.from+' a '+p.periodo.to+'.\nSem telefone no Clinicorp: '+p.semTelefone);
       return;
     }
 
     let confirmMsg='Encontrado no Clinicorp ('+p.periodo.from+' a '+p.periodo.to+'):\n\n'+
       '• '+p.novos+' orçamento(s) novo(s) pra importar\n'+
+      (p.clientesCriados>0?'   ↳ sendo '+p.clientesCriados+' de cliente(s) que ainda NÃO existem no CRM (nunca passaram pelo Cloudia) — serão criados automaticamente com os dados do Clinicorp\n':'')+
       '• '+p.atualizados+' já importado(s) antes, com status/valor atualizado\n'+
-      (p.semCorrespondencia>0?'• '+p.semCorrespondencia+' sem telefone correspondente no CRM\n':'');
+      (p.semTelefone>0?'• '+p.semTelefone+' sem NENHUM telefone cadastrado no Clinicorp (impossível importar)\n':'');
+
+    if(p.clientesCriados>0){
+      confirmMsg+='\nℹ️ Clientes criados automaticamente NÃO terão data de comparecimento preenchida (o Clinicorp só nos dá a data do orçamento, não da consulta) — isso evita poluir o relatório de Comparecidos x Agendamento com data inventada. Se precisar da data real, edite manualmente depois.\n';
+    }
 
     if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
       confirmMsg+='\n⚠️ ATENÇÃO: '+p.possiveisDuplicatas.length+' desses novos têm o MESMO VALOR de um orçamento já lançado manualmente pro mesmo telefone — pode ser duplicata:\n';
@@ -4213,7 +4218,7 @@ async function sincronizarOrcamentosClinicorp(){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({
         action:'syncOrcamentosClinicorp',
-        candidatos:{novos:p.candidatosNovos||[],atualizados:p.candidatosAtualizados||[]}
+        candidatos:{novos:p.candidatosNovos||[],atualizados:p.candidatosAtualizados||[],novoCliente:p.candidatosNovoCliente||[]}
       })
     });
     const r=await res.json();
@@ -4221,6 +4226,7 @@ async function sincronizarOrcamentosClinicorp(){
       await carregarCRMRemoto(); // recarrega _ccData com os orçamentos novos gravados pelo Apps Script
       renderRelOrcamentos();
       let msg='Novos importados: '+r.novos+
+        (r.clientesCriados>0?' (sendo '+r.clientesCriados+' cliente(s) novo(s) criado(s))':'')+
         '\nAtualizados (mudança de status): '+r.atualizados;
       if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
         msg+='\n\n⚠️ '+p.possiveisDuplicatas.length+' importado(s) com valor igual a um orçamento manual existente — revise manualmente.';
@@ -4909,7 +4915,7 @@ function updateEntradas(){
 
 // GERENCIAR LISTAS
 var _listas={
-  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']},
+  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling','#Clinicorp Direto'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']},
   status:{ativos:['Em aberto','Aprovado','Reprovado','Cancelado'],desativos:[]},
   tratamentos:{ativos:['#Alinhador Ortodontico','#Aparelho Ortodontico','#Clareamento Conjugado','#Clareamento inferior Conjugado','#Clínico','#Endodontia','#Extração','#Gengivoplastia','#HOF','#Implantes','#Lentes em Porcelana','#Lentes em Resina','#Lentes inferiores','#Lentes unitárias','#Paciente modelo','#Protocolo sobre Implantes','#Reabilitação Oral','#Retrabalho'],desativos:[]},
   fases:{ativos:['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Agendou retorno','Aguardando 1° contato','Aguardando entrada','Avaliação comercial','Fechou','Pós venda','Sem resposta'],desativos:[]},
@@ -5322,6 +5328,7 @@ function renderRelOrcamentos(){
 
   const avalMap={};
   const pgtoMap={};
+  const todosFechados=[]; // pra lupa do TOTAL
 
   Object.entries(_ccData).forEach(([ph,d])=>{
     (d.orcamentos||[]).forEach(o=>{
@@ -5339,10 +5346,14 @@ function renderRelOrcamentos(){
       const entrada=Number(o.entrada||0);
       const pgto=o.pagamento||'—';
 
-      if(!avalMap[av])avalMap[av]={fechados:0,total:0,entradas:0,parcelas:[],pgtos:{}};
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0,entradas:0,parcelas:[],pgtos:{},rows:[]};
       avalMap[av].fechados++;
       avalMap[av].total+=valorFech;
       avalMap[av].entradas+=entrada;
+      const nomeCliente=d.nomeAtual||'—';
+      const itemFechado={nome:nomeCliente,telefone:ph,valor:valorFech,data:dataRef,tratamento:o.tratamento||'—',avaliador:av};
+      avalMap[av].rows.push(itemFechado);
+      todosFechados.push(itemFechado);
       if(o.parcelas&&o.parcelas!=='—'&&o.parcelas!=='À vista'){
         const n=parseInt(o.parcelas);if(n>0)avalMap[av].parcelas.push(n);
       }
@@ -5353,6 +5364,7 @@ function renderRelOrcamentos(){
       }
     });
   });
+  window._lastOrcFechados={porAvaliador:avalMap,total:todosFechados};
 
   const entries=Object.entries(avalMap).sort((a,b)=>b[1].total-a[1].total);
   let tF=0,tV=0,tE=0;
@@ -5366,7 +5378,7 @@ function renderRelOrcamentos(){
   document.getElementById('rof-tbody').innerHTML=entries.map(([av,d])=>`
     <tr>
       <td style="font-weight:500;">${av}</td>
-      <td style="text-align:right" class="tg">${d.fechados}</td>
+      <td style="text-align:right" class="tg">${d.fechados} <button class="lupa" onclick="lupaOrcFechados('${av.replace(/'/g,"\\'")}')" title="Ver quem fechou">🔍</button></td>
       <td style="text-align:right" class="tg">${fmt(d.total)}</td>
       <td style="text-align:right" class="tg">${d.fechados>0?fmt(d.total/d.fechados):'—'}</td>
       <td style="text-align:right" class="ta">${d.entradas>0?fmt(d.entradas):'—'}</td>
@@ -5376,7 +5388,7 @@ function renderRelOrcamentos(){
     </tr>`).join('')+`
     <tr style="font-weight:600;background:#faf7f3;">
       <td>TOTAL</td>
-      <td style="text-align:right" class="tg">${tF}</td>
+      <td style="text-align:right" class="tg">${tF} <button class="lupa" onclick="lupaOrcFechados('__total__')" title="Ver todos que fecharam">🔍</button></td>
       <td style="text-align:right" class="tg">${fmt(tV)}</td>
       <td style="text-align:right" class="tg">${tF>0?fmt(tV/tF):'—'}</td>
       <td style="text-align:right" class="ta">${tE>0?fmt(tE):'—'}</td>
@@ -5392,6 +5404,18 @@ function renderRelOrcamentos(){
           <div style="font-size:10px;color:#9a8c7e;">${d.fechados} contrato(s)</div>
         </div>`).join('')}
       </div></td></tr>`:''}`;
+}
+function lupaOrcFechados(avaliador){
+  const dados=window._lastOrcFechados;
+  if(!dados)return;
+  const rows=(avaliador==='__total__'?dados.total:(dados.porAvaliador[avaliador]?dados.porAvaliador[avaliador].rows:[]))
+    .slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''))
+    .map(r=>[fmtDate(r.data),r.nome,r.telefone,r.tratamento,fmt(r.valor),avaliador==='__total__'?r.avaliador:undefined].filter(x=>x!==undefined));
+  const headers=avaliador==='__total__'
+    ?['Data fechamento','Nome','Telefone','Tratamento','Valor','Avaliador']
+    :['Data fechamento','Nome','Telefone','Tratamento','Valor'];
+  const titulo=avaliador==='__total__'?'Todos os fechados — '+rows.length+' registros':'Fechados — '+avaliador+' ('+rows.length+')';
+  openModal(titulo,headers,rows);
 }
 
 // ===== EXPORT =====
