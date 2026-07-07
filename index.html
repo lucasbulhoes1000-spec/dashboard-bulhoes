@@ -4161,23 +4161,31 @@ async function sincronizarOrcamentosClinicorp(){
   btn.disabled=true;
   btn.textContent='⏳ Verificando...';
   try{
+    // Usa o período selecionado no filtro da tela (Data inicial/Data final).
+    // Se estiver vazio, o backend usa o padrão de últimos 30 dias.
+    const filtroFrom=document.getElementById('rof-from').value;
+    const filtroTo=document.getElementById('rof-to').value;
+
     // --- ETAPA 1: busca no Clinicorp UMA VEZ (dry-run) — não grava nada ainda ---
     const resPreview=await fetch(CLOUDIA_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'syncOrcamentosClinicorp',dryRun:true})
+      body:JSON.stringify({action:'syncOrcamentosClinicorp',dryRun:true,from:filtroFrom||undefined,to:filtroTo||undefined})
     });
     const p=await resPreview.json();
     if(p.status!=='ok'){
       showToast('error','Erro na verificação',p.mensagem||JSON.stringify(p));
       return;
     }
+    if(p.semCorrespondencia>0){
+      console.warn('[SYNC ORÇAMENTOS] '+p.semCorrespondencia+' sem correspondência de telefone no CRM (amostra abaixo, F12 pra copiar):',p.detalheSemCorrespondencia);
+    }
     if(p.novos===0&&p.atualizados===0){
-      showToast('success','Tudo em dia','Nenhum orçamento novo encontrado no Clinicorp para importar.\nSem correspondência: '+p.semCorrespondencia);
+      showToast('success','Tudo em dia','Nenhum orçamento novo encontrado no Clinicorp para importar no período '+p.periodo.from+' a '+p.periodo.to+'.\nSem correspondência: '+p.semCorrespondencia);
       return;
     }
 
-    let confirmMsg='Encontrado no Clinicorp (últimos 30 dias):\n\n'+
+    let confirmMsg='Encontrado no Clinicorp ('+p.periodo.from+' a '+p.periodo.to+'):\n\n'+
       '• '+p.novos+' orçamento(s) novo(s) pra importar\n'+
       '• '+p.atualizados+' já importado(s) antes, com status/valor atualizado\n'+
       (p.semCorrespondencia>0?'• '+p.semCorrespondencia+' sem telefone correspondente no CRM\n':'');
