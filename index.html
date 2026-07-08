@@ -68,6 +68,7 @@ tbody tr:hover td{background:#faf7f3;}
 .row{display:grid;gap:8px;margin-bottom:14px;}
 .r3{grid-template-columns:repeat(3,minmax(0,1fr));}
 .r4{grid-template-columns:repeat(4,minmax(0,1fr));}
+.r5{grid-template-columns:repeat(5,minmax(0,1fr));}
 .r8{grid-template-columns:repeat(8,minmax(0,1fr));}
 .mc{background:#fff;border:0.5px solid #e0d8ce;border-radius:8px;padding:12px 14px;min-width:0;}
 .ccard{background:#fff;border:0.5px solid #A18B6C;border-radius:8px;padding:12px 14px;min-width:0;}
@@ -287,14 +288,16 @@ tbody tr:hover td{background:#faf7f3;}
           <div class="loading" id="loading-trafego"><div class="spinner"></div><span>Carregando dados...</span></div>
           <div id="content-trafego" style="display:none;">
             <div class="slabel">Investimento & leads</div>
-            <div class="row r3">
+            <div class="row r4">
               <div class="mc"><div class="ml">Investimento em ADS</div><div class="mv gold" id="t-spend">—</div><div class="ms">campanhas de captação</div></div>
               <div class="mc"><div class="ml">CPL — Meta ADS</div><div class="mv cost" id="t-cpl">—</div><div class="ms" id="t-leads-sub">aguardando dados</div></div>
+              <div class="mc"><div class="ml">CPL — Geral</div><div class="mv cost" id="t-cpl-geral">—</div><div class="ms">investimento ÷ todos os leads</div></div>
               <div class="mc"><div class="ml">Leads</div><div class="mv" id="t-leads">— <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button></div><div class="ms">no período</div></div>
             </div>
             <div class="slabel">Captação</div>
-            <div class="row r4">
-              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">dos leads</div></div>
+            <div class="row r5">
+              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
+              <div class="mc"><div class="ml">Leads agendados</div><div class="mv" id="t-leads-agendados">—</div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
               <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
@@ -1820,22 +1823,39 @@ function fmtDateOnly(str){
 
 // ===== TRÁFEGO =====
 async function carregarComparecimentoClinicorp(){
-  const el=document.getElementById('t-comp-clinicorp');
-  if(!el)return;
+  const elAgendados=document.getElementById('t-leads-agendados');
+  const elAgendadosSub=document.getElementById('t-leads-agendados-sub');
+  const elCompClinicorp=document.getElementById('t-comp-clinicorp');
+  if(!elAgendados)return;
   try{
     const range=getRange('trafego');
-    const url=CLOUDIA_URL+'?action=analyticsClinicorp&from='+range.since+'&to='+range.until;
+    const url=CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+range.since+'&to='+range.until;
     const res=await fetch(url);
     const r=await res.json();
-    if(r.status==='ok'&&r.appointmentsTotal>0){
-      el.textContent='Clinicorp: '+r.appointmentsFinished+'/'+r.appointmentsTotal+' ('+r.pctComparecimento+'% comparecimento oficial)';
-      el.title='Fonte: Clinicorp /analytics/list_results — período '+r.periodo.from+' a '+r.periodo.to+'. Faltas: '+r.appointmentsMissed;
-    }else{
-      el.textContent='';
+    if(r.status!=='ok'){
+      elAgendados.textContent='—';
+      if(elCompClinicorp)elCompClinicorp.textContent='';
+      return;
     }
+
+    // Total e % de leads agendados (únicos, agenda real do Clinicorp)
+    elAgendados.innerHTML=r.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+r.pctComparecimento+'%)</span>';
+    if(elAgendadosSub)elAgendadosSub.title='Fonte: Clinicorp /appointment/list — período '+r.periodo.from+' a '+r.periodo.to;
+
+    // Comparecimento REAL (status "Em atendimento"/"Atendido") — substitui o valor
+    // do card "Comparecimentos" quando não houver override manual, e o % agora é
+    // sempre sobre leads agendados (Clinicorp), não sobre atos de agendamento (Cloudia).
+    const compManual=getManualOverride('comp');
+    if(compManual==null){
+      const btnLupa=document.querySelector('#t-comp button.lupa');
+      document.getElementById('t-comp').innerHTML=(r.comparecimentos||'0')+' '+(btnLupa?btnLupa.outerHTML:'');
+      const pctTxt=r.leadsAgendados>0?(r.comparecimentos/r.leadsAgendados*100).toFixed(1)+'%':'—';
+      document.getElementById('t-comp-sub').textContent=pctTxt+' show rate (sobre leads agendados)';
+    }
+    if(elCompClinicorp)elCompClinicorp.textContent='';
   }catch(e){
-    console.warn('[COMPARECIMENTO CLINICORP] Erro (não bloqueia o dashboard):',e);
-    el.textContent='';
+    console.warn('[AGENDA CLINICORP] Erro (não bloqueia o dashboard):',e);
+    elAgendados.textContent='—';
   }
 }
 async function loadTrafego(){
@@ -2160,12 +2180,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const leadsBase=cloudiaLeadsCount;
   const leadsBasePago=leadsInstagram.size||leadsBase;
   const cplReal=leadsBasePago>0&&spend>0?spend/leadsBasePago:0;
+  // CPL Geral: mesmo investimento (Meta é o único canal pago hoje), dividido por
+  // TODOS os leads do período, qualquer canal — mostra o custo médio "diluído".
+  const cplGeral=leadsBase>0&&spend>0?spend/leadsBase:0;
   const cpa=agend>0?spend/agend:0;
   const cpcomp=comp>0?spend/comp:0;
   // cpc2 calculado após atualizar contratos (ver abaixo)
 
   document.getElementById('t-spend').textContent=fmt(spend);
   document.getElementById('t-cpl').textContent=cplReal>0?fmt(cplReal):'—';
+  const elCplGeral=document.getElementById('t-cpl-geral');
+  if(elCplGeral)elCplGeral.textContent=cplGeral>0?fmt(cplGeral):'—';
   document.getElementById('t-leads').innerHTML=fmtN(leadsBase)+' <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-leads-sub').textContent=(leadsInstagram.size>0?leadsInstagram.size+' leads Meta ADS':'base: '+leadsBase+' leads');
   const agendTag=_agendManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
