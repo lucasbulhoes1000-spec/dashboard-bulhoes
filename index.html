@@ -4854,33 +4854,52 @@ async function garantirNoFluxo(tel, nome, tratamentoStr, dataInicio){
 // certo no Fluxo — mesma lógica de sempre (mesclarOrcamentoNoFluxo).
 // ============================================================
 async function backfillFluxoAprovados(){
-  if(!confirm('Isso vai varrer TODOS os orçamentos já Aprovados no CRM e criar/completar o card deles no Fluxo de Tratamento. Pode levar alguns segundos. Continuar?'))return;
+  const hoje=new Date();
+  const inicioMes=new Date(hoje.getFullYear(),hoje.getMonth(),1).toISOString().slice(0,10);
+  const fimMes=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).toISOString().slice(0,10);
+  if(!confirm('Isso vai varrer os orçamentos Aprovados DESTE MÊS ('+inicioMes+' a '+fimMes+') e criar/completar o card deles no Fluxo de Tratamento. Orçamentos de meses anteriores (tratamento já entregue) ficam de fora. Continuar?'))return;
   try{
-    showToast('success','⏳ Processando...','Varrendo orçamentos aprovados, aguarde...');
+    showToast('success','⏳ Processando...','Varrendo orçamentos aprovados do mês, aguarde...');
+    console.log('[BACKFILL FLUXO] Etapa 1: buscando fluxo atual...');
     const resp=await fetch(CLOUDIA_URL+'?action=loadFluxo');
+    console.log('[BACKFILL FLUXO] loadFluxo status HTTP:',resp.status);
+    if(!resp.ok){
+      showToast('error','Erro no backfill','loadFluxo retornou HTTP '+resp.status+' — veja o console (F12) pra detalhes.');
+      return;
+    }
     const data=await resp.json();
     const modelos=data.modelos||{};
     const pacientes=data.pacientes||[];
+    console.log('[BACKFILL FLUXO] Fluxo atual carregado. Pacientes existentes:',pacientes.length);
 
-    let processados=0,mudancas=0;
+    let processados=0,mudancas=0,foraDoMes=0;
     Object.entries(_ccData).forEach(([ph,d])=>{
       (d.orcamentos||[]).forEach(o=>{
         if(o.status!=='Aprovado')return;
+        const dataRef=o.fechData||o.data||'';
+        if(!dataRef||dataRef<inicioMes||dataRef>fimMes){foraDoMes++;return;}
         processados++;
-        const mudou=mesclarOrcamentoNoFluxo(pacientes,modelos,ph,d.nomeAtual,o.tratamento,o.fechData||o.data);
+        const mudou=mesclarOrcamentoNoFluxo(pacientes,modelos,ph,d.nomeAtual,o.tratamento,dataRef);
         if(mudou)mudancas++;
       });
     });
+    console.log('[BACKFILL FLUXO] Processados:',processados,'| Fora do mês (ignorados):',foraDoMes,'| Mudanças:',mudancas,'| Pacientes no fluxo agora:',pacientes.length);
 
     if(mudancas>0){
-      await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({action:'saveFluxo',data:{modelos,pacientes}})});
+      const payload=JSON.stringify({action:'saveFluxo',data:{modelos,pacientes}});
+      console.log('[BACKFILL FLUXO] Etapa 2: salvando... tamanho do payload:',(payload.length/1024).toFixed(1)+'KB');
+      const resSave=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload});
+      console.log('[BACKFILL FLUXO] saveFluxo status HTTP:',resSave.status);
+      if(!resSave.ok){
+        showToast('error','Erro ao salvar','saveFluxo retornou HTTP '+resSave.status+' — veja o console (F12).');
+        return;
+      }
       if(_fluxoIniciado){_fluxoModelos=modelos;_fluxoPacientes=pacientes;renderFluxoCards();}
     }
-    showToast('success','✅ Backfill concluído','Orçamentos aprovados processados: '+processados+'\nCards criados/atualizados: '+mudancas);
+    showToast('success','✅ Backfill concluído','Orçamentos aprovados este mês: '+processados+'\nCards criados/atualizados: '+mudancas+(foraDoMes>0?'\nDe outros meses (ignorados): '+foraDoMes:''));
   }catch(e){
-    console.error('[BACKFILL FLUXO] Erro:',e);
-    showToast('error','Erro no backfill',e.message);
+    console.error('[BACKFILL FLUXO] Erro completo:',e);
+    showToast('error','Erro no backfill',e.message+' — veja o console (F12), tem mais detalhe logado lá agora.');
   }
 }
 
