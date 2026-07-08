@@ -515,6 +515,7 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="abrirModalModelos()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;">⚙️ Modelos de Procedimentos</button>
+          <button onclick="backfillFluxoAprovados()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;" title="Cria/completa o card de todo orçamento já Aprovado no CRM">📋 Importar Aprovados</button>
           <button onclick="abrirAdicionarFluxo()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente</button>
         </div>
       </div>
@@ -4266,6 +4267,23 @@ async function sincronizarOrcamentosClinicorp(){
     const r=await res.json();
     if(r.status==='ok'){
       await carregarCRMRemoto(); // recarrega _ccData com os orçamentos novos gravados pelo Apps Script
+
+      // Cria/atualiza card no Fluxo de Tratamento pra todo orçamento Aprovado que
+      // acabou de ser importado/atualizado — igual já acontece no salvamento manual.
+      (p.candidatosNovos||[]).filter(c=>c.orcamento.status==='Aprovado').forEach(c=>{
+        garantirNoFluxo(c.tel,c.nome,c.orcamento.tratamento,c.orcamento.fechData||c.orcamento.data);
+      });
+      (p.candidatosNovoCliente||[]).forEach(c=>{
+        (c.cliente.orcamentos||[]).filter(o=>o.status==='Aprovado').forEach(o=>{
+          garantirNoFluxo(c.tel,c.cliente.nomeAtual||c.nome,o.tratamento,o.fechData||o.data);
+        });
+      });
+      (p.candidatosAtualizados||[]).filter(c=>c.status==='Aprovado').forEach(c=>{
+        const entrada=_ccData[c.tel];
+        const orcamentoAtualizado=entrada&&entrada.orcamentos&&entrada.orcamentos.find(o=>o._clinicorpId===c.clinicorpId);
+        if(orcamentoAtualizado)garantirNoFluxo(c.tel,entrada.nomeAtual,orcamentoAtualizado.tratamento,orcamentoAtualizado.fechData||orcamentoAtualizado.data);
+      });
+
       renderRelOrcamentos();
       let msg='Novos importados: '+r.novos+
         (r.clientesCriados>0?' (sendo '+r.clientesCriados+' cliente(s) novo(s) criado(s))':'')+
@@ -4768,6 +4786,104 @@ function desfazerStageGanho(ph){
     }
   }
 }
+// ============================================================
+// FLUXO AUTOMÁTICO — cria/atualiza o card do paciente na aba Fluxo de
+// Tratamento sempre que um orçamento vira "Aprovado" (manual ou via sync do
+// Clinicorp). Casa o texto do tratamento contra os "modelos" já configurados
+// em Gerenciar > Fluxo (pode bater mais de um modelo se o orçamento tiver
+// mais de um tratamento, ex: "Lentes em Resina, Implante"). Se não bater
+// nenhum modelo configurado, cria mesmo assim com uma etapa genérica —
+// melhor um card incompleto do que nenhum card.
+// ============================================================
+// Lógica pura de merge (sem rede) — usada tanto pelo garantirNoFluxo (1 orçamento,
+// salva na hora) quanto pelo backfillFluxoAprovados (vários orçamentos, salva 1x no final).
+// Recebe/modifica `pacientes` (array) e `modelos` (objeto) diretamente. Retorna true se mudou algo.
+function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataInicio){
+  const telLimpo=String(tel||'').replace(/\D/g,'');
+  if(!telLimpo||!tratamentoStr)return false;
+  const tratLower=tratamentoStr.toLowerCase();
+  let modelosBatidos=Object.keys(modelos).filter(chave=>tratLower.includes(chave.toLowerCase()));
+  if(modelosBatidos.length===0)modelosBatidos=[null]; // sem modelo configurado — cria genérico mesmo assim
+
+  let paciente=pacientes.find(p=>String(p.tel||'').replace(/\D/g,'')===telLimpo);
+  let mudou=false;
+  if(!paciente){
+    paciente={id:Date.now().toString()+'_'+telLimpo,nome:nome||'(sem nome)',tel:telLimpo,dataInicio:dataInicio||new Date().toISOString().slice(0,10),concluido:false,procedimentos:[]};
+    pacientes.push(paciente);
+    mudou=true;
+  }else{
+    paciente.concluido=false; // reabre se já tinha sido marcado concluído
+  }
+
+  modelosBatidos.forEach(chave=>{
+    const nomeProc=chave||tratamentoStr;
+    const jaTem=paciente.procedimentos.some(p=>p.nome===nomeProc);
+    if(jaTem)return;
+    const subetapasBase=chave?(modelos[chave]||[]):['Avaliação/Execução'];
+    paciente.procedimentos.push({nome:nomeProc,subetapas:subetapasBase.map(s=>({nome:s,ok:false,data:null}))});
+    mudou=true;
+  });
+  return mudou;
+}
+
+async function garantirNoFluxo(tel, nome, tratamentoStr, dataInicio){
+  const telLimpo=String(tel||'').replace(/\D/g,'');
+  if(!telLimpo||!tratamentoStr)return;
+  try{
+    const resp=await fetch(CLOUDIA_URL+'?action=loadFluxo');
+    const data=await resp.json();
+    const modelos=data.modelos||{};
+    const pacientes=data.pacientes||[];
+
+    const mudou=mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataInicio);
+
+    if(mudou){
+      await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'saveFluxo',data:{modelos,pacientes}})});
+      if(_fluxoIniciado){_fluxoModelos=modelos;_fluxoPacientes=pacientes;renderFluxoCards();}
+    }
+  }catch(e){
+    console.warn('[FLUXO AUTO] Erro ao criar/atualizar card (não bloqueia o resto):',e);
+  }
+}
+
+// ============================================================
+// BACKFILL — cria/atualiza card no Fluxo pra TODO orçamento já Aprovado que
+// existir hoje no _ccData, de uma vez só (útil pra pegar aprovados de antes
+// dessa funcionalidade existir). Não duplica quem já tem o procedimento
+// certo no Fluxo — mesma lógica de sempre (mesclarOrcamentoNoFluxo).
+// ============================================================
+async function backfillFluxoAprovados(){
+  if(!confirm('Isso vai varrer TODOS os orçamentos já Aprovados no CRM e criar/completar o card deles no Fluxo de Tratamento. Pode levar alguns segundos. Continuar?'))return;
+  try{
+    showToast('success','⏳ Processando...','Varrendo orçamentos aprovados, aguarde...');
+    const resp=await fetch(CLOUDIA_URL+'?action=loadFluxo');
+    const data=await resp.json();
+    const modelos=data.modelos||{};
+    const pacientes=data.pacientes||[];
+
+    let processados=0,mudancas=0;
+    Object.entries(_ccData).forEach(([ph,d])=>{
+      (d.orcamentos||[]).forEach(o=>{
+        if(o.status!=='Aprovado')return;
+        processados++;
+        const mudou=mesclarOrcamentoNoFluxo(pacientes,modelos,ph,d.nomeAtual,o.tratamento,o.fechData||o.data);
+        if(mudou)mudancas++;
+      });
+    });
+
+    if(mudancas>0){
+      await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'saveFluxo',data:{modelos,pacientes}})});
+      if(_fluxoIniciado){_fluxoModelos=modelos;_fluxoPacientes=pacientes;renderFluxoCards();}
+    }
+    showToast('success','✅ Backfill concluído','Orçamentos aprovados processados: '+processados+'\nCards criados/atualizados: '+mudancas);
+  }catch(e){
+    console.error('[BACKFILL FLUXO] Erro:',e);
+    showToast('error','Erro no backfill',e.message);
+  }
+}
+
 function salvarOrcamento(){
   try{
   var r=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
@@ -4816,6 +4932,7 @@ function salvarOrcamento(){
   if(temAprovado){
     marcarStageGanho(ph,applyEdits(r).name||r.name,r.origin,orc.valor);
     r.stage='Ganho';
+    if(orc.status==='Aprovado')garantirNoFluxo(ph,applyEdits(r).name||r.name,orc.tratamento,orc.fechData||orc.data);
   }else{
     desfazerStageGanho(ph);
     // Restaura a fase mais recente que não seja Ganho (ex: Compareceu), se existir no histórico
