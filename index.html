@@ -296,8 +296,8 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="slabel">Captação</div>
             <div class="row r5">
-              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
-              <div class="mc"><div class="ml">Leads agendados</div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
+              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
+              <div class="mc"><div class="ml">Leads na agenda no período</div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
               <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
@@ -1843,7 +1843,25 @@ async function carregarComparecimentoClinicorp(){
 
     // Total e % de leads agendados (únicos, agenda real do Clinicorp)
     elAgendados.innerHTML=r.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+r.pctComparecimento+'%)</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
-    if(elAgendadosSub)elAgendadosSub.title='Fonte: Clinicorp /appointment/list (categoria Avaliação) — período '+r.periodo.from+' a '+r.periodo.to;
+    if(elAgendadosSub){
+      elAgendadosSub.title='Fonte: Supabase (agenda de avaliações, alimentada por webhook do Clinicorp) — período '+r.periodo.from+' a '+r.periodo.to;
+      elAgendadosSub.textContent='únicos na agenda (Clinicorp)';
+    }
+
+    // Agendamentos (TODO ATO de agendar, não pessoas únicas — se a mesma
+    // pessoa for agendada 2x, cada agendamento novo do Clinicorp tem seu
+    // próprio id, então conta 2x aqui). Substitui a contagem antiga do
+    // Cloudia (que deduplicava por telefone), a não ser que exista edição manual.
+    const agendManual=getManualOverride('agend');
+    if(agendManual==null){
+      const btnLupaAgend=document.querySelector('#t-agend button.lupa');
+      document.getElementById('t-agend').innerHTML=r.totalAgendamentos+' '+(btnLupaAgend?btnLupaAgend.outerHTML:'');
+      const elAgendSub=document.getElementById('t-agend-sub');
+      if(elAgendSub){
+        elAgendSub.textContent='atos de agendamento (Clinicorp)';
+        elAgendSub.title='Cada agendamento novo conta separado, mesmo que seja da mesma pessoa — período '+r.periodo.from+' a '+r.periodo.to;
+      }
+    }
 
     // Comparecimento REAL (status "Em atendimento"/"Atendido") — substitui o valor
     // do card "Comparecimentos" quando não houver override manual, e o % agora é
@@ -1865,7 +1883,7 @@ function lupaLeadsAgendadosClinicorp(){
   if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
   const rows=(r.detalheAgendados||[]).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
     .map(d=>[d.nome,d.tel,d.qtd,d.statusResumo,d.comparecimento?'✅ Sim':'—']);
-  openModal('Leads agendados (Avaliação) — Clinicorp — '+rows.length+' registros',
+  openModal('Leads na agenda no período (Avaliação) — Clinicorp — '+rows.length+' registros',
     ['Nome','Telefone','Qtd. agend.','Status na agenda','Compareceu?'],rows);
 }
 function lupaComparecimentoClinicorp(){
