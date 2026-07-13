@@ -607,6 +607,7 @@ tbody tr:hover td{background:#faf7f3;}
           <option value="atrasadomais2anos">Atrasado +2 anos</option>
           <option value="nuncafez">Nunca fez</option>
           <option value="emdia">Em dia</option>
+          <option value="precisaNovoContato">⚠️ Chamado sem retorno (30+ dias)</option>
         </select>
         <span class="count-badge" id="pacientes-count"></span>
         <button onclick="exportarParaCloudia('pacientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;margin-left:6px;">📤 Cloudia</button>
@@ -616,7 +617,7 @@ tbody tr:hover td{background:#faf7f3;}
           <table>
             <thead><tr>
               <th>Nome</th><th>Data do procedimento</th><th>Há quanto tempo</th>
-              <th>Intervalo</th><th>Status</th><th>Próx. agendamento</th><th>WhatsApp</th>
+              <th>Intervalo</th><th>Status</th><th>Próx. agendamento</th><th>Contato</th><th>WhatsApp</th>
             </tr></thead>
             <tbody id="pacientes-tbody"></tbody>
           </table>
@@ -4092,9 +4093,10 @@ function getRegistrosPaciente(cat){
     const override = _ccData[key] && _ccData[key].manutPlanilha;
     const dataBase = override&&override.dataBase!==undefined ? override.dataBase : s.dataBase;
     const agendado = override&&override.agendado!==undefined ? override.agendado : s.agendado;
+    const ultimoContato = (override&&override.ultimoContato)||null;
     // Prioridade do telefone: edição manual no card > telefone do Clinicorp (sincronização) > base de leads do Cloudia
     const telefone = (override&&override.telefone)||s.telefone||getTelefonePorNome(s.nome);
-    return {...s, dataBase, agendado, telefone, _key:key};
+    return {...s, dataBase, agendado, telefone, ultimoContato, _key:key};
   });
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
@@ -4117,6 +4119,24 @@ function statusPaciente(reg,intervalo){
 }
 // Agrupador: todas as faixas de atraso somadas, usado para "precisa de contato" e ordenação.
 function ehAtrasado(status){return status==='atrasado6_12'||status==='atrasado1_2anos'||status==='atrasadomais2anos';}
+
+// "Precisa de novo contato": foi marcado como chamado há 30+ dias E não teve
+// nenhum agendamento/manutenção nova desde então. Some sozinho assim que a
+// pessoa agenda ou faz a manutenção de verdade (dataBase/agendado ficam mais
+// recentes que ultimoContato), sem precisar desmarcar manualmente.
+function precisaNovoContato(reg){
+  if(!reg.ultimoContato)return false;
+  const diasDesde=Math.floor((new Date()-new Date(reg.ultimoContato+'T12:00'))/86400000);
+  if(diasDesde<30)return false;
+  const agendouDepois=reg.agendado&&reg.agendado>reg.ultimoContato;
+  const fezDepois=reg.dataBase&&reg.dataBase>reg.ultimoContato;
+  return !agendouDepois&&!fezDepois;
+}
+function marcarPacienteChamado(cat,key){
+  salvarOverridePaciente(cat,key,'ultimoContato',localDateStr(new Date()));
+  showToast('success','✓ Marcado','Registrado que você chamou esse paciente hoje.');
+}
+
 function salvarOverridePaciente(cat,key,campo,valor){
   if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
   if(!_ccData[key].manutPlanilha)_ccData[key].manutPlanilha={};
@@ -4393,9 +4413,10 @@ function renderTabelaPacientes(){
   const busca=(document.getElementById('pacientes-search')?.value||'').toLowerCase();
   const statusFiltro=document.getElementById('pacientes-status-filter')?.value||'';
   let regs=getRegistrosPaciente(cat);
-  regs=regs.map(r=>({...r,_status:statusPaciente(r,cfg.intervalo)}));
+  regs=regs.map(r=>({...r,_status:statusPaciente(r,cfg.intervalo),_precisaContato:precisaNovoContato(r)}));
   if(busca)regs=regs.filter(r=>r.nome.toLowerCase().includes(busca));
-  if(statusFiltro)regs=regs.filter(r=>r._status===statusFiltro);
+  if(statusFiltro==='precisaNovoContato')regs=regs.filter(r=>r._precisaContato);
+  else if(statusFiltro)regs=regs.filter(r=>r._status===statusFiltro);
   const rank={atrasadomais2anos:0,atrasado1_2anos:1,atrasado6_12:2,nuncafez:3,semdado:4,emdia:5,agendado:6};
   regs.sort((a,b)=>(rank[a._status]-rank[b._status])||a.nome.localeCompare(b.nome));
 
@@ -4429,6 +4450,21 @@ function renderTabelaPacientes(){
     const agendadoCell=(r.agendado&&r.agendado>=hojeStrCell)
       ?`<span style="background:#e2ecf0;color:#3a6a8a;font-size:12px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 ${fmtDateOnly(r.agendado)}</span>`
       :'<span style="color:#b5a898;font-size:12px;">—</span>';
+    let contatoCell;
+    if(r._precisaContato){
+      const diasDesde=Math.floor((new Date()-new Date(r.ultimoContato+'T12:00'))/86400000);
+      contatoCell=`<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+        <span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ ${diasDesde}d sem retorno</span>
+        <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#7a6550;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Chamei de novo</button>
+      </div>`;
+    }else if(r.ultimoContato){
+      contatoCell=`<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
+        <span style="font-size:11px;color:#4a7a4a;">✓ Chamado em ${fmtDateOnly(r.ultimoContato)}</span>
+        <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#9a8c7e;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Marcar de novo</button>
+      </div>`;
+    }else{
+      contatoCell=`<button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:#f0ece4;color:#7a6550;font-size:11px;border:none;padding:4px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">✓ Marcar chamado</button>`;
+    }
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
       <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;">${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#b5a898;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
@@ -4436,9 +4472,10 @@ function renderTabelaPacientes(){
       <td style="font-size:12px;color:#9a8c7e;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
       <td>${agendadoCell}</td>
+      <td>${contatoCell}</td>
       <td>${waBtn}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="7" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#b5a898;padding:20px;">Nenhum paciente encontrado.</td></tr>';
 }
 function definirTelefonePaciente(cat,key,nome){
   const tel=prompt('Telefone de '+nome+' (com DDD, ex: 13981234567):');
