@@ -587,13 +587,6 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
       <div id="pac-diagnostico"></div>
 
-      <details id="pac-relatorio-details" style="margin:18px 0 22px;background:#fff;border:1px solid #e0d8ce;border-radius:12px;overflow:hidden;">
-        <summary onclick="setTimeout(()=>{if(document.getElementById('pac-relatorio-details').open)renderRelatorioPacientesInline();},0)" style="cursor:pointer;list-style:none;padding:14px 18px;font-size:13px;font-weight:600;color:#7a6550;display:flex;align-items:center;gap:8px;background:#faf7f2;">
-          📄 Relatório de manutenção
-        </summary>
-        <div id="pac-relatorio-body" style="padding:18px;"></div>
-      </details>
-
       <div style="display:flex;gap:6px;margin:20px 0 12px;flex-wrap:wrap;">
         <button class="pac-cat-tab active" id="pac-cat-lentesResina" onclick="switchCatPacientes('lentesResina')" style="background:#A18B6C;color:#fff;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Resina</button>
         <button class="pac-cat-tab" id="pac-cat-harmonizacao" onclick="switchCatPacientes('harmonizacao')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Harmonização</button>
@@ -4346,11 +4339,8 @@ function renderDiagnosticoPacientes(){
 
   // Cards gerais (linha 1)
   const cardsGerais=`
-    <div class="row r4" style="margin-bottom:16px;">
-      <div class="mc"><div class="ml">Total na base</div><div class="mv ta">${totalGeral}</div><div class="ms">pacientes em todas as categorias</div></div>
-      <div class="mc"><div class="ml">Em dia</div><div class="mv green">${emDiaGeral}</div><div class="ms">${totalGeral?Math.round(emDiaGeral/totalGeral*100):0}% da base</div></div>
-      <div class="mc"><div class="ml">Agendado</div><div class="mv" style="color:#3a6a8a;">${agendadoGeral}</div><div class="ms">${totalGeral?Math.round(agendadoGeral/totalGeral*100):0}% da base</div></div>
-      <div class="mc"><div class="ml">Precisam de contato</div><div class="mv" style="color:#b5483d;">${precisamContatoGeral}</div><div class="ms">atrasados em qualquer faixa ou nunca fizeram</div></div>
+    <div style="margin-bottom:16px;">
+      <div class="mc" style="max-width:280px;"><div class="ml">Total na base</div><div class="mv ta">${totalGeral}</div><div class="ms">pacientes em todas as categorias</div></div>
     </div>`;
 
   // Cards por categoria (grid 2 colunas), com as 3 faixas de atraso detalhadas
@@ -4455,57 +4445,6 @@ function definirTelefonePaciente(cat,key,nome){
   if(!tel)return;
   salvarOverridePaciente(cat,key,'telefone',tel.replace(/\D/g,''));
 }
-
-// ===================== RELATÓRIO DE PACIENTES =====================
-function renderRelatorioPacientesInline(){
-  const cats=Object.keys(_categoriasPacientes);
-  const agora=new Date().toLocaleDateString('pt-BR');
-  let totalGeral=0,emDiaGeral=0,precisamContatoGeral=0;
-  let blocos='';
-  const labelStatus={atrasado6_12:'atrasado 6-12 meses',atrasado1_2anos:'atrasado 1-2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:'nunca fez'};
-  cats.forEach(cat=>{
-    const cfg=_categoriasPacientes[cat];
-    const regs=getRegistrosPaciente(cat).map(r=>({...r,_status:statusPaciente(r,cfg.intervalo)}));
-    const total=regs.length;
-    const emdia=regs.filter(r=>r._status==='emdia').length;
-    const atrasado6_12=regs.filter(r=>r._status==='atrasado6_12').length;
-    const atrasado1_2anos=regs.filter(r=>r._status==='atrasado1_2anos').length;
-    const atrasadomais2anos=regs.filter(r=>r._status==='atrasadomais2anos').length;
-    const nuncafez=regs.filter(r=>r._status==='nuncafez').length;
-    const semdado=regs.filter(r=>r._status==='semdado').length;
-    const precisamContato=atrasado6_12+atrasado1_2anos+atrasadomais2anos+nuncafez;
-    totalGeral+=total;emDiaGeral+=emdia;precisamContatoGeral+=precisamContato;
-    const listaContato=regs.filter(r=>ehAtrasado(r._status)||r._status==='nuncafez')
-      .sort((a,b)=>a.nome.localeCompare(b.nome))
-      .map(r=>`<li>${r.nome} <span style="color:#9a8c7e;">— ${labelStatus[r._status]}</span></li>`).join('');
-    blocos+=`
-      <h3 style="margin:22px 0 8px;font-size:15px;color:#2a2520;">${cfg.label} — ${total} pacientes</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;">
-        <tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Em dia</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${emdia}</td></tr>
-        ${atrasado6_12?`<tr><td style="padding:6px 10px;">Atrasados ${cfg.intervalo||0}-12 meses</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasado6_12}</td></tr>`:''}
-        ${atrasado1_2anos?`<tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Atrasados 1-2 anos</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasado1_2anos}</td></tr>`:''}
-        ${atrasadomais2anos?`<tr><td style="padding:6px 10px;">Atrasados +2 anos</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${atrasadomais2anos}</td></tr>`:''}
-        ${nuncafez?`<tr style="background:#f5f0ea;"><td style="padding:6px 10px;">Nunca fizeram</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${nuncafez}</td></tr>`:''}
-        ${semdado?`<tr><td style="padding:6px 10px;">Sem dado registrado</td><td style="padding:6px 10px;text-align:right;font-weight:700;">${semdado}</td></tr>`:''}
-      </table>
-      ${listaContato?`<details style="margin-bottom:6px;"><summary style="cursor:pointer;font-size:12.5px;color:#7a6550;">Ver lista de pacientes para contato (${precisamContato})</summary>
-        <ul style="font-size:12.5px;color:#2a2520;line-height:1.7;margin-top:8px;columns:2;column-gap:24px;">${listaContato}</ul>
-      </details>`:''}`;
-  });
-
-  const html=`
-  <p style="color:#9a8c7e;font-size:13px;margin:0 0 14px;">Gerado em ${agora} · Bulhões Odontologia &amp; Estética</p>
-  <div style="display:flex;gap:14px;margin:0 0 18px;flex-wrap:wrap;">
-    <div style="flex:1;min-width:140px;background:#f5f0ea;border-radius:10px;padding:14px;"><div style="font-size:11px;color:#9a8c7e;">TOTAL NA BASE</div><div style="font-size:26px;font-weight:700;">${totalGeral}</div></div>
-    <div style="flex:1;min-width:140px;background:#e2f0e2;border-radius:10px;padding:14px;"><div style="font-size:11px;color:#4a7a4a;">EM DIA</div><div style="font-size:26px;font-weight:700;color:#4a7a4a;">${emDiaGeral}</div></div>
-    <div style="flex:1;min-width:140px;background:#f7e2de;border-radius:10px;padding:14px;"><div style="font-size:11px;color:#b5483d;">PRECISAM DE CONTATO</div><div style="font-size:26px;font-weight:700;color:#b5483d;">${precisamContatoGeral}</div></div>
-  </div>
-  ${blocos}`;
-
-  const body=document.getElementById('pac-relatorio-body');
-  if(body)body.innerHTML=html;
-}
-// ===================== FIM PACIENTES / MANUTENÇÃO =====================
 
 function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
