@@ -261,7 +261,8 @@ tbody tr:hover td{background:#faf7f3;}
             <span class="sbadge green" id="badge-cloudia">⬤ Cloudia CRM</span>
           </div>
           <div class="filters" id="filters-trafego">
-            <button class="fb active" onclick="setFilter('trafego','mes',this)">Este mês (até hoje)</button>
+            <button class="fb active" onclick="setFilter('trafego','mes',this)">Este mês</button>
+            <button class="fb" onclick="setFilter('trafego','ateHoje',this)">Até hoje</button>
             <button class="fb" onclick="setFilter('trafego','hoje',this)">Hoje</button>
             <button class="fb" onclick="setFilter('trafego','ontem',this)">Ontem</button>
             <button class="fb" onclick="setFilter('trafego','7dias',this)">7 dias</button>
@@ -356,7 +357,8 @@ tbody tr:hover td{background:#faf7f3;}
         <div id="dash-social" class="dash-tab-content" style="display:none;">
           <div class="source-badges"><span class="sbadge green" id="badge-ss">⬤ Google Sheets</span></div>
           <div class="filters" id="filters-social">
-            <button class="fb active" onclick="setFilter('social','mes',this)">Este mês (até hoje)</button>
+            <button class="fb active" onclick="setFilter('social','mes',this)">Este mês</button>
+            <button class="fb" onclick="setFilter('social','ateHoje',this)">Até hoje</button>
             <button class="fb" onclick="setFilter('social','hoje',this)">Hoje</button>
             <button class="fb" onclick="setFilter('social','ontem',this)">Ontem</button>
             <button class="fb" onclick="setFilter('social','7dias',this)">7 dias</button>
@@ -1545,7 +1547,8 @@ function getRange(tab){
   if(f==='hoje'){const t=localDateStr(now);return{since:t,until:t};}
   if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=localDateStr(y);return{since:t,until:t};}
   if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:localDateStr(s),until:localDateStr(now)};}
-  if(f==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
+  if(f==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(new Date(now.getFullYear(),now.getMonth()+1,0))};
+  if(f==='ateHoje')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
   if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:localDateStr(fm),until:localDateStr(lm)};}
   if(f==='personalizado'&&customDates[tab].from&&customDates[tab].to)return{since:localDateStr(customDates[tab].from),until:localDateStr(customDates[tab].to)};
   return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
