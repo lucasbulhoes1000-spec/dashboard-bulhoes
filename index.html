@@ -1768,6 +1768,23 @@ function ccDataLookup(phoneOrKey){
   }
   return found?_ccData[found]:null;
 }
+// Igual ccDataLookup, mas devolve a CHAVE real usada em _ccData (pode ter
+// variação, tipo com "55" na frente), não o objeto. Essencial pra salvar
+// edições (nome, origem etc.) no lugar certo — sem isso, editar criava uma
+// entrada nova em vez de atualizar a existente (bug encontrado 13/07/2026).
+function ccDataResolveKey(phoneOrKey){
+  if(!phoneOrKey)return phoneOrKey;
+  if(_ccData[phoneOrKey])return phoneOrKey;
+  const norm=normalizePhone(phoneOrKey);
+  if(_ccData[norm])return norm;
+  if(!_ccDataNormIndex)buildCcDataNormIndex();
+  let found=_ccDataNormIndex[norm];
+  if(!found){
+    buildCcDataNormIndex();
+    found=_ccDataNormIndex[norm];
+  }
+  return found||phoneOrKey; // não achou nada — provável lead novo, devolve o telefone bruto mesmo
+}
 function toggleCustosBlock(){
   const block=document.getElementById('custos-block');
   const icon=document.getElementById('custos-toggle-icon');
@@ -4051,7 +4068,15 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
 
 // CRM STATE
-function ccKey(r){var ph=String(r.phone||'').replace(/\D/g,'');return ph.length>6?ph:(r.name||'unknown');}
+function ccKey(r){
+  var ph=String(r.phone||'').replace(/\D/g,'');
+  if(ph.length<=6)return r.name||'unknown';
+  // Resolve pra chave REAL já existente (pode ter variação, tipo "55" na
+  // frente) antes de aceitar o telefone bruto — sem isso, abrir o card podia
+  // criar uma entrada nova em branco em vez de usar a que já tinha dado
+  // salvo, fazendo edição (nome, orçamento etc.) sumir (bug 13/07/2026).
+  return ccDataResolveKey(ph);
+}
 function normStr(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^#/,'').trim();}
 function ccGet(r){var k=ccKey(r);if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]};return _ccData[k];}
 function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -4450,9 +4475,9 @@ function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
   _currentLeadIdx=-1;
   _currentClienteIdx=idx;
-  var d=ccGet(r);
-  const ph_cc=String(r.phone||'').replace(/\D/g,'');
-  const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
+  var d=ccGet(r); // já resolve variação de telefone internamente (ver ccKey)
+  const ph_cc=ccKey(r); // chave REAL (resolvida), não o telefone bruto — corrigido 13/07/2026
+  const nomeAtualizado=d.nomeAtual||r.name||'—';
   document.getElementById('cc-name').textContent=nomeAtualizado;
   document.getElementById('cc-phone').textContent=r.phone||'—';
   document.getElementById('cc-phone').dataset.phone=ph_cc;
