@@ -4136,6 +4136,10 @@ function marcarPacienteChamado(cat,key){
   salvarOverridePaciente(cat,key,'ultimoContato',localDateStr(new Date()));
   showToast('success','✓ Marcado','Registrado que você chamou esse paciente hoje.');
 }
+function removerMarcacaoChamado(cat,key){
+  salvarOverridePaciente(cat,key,'ultimoContato',null);
+  showToast('success','Removido','Marcação de contato removida.');
+}
 
 function salvarOverridePaciente(cat,key,campo,valor){
   if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
@@ -4455,12 +4459,18 @@ function renderTabelaPacientes(){
       const diasDesde=Math.floor((new Date()-new Date(r.ultimoContato+'T12:00'))/86400000);
       contatoCell=`<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
         <span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ ${diasDesde}d sem retorno</span>
-        <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#7a6550;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Chamei de novo</button>
+        <div style="display:flex;gap:8px;">
+          <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#7a6550;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Chamei de novo</button>
+          <button onclick="removerMarcacaoChamado('${cat}','${r._key}')" style="background:none;border:none;color:#b5483d;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">✕ Remover</button>
+        </div>
       </div>`;
     }else if(r.ultimoContato){
       contatoCell=`<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">
         <span style="font-size:11px;color:#4a7a4a;">✓ Chamado em ${fmtDateOnly(r.ultimoContato)}</span>
-        <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#9a8c7e;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Marcar de novo</button>
+        <div style="display:flex;gap:8px;">
+          <button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:none;border:none;color:#9a8c7e;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">Marcar de novo</button>
+          <button onclick="removerMarcacaoChamado('${cat}','${r._key}')" style="background:none;border:none;color:#b5483d;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">✕ Remover</button>
+        </div>
       </div>`;
     }else{
       contatoCell=`<button onclick="marcarPacienteChamado('${cat}','${r._key}')" style="background:#f0ece4;color:#7a6550;font-size:11px;border:none;padding:4px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">✓ Marcar chamado</button>`;
