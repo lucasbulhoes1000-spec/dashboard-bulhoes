@@ -4427,6 +4427,9 @@ function renderTabelaPacientes(){
     if(r.dataBase){
       const base=new Date(r.dataBase+'T12:00');
       if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=dm+' meses atrás';}
+    }else if(r.dataInstalacao){
+      const inst=new Date(r.dataInstalacao+'T12:00');
+      if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());infoTempo=`Instalado há ${dmInst} meses (nunca fez manutenção)`;}
     }
     const waLink=linkWhatsapp(r.telefone);
     const waBtn=waLink
@@ -4438,7 +4441,7 @@ function renderTabelaPacientes(){
       :'<span style="color:#b5a898;font-size:12px;">—</span>';
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
-      <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;"></td>
+      <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:4px 6px;">${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#b5a898;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
       <td style="font-size:12px;color:#9a8c7e;">${infoTempo}</td>
       <td style="font-size:12px;color:#9a8c7e;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
