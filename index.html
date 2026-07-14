@@ -2007,11 +2007,15 @@ async function fetchCloudia(){
     });
     // Reconstrói leads importados que não estão no Cloudia
     Object.entries(_ccData).forEach(([ph,d])=>{
-      if(!d.leadImportado)return;
+      // ⚠️ CORRIGIDO (14/07/2026): antes só reconstruía quem tinha leadImportado
+      // explícito. Algumas entradas criadas por caminhos mais antigos/diretos do
+      // Clinicorp (comparecimento real sem passar pelo fluxo padrão) ficaram sem
+      // essa flag e nunca apareciam em lugar nenhum. Amplia pra cobrir isso.
+      if(!d.leadImportado && !d.consultaTimestampViaClinicorp)return;
       const jaExiste=allCloudiaRows.some(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
       if(!jaExiste){
         allCloudiaRows.push({
-          name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'',
+          name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'#Clinicorp Direto',
           stage:d.statusAtual||'Lead',created_at:d.created_at||'',
           timestamp:d.timestamp||d.created_at||'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
         });
@@ -2981,7 +2985,16 @@ function renderClientes(){
 function renderClientesTable(){
   const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;return 1;};
   const phoneMap={};
-  allCloudiaRows.filter(r=>isComp(r.stage)||isFechou(r.stage)).forEach(r=>{
+  // ⚠️ CORRIGIDO (14/07/2026): antes filtrava pelo estágio BRUTO do evento
+  // original do Cloudia (r.stage) — isso nunca refletia comparecimento real
+  // sincronizado depois via Clinicorp (webhook, botão manual etc.), porque
+  // esse dado mora em _ccData, não no evento original. Agora usa o estágio
+  // EFETIVO (getEffectiveAgendInfo já mescla os dois, dando prioridade pro
+  // mais recente).
+  allCloudiaRows.filter(r=>{
+    const info=getEffectiveAgendInfo(r.phone,r);
+    return isComp(info.stage)||isFechou(info.stage);
+  }).forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name||Math.random();
     if(!phoneMap[ph]||stageRank(r.stage)>stageRank(phoneMap[ph].stage)){phoneMap[ph]={...r};}
     const v=parseFloat(r.value||0);
