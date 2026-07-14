@@ -3668,7 +3668,12 @@ function renderClientesPage(){
     const fechou=isFechou(r.stage)||(d.orcamentos||[]).some(o=>o.status==='Aprovado');
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
-    const orc0=d.orcamentos&&d.orcamentos[0];
+    // Mostra o orçamento de MAIOR VALOR (não necessariamente o primeiro do
+    // array) — evita mostrar um tratamento menor quando a pessoa tem vários
+    // orçamentos e o mais caro/relevante está em outra posição.
+    const orc0=d.orcamentos&&d.orcamentos.length>0
+      ?d.orcamentos.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0]
+      :null;
     const ultimaAtv=(d.atividades&&d.atividades.length>0)?d.atividades[0]:null;
     const proxContato=ultimaAtv&&ultimaAtv.proximo?new Date(ultimaAtv.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
     const faseAtv=ultimaAtv&&ultimaAtv.fase?ultimaAtv.fase:'—';
