@@ -4520,9 +4520,11 @@ function definirTelefonePaciente(cat,key,nome){
 function mesclarVariacaoSeVazio(ph,d){
   const vazio=(!d.orcamentos||d.orcamentos.length===0)&&(!d.atividades||d.atividades.length===0)&&(!d.anotacoes||d.anotacoes.length===0);
   if(!vazio||!ph)return d;
-  const variacoes=['55'+ph];
-  if(ph.length===11)variacoes.push(ph.substring(0,2)+ph.substring(3),'55'+ph.substring(0,2)+ph.substring(3));
-  else if(ph.length===10)variacoes.push(ph.substring(0,2)+'9'+ph.substring(2),'55'+ph.substring(0,2)+'9'+ph.substring(2));
+  var semDDI=ph;
+  if((ph.length===12||ph.length===13)&&ph.startsWith('55'))semDDI=ph.substring(2);
+  const variacoes=['55'+ph,semDDI,'55'+semDDI];
+  if(semDDI.length===11)variacoes.push(semDDI.substring(0,2)+semDDI.substring(3),'55'+semDDI.substring(0,2)+semDDI.substring(3));
+  else if(semDDI.length===10)variacoes.push(semDDI.substring(0,2)+'9'+semDDI.substring(2),'55'+semDDI.substring(0,2)+'9'+semDDI.substring(2));
   for(const v of variacoes){
     if(v===ph||!_ccData[v])continue;
     const outro=_ccData[v];
