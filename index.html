@@ -3663,7 +3663,7 @@ function renderClientesPage(){
   elValSub.title=fmt(valorF)+' de '+fmt(totalOrcado)+' orçados converteram em venda ('+pctValor.toFixed(1)+'%)';
   document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph)||{orcamentos:[],atividades:[]};
+    const d=mesclarVariacaoSeVazio(ph,ccDataLookup(ph)||{orcamentos:[],atividades:[],anotacoes:[]});
     // Fechado = Fase "Ganho" no Cloudia OU orçamento aprovado manualmente no dashboard.
     const fechou=isFechou(r.stage)||(d.orcamentos||[]).some(o=>o.status==='Aprovado');
     const val=parseFloat(r.value||0);
@@ -4541,6 +4541,7 @@ function mesclarVariacaoSeVazio(ph,d){
     if(outro.consultaTimestamp)d.consultaTimestamp=outro.consultaTimestamp;
     if(outro.consultaTimestampViaClinicorp)d.consultaTimestampViaClinicorp=outro.consultaTimestampViaClinicorp;
     if(outro.agendTimestamp)d.agendTimestamp=outro.agendTimestamp;
+    _ccData[ph]=d; // ⚠️ garante que a fusão fica gravada na chave certa, não só na variável local
     delete _ccData[v];
     salvarCRMRemoto();
     showToast('success','🔗 Cadastro duplicado unido','Encontramos esse telefone salvo 2x (com/sem DDI) e já juntamos os dados automaticamente.');
