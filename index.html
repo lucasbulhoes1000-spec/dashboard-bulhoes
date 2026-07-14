@@ -4511,11 +4511,46 @@ function definirTelefonePaciente(cat,key,nome){
   salvarOverridePaciente(cat,key,'telefone',tel.replace(/\D/g,''));
 }
 
+// Quando o card abre com uma entrada "vazia" (sem orçamento, atividade ou
+// anotação nenhuma), verifica se existe uma VARIAÇÃO do mesmo telefone (com/sem
+// DDI 55, com/sem o 9º dígito) que tenha dado de verdade — e já funde
+// automaticamente, sem precisar de mesclagem manual (mesmo bug de sempre:
+// Ana Cristina, Maria Fernanda, Yasmin...). Só mexe quando a entrada ATUAL
+// está vazia — nunca sobrescreve dado que já existia na tela.
+function mesclarVariacaoSeVazio(ph,d){
+  const vazio=(!d.orcamentos||d.orcamentos.length===0)&&(!d.atividades||d.atividades.length===0)&&(!d.anotacoes||d.anotacoes.length===0);
+  if(!vazio||!ph)return d;
+  const variacoes=['55'+ph];
+  if(ph.length===11)variacoes.push(ph.substring(0,2)+ph.substring(3),'55'+ph.substring(0,2)+ph.substring(3));
+  else if(ph.length===10)variacoes.push(ph.substring(0,2)+'9'+ph.substring(2),'55'+ph.substring(0,2)+'9'+ph.substring(2));
+  for(const v of variacoes){
+    if(v===ph||!_ccData[v])continue;
+    const outro=_ccData[v];
+    const outroTemDado=(outro.orcamentos&&outro.orcamentos.length>0)||(outro.atividades&&outro.atividades.length>0)||(outro.anotacoes&&outro.anotacoes.length>0);
+    if(!outroTemDado)continue;
+    // Funde: traz o dado real pra chave atual, remove a duplicata
+    if(outro.orcamentos&&outro.orcamentos.length>0)d.orcamentos=outro.orcamentos;
+    if(outro.atividades&&outro.atividades.length>0)d.atividades=outro.atividades;
+    if(outro.anotacoes&&outro.anotacoes.length>0)d.anotacoes=outro.anotacoes;
+    if(outro.nomeAtual)d.nomeAtual=outro.nomeAtual;
+    if(outro.origemAtual)d.origemAtual=outro.origemAtual;
+    if(outro.statusAtual)d.statusAtual=outro.statusAtual;
+    if(outro.statusAtualEditedAt)d.statusAtualEditedAt=outro.statusAtualEditedAt;
+    if(outro.consultaTimestamp)d.consultaTimestamp=outro.consultaTimestamp;
+    if(outro.consultaTimestampViaClinicorp)d.consultaTimestampViaClinicorp=outro.consultaTimestampViaClinicorp;
+    if(outro.agendTimestamp)d.agendTimestamp=outro.agendTimestamp;
+    delete _ccData[v];
+    salvarCRMRemoto();
+    showToast('success','🔗 Cadastro duplicado unido','Encontramos esse telefone salvo 2x (com/sem DDI) e já juntamos os dados automaticamente.');
+    break;
+  }
+  return d;
+}
 function openClienteCard(idx){
   var r=clientesData[idx];if(!r)return;
   _currentLeadIdx=-1;
   _currentClienteIdx=idx;
-  var d=ccGet(r);
+  var d=mesclarVariacaoSeVazio(String(r.phone||'').replace(/\D/g,''),ccGet(r));
   const ph_cc=String(r.phone||'').replace(/\D/g,'');
   const nomeAtualizado=(_ccData[ph_cc]&&_ccData[ph_cc].nomeAtual)||r.name||'—';
   document.getElementById('cc-name').textContent=nomeAtualizado;
