@@ -7201,19 +7201,27 @@ function renderCalendarioSazonal() {
   if (!container) return;
   const anoSel = Number(document.getElementById('calendario-ano')?.value) || new Date().getFullYear();
 
+  // Todas as ações visíveis nesse ano (recorrentes + específicas do ano), sem
+  // filtrar por mês ainda — precisamos disso pra achar tarefas de preparação
+  // que têm mês PRÓPRIO diferente do mês da campanha (ex: campanha é em
+  // Outubro, mas a tarefa de "esquentar" está marcada pra Setembro).
+  const acoesVisiveis = _calendarioAcoes.filter(a => a.recorrente || Number(a.ano) === anoSel);
+
   container.innerHTML = MESES_NOMES.map((nomeMes, i) => {
     const mes = i + 1;
-    const acoesDoMes = _calendarioAcoes
-      .filter(a => a.mes === mes && (a.recorrente || Number(a.ano) === anoSel))
+    const acoesDoMes = acoesVisiveis
+      .filter(a => a.mes === mes)
       .sort((a, b) => (b.recorrente ? 1 : 0) - (a.recorrente ? 1 : 0));
 
     // --- Grade de dias de verdade (estilo calendário), com um pontinho nos
-    // dias que têm alguma tarefa marcada (verde se todas as tarefas daquele
-    // dia já estão feitas, marrom se ainda falta alguma) ---
+    // dias que têm alguma tarefa marcada nesse mês (verde se todas já estão
+    // feitas, marrom se falta alguma) — olha o mês PRÓPRIO de cada tarefa
+    // (t.mes), não o mês da campanha, então uma tarefa de preparação de
+    // Setembro pra uma campanha de Outubro aparece aqui em Setembro. ---
     const tarefasPorDia = {};
-    acoesDoMes.forEach(a => {
+    acoesVisiveis.forEach(a => {
       (a.tarefas || []).forEach(t => {
-        if (!t.dia) return;
+        if (!t.dia || (t.mes || a.mes) !== mes) return;
         if (!tarefasPorDia[t.dia]) tarefasPorDia[t.dia] = [];
         tarefasPorDia[t.dia].push(t);
       });
@@ -7237,32 +7245,64 @@ function renderCalendarioSazonal() {
       ${celulas}
     </div>`;
 
-    const acoesHtml = acoesDoMes.length
-      ? acoesDoMes.map(a => {
-          const idx = _calendarioAcoes.indexOf(a);
-          const tarefas = (a.tarefas || []).slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0));
-          const tarefasHtml = tarefas.length
-            ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">` + tarefas.map(t => {
-                const tIdx = a.tarefas.indexOf(t);
-                return `<label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;color:${t.feito ? '#9a8c7e' : '#5a4a3a'};cursor:pointer;${t.feito ? 'text-decoration:line-through;' : ''}">
-                  <input type="checkbox" ${t.feito ? 'checked' : ''} onchange="toggleTarefaCalendario(${idx},${tIdx},this.checked)" style="width:13px;height:13px;cursor:pointer;margin-top:1px;flex-shrink:0;">
-                  <span><b>Dia ${t.dia || '?'}</b> — ${t.tarefa}${t.responsavel ? ' <span style="color:#A18B6C;">· ' + t.responsavel + '</span>' : ''}</span>
-                </label>`;
-              }).join('') + `</div>`
-            : '';
-          return `<div style="background:#f5f0ea;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-              <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
-              <div style="display:flex;gap:4px;flex-shrink:0;">
-                <button onclick="abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar">✏️</button>
-                <button onclick="removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover">✕</button>
-              </div>
-            </div>
-            ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-top:4px;">${a.observacao}</div>` : ''}
-            ${tarefasHtml}
-          </div>`;
-        }).join('')
-      : `<div style="font-size:11px;color:#b5a898;padding:8px 0;">Nenhuma ação neste mês.</div>`;
+    const acoesHtml = acoesDoMes.map(a => {
+      const idx = _calendarioAcoes.indexOf(a);
+      // Só as tarefas cujo mês próprio bate com o mês da CAMPANHA aparecem
+      // aqui dentro do card dela — as de preparação em outro mês aparecem
+      // na seção "Preparação" do mês delas (ver abaixo).
+      const tarefas = (a.tarefas || []).filter(t => (t.mes || a.mes) === mes).slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0));
+      const tarefasHtml = tarefas.length
+        ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">` + tarefas.map(t => {
+            const tIdx = a.tarefas.indexOf(t);
+            return `<label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;color:${t.feito ? '#9a8c7e' : '#5a4a3a'};cursor:pointer;${t.feito ? 'text-decoration:line-through;' : ''}">
+              <input type="checkbox" ${t.feito ? 'checked' : ''} onchange="toggleTarefaCalendario(${idx},${tIdx},this.checked)" style="width:13px;height:13px;cursor:pointer;margin-top:1px;flex-shrink:0;">
+              <span><b>Dia ${t.dia || '?'}</b> — ${t.tarefa}${t.responsavel ? ' <span style="color:#A18B6C;">· ' + t.responsavel + '</span>' : ''}</span>
+            </label>`;
+          }).join('') + `</div>`
+        : '';
+      return `<div style="background:#f5f0ea;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button onclick="abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar">✏️</button>
+            <button onclick="removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover">✕</button>
+          </div>
+        </div>
+        ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-top:4px;">${a.observacao}</div>` : ''}
+        ${tarefasHtml}
+      </div>`;
+    }).join('');
+
+    // --- Preparação de campanhas de OUTRO mês: tarefas cujo mês próprio é
+    // este, mas a campanha "mora" em outro mês (ex: campanha de Outubro,
+    // tarefa de esquentar marcada pra Setembro). Editar/marcar como feito
+    // funciona igual, só que a partir daqui — o card completo da campanha
+    // continua no mês dela. ---
+    const preparacaoHtml = acoesVisiveis
+      .filter(a => a.mes !== mes)
+      .map(a => {
+        const idx = _calendarioAcoes.indexOf(a);
+        const tarefasDoMes = (a.tarefas || []).filter(t => (t.mes || a.mes) === mes);
+        return { a, idx, tarefasDoMes };
+      })
+      .filter(x => x.tarefasDoMes.length)
+      .map(({ a, idx, tarefasDoMes }) => {
+        const linhas = tarefasDoMes.slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0)).map(t => {
+          const tIdx = a.tarefas.indexOf(t);
+          return `<label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;color:${t.feito ? '#9a8c7e' : '#5a4a3a'};cursor:pointer;${t.feito ? 'text-decoration:line-through;' : ''}">
+            <input type="checkbox" ${t.feito ? 'checked' : ''} onchange="toggleTarefaCalendario(${idx},${tIdx},this.checked)" style="width:13px;height:13px;cursor:pointer;margin-top:1px;flex-shrink:0;">
+            <span><b>Dia ${t.dia || '?'}</b> — ${t.tarefa}${t.responsavel ? ' <span style="color:#A18B6C;">· ' + t.responsavel + '</span>' : ''}</span>
+          </label>`;
+        }).join('');
+        return `<div style="background:#fdf3d9;border:1px solid #e8cf8f;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:600;color:#8a6d1a;">🔥 Preparação — ${a.titulo} <span style="font-weight:400;">(${MESES_NOMES[a.mes - 1]})</span></div>
+          <div style="margin-top:6px;display:flex;flex-direction:column;gap:5px;">${linhas}</div>
+        </div>`;
+      }).join('');
+
+    const semNadaHtml = (!acoesHtml && !preparacaoHtml)
+      ? `<div style="font-size:11px;color:#b5a898;padding:8px 0;">Nenhuma ação neste mês.</div>`
+      : '';
 
     return `<div style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:16px 18px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -7271,6 +7311,8 @@ function renderCalendarioSazonal() {
       </div>
       ${calendarioHtml}
       ${acoesHtml}
+      ${preparacaoHtml}
+      ${semNadaHtml}
     </div>`;
   }).join('');
 }
@@ -7285,6 +7327,8 @@ function toggleTarefaCalendario(acaoIdx, tarefaIdx, checked) {
 }
 
 // ---- Tarefas dentro do modal (dia + o que fazer + responsável) ----
+const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 function renderCalendarioAddTarefasModal() {
   const container = document.getElementById('calendario-add-tarefas-lista');
   if (!container) return;
@@ -7292,9 +7336,13 @@ function renderCalendarioAddTarefasModal() {
     container.innerHTML = '<div style="font-size:11px;color:#b5a898;">Nenhuma tarefa adicionada ainda.</div>';
     return;
   }
+  const mesAcao = Number(document.getElementById('calendario-add-mes')?.value) || 1;
   container.innerHTML = _calendarioAddTarefas.map((t, i) => `
     <div style="display:flex;gap:6px;align-items:center;">
-      <input type="number" min="1" max="31" placeholder="Dia" value="${t.dia || ''}" oninput="_calendarioAddTarefas[${i}].dia=this.value" style="width:55px;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;flex-shrink:0;">
+      <select onchange="_calendarioAddTarefas[${i}].mes=Number(this.value)" style="width:62px;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 4px;font-size:11px;outline:none;flex-shrink:0;">
+        ${MESES_ABREV.map((m, mi) => `<option value="${mi + 1}" ${(t.mes || mesAcao) === mi + 1 ? 'selected' : ''}>${m}</option>`).join('')}
+      </select>
+      <input type="number" min="1" max="31" placeholder="Dia" value="${t.dia || ''}" oninput="_calendarioAddTarefas[${i}].dia=this.value" style="width:48px;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 6px;font-size:12px;outline:none;flex-shrink:0;">
       <input type="text" placeholder="O que fazer" value="${(t.tarefa || '').replace(/"/g, '&quot;')}" oninput="_calendarioAddTarefas[${i}].tarefa=this.value" style="flex:2;min-width:0;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;">
       <input type="text" placeholder="Responsável" value="${(t.responsavel || '').replace(/"/g, '&quot;')}" oninput="_calendarioAddTarefas[${i}].responsavel=this.value" style="flex:1;min-width:0;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;">
       <button onclick="removerTarefaCalendarioModal(${i})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:14px;padding:2px;flex-shrink:0;" title="Remover tarefa">✕</button>
@@ -7302,7 +7350,12 @@ function renderCalendarioAddTarefasModal() {
 }
 
 function adicionarTarefaCalendarioModal() {
-  _calendarioAddTarefas.push({ dia: '', tarefa: '', responsavel: '', feito: false });
+  const mesAcao = Number(document.getElementById('calendario-add-mes')?.value) || 1;
+  // Tarefa nasce no mesmo mês da campanha por padrão, mas pode ser mudada pra
+  // um mês anterior — ex: campanha é em Outubro, mas a "esquentada" começa
+  // em Setembro. O ponto (dot) no calendário aparece no mês da TAREFA, não
+  // necessariamente no mês da campanha.
+  _calendarioAddTarefas.push({ dia: '', mes: mesAcao, tarefa: '', responsavel: '', feito: false });
   renderCalendarioAddTarefasModal();
 }
 
@@ -7353,7 +7406,7 @@ function confirmarAdicionarAcaoCalendario() {
   // Só guarda tarefas com pelo menos a descrição preenchida (linhas em branco somem)
   const tarefas = _calendarioAddTarefas
     .filter(t => (t.tarefa || '').trim())
-    .map(t => ({ dia: Number(t.dia) || null, tarefa: t.tarefa.trim(), responsavel: (t.responsavel || '').trim(), feito: !!t.feito }));
+    .map(t => ({ dia: Number(t.dia) || null, mes: Number(t.mes) || mes, tarefa: t.tarefa.trim(), responsavel: (t.responsavel || '').trim(), feito: !!t.feito }));
 
   if (_calendarioEditandoIdx >= 0) {
     const a = _calendarioAcoes[_calendarioEditandoIdx];
