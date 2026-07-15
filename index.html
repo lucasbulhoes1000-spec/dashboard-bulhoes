@@ -94,6 +94,7 @@ tbody tr:hover td{background:#faf7f3;}
 .mc-ind-icon{width:19px;height:19px;border-radius:50%;background:#8a7a68;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .mc-ind-value{font-size:28px;font-weight:700;color:#2a2520;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mc-ind-value.green{color:#5a8a6a;}
+#bloco-detalhes-trafego .mc,#bloco-detalhes-trafego .ccard{background:#f2ede4;border:none;border-radius:14px;padding:16px 18px;}
 .card{background:#fff;border:0.5px solid #e0d8ce;border-radius:10px;padding:16px;min-width:0;margin-bottom:12px;}
 .card.no-mb{margin-bottom:0;}
 .ctitle{font-size:10px;font-weight:500;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
@@ -1961,7 +1962,9 @@ async function carregarComparecimentoClinicorp(){
     const agendManual=getManualOverride('agend');
     if(agendManual==null){
       const btnLupaAgend=document.querySelector('#t-agend button.lupa');
-      document.getElementById('t-agend').innerHTML=r.totalAgendamentos+' '+(btnLupaAgend?btnLupaAgend.outerHTML:'');
+      const leadsParaPct=window._lastLeadsBase||0;
+      const pctAgendTxt=leadsParaPct>0?(r.totalAgendamentos/leadsParaPct*100).toFixed(1)+'%':'—';
+      document.getElementById('t-agend').innerHTML=r.totalAgendamentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctAgendTxt+')</span> '+(btnLupaAgend?btnLupaAgend.outerHTML:'');
       const elAgendSub=document.getElementById('t-agend-sub');
       if(elAgendSub){
         elAgendSub.textContent='atos de agendamento (Clinicorp)';
@@ -1974,8 +1977,8 @@ async function carregarComparecimentoClinicorp(){
     // sempre sobre leads agendados (Clinicorp), não sobre atos de agendamento (Cloudia).
     const compManual=getManualOverride('comp');
     if(compManual==null){
-      document.getElementById('t-comp').innerHTML=(r.comparecimentos||'0')+' <button class="lupa" onclick="lupaComparecimentoClinicorp()" title="Ver detalhes">🔍</button>';
       const pctTxt=r.leadsAgendados>0?(r.comparecimentos/r.leadsAgendados*100).toFixed(1)+'%':'—';
+      document.getElementById('t-comp').innerHTML=(r.comparecimentos||'0')+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+')</span> <button class="lupa" onclick="lupaComparecimentoClinicorp()" title="Ver detalhes">🔍</button>';
       document.getElementById('t-comp-sub').textContent=pctTxt+' show rate (sobre leads agendados)';
     }
     if(elCompClinicorp)elCompClinicorp.textContent='';
