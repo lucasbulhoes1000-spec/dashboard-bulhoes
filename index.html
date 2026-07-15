@@ -7192,6 +7192,10 @@ async function salvarCalendarioSazonalRemoto() {
   } catch (e) { console.warn('[CALENDARIO SAZONAL] Erro ao salvar:', e); }
 }
 
+function diasNoMes(mes, ano) { return new Date(ano, mes, 0).getDate(); }
+function primeiroDiaSemanaMes(mes, ano) { return new Date(ano, mes - 1, 1).getDay(); }
+function escAttrCalendario(s) { return String(s || '').replace(/"/g, '&quot;'); }
+
 function renderCalendarioSazonal() {
   const container = document.getElementById('calendario-grid');
   if (!container) return;
@@ -7202,6 +7206,37 @@ function renderCalendarioSazonal() {
     const acoesDoMes = _calendarioAcoes
       .filter(a => a.mes === mes && (a.recorrente || Number(a.ano) === anoSel))
       .sort((a, b) => (b.recorrente ? 1 : 0) - (a.recorrente ? 1 : 0));
+
+    // --- Grade de dias de verdade (estilo calendário), com um pontinho nos
+    // dias que têm alguma tarefa marcada (verde se todas as tarefas daquele
+    // dia já estão feitas, marrom se ainda falta alguma) ---
+    const tarefasPorDia = {};
+    acoesDoMes.forEach(a => {
+      (a.tarefas || []).forEach(t => {
+        if (!t.dia) return;
+        if (!tarefasPorDia[t.dia]) tarefasPorDia[t.dia] = [];
+        tarefasPorDia[t.dia].push(t);
+      });
+    });
+    const totalDias = diasNoMes(mes, anoSel);
+    const offset = primeiroDiaSemanaMes(mes, anoSel);
+    let celulas = '';
+    for (let b = 0; b < offset; b++) celulas += `<div></div>`;
+    for (let d = 1; d <= totalDias; d++) {
+      const doDia = tarefasPorDia[d];
+      const todasFeitas = doDia && doDia.every(t => t.feito);
+      const corDot = !doDia ? 'transparent' : (todasFeitas ? '#5a8a6a' : '#A18B6C');
+      const tituloAttr = doDia ? escAttrCalendario(doDia.map(t => t.tarefa).join(' | ')) : '';
+      celulas += `<div title="${tituloAttr}" style="text-align:center;font-size:10px;color:#5a4a3a;padding:3px 0 5px;">
+        <div>${d}</div>
+        <div style="width:5px;height:5px;border-radius:50%;background:${corDot};margin:2px auto 0;"></div>
+      </div>`;
+    }
+    const calendarioHtml = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid #f0ebe4;">
+      ${['D','S','T','Q','Q','S','S'].map(l => `<div style="text-align:center;font-size:9px;color:#b5a898;font-weight:700;">${l}</div>`).join('')}
+      ${celulas}
+    </div>`;
+
     const acoesHtml = acoesDoMes.length
       ? acoesDoMes.map(a => {
           const idx = _calendarioAcoes.indexOf(a);
@@ -7234,6 +7269,7 @@ function renderCalendarioSazonal() {
         <div style="font-size:14px;font-weight:700;color:#2a2520;">${nomeMes}</div>
         <button onclick="abrirAdicionarAcaoCalendario(-1,${mes})" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:16px;padding:0;line-height:1;" title="Adicionar ação em ${nomeMes}">+</button>
       </div>
+      ${calendarioHtml}
       ${acoesHtml}
     </div>`;
   }).join('');
