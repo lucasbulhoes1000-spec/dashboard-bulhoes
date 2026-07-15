@@ -1833,11 +1833,23 @@ function origemMatchClinicorp(ph){
 function getAgendaClinicorpFiltrada(){
   const agenda=window._lastAgendaClinicorp;
   if(!agenda)return null;
-  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
-  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const todosAgend=agenda.detalheAgendados||[];
+  const todosComp=agenda.detalheComparecimentos||[];
+  const detAgend=todosAgend.filter(d=>origemMatchClinicorp(d.tel));
+  const detComp=todosComp.filter(d=>origemMatchClinicorp(d.tel));
+  // "Agendamentos" (atos) sem filtro de origem = usa direto o valor bruto do backend
+  // (agenda.totalAgendamentos), que é a fonte confiável. Somar o campo `qtd` de cada
+  // pessoa do detalhe inflava o número (ex: 48 virou 66) — provavelmente `qtd` conta
+  // algo a mais que só "atos de agendamento na Avaliação". Com filtro de origem, como
+  // não dá pra confiar no `qtd` por pessoa, aplica a MESMA proporção de pessoas
+  // filtradas sobre o total de pessoas (estimativa proporcional, não soma).
+  let totalAgendamentos=agenda.totalAgendamentos||0;
+  if(_origemFilter&&todosAgend.length>0){
+    totalAgendamentos=Math.round(totalAgendamentos*(detAgend.length/todosAgend.length));
+  }
   return{
     leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
-    totalAgendamentos:detAgend.reduce((s,d)=>s+(Number(d.qtd)||1),0), // atos de agendamento
+    totalAgendamentos, // atos de agendamento
     comparecimentos:detComp.length // pessoas únicas que compareceram
   };
 }
@@ -5052,11 +5064,15 @@ function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataIn
   let paciente=pacientes.find(p=>String(p.tel||'').replace(/\D/g,'')===telLimpo);
   let mudou=false;
   if(!paciente){
-    paciente={id:Date.now().toString()+'_'+telLimpo,nome:nome||'(sem nome)',tel:telLimpo,dataInicio:dataInicio||new Date().toISOString().slice(0,10),concluido:false,procedimentos:[]};
+    paciente={id:Date.now().toString()+'_'+telLimpo,nome:nome||'(sem nome)',tel:telLimpo,dataInicio:dataInicio||new Date().toISOString().slice(0,10),concluido:false,npsEnviado:false,posVendaEnviado:false,dataConcluido:null,procedimentos:[]};
     pacientes.push(paciente);
     mudou=true;
   }else{
-    paciente.concluido=false; // reabre se já tinha sido marcado concluído
+    // reabre se já tinha sido marcado concluído — novo tratamento, novo ciclo de pós-venda/NPS
+    paciente.concluido=false;
+    paciente.npsEnviado=false;
+    paciente.posVendaEnviado=false;
+    paciente.dataConcluido=null;
   }
 
   modelosBatidos.forEach(chave=>{
@@ -6724,12 +6740,32 @@ function salvarSaidaEstoque(){
 
 // ===== FLUXO DE TRATAMENTO =====
 // _fluxoModelos: { "Lentes em Resina": ["Moldagem","Instalação","Revisão 30 dias"], ... }
-// _fluxoPacientes: [{ id, nome, tel, dataInicio, concluido,
+// _fluxoPacientes: [{ id, nome, tel, dataInicio, concluido, dataConcluido,
+//   npsEnviado, posVendaEnviado,
 //   procedimentos: [{ nome, subetapas: [{nome, ok, data}] }] }, ...]
 
 let _fluxoModelos = {};
 let _fluxoPacientes = [];
 let _fluxoIniciado = false;
+
+// Só considera a parte CLÍNICA concluída (todas as subetapas de todos os
+// procedimentos marcadas) — não confundir com p.concluido, que agora também
+// exige os checks de NPS e pós-venda (ver atualizarConclusaoFluxo).
+function clinicoConcluido(p) {
+  const totalSubs = p.procedimentos.reduce((s, pr) => s + pr.subetapas.length, 0);
+  return totalSubs > 0 && p.procedimentos.every(pr => pr.subetapas.length > 0 && pr.subetapas.every(s => s.ok));
+}
+
+// Recalcula p.concluido: só vira true quando a parte clínica termina E os dois
+// checks de pós-tratamento (NPS + pós-venda) foram marcados. Se deixar de valer
+// (ex: desmarcou uma subetapa), volta pra "em tratamento" e limpa dataConcluido
+// (usado pra saber há quantos dias está concluído, pra limpeza automática de 30 dias).
+function atualizarConclusaoFluxo(p) {
+  const estavaConcluido = !!p.concluido;
+  p.concluido = clinicoConcluido(p) && !!p.npsEnviado && !!p.posVendaEnviado;
+  if (p.concluido && !estavaConcluido) p.dataConcluido = new Date().toISOString().slice(0, 10);
+  if (!p.concluido) p.dataConcluido = null;
+}
 
 async function initFluxoTratamento() {
   if (_fluxoIniciado) { renderFluxoCards(); return; }
@@ -6760,8 +6796,21 @@ function renderFluxoCards() {
     if (busca && !p.nome.toLowerCase().includes(busca)) return false;
     if (statusFil === 'em_andamento' && p.concluido) return false;
     if (statusFil === 'concluido' && !p.concluido) return false;
+    // Limpeza automática: card concluído há mais de 30 dias some da lista
+    // (não apaga o dado, só deixa de exibir — ver dataConcluido).
+    if (p.concluido && p.dataConcluido) {
+      const dias = Math.floor((Date.now() - new Date(p.dataConcluido + 'T12:00').getTime()) / 86400000);
+      if (dias > 30) return false;
+    }
     return true;
-  }).sort((a, b) => (a.concluido ? 1 : 0) - (b.concluido ? 1 : 0) || a.dataInicio.localeCompare(b.dataInicio));
+  }).sort((a, b) => {
+    // Prioridade: 1) terminou a parte clínica mas aguarda NPS/pós-venda (sobe pro topo)
+    // 2) ainda em tratamento clínico, por data de início 3) já concluído, por último
+    const pa = a.concluido ? 2 : (clinicoConcluido(a) ? 0 : 1);
+    const pb = b.concluido ? 2 : (clinicoConcluido(b) ? 0 : 1);
+    if (pa !== pb) return pa - pb;
+    return a.dataInicio.localeCompare(b.dataInicio);
+  });
 
   document.getElementById('fluxo-count').textContent = filtrados.length + ' paciente(s)';
   const container = document.getElementById('fluxo-cards');
@@ -6802,12 +6851,28 @@ function renderFluxoCards() {
         </div>`;
     }).join('');
 
+    const aguardandoPosVenda = !p.concluido && clinicoConcluido(p);
+
     return `
-    <div style="background:${p.concluido ? '#f0f9f2' : '#fff'};border-radius:12px;border:1px solid ${p.concluido ? '#8fcf9f' : '#e8e2da'};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div style="background:${p.concluido ? '#f0f9f2' : (aguardandoPosVenda ? '#fdf8ec' : '#fff')};border-radius:12px;border:1px solid ${p.concluido ? '#8fcf9f' : (aguardandoPosVenda ? '#e8cf8f' : '#e8e2da')};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
       ${p.concluido ? `
       <div style="background:#dcfce7;border:1px solid #8fcf9f;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="font-size:12px;color:#166534;font-weight:600;">🎉 Tratamento concluído! Envie a mensagem de pós-venda e a pesquisa de NPS.</div>
-        ${p.tel ? `<a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Chamar no WhatsApp</a>` : ''}
+        <div style="font-size:12px;color:#166534;font-weight:600;">🎉 Tratamento concluído — NPS e pós-venda já enviados.</div>
+      </div>` : ''}
+      ${aguardandoPosVenda ? `
+      <div style="background:#fdf3d9;border:1px solid #e8cf8f;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+        <div style="font-size:12px;color:#8a6d1a;font-weight:600;margin-bottom:8px;">✅ Parte clínica finalizada! Falta confirmar antes de concluir:</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#5a4a2a;cursor:pointer;">
+            <input type="checkbox" ${p.npsEnviado ? 'checked' : ''} onchange="toggleNpsFluxo(${pIdx},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#c9a227;">
+            Mensagem de NPS enviada
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#5a4a2a;cursor:pointer;">
+            <input type="checkbox" ${p.posVendaEnviado ? 'checked' : ''} onchange="togglePosVendaFluxo(${pIdx},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#c9a227;">
+            Pós-venda enviada
+          </label>
+          ${p.tel ? `<a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#fff;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Chamar no WhatsApp</a>` : ''}
+        </div>
       </div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px;">
         <div>
@@ -6819,9 +6884,9 @@ function renderFluxoCards() {
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           <button onclick="abrirAdicionarFluxo(${pIdx})" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:4px 10px;cursor:pointer;">✏️ Editar</button>
-          ${!p.concluido
-            ? `<button onclick="concluirFluxoPaciente(${pIdx})" style="background:#f0f7f0;border:1px solid #b8dfc0;border-radius:6px;color:#2a5a3a;font-size:11px;padding:4px 10px;cursor:pointer;">✓ Concluir</button>`
-            : `<span style="background:#dcfce7;color:#166534;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>`}
+          ${p.concluido
+            ? `<span style="background:#dcfce7;color:#166534;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>`
+            : ''}
           <button onclick="removerFluxoPaciente(${pIdx})" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:4px 10px;cursor:pointer;">✕</button>
         </div>
       </div>
@@ -6839,13 +6904,27 @@ function toggleSubetapaFluxo(pIdx, prIdx, subIdx, checked) {
   if (!p) return;
   p.procedimentos[prIdx].subetapas[subIdx].ok = checked;
   p.procedimentos[prIdx].subetapas[subIdx].data = checked ? new Date().toISOString().slice(0, 10) : null;
-  if (p.procedimentos.every(pr => pr.subetapas.every(s => s.ok))) p.concluido = true;
+  // Recalcula concluído (clínico + NPS + pós-venda) — se desmarcou uma subetapa,
+  // a parte clínica deixa de estar completa e o paciente volta pra "em tratamento".
+  atualizarConclusaoFluxo(p);
   salvarFluxoRemoto();
   renderFluxoCards();
 }
 
-function concluirFluxoPaciente(idx) {
-  _fluxoPacientes[idx].concluido = true;
+function toggleNpsFluxo(idx, checked) {
+  const p = _fluxoPacientes[idx];
+  if (!p) return;
+  p.npsEnviado = checked;
+  atualizarConclusaoFluxo(p);
+  salvarFluxoRemoto();
+  renderFluxoCards();
+}
+
+function togglePosVendaFluxo(idx, checked) {
+  const p = _fluxoPacientes[idx];
+  if (!p) return;
+  p.posVendaEnviado = checked;
+  atualizarConclusaoFluxo(p);
   salvarFluxoRemoto();
   renderFluxoCards();
 }
@@ -6968,8 +7047,9 @@ function confirmarAdicionarFluxo() {
     p.tel = tel;
     p.dataInicio = data || p.dataInicio;
     p.procedimentos = JSON.parse(JSON.stringify(_fluxoAddProcedimentos));
-    // Reavalia se ainda está tudo concluído (pode ter adicionado etapa nova numa pessoa já concluída)
-    p.concluido = p.procedimentos.every(pr => pr.subetapas.every(s => s.ok));
+    // Reavalia concluído (clínico + NPS + pós-venda) — pode ter adicionado etapa
+    // nova numa pessoa já concluída, o que reabre o card automaticamente.
+    atualizarConclusaoFluxo(p);
     document.getElementById('modal-adicionar-fluxo').style.display = 'none';
     _fluxoEditandoIdx = -1;
     salvarFluxoRemoto();
@@ -6980,7 +7060,7 @@ function confirmarAdicionarFluxo() {
       id: Date.now().toString(), nome, tel,
       dataInicio: data || new Date().toISOString().slice(0, 10),
       procedimentos: JSON.parse(JSON.stringify(_fluxoAddProcedimentos)),
-      concluido: false
+      concluido: false, npsEnviado: false, posVendaEnviado: false, dataConcluido: null
     });
     document.getElementById('modal-adicionar-fluxo').style.display = 'none';
     salvarFluxoRemoto();
