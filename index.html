@@ -1812,6 +1812,88 @@ function toggleDetalhesTrafego(){
   if(slider)slider.style.background=checked?'#5a8a6a':'#d4c9bc';
   if(knob)knob.style.left=checked?'20px':'2px';
 }
+// Confere se um telefone bate com a origem selecionada no filtro do Dashboard —
+// usado pra cruzar dados do Clinicorp (que não sabe a origem) com a origem
+// reconciliada de cada telefone (mesma fonte usada no resto do Dashboard).
+function origemMatchClinicorp(ph){
+  if(!_origemFilter)return true;
+  const d=ccDataLookup(ph);
+  const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
+  if(_origemFilter==='instagram ads')return org.includes('instagram');
+  if(_origemFilter==='organico')return org.includes('organ');
+  if(_origemFilter==='indicacao')return org.includes('indica');
+  if(_origemFilter==='social selling')return org.includes('social');
+  return true;
+}
+// Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
+// filtrados pela origem selecionada, a partir do detalhe por telefone
+// (detalheAgendados/detalheComparecimentos). Usado tanto pelo funil quanto
+// pelos cards do bloco detalhado, pra essas 3 métricas NUNCA divergirem entre
+// si — antes, cada um filtrava (ou não) por conta própria, em momentos diferentes.
+function getAgendaClinicorpFiltrada(){
+  const agenda=window._lastAgendaClinicorp;
+  if(!agenda)return null;
+  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
+  return{
+    leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
+    totalAgendamentos:detAgend.reduce((s,d)=>s+(Number(d.qtd)||1),0), // atos de agendamento
+    comparecimentos:detComp.length // pessoas únicas que compareceram
+  };
+}
+// Atualiza os cards do bloco detalhado que vêm do Clinicorp (Agendamentos, Leads na
+// agenda no período, Comparecimentos) e a % de "Contratos fechados", sempre com a
+// MESMA base filtrada por origem usada no funil. Roda toda vez que o funil é
+// re-renderizado (troca de origem, troca de período, chegada do fetch do Clinicorp).
+function atualizarCardsAgendaClinicorp(dados){
+  if(!dados)return;
+  const leads=window._lastLeadsBase||0;
+
+  // Leads na agenda no período (únicos) — não tem override manual
+  const elAgendados=document.getElementById('t-leads-agendados');
+  if(elAgendados){
+    const pctTxt=leads>0?(dados.leadsAgendados/leads*100).toFixed(1)+'%':'—';
+    elAgendados.innerHTML=dados.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+')</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+  }
+
+  // Agendamentos (atos) — respeita edição manual, se houver
+  if(getManualOverride('agend')==null){
+    const elAgend=document.getElementById('t-agend');
+    if(elAgend){
+      const pctAgendTxt=leads>0?(dados.totalAgendamentos/leads*100).toFixed(1)+'%':'—';
+      elAgend.innerHTML=dados.totalAgendamentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctAgendTxt+')</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+    }
+    const elAgendSub=document.getElementById('t-agend-sub');
+    if(elAgendSub)elAgendSub.textContent='atos de agendamento (Clinicorp)';
+  }
+
+  // Comparecimentos — respeita edição manual, se houver. % agora é só inline
+  // (nada de "show rate" no subtítulo), sempre sobre leads únicos na agenda.
+  if(getManualOverride('comp')==null){
+    const elComp=document.getElementById('t-comp');
+    if(elComp){
+      const pctCompTxt=dados.leadsAgendados>0?(dados.comparecimentos/dados.leadsAgendados*100).toFixed(1)+'%':'—';
+      elComp.innerHTML=dados.comparecimentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctCompTxt+')</span> <button class="lupa" onclick="lupaComparecimentoClinicorp()" title="Ver detalhes">🔍</button>';
+    }
+    const elCompSub=document.getElementById('t-comp-sub');
+    if(elCompSub)elCompSub.textContent='sobre leads únicos na agenda no período';
+    if(document.getElementById('t-comp-clinicorp'))document.getElementById('t-comp-clinicorp').textContent='';
+  }
+
+  // Contratos fechados — a % agora usa o MESMO comparecimentos (Clinicorp, filtrado
+  // por origem) usado no funil, em vez do comparecimento do Cloudia — antes podia
+  // passar de 100% porque comparava contra bases diferentes. Some só a % inline,
+  // sem o texto explicativo embaixo.
+  const elContratos=document.getElementById('t-contratos');
+  const elContratosSub=document.getElementById('t-contratos-sub');
+  if(elContratos){
+    const contratos=window._lastContratos||0;
+    const pctContratos=dados.comparecimentos>0?Math.round(contratos/dados.comparecimentos*100)+'%':'—';
+    const btnLupaContr=elContratos.querySelector('button.lupa');
+    elContratos.innerHTML=contratos+' <span style="font-size:11px;color:#9a8c7e;">('+pctContratos+')</span> '+(btnLupaContr?btnLupaContr.outerHTML:'');
+  }
+  if(elContratosSub)elContratosSub.textContent='';
+}
 // Funil resumido em barras decrescentes, estilo "Dados descritivos" — cada
 // etapa ocupa um degrau fixo de largura (100% / 82% / 64% / 46%) pra sempre
 // formar o desenho de funil, com espaço garantido pro texto. O % mostrado no
@@ -1820,28 +1902,13 @@ function renderFunilResumido(){
   const el=document.getElementById('t-funil-resumido');
   if(!el)return;
   const leads=window._lastLeadsBase||0;
-  const agenda=window._lastAgendaClinicorp;
-  // Agendados/Comparecimentos vêm do Clinicorp (agenda.leadsAgendados/comparecimentos),
-  // que é um agregado por período SEM filtro de origem. Quando há origem selecionada,
-  // recalcula a partir do detalhe por telefone (detalheAgendados/detalheComparecimentos)
-  // cruzando cada telefone com a origem reconciliada — mesma lógica usada no resto do
-  // Dashboard pra filtrar por origem.
-  const origemMatch=(ph)=>{
-    if(!_origemFilter)return true;
-    const d=ccDataLookup(ph);
-    const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
-    if(_origemFilter==='instagram ads')return org.includes('instagram');
-    if(_origemFilter==='organico')return org.includes('organ');
-    if(_origemFilter==='indicacao')return org.includes('indica');
-    if(_origemFilter==='social selling')return org.includes('social');
-    return true;
-  };
-  let agendados=agenda?agenda.leadsAgendados:null;
-  let comparecimentos=agenda?agenda.comparecimentos:null;
-  if(agenda&&_origemFilter){
-    agendados=(agenda.detalheAgendados||[]).filter(d=>origemMatch(d.tel)).length;
-    comparecimentos=(agenda.detalheComparecimentos||[]).filter(d=>origemMatch(d.tel)).length;
-  }
+  // Agendados/Comparecimentos vêm do Clinicorp, já filtrados pela origem selecionada
+  // (ver getAgendaClinicorpFiltrada) — mesma base usada nos cards do bloco detalhado,
+  // pra funil e cards nunca divergirem entre si.
+  const dadosClinicorp=getAgendaClinicorpFiltrada();
+  const agendados=dadosClinicorp?dadosClinicorp.leadsAgendados:null;
+  const comparecimentos=dadosClinicorp?dadosClinicorp.comparecimentos:null;
+  atualizarCardsAgendaClinicorp(dadosClinicorp);
   const contratos=window._lastContratos||0;
   const valorFechado=window._lastValorFechado||0;
 
@@ -1947,41 +2014,17 @@ async function carregarComparecimentoClinicorp(){
     }
 
     window._lastAgendaClinicorp=r; // guarda pra alimentar as lupas
-    renderFunilResumido();
-
-    // Total e % de leads agendados (únicos, agenda real do Clinicorp)
-    elAgendados.innerHTML=r.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+r.pctComparecimento+'%)</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
     if(elAgendadosSub){
       elAgendadosSub.title='Fonte: Supabase (agenda de avaliações, alimentada por webhook do Clinicorp) — período '+r.periodo.from+' a '+r.periodo.to;
       elAgendadosSub.textContent='únicos na agenda (Clinicorp)';
     }
-
-    // Agendamentos (TODO ATO de agendar, não pessoas únicas — se a mesma
-    // pessoa for agendada 2x, cada agendamento novo do Clinicorp tem seu
-    // próprio id, então conta 2x aqui). Substitui a contagem antiga do
-    // Cloudia (que deduplicava por telefone), a não ser que exista edição manual.
-    const agendManual=getManualOverride('agend');
-    if(agendManual==null){
-      const btnLupaAgend=document.querySelector('#t-agend button.lupa');
-      const leadsParaPct=window._lastLeadsBase||0;
-      const pctAgendTxt=leadsParaPct>0?(r.totalAgendamentos/leadsParaPct*100).toFixed(1)+'%':'—';
-      document.getElementById('t-agend').innerHTML=r.totalAgendamentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctAgendTxt+')</span> '+(btnLupaAgend?btnLupaAgend.outerHTML:'');
-      const elAgendSub=document.getElementById('t-agend-sub');
-      if(elAgendSub){
-        elAgendSub.textContent='atos de agendamento (Clinicorp)';
-        elAgendSub.title='Cada agendamento novo conta separado, mesmo que seja da mesma pessoa — período '+r.periodo.from+' a '+r.periodo.to;
-      }
-    }
-
-    // Comparecimento REAL (status "Em atendimento"/"Atendido") — substitui o valor
-    // do card "Comparecimentos" quando não houver override manual, e o % agora é
-    // sempre sobre leads agendados (Clinicorp), não sobre atos de agendamento (Cloudia).
-    const compManual=getManualOverride('comp');
-    if(compManual==null){
-      const pctTxt=r.leadsAgendados>0?(r.comparecimentos/r.leadsAgendados*100).toFixed(1)+'%':'—';
-      document.getElementById('t-comp').innerHTML=(r.comparecimentos||'0')+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+')</span> <button class="lupa" onclick="lupaComparecimentoClinicorp()" title="Ver detalhes">🔍</button>';
-      document.getElementById('t-comp-sub').textContent=pctTxt+' show rate (sobre leads agendados)';
-    }
+    if(document.getElementById('t-agend-sub'))document.getElementById('t-agend-sub').title='Cada agendamento novo conta separado, mesmo que seja da mesma pessoa — período '+r.periodo.from+' a '+r.periodo.to;
+    // renderFunilResumido() recalcula e escreve Agendamentos/Leads na agenda/Comparecimentos
+    // (já filtrados pela origem selecionada) tanto no funil quanto nos cards abaixo —
+    // ver getAgendaClinicorpFiltrada/atualizarCardsAgendaClinicorp — então essas 3 métricas
+    // nunca mais divergem entre si, seja qual for o gatilho (troca de origem ou chegada
+    // deste fetch).
+    renderFunilResumido();
     if(elCompClinicorp)elCompClinicorp.textContent='';
   }catch(e){
     console.warn('[AGENDA CLINICORP] Erro (não bloqueia o dashboard):',e);
