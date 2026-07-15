@@ -545,19 +545,58 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="abrirModalModelos()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;">⚙️ Modelos de Procedimentos</button>
           <button onclick="backfillFluxoAprovados()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;" title="Cria/completa o card de todo orçamento já Aprovado no CRM">📋 Importar Aprovados</button>
-          <button onclick="abrirAdicionarFluxo()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente</button>
+          <button onclick="abrirAdicionarFluxo()" id="btn-fluxo-novo-paciente" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente</button>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-        <input type="text" id="fluxo-search" placeholder="Buscar por nome..." oninput="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
-        <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
-          <option value="">Todos os status</option>
-          <option value="em_andamento">Em andamento</option>
-          <option value="concluido">Concluído</option>
-        </select>
-        <span id="fluxo-count" style="font-size:12px;color:#9a8c7e;"></span>
+
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="fluxo-sub-tab active" id="fluxo-sub-tratamentos" onclick="mudarFluxoSubView('tratamentos')" style="background:#A18B6C;color:#fff;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🔄 Tratamentos</button>
+        <button class="fluxo-sub-tab" id="fluxo-sub-ortodontia" onclick="mudarFluxoSubView('ortodontia')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🦷 Ortodontia (manutenção mensal)</button>
       </div>
-      <div id="fluxo-cards" style="display:flex;flex-direction:column;gap:14px;"></div>
+
+      <div id="fluxo-view-tratamentos">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="fluxo-search" placeholder="Buscar por nome..." oninput="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
+          <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos os status</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="concluido">Concluído</option>
+          </select>
+          <span id="fluxo-count" style="font-size:12px;color:#9a8c7e;"></span>
+        </div>
+        <div id="fluxo-cards" style="display:flex;flex-direction:column;gap:14px;"></div>
+      </div>
+
+      <div id="fluxo-view-ortodontia" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input type="text" id="orto-search" placeholder="Buscar por nome..." oninput="renderOrtoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
+            <span id="orto-count" style="font-size:12px;color:#9a8c7e;"></span>
+          </div>
+          <button onclick="abrirAdicionarOrto()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente de Ortodontia</button>
+        </div>
+        <div style="font-size:11px;color:#9a8c7e;margin-bottom:14px;">Manutenção mensal do aparelho — cada paciente entra aqui uma vez e fica até você removê-lo. Fica "Atrasado" quando passam mais de 35 dias desde a última manutenção registrada.</div>
+        <div id="orto-cards" style="display:flex;flex-direction:column;gap:12px;"></div>
+      </div>
+    </div>
+
+    <!-- Modal: Adicionar/Editar paciente de Ortodontia -->
+    <div id="modal-adicionar-orto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:14px;padding:24px;width:420px;max-width:92vw;">
+        <div id="orto-modal-titulo" style="font-size:16px;font-weight:700;color:#2a2520;margin-bottom:16px;">+ Novo Paciente de Ortodontia</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input type="text" id="orto-add-nome" placeholder="Nome do paciente" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;">
+          <input type="text" id="orto-add-tel" placeholder="Telefone (com DDD)" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;">
+          <div>
+            <label style="font-size:11px;color:#9a8c7e;">Início do tratamento</label>
+            <input type="date" id="orto-add-data" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+          <button onclick="document.getElementById('modal-adicionar-orto').style.display='none';" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;color:#7a6550;">Cancelar</button>
+          <button onclick="confirmarAdicionarOrto()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button>
+        </div>
+      </div>
     </div>
 
     <!-- Modal: Modelos de Procedimentos -->
@@ -622,16 +661,16 @@ tbody tr:hover td{background:#faf7f3;}
         <button class="pac-cat-tab" id="pac-cat-lentesPorcelana" onclick="switchCatPacientes('lentesPorcelana')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Porcelana</button>
         <button class="pac-cat-tab" id="pac-cat-implantes" onclick="switchCatPacientes('implantes')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Implantes</button>
       </div>
-      <style>.pac-cat-tab.active{background:#A18B6C!important;color:#fff!important;}</style>
+      <style>.pac-cat-tab.active{background:#A18B6C!important;color:#fff!important;}.fluxo-sub-tab.active{background:#A18B6C!important;color:#fff!important;}</style>
 
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome..." id="pacientes-search" oninput="renderTabelaPacientes()">
         <select id="pacientes-status-filter" class="filter-select" onchange="renderTabelaPacientes()">
           <option value="">Todos os status</option>
           <option value="agendado">Agendado</option>
-          <option value="atrasado6_12">Atrasado 6-12 meses</option>
-          <option value="atrasado1_2anos">Atrasado 1-2 anos</option>
-          <option value="atrasadomais2anos">Atrasado +2 anos</option>
+          <option value="atrasado6_12">6-12 meses</option>
+          <option value="atrasado1_2anos">1-2 anos</option>
+          <option value="atrasadomais2anos">+2 anos</option>
           <option value="nuncafez">Nunca fez</option>
           <option value="emdia">Em dia</option>
           <option value="precisaNovoContato">⚠️ Chamado sem retorno (30+ dias)</option>
@@ -1833,20 +1872,17 @@ function origemMatchClinicorp(ph){
 function getAgendaClinicorpFiltrada(){
   const agenda=window._lastAgendaClinicorp;
   if(!agenda)return null;
-  const todosAgend=agenda.detalheAgendados||[];
-  const todosComp=agenda.detalheComparecimentos||[];
-  const detAgend=todosAgend.filter(d=>origemMatchClinicorp(d.tel));
-  const detComp=todosComp.filter(d=>origemMatchClinicorp(d.tel));
+  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
   // "Agendamentos" (atos) sem filtro de origem = usa direto o valor bruto do backend
-  // (agenda.totalAgendamentos), que é a fonte confiável. Somar o campo `qtd` de cada
-  // pessoa do detalhe inflava o número (ex: 48 virou 66) — provavelmente `qtd` conta
-  // algo a mais que só "atos de agendamento na Avaliação". Com filtro de origem, como
-  // não dá pra confiar no `qtd` por pessoa, aplica a MESMA proporção de pessoas
-  // filtradas sobre o total de pessoas (estimativa proporcional, não soma).
-  let totalAgendamentos=agenda.totalAgendamentos||0;
-  if(_origemFilter&&todosAgend.length>0){
-    totalAgendamentos=Math.round(totalAgendamentos*(detAgend.length/todosAgend.length));
-  }
+  // (agenda.totalAgendamentos) — é o total de atos filtrados por DATA DE CRIAÇÃO do
+  // agendamento (dataCriacao), uma base diferente de detalheAgendados (que filtra
+  // pela data da CONSULTA) — por isso não dá pra derivar um do outro.
+  // Com filtro de origem, o backend já manda detalheAtos com o telefone de cada ato
+  // (mesma base usada pra calcular totalAgendamentos), então filtra exato por lá —
+  // nada de estimativa/proporção.
+  const detAtos=(agenda.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const totalAgendamentos=_origemFilter?detAtos.length:(agenda.totalAgendamentos||0);
   return{
     leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
     totalAgendamentos, // atos de agendamento
@@ -4583,9 +4619,9 @@ function renderDiagnosticoPacientes(){
     const linhas=[];
     if(c.agendado)linhas.push(['Agendado',c.agendado,'#e2ecf0','#3a6a8a']);
     if(c.emdia!==undefined)linhas.push(['Em dia ('+(cfg.intervalo?'< '+cfg.intervalo+'m':'—')+')',c.emdia,'#e2f0e2','#4a7a4a']);
-    if(c.atrasado6_12)linhas.push(['Atrasados '+(cfg.intervalo||0)+'-12 meses',c.atrasado6_12,'#faf0d8','#b08a2e']);
-    if(c.atrasado1_2anos)linhas.push(['Atrasados 1-2 anos',c.atrasado1_2anos,'#f7e0c8','#a8682e']);
-    if(c.atrasadomais2anos)linhas.push(['Atrasados +2 anos',c.atrasadomais2anos,'#f7e2de','#b5483d']);
+    if(c.atrasado6_12)linhas.push([(cfg.intervalo||0)+'-12 meses',c.atrasado6_12,'#faf0d8','#b08a2e']);
+    if(c.atrasado1_2anos)linhas.push(['1-2 anos',c.atrasado1_2anos,'#f7e0c8','#a8682e']);
+    if(c.atrasadomais2anos)linhas.push(['+2 anos',c.atrasadomais2anos,'#f7e2de','#b5483d']);
     if(c.nuncafez)linhas.push(['Nunca fizeram',c.nuncafez,'#f3d6d6','#9a3a3a']);
     if(c.semdado)linhas.push(['Sem dado registrado',c.semdado,'#f0ece4','#9a8c7e']);
     const precisamContato=c.atrasado6_12+c.atrasado1_2anos+c.atrasadomais2anos+c.nuncafez;
@@ -4635,9 +4671,9 @@ function renderTabelaPacientes(){
   document.getElementById('pacientes-count').textContent=regs.length+' paciente'+(regs.length!==1?'s':'');
 
   const statusBadge={
-    atrasado6_12:'<span style="background:#faf0d8;color:#b08a2e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado 6-12m</span>',
-    atrasado1_2anos:'<span style="background:#f7e0c8;color:#a8682e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado 1-2 anos</span>',
-    atrasadomais2anos:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ Atrasado +2 anos</span>',
+    atrasado6_12:'<span style="background:#faf0d8;color:#b08a2e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ 6-12m</span>',
+    atrasado1_2anos:'<span style="background:#f7e0c8;color:#a8682e;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ 1-2 anos</span>',
+    atrasadomais2anos:'<span style="background:#f7e2de;color:#b5483d;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">⚠ +2 anos</span>',
     nuncafez:'<span style="background:#f3d6d6;color:#9a3a3a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Nunca fez</span>',
     emdia:'<span style="background:#e2f0e2;color:#4a7a4a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">✓ Em dia</span>',
     agendado:'<span style="background:#e2ecf0;color:#3a6a8a;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 Agendado</span>',
@@ -6747,6 +6783,8 @@ function salvarSaidaEstoque(){
 let _fluxoModelos = {};
 let _fluxoPacientes = [];
 let _fluxoIniciado = false;
+let _ortoPacientes = []; // [{id,nome,tel,dataInicio,ultimaManutencao,historico:[{data}]}]
+let _fluxoSubView = 'tratamentos';
 
 // Só considera a parte CLÍNICA concluída (todas as subetapas de todos os
 // procedimentos marcadas) — não confundir com p.concluido, que agora também
@@ -6767,8 +6805,21 @@ function atualizarConclusaoFluxo(p) {
   if (!p.concluido) p.dataConcluido = null;
 }
 
+// Troca entre a lista normal de Tratamentos e a lista separada de Ortodontia
+// (manutenção mensal recorrente, não é um "tratamento com fim" como os outros).
+function mudarFluxoSubView(view) {
+  _fluxoSubView = view;
+  document.getElementById('fluxo-sub-tratamentos').classList.toggle('active', view === 'tratamentos');
+  document.getElementById('fluxo-sub-ortodontia').classList.toggle('active', view === 'ortodontia');
+  document.getElementById('fluxo-view-tratamentos').style.display = view === 'tratamentos' ? '' : 'none';
+  document.getElementById('fluxo-view-ortodontia').style.display = view === 'ortodontia' ? '' : 'none';
+  const btnNovo = document.getElementById('btn-fluxo-novo-paciente');
+  if (btnNovo) btnNovo.style.display = view === 'tratamentos' ? '' : 'none';
+  if (view === 'ortodontia') renderOrtoCards();
+}
+
 async function initFluxoTratamento() {
-  if (_fluxoIniciado) { renderFluxoCards(); return; }
+  if (_fluxoIniciado) { renderFluxoCards(); renderOrtoCards(); return; }
   _fluxoIniciado = true;
   try {
     const resp = await fetch(CLOUDIA_URL + '?action=loadFluxo');
@@ -6776,15 +6827,17 @@ async function initFluxoTratamento() {
       const data = await resp.json();
       _fluxoModelos = data.modelos || {};
       _fluxoPacientes = data.pacientes || [];
+      _ortoPacientes = data.ortoPacientes || [];
     }
   } catch(e) { console.warn('[FLUXO] Erro ao carregar:', e); }
   renderFluxoCards();
+  renderOrtoCards();
 }
 
 async function salvarFluxoRemoto() {
   try {
     await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveFluxo', data: { modelos: _fluxoModelos, pacientes: _fluxoPacientes } }) });
+      body: JSON.stringify({ action: 'saveFluxo', data: { modelos: _fluxoModelos, pacientes: _fluxoPacientes, ortoPacientes: _ortoPacientes } }) });
   } catch(e) { console.warn('[FLUXO] Erro ao salvar:', e); }
 }
 
@@ -6934,6 +6987,100 @@ function removerFluxoPaciente(idx) {
   _fluxoPacientes.splice(idx, 1);
   salvarFluxoRemoto();
   renderFluxoCards();
+}
+
+// ============================================================
+// ORTODONTIA — manutenção mensal recorrente. Diferente do Fluxo normal:
+// não tem "subetapas" nem "concluído", é um ciclo que se repete todo mês
+// enquanto o paciente estiver em tratamento com aparelho.
+// ============================================================
+function diasDesde(dataStr) {
+  if (!dataStr) return Infinity;
+  return Math.floor((Date.now() - new Date(dataStr + 'T12:00').getTime()) / 86400000);
+}
+
+function renderOrtoCards() {
+  const container = document.getElementById('orto-cards');
+  if (!container) return;
+  const busca = (document.getElementById('orto-search')?.value || '').toLowerCase();
+  const filtrados = _ortoPacientes.filter(p => !busca || p.nome.toLowerCase().includes(busca))
+    .sort((a, b) => diasDesde(b.ultimaManutencao) - diasDesde(a.ultimaManutencao)); // mais atrasado primeiro
+
+  const elCount = document.getElementById('orto-count');
+  if (elCount) elCount.textContent = filtrados.length + ' paciente(s)';
+
+  if (!filtrados.length) {
+    container.innerHTML = '<div style="text-align:center;color:#b5a898;padding:40px;font-size:13px;">Nenhum paciente de ortodontia ainda.<br>Clique em "+ Novo Paciente de Ortodontia" para começar.</div>';
+    return;
+  }
+
+  container.innerHTML = filtrados.map(p => {
+    const idx = _ortoPacientes.indexOf(p);
+    const dias = diasDesde(p.ultimaManutencao);
+    const atrasado = dias > 35;
+    const nuncaFez = !p.ultimaManutencao;
+    const statusTxt = nuncaFez ? 'Nunca registrada' : (atrasado ? `Atrasado — ${dias} dias desde a última` : `Em dia — última há ${dias} dia(s)`);
+    const statusCor = nuncaFez ? '#9a8c7e' : (atrasado ? '#b5483d' : '#4a7a4a');
+    const statusFundo = nuncaFez ? '#f0ece4' : (atrasado ? '#f7e2de' : '#e2f0e2');
+    const qtdManutencoes = (p.historico || []).length;
+    return `
+    <div style="background:#fff;border-radius:12px;border:1px solid ${atrasado ? '#e8b8ac' : '#e8e2da'};padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+      <div style="min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#2a2520;">${p.nome}</div>
+        <div style="font-size:11px;color:#9a8c7e;margin-top:2px;">
+          Início: ${p.dataInicio ? new Date(p.dataInicio+'T12:00').toLocaleDateString('pt-BR') : '—'}
+          ${p.tel ? ` · <a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="color:#5a8a6a;text-decoration:none;">📱 WhatsApp</a>` : ''}
+          ${qtdManutencoes ? ` · ${qtdManutencoes} manutenção(ões) registrada(s)` : ''}
+        </div>
+        <div style="margin-top:6px;"><span style="background:${statusFundo};color:${statusCor};font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;">${statusTxt}</span></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button onclick="marcarManutencaoOrto(${idx})" style="background:#f0f7f0;border:1px solid #b8dfc0;border-radius:6px;color:#2a5a3a;font-size:11px;padding:6px 12px;cursor:pointer;font-weight:600;">✓ Manutenção feita hoje</button>
+        <button onclick="removerOrtoPaciente(${idx})" style="background:#fee2e2;border:none;border-radius:6px;color:#991b1b;font-size:11px;padding:6px 10px;cursor:pointer;">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function marcarManutencaoOrto(idx) {
+  const p = _ortoPacientes[idx];
+  if (!p) return;
+  const hoje = new Date().toISOString().slice(0, 10);
+  p.ultimaManutencao = hoje;
+  if (!p.historico) p.historico = [];
+  p.historico.push({ data: hoje });
+  salvarFluxoRemoto();
+  renderOrtoCards();
+}
+
+function removerOrtoPaciente(idx) {
+  if (!confirm('Remover este paciente da manutenção de ortodontia?')) return;
+  _ortoPacientes.splice(idx, 1);
+  salvarFluxoRemoto();
+  renderOrtoCards();
+}
+
+function abrirAdicionarOrto() {
+  document.getElementById('orto-add-nome').value = '';
+  document.getElementById('orto-add-tel').value = '';
+  document.getElementById('orto-add-data').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('modal-adicionar-orto').style.display = 'flex';
+}
+
+function confirmarAdicionarOrto() {
+  const nome = document.getElementById('orto-add-nome').value.trim();
+  const tel = document.getElementById('orto-add-tel').value.trim();
+  const data = document.getElementById('orto-add-data').value;
+  if (!nome) { alert('Informe o nome do paciente.'); return; }
+  _ortoPacientes.push({
+    id: Date.now().toString(), nome, tel,
+    dataInicio: data || new Date().toISOString().slice(0, 10),
+    ultimaManutencao: null, historico: []
+  });
+  document.getElementById('modal-adicionar-orto').style.display = 'none';
+  salvarFluxoRemoto();
+  renderOrtoCards();
+  showToast('success', '✅ Paciente de ortodontia adicionado!', '');
 }
 
 // ---- Modal adicionar paciente ----
