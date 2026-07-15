@@ -621,7 +621,7 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- Modal: Adicionar/Editar ação do Calendário Sazonal -->
     <div id="modal-adicionar-acao-calendario" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:14px;padding:24px;width:420px;max-width:92vw;">
+      <div style="background:#fff;border-radius:14px;padding:24px;width:520px;max-width:92vw;max-height:88vh;overflow-y:auto;">
         <div id="calendario-modal-titulo" style="font-size:16px;font-weight:700;color:#2a2520;margin-bottom:16px;">+ Nova Ação</div>
         <div style="display:flex;flex-direction:column;gap:10px;">
           <input type="text" id="calendario-add-titulo" placeholder="Título da ação (ex: Promoção Dia das Mães)" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;">
@@ -634,7 +634,10 @@ tbody tr:hover td{background:#faf7f3;}
               <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
             </select>
           </div>
-          <textarea id="calendario-add-obs" placeholder="Observações" rows="3" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;"></textarea>
+          <div>
+            <label style="font-size:11px;color:#9a8c7e;">Estratégia</label>
+            <textarea id="calendario-add-obs" placeholder="Qual a estratégia dessa ação?" rows="3" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;width:100%;box-sizing:border-box;"></textarea>
+          </div>
           <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#5a4a3a;cursor:pointer;">
             <input type="checkbox" id="calendario-add-recorrente" style="width:15px;height:15px;cursor:pointer;">
             🔁 Ação recorrente (repete todo ano)
@@ -642,6 +645,14 @@ tbody tr:hover td{background:#faf7f3;}
           <div id="calendario-add-ano-wrap">
             <label style="font-size:11px;color:#9a8c7e;">Ano (só se não for recorrente)</label>
             <input type="number" id="calendario-add-ano" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+          </div>
+
+          <div style="border-top:0.5px solid #e8e2da;margin-top:6px;padding-top:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <label style="font-size:11px;color:#9a8c7e;">Tarefas (dia, o que fazer e quem é responsável)</label>
+              <button onclick="adicionarTarefaCalendarioModal()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:4px 10px;cursor:pointer;">+ Adicionar tarefa</button>
+            </div>
+            <div id="calendario-add-tarefas-lista" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
@@ -7141,11 +7152,13 @@ function confirmarAdicionarOrto() {
 //  - específica de um ano (só aparece quando esse ano está selecionado no filtro)
 // Persistido no backend próprio (loadCalendarioSazonal/saveCalendarioSazonal),
 // mesmo padrão de armazenamento já usado no Fluxo de Tratamento.
-// _calendarioAcoes: [{id, titulo, mes(1-12), observacao, recorrente, ano}]
+// _calendarioAcoes: [{id, titulo, mes(1-12), observacao(estratégia), recorrente, ano,
+//   tarefas: [{dia(1-31), tarefa, responsavel, feito}]}]
 // ============================================================
 let _calendarioAcoes = [];
 let _calendarioIniciado = false;
 let _calendarioEditandoIdx = -1;
+let _calendarioAddTarefas = []; // estado temporário das tarefas enquanto o modal está aberto
 const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 async function initCalendarioSazonal() {
@@ -7192,6 +7205,16 @@ function renderCalendarioSazonal() {
     const acoesHtml = acoesDoMes.length
       ? acoesDoMes.map(a => {
           const idx = _calendarioAcoes.indexOf(a);
+          const tarefas = (a.tarefas || []).slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0));
+          const tarefasHtml = tarefas.length
+            ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">` + tarefas.map(t => {
+                const tIdx = a.tarefas.indexOf(t);
+                return `<label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;color:${t.feito ? '#9a8c7e' : '#5a4a3a'};cursor:pointer;${t.feito ? 'text-decoration:line-through;' : ''}">
+                  <input type="checkbox" ${t.feito ? 'checked' : ''} onchange="toggleTarefaCalendario(${idx},${tIdx},this.checked)" style="width:13px;height:13px;cursor:pointer;margin-top:1px;flex-shrink:0;">
+                  <span><b>Dia ${t.dia || '?'}</b> — ${t.tarefa}${t.responsavel ? ' <span style="color:#A18B6C;">· ' + t.responsavel + '</span>' : ''}</span>
+                </label>`;
+              }).join('') + `</div>`
+            : '';
           return `<div style="background:#f5f0ea;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
               <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
@@ -7201,6 +7224,7 @@ function renderCalendarioSazonal() {
               </div>
             </div>
             ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-top:4px;">${a.observacao}</div>` : ''}
+            ${tarefasHtml}
           </div>`;
         }).join('')
       : `<div style="font-size:11px;color:#b5a898;padding:8px 0;">Nenhuma ação neste mês.</div>`;
@@ -7213,6 +7237,42 @@ function renderCalendarioSazonal() {
       ${acoesHtml}
     </div>`;
   }).join('');
+}
+
+// Marca/desmarca uma tarefa como feita direto na grade, sem precisar abrir o modal
+function toggleTarefaCalendario(acaoIdx, tarefaIdx, checked) {
+  const a = _calendarioAcoes[acaoIdx];
+  if (!a || !a.tarefas || !a.tarefas[tarefaIdx]) return;
+  a.tarefas[tarefaIdx].feito = checked;
+  salvarCalendarioSazonalRemoto();
+  renderCalendarioSazonal();
+}
+
+// ---- Tarefas dentro do modal (dia + o que fazer + responsável) ----
+function renderCalendarioAddTarefasModal() {
+  const container = document.getElementById('calendario-add-tarefas-lista');
+  if (!container) return;
+  if (!_calendarioAddTarefas.length) {
+    container.innerHTML = '<div style="font-size:11px;color:#b5a898;">Nenhuma tarefa adicionada ainda.</div>';
+    return;
+  }
+  container.innerHTML = _calendarioAddTarefas.map((t, i) => `
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input type="number" min="1" max="31" placeholder="Dia" value="${t.dia || ''}" oninput="_calendarioAddTarefas[${i}].dia=this.value" style="width:55px;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;flex-shrink:0;">
+      <input type="text" placeholder="O que fazer" value="${(t.tarefa || '').replace(/"/g, '&quot;')}" oninput="_calendarioAddTarefas[${i}].tarefa=this.value" style="flex:2;min-width:0;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;">
+      <input type="text" placeholder="Responsável" value="${(t.responsavel || '').replace(/"/g, '&quot;')}" oninput="_calendarioAddTarefas[${i}].responsavel=this.value" style="flex:1;min-width:0;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 8px;font-size:12px;outline:none;">
+      <button onclick="removerTarefaCalendarioModal(${i})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:14px;padding:2px;flex-shrink:0;" title="Remover tarefa">✕</button>
+    </div>`).join('');
+}
+
+function adicionarTarefaCalendarioModal() {
+  _calendarioAddTarefas.push({ dia: '', tarefa: '', responsavel: '', feito: false });
+  renderCalendarioAddTarefasModal();
+}
+
+function removerTarefaCalendarioModal(i) {
+  _calendarioAddTarefas.splice(i, 1);
+  renderCalendarioAddTarefasModal();
 }
 
 function abrirAdicionarAcaoCalendario(idx, mesPreSelecionado) {
@@ -7230,6 +7290,7 @@ function abrirAdicionarAcaoCalendario(idx, mesPreSelecionado) {
     document.getElementById('calendario-add-obs').value = a.observacao || '';
     elRecorrente.checked = !!a.recorrente;
     document.getElementById('calendario-add-ano').value = a.ano || anoSel;
+    _calendarioAddTarefas = JSON.parse(JSON.stringify(a.tarefas || []));
   } else {
     titulo.textContent = '+ Nova Ação';
     document.getElementById('calendario-add-titulo').value = '';
@@ -7237,7 +7298,9 @@ function abrirAdicionarAcaoCalendario(idx, mesPreSelecionado) {
     document.getElementById('calendario-add-obs').value = '';
     elRecorrente.checked = false;
     document.getElementById('calendario-add-ano').value = anoSel;
+    _calendarioAddTarefas = [];
   }
+  renderCalendarioAddTarefasModal();
   elAnoWrap.style.display = elRecorrente.checked ? 'none' : 'block';
   elRecorrente.onchange = () => { elAnoWrap.style.display = elRecorrente.checked ? 'none' : 'block'; };
   document.getElementById('modal-adicionar-acao-calendario').style.display = 'flex';
@@ -7251,14 +7314,20 @@ function confirmarAdicionarAcaoCalendario() {
   const ano = Number(document.getElementById('calendario-add-ano').value) || new Date().getFullYear();
   if (!titulo) { alert('Informe o título da ação.'); return; }
 
+  // Só guarda tarefas com pelo menos a descrição preenchida (linhas em branco somem)
+  const tarefas = _calendarioAddTarefas
+    .filter(t => (t.tarefa || '').trim())
+    .map(t => ({ dia: Number(t.dia) || null, tarefa: t.tarefa.trim(), responsavel: (t.responsavel || '').trim(), feito: !!t.feito }));
+
   if (_calendarioEditandoIdx >= 0) {
     const a = _calendarioAcoes[_calendarioEditandoIdx];
     a.titulo = titulo; a.mes = mes; a.observacao = observacao; a.recorrente = recorrente;
     a.ano = recorrente ? null : ano;
+    a.tarefas = tarefas;
   } else {
     _calendarioAcoes.push({
       id: Date.now().toString(), titulo, mes, observacao,
-      recorrente, ano: recorrente ? null : ano
+      recorrente, ano: recorrente ? null : ano, tarefas
     });
   }
   document.getElementById('modal-adicionar-acao-calendario').style.display = 'none';
