@@ -197,6 +197,10 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-icon">📦</span>
       <span class="nav-label">Estoque</span>
     </div>
+    <div class="nav-item" onclick="switchPage('calendario',this);initCalendarioSazonal();">
+      <span class="nav-icon">📅</span>
+      <span class="nav-label">Calendário Sazonal</span>
+    </div>
     <div class="nav-section">Relatórios</div>
     <div class="nav-item" onclick="switchPage('rel-origem',this)">
       <span class="nav-icon">📈</span>
@@ -595,6 +599,54 @@ tbody tr:hover td{background:#faf7f3;}
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
           <button onclick="document.getElementById('modal-adicionar-orto').style.display='none';" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;color:#7a6550;">Cancelar</button>
           <button onclick="confirmarAdicionarOrto()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== CALENDÁRIO SAZONAL ==================== -->
+    <div class="page" id="page-calendario">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#2a2520;">📅 Calendário Sazonal</div>
+          <div style="font-size:12px;color:#9a8c7e;margin-top:2px;">Ações e datas comemorativas do ano, organizadas por mês</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="calendario-ano" onchange="renderCalendarioSazonal()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;"></select>
+          <button onclick="abrirAdicionarAcaoCalendario()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Nova Ação</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#9a8c7e;margin-bottom:16px;">🔁 = ação recorrente (repete todo ano, aparece em qualquer ano selecionado). As demais valem só para o ano escolhido no filtro acima.</div>
+      <div id="calendario-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;"></div>
+    </div>
+
+    <!-- Modal: Adicionar/Editar ação do Calendário Sazonal -->
+    <div id="modal-adicionar-acao-calendario" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:14px;padding:24px;width:420px;max-width:92vw;">
+        <div id="calendario-modal-titulo" style="font-size:16px;font-weight:700;color:#2a2520;margin-bottom:16px;">+ Nova Ação</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input type="text" id="calendario-add-titulo" placeholder="Título da ação (ex: Promoção Dia das Mães)" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;">
+          <div>
+            <label style="font-size:11px;color:#9a8c7e;">Mês</label>
+            <select id="calendario-add-mes" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+              <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+              <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+          <textarea id="calendario-add-obs" placeholder="Observações" rows="3" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;resize:vertical;font-family:inherit;"></textarea>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#5a4a3a;cursor:pointer;">
+            <input type="checkbox" id="calendario-add-recorrente" style="width:15px;height:15px;cursor:pointer;">
+            🔁 Ação recorrente (repete todo ano)
+          </label>
+          <div id="calendario-add-ano-wrap">
+            <label style="font-size:11px;color:#9a8c7e;">Ano (só se não for recorrente)</label>
+            <input type="number" id="calendario-add-ano" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 12px;font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
+          <button onclick="document.getElementById('modal-adicionar-acao-calendario').style.display='none';" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;color:#7a6550;">Cancelar</button>
+          <button onclick="confirmarAdicionarAcaoCalendario()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button>
         </div>
       </div>
     </div>
@@ -1539,7 +1591,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -7081,6 +7133,146 @@ function confirmarAdicionarOrto() {
   salvarFluxoRemoto();
   renderOrtoCards();
   showToast('success', '✅ Paciente de ortodontia adicionado!', '');
+}
+
+// ============================================================
+// CALENDÁRIO SAZONAL — grade de 12 meses. Cada ação pode ser:
+//  - recorrente (repete todo ano, sem ano associado)
+//  - específica de um ano (só aparece quando esse ano está selecionado no filtro)
+// Persistido no backend próprio (loadCalendarioSazonal/saveCalendarioSazonal),
+// mesmo padrão de armazenamento já usado no Fluxo de Tratamento.
+// _calendarioAcoes: [{id, titulo, mes(1-12), observacao, recorrente, ano}]
+// ============================================================
+let _calendarioAcoes = [];
+let _calendarioIniciado = false;
+let _calendarioEditandoIdx = -1;
+const MESES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+async function initCalendarioSazonal() {
+  // Popula o seletor de ano (2 anos pra trás até 3 pra frente) na primeira vez
+  const selAno = document.getElementById('calendario-ano');
+  if (selAno && !selAno.options.length) {
+    const anoAtual = new Date().getFullYear();
+    for (let a = anoAtual - 2; a <= anoAtual + 3; a++) {
+      const opt = document.createElement('option');
+      opt.value = a; opt.textContent = a;
+      if (a === anoAtual) opt.selected = true;
+      selAno.appendChild(opt);
+    }
+  }
+  if (_calendarioIniciado) { renderCalendarioSazonal(); return; }
+  _calendarioIniciado = true;
+  try {
+    const resp = await fetch(CLOUDIA_URL + '?action=loadCalendarioSazonal');
+    if (resp.ok) {
+      const data = await resp.json();
+      _calendarioAcoes = data.acoes || [];
+    }
+  } catch (e) { console.warn('[CALENDARIO SAZONAL] Erro ao carregar:', e); }
+  renderCalendarioSazonal();
+}
+
+async function salvarCalendarioSazonalRemoto() {
+  try {
+    await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveCalendarioSazonal', data: { acoes: _calendarioAcoes } }) });
+  } catch (e) { console.warn('[CALENDARIO SAZONAL] Erro ao salvar:', e); }
+}
+
+function renderCalendarioSazonal() {
+  const container = document.getElementById('calendario-grid');
+  if (!container) return;
+  const anoSel = Number(document.getElementById('calendario-ano')?.value) || new Date().getFullYear();
+
+  container.innerHTML = MESES_NOMES.map((nomeMes, i) => {
+    const mes = i + 1;
+    const acoesDoMes = _calendarioAcoes
+      .filter(a => a.mes === mes && (a.recorrente || Number(a.ano) === anoSel))
+      .sort((a, b) => (b.recorrente ? 1 : 0) - (a.recorrente ? 1 : 0));
+    const acoesHtml = acoesDoMes.length
+      ? acoesDoMes.map(a => {
+          const idx = _calendarioAcoes.indexOf(a);
+          return `<div style="background:#f5f0ea;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
+              <div style="display:flex;gap:4px;flex-shrink:0;">
+                <button onclick="abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar">✏️</button>
+                <button onclick="removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover">✕</button>
+              </div>
+            </div>
+            ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-top:4px;">${a.observacao}</div>` : ''}
+          </div>`;
+        }).join('')
+      : `<div style="font-size:11px;color:#b5a898;padding:8px 0;">Nenhuma ação neste mês.</div>`;
+
+    return `<div style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:16px 18px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:700;color:#2a2520;">${nomeMes}</div>
+        <button onclick="abrirAdicionarAcaoCalendario(-1,${mes})" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:16px;padding:0;line-height:1;" title="Adicionar ação em ${nomeMes}">+</button>
+      </div>
+      ${acoesHtml}
+    </div>`;
+  }).join('');
+}
+
+function abrirAdicionarAcaoCalendario(idx, mesPreSelecionado) {
+  _calendarioEditandoIdx = idx != null ? idx : -1;
+  const titulo = document.getElementById('calendario-modal-titulo');
+  const elRecorrente = document.getElementById('calendario-add-recorrente');
+  const elAnoWrap = document.getElementById('calendario-add-ano-wrap');
+  const anoSel = Number(document.getElementById('calendario-ano')?.value) || new Date().getFullYear();
+
+  if (_calendarioEditandoIdx >= 0) {
+    const a = _calendarioAcoes[_calendarioEditandoIdx];
+    titulo.textContent = '✏️ Editar Ação';
+    document.getElementById('calendario-add-titulo').value = a.titulo;
+    document.getElementById('calendario-add-mes').value = a.mes;
+    document.getElementById('calendario-add-obs').value = a.observacao || '';
+    elRecorrente.checked = !!a.recorrente;
+    document.getElementById('calendario-add-ano').value = a.ano || anoSel;
+  } else {
+    titulo.textContent = '+ Nova Ação';
+    document.getElementById('calendario-add-titulo').value = '';
+    document.getElementById('calendario-add-mes').value = mesPreSelecionado || (new Date().getMonth() + 1);
+    document.getElementById('calendario-add-obs').value = '';
+    elRecorrente.checked = false;
+    document.getElementById('calendario-add-ano').value = anoSel;
+  }
+  elAnoWrap.style.display = elRecorrente.checked ? 'none' : 'block';
+  elRecorrente.onchange = () => { elAnoWrap.style.display = elRecorrente.checked ? 'none' : 'block'; };
+  document.getElementById('modal-adicionar-acao-calendario').style.display = 'flex';
+}
+
+function confirmarAdicionarAcaoCalendario() {
+  const titulo = document.getElementById('calendario-add-titulo').value.trim();
+  const mes = Number(document.getElementById('calendario-add-mes').value);
+  const observacao = document.getElementById('calendario-add-obs').value.trim();
+  const recorrente = document.getElementById('calendario-add-recorrente').checked;
+  const ano = Number(document.getElementById('calendario-add-ano').value) || new Date().getFullYear();
+  if (!titulo) { alert('Informe o título da ação.'); return; }
+
+  if (_calendarioEditandoIdx >= 0) {
+    const a = _calendarioAcoes[_calendarioEditandoIdx];
+    a.titulo = titulo; a.mes = mes; a.observacao = observacao; a.recorrente = recorrente;
+    a.ano = recorrente ? null : ano;
+  } else {
+    _calendarioAcoes.push({
+      id: Date.now().toString(), titulo, mes, observacao,
+      recorrente, ano: recorrente ? null : ano
+    });
+  }
+  document.getElementById('modal-adicionar-acao-calendario').style.display = 'none';
+  _calendarioEditandoIdx = -1;
+  salvarCalendarioSazonalRemoto();
+  renderCalendarioSazonal();
+  showToast('success', '✅ Ação salva!', '');
+}
+
+function removerAcaoCalendario(idx) {
+  if (!confirm('Remover esta ação do calendário?')) return;
+  _calendarioAcoes.splice(idx, 1);
+  salvarCalendarioSazonalRemoto();
+  renderCalendarioSazonal();
 }
 
 // ---- Modal adicionar paciente ----
