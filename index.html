@@ -90,11 +90,12 @@ tbody tr:hover td{background:#faf7f3;}
 .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:12px;}
 .mc-ind{background:#f2ede4;border-radius:16px;padding:22px 24px;min-height:118px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
 .mc-ind-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
-.mc-ind-label{font-size:13px;color:#7a6550;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-ind-label{font-size:13px;color:#7a6550;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mc-ind-icon{width:19px;height:19px;border-radius:50%;background:#8a7a68;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .mc-ind-value{font-size:28px;font-weight:700;color:#2a2520;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mc-ind-value.green{color:#5a8a6a;}
 #bloco-detalhes-trafego .mc,#bloco-detalhes-trafego .ccard{background:#f2ede4;border:none;border-radius:14px;padding:16px 18px;}
+#bloco-detalhes-trafego .ml,#bloco-detalhes-trafego .mv{font-weight:700;}
 .card{background:#fff;border:0.5px solid #e0d8ce;border-radius:10px;padding:16px;min-width:0;margin-bottom:12px;}
 .card.no-mb{margin-bottom:0;}
 .ctitle{font-size:10px;font-weight:500;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
@@ -320,7 +321,7 @@ tbody tr:hover td{background:#faf7f3;}
             <div id="bloco-detalhes-trafego" style="display:none;">
             <div class="slabel">Investimento & leads</div>
             <div class="row r4">
-              <div class="mc"><div class="ml">Investimento em ADS</div><div class="mv gold" id="t-spend">—</div><div class="ms">campanhas de captação</div></div>
+              <div class="mc"><div class="ml">Investimento em ADS</div><div class="mv gold" id="t-spend">—</div><div class="ms">investimento total (todas as campanhas)</div></div>
               <div class="mc"><div class="ml">CPL — Meta ADS</div><div class="mv cost" id="t-cpl">—</div><div class="ms" id="t-leads-sub">aguardando dados</div></div>
               <div class="mc"><div class="ml">CPL — Geral</div><div class="mv cost" id="t-cpl-geral">—</div><div class="ms">investimento ÷ todos os leads</div></div>
               <div class="mc"><div class="ml">Leads</div><div class="mv" id="t-leads">— <button class="lupa" onclick="lupaLeads()" title="Ver detalhes">🔍</button></div><div class="ms">no período</div></div>
@@ -2188,17 +2189,25 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
 
   // --- STEP 1: Monta adMap com dados da Meta ---
-  let spend=0;
+  let spend=0; // investimento TOTAL (todas as campanhas)
+  let spendCaptacao=0; // investimento só das campanhas de captação (resultado = conversa por mensagem)
+  // Campanha de captação = tem resultado do tipo "conversa por mensagem" (click-to-WhatsApp/Messenger).
+  // A Meta reporta isso no array `actions`, com action_type contendo "messaging_conversation_started".
+  // Campanhas com outro objetivo (ex: tráfego/visita ao perfil) não têm essa action e ficam de fora.
+  const isCaptacaoAd=(ad)=>(ad.actions||[]).some(a=>String(a.action_type||'').includes('messaging_conversation_started'));
   const adMap={};    // chave: ad_id completo da Meta
   const adNameMap={}; // chave: ad_name normalizado → ad_id
   metaAds.forEach(ad=>{
-    spend+=parseFloat(ad.spend||0);
+    const adSpend=parseFloat(ad.spend||0);
+    spend+=adSpend;
+    if(isCaptacaoAd(ad))spendCaptacao+=adSpend;
     const key=String(ad.ad_id||'').trim();
     if(!key)return;
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',campaign:ad.campaign_name||'',label:ad.ad_name||key,phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
-    adMap[key].spend+=parseFloat(ad.spend||0);
+    adMap[key].spend+=adSpend;
     if(ad.ad_name)adNameMap[norm(ad.ad_name)]=key;
   });
+
 
   // --- STEP 2: Função para casar um row do Cloudia com uma chave do adMap ---
   function findAdKey(r){
@@ -2328,8 +2337,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   const leadsBase=cloudiaLeadsCount;
   const leadsBasePago=leadsInstagram.size||leadsBase;
-  const cplReal=leadsBasePago>0&&spend>0?spend/leadsBasePago:0;
-  // CPL Geral: mesmo investimento (Meta é o único canal pago hoje), dividido por
+  // CPL — Meta ADS: só o investimento das campanhas de captação (conversa por mensagem)
+  const cplReal=leadsBasePago>0&&spendCaptacao>0?spendCaptacao/leadsBasePago:0;
+  // CPL Geral: investimento TOTAL (todas as campanhas), dividido por
   // TODOS os leads do período, qualquer canal — mostra o custo médio "diluído".
   const cplGeral=leadsBase>0&&spend>0?spend/leadsBase:0;
   const cpa=agend>0?spend/agend:0;
