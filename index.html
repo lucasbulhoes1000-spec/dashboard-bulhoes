@@ -88,11 +88,11 @@ tbody tr:hover td{background:#faf7f3;}
 .progress-fill.danger{background:#b5856a;}
 .sep{border:none;border-top:0.5px solid #e0d8ce;margin:4px 0 14px;}
 .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:12px;}
-.mc-ind{background:#f2ede4;border-radius:14px;padding:16px 18px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+.mc-ind{background:#f2ede4;border-radius:16px;padding:22px 24px;min-height:118px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
 .mc-ind-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
-.mc-ind-label{font-size:12px;color:#7a6550;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.mc-ind-icon{width:17px;height:17px;border-radius:50%;background:#8a7a68;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.mc-ind-value{font-size:24px;font-weight:700;color:#2a2520;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-ind-label{font-size:13px;color:#7a6550;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-ind-icon{width:19px;height:19px;border-radius:50%;background:#8a7a68;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mc-ind-value{font-size:28px;font-weight:700;color:#2a2520;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mc-ind-value.green{color:#5a8a6a;}
 .card{background:#fff;border:0.5px solid #e0d8ce;border-radius:10px;padding:16px;min-width:0;margin-bottom:12px;}
 .card.no-mb{margin-bottom:0;}
@@ -1819,8 +1819,27 @@ function renderFunilResumido(){
   if(!el)return;
   const leads=window._lastLeadsBase||0;
   const agenda=window._lastAgendaClinicorp;
-  const agendados=agenda?agenda.leadsAgendados:null;
-  const comparecimentos=agenda?agenda.comparecimentos:null;
+  // Agendados/Comparecimentos vêm do Clinicorp (agenda.leadsAgendados/comparecimentos),
+  // que é um agregado por período SEM filtro de origem. Quando há origem selecionada,
+  // recalcula a partir do detalhe por telefone (detalheAgendados/detalheComparecimentos)
+  // cruzando cada telefone com a origem reconciliada — mesma lógica usada no resto do
+  // Dashboard pra filtrar por origem.
+  const origemMatch=(ph)=>{
+    if(!_origemFilter)return true;
+    const d=ccDataLookup(ph);
+    const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
+    if(_origemFilter==='instagram ads')return org.includes('instagram');
+    if(_origemFilter==='organico')return org.includes('organ');
+    if(_origemFilter==='indicacao')return org.includes('indica');
+    if(_origemFilter==='social selling')return org.includes('social');
+    return true;
+  };
+  let agendados=agenda?agenda.leadsAgendados:null;
+  let comparecimentos=agenda?agenda.comparecimentos:null;
+  if(agenda&&_origemFilter){
+    agendados=(agenda.detalheAgendados||[]).filter(d=>origemMatch(d.tel)).length;
+    comparecimentos=(agenda.detalheComparecimentos||[]).filter(d=>origemMatch(d.tel)).length;
+  }
   const contratos=window._lastContratos||0;
   const valorFechado=window._lastValorFechado||0;
 
@@ -1859,9 +1878,9 @@ function renderFunilResumido(){
   el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
     const valorTxt=e.valor==null?'—':e.valor;
     return `<div style="display:flex;justify-content:center;">
-      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:${degraus[i]}%;box-sizing:border-box;">
-        <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;">${e.icon} ${e.label}</span>
-        <span style="font-size:16px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:11px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
+      <div style="background:${e.cor};color:#fff;border-radius:28px;padding:18px 26px;display:flex;align-items:center;justify-content:space-between;gap:18px;width:${degraus[i]}%;box-sizing:border-box;">
+        <span style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap;">${e.icon} ${e.label}</span>
+        <span style="font-size:18px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:12px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
       </div>
     </div>`;
   }).join('')+`</div>`;
