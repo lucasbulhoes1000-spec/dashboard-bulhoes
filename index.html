@@ -288,6 +288,19 @@ tbody tr:hover td{background:#faf7f3;}
           <div class="error-msg" id="error-trafego"></div>
           <div class="loading" id="loading-trafego"><div class="spinner"></div><span>Carregando dados...</span></div>
           <div id="content-trafego" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <div style="font-size:15px;font-weight:700;color:#2a2520;">Dados descritivos</div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#7a6550;cursor:pointer;user-select:none;">
+                Visualizar informações mais detalhadas
+                <span style="position:relative;display:inline-block;width:38px;height:20px;">
+                  <input type="checkbox" id="toggle-detalhes-trafego" onchange="toggleDetalhesTrafego()" style="opacity:0;width:0;height:0;">
+                  <span id="toggle-detalhes-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#d4c9bc;border-radius:20px;transition:.2s;"></span>
+                  <span id="toggle-detalhes-knob" style="position:absolute;height:16px;width:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;"></span>
+                </span>
+              </label>
+            </div>
+            <div id="t-funil-resumido" style="margin-bottom:20px;"></div>
+            <div id="bloco-detalhes-trafego" style="display:none;">
             <div class="slabel">Investimento & leads</div>
             <div class="row r4">
               <div class="mc"><div class="ml">Investimento em ADS</div><div class="mv gold" id="t-spend">—</div><div class="ms">campanhas de captação</div></div>
@@ -318,6 +331,7 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="mc"><div class="ml">Total de vendas</div><div class="mv green" id="t-vendas">— <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button></div></div>
               <div class="mc"><div class="ml">Total de entradas <button onclick="abrirEdicaoManual('entrada')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-entradas" style="color:#4a7a9a;">—</div></div>
               <div class="mc"><div class="ml">Ticket médio</div><div class="mv green" id="t-ticket">—</div></div>
+            </div>
             </div>
             <div class="sep"></div>
             <div class="two-col">
@@ -1777,6 +1791,47 @@ function toggleCustosBlock(){
   block.style.display=isHidden?'grid':'none';
   if(icon)icon.style.transform=isHidden?'rotate(90deg)':'rotate(0deg)';
 }
+function toggleDetalhesTrafego(){
+  const checked=document.getElementById('toggle-detalhes-trafego').checked;
+  document.getElementById('bloco-detalhes-trafego').style.display=checked?'block':'none';
+  const slider=document.getElementById('toggle-detalhes-slider');
+  const knob=document.getElementById('toggle-detalhes-knob');
+  if(slider)slider.style.background=checked?'#5a8a6a':'#d4c9bc';
+  if(knob)knob.style.left=checked?'20px':'2px';
+}
+// Funil resumido em barras decrescentes, estilo "Dados descritivos" — largura
+// proporcional ao total de leads, % de cada etapa relativo à etapa ANTERIOR
+// (não ao total), igual ao relatório de referência do appcrc.
+function renderFunilResumido(){
+  const el=document.getElementById('t-funil-resumido');
+  if(!el)return;
+  const leads=window._lastLeadsBase||0;
+  const agenda=window._lastAgendaClinicorp;
+  const agendados=agenda?agenda.leadsAgendados:null;
+  const comparecimentos=agenda?agenda.comparecimentos:null;
+  const contratos=window._lastContratos||0;
+
+  const fmtPct=(v,base)=>(base>0?((v/base)*100).toFixed(2):'0,00')+'%';
+  const widthPct=(v)=>leads>0?Math.max(10,(v/leads)*100):10;
+
+  const etapas=[
+    {label:'Leads Criados',icon:'👥',valor:leads,pctTxt:'100%',cor:'#2a4a45'},
+    {label:'Agendados',icon:'🏷️',valor:agendados,pctTxt:agendados!=null?fmtPct(agendados,leads):'—',cor:'#8a8a8a'},
+    {label:'Comparecimentos',icon:'👤',valor:comparecimentos,pctTxt:(comparecimentos!=null&&agendados)?fmtPct(comparecimentos,agendados):'—',cor:'#1a8a7a'},
+    {label:'Fechamentos',icon:'🏷️',valor:contratos,pctTxt:comparecimentos?fmtPct(contratos,comparecimentos):'—',cor:'#3aaa5a'}
+  ];
+
+  el.innerHTML=etapas.map(e=>{
+    const valorTxt=e.valor==null?'—':e.valor;
+    const w=e.valor==null?10:widthPct(e.valor);
+    return `<div style="display:flex;align-items:center;margin-bottom:10px;">
+      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;width:${w}%;min-width:210px;box-sizing:border-box;">
+        <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;">${e.icon} ${e.label}</span>
+        <span style="font-size:16px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:11px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
+      </div>
+    </div>`;
+  }).join('');
+}
 // Atribui manualmente um anúncio (ad_id) a um telefone, para quando o Cloudia não
 // preencheu ad_id/ad_name no evento original. Uso no console: setAdIdManual('telefone','ad_id')
 function setAdIdManual(phone,adId){
@@ -1837,6 +1892,7 @@ async function carregarComparecimentoClinicorp(){
     }
 
     window._lastAgendaClinicorp=r; // guarda pra alimentar as lupas
+    renderFunilResumido();
 
     // Total e % de leads agendados (únicos, agenda real do Clinicorp)
     elAgendados.innerHTML=r.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+r.pctComparecimento+'%)</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
@@ -2318,6 +2374,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
   document.getElementById('t-conv').textContent=pct(contratos,leadsBase);
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
+  window._lastLeadsBase=leadsBase;
+  window._lastContratos=contratos;
+  renderFunilResumido();
 
   // Vendas — usa fechadosPhones (já filtrado por data do orçamento)
   fechadosPhones.forEach(ph=>{
