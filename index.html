@@ -5033,6 +5033,15 @@ function excluirOrcamento(idx){
   if(!confirm('Excluir este orçamento?'))return;
   var _excR=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);if(!_excR)return;
   var d=ccGet(_excR);
+  // Se veio do Clinicorp, registra a exclusão numa "lista negra" — sem isso,
+  // o próximo "Puxar orçamentos" traria ele de volta do zero.
+  var orcExcluido=d.orcamentos[idx];
+  if(orcExcluido&&orcExcluido.origemClinicorp&&orcExcluido._clinicorpId){
+    if(!_ccData['__exclusoes__'])_ccData['__exclusoes__']={orcamentos:[],clientes:[]};
+    if(!_ccData['__exclusoes__'].orcamentos.includes(orcExcluido._clinicorpId)){
+      _ccData['__exclusoes__'].orcamentos.push(orcExcluido._clinicorpId);
+    }
+  }
   d.orcamentos.splice(idx,1);
   refreshOrcamentos(d);
   updateEntradas();
@@ -7559,6 +7568,12 @@ function excluirCliente(){
   const r=clientesData[_currentClienteIdx];if(!r)return;
   if(!confirm('Excluir o cliente "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
   const ph=String(r.phone||'').replace(/\D/g,'');
+  // Registra a exclusão numa "lista negra" — sem isso, o próximo "Puxar
+  // orçamentos" ou o sync de comparecimento recriaria esse cliente do zero.
+  if(!_ccData['__exclusoes__'])_ccData['__exclusoes__']={orcamentos:[],clientes:[]};
+  if(!_ccData['__exclusoes__'].clientes.includes(ph)){
+    _ccData['__exclusoes__'].clientes.push(ph);
+  }
   // Remove do _ccData
   if(_ccData[ph])delete _ccData[ph];
   // Remove de allCloudiaRows
