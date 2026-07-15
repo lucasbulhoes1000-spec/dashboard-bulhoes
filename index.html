@@ -66,6 +66,7 @@ tbody tr:hover td{background:#faf7f3;}
 .date-wrap input{background:#fff;border:0.5px solid #d4c9bc;border-radius:6px;color:#9a8c7e;font-size:12px;padding:5px 10px;outline:none;}
 .slabel{font-size:9px;color:#b5a898;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;}
 .row{display:grid;gap:8px;margin-bottom:14px;}
+.r2{grid-template-columns:repeat(2,minmax(0,1fr));}
 .r3{grid-template-columns:repeat(3,minmax(0,1fr));}
 .r4{grid-template-columns:repeat(4,minmax(0,1fr));}
 .r5{grid-template-columns:repeat(5,minmax(0,1fr));}
@@ -299,7 +300,15 @@ tbody tr:hover td{background:#faf7f3;}
                 </span>
               </label>
             </div>
-            <div id="t-funil-resumido" style="margin-bottom:20px;"></div>
+            <div class="two-col" style="align-items:flex-start;">
+              <div id="t-funil-resumido"></div>
+              <div class="row r2" style="gap:12px;">
+                <div class="mc"><div class="ml">Leads</div><div class="mv" id="t-funil-card-leads">—</div></div>
+                <div class="mc"><div class="ml">Agendados</div><div class="mv" id="t-funil-card-agend">—</div></div>
+                <div class="mc"><div class="ml">Comparecimentos</div><div class="mv" id="t-funil-card-comp">—</div></div>
+                <div class="mc"><div class="ml">Valor fechado</div><div class="mv green" id="t-funil-card-valor">—</div></div>
+              </div>
+            </div>
             <div id="bloco-detalhes-trafego" style="display:none;">
             <div class="slabel">Investimento & leads</div>
             <div class="row r4">
@@ -332,11 +341,6 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="mc"><div class="ml">Total de entradas <button onclick="abrirEdicaoManual('entrada')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-entradas" style="color:#4a7a9a;">—</div></div>
               <div class="mc"><div class="ml">Ticket médio</div><div class="mv green" id="t-ticket">—</div></div>
             </div>
-            </div>
-            <div class="sep"></div>
-            <div class="two-col">
-              <div class="card no-mb"><div class="ctitle" style="display:flex;align-items:center;justify-content:space-between;">Funil geral<span id="t-funnel-origem" style="font-size:10px;color:#b5a898;text-transform:none;font-weight:400;"></span></div><div id="t-funnel"></div></div>
-              <div class="card no-mb"><div class="ctitle">Origem dos leads</div><div id="t-origem"></div></div>
             </div>
             <div style="margin-top:12px;">
               <div class="card">
@@ -1810,9 +1814,20 @@ function renderFunilResumido(){
   const agendados=agenda?agenda.leadsAgendados:null;
   const comparecimentos=agenda?agenda.comparecimentos:null;
   const contratos=window._lastContratos||0;
+  const valorFechado=window._lastValorFechado||0;
+
+  // Preenche os 4 cards ao lado do funil
+  const elLeads=document.getElementById('t-funil-card-leads');
+  const elAgend=document.getElementById('t-funil-card-agend');
+  const elComp=document.getElementById('t-funil-card-comp');
+  const elValor=document.getElementById('t-funil-card-valor');
+  if(elLeads)elLeads.textContent=leads||'—';
+  if(elAgend)elAgend.textContent=agendados!=null?agendados:'—';
+  if(elComp)elComp.textContent=comparecimentos!=null?comparecimentos:'—';
+  if(elValor)elValor.textContent=valorFechado>0?fmt(valorFechado):'—';
 
   const fmtPct=(v,base)=>(base>0?((v/base)*100).toFixed(2):'0,00')+'%';
-  const widthPct=(v)=>leads>0?Math.max(10,(v/leads)*100):10;
+  const widthPct=(v)=>leads>0?Math.max(15,(v/leads)*100):15;
 
   const etapas=[
     {label:'Leads Criados',icon:'👥',valor:leads,pctTxt:'100%',cor:'#2a4a45'},
@@ -1823,11 +1838,11 @@ function renderFunilResumido(){
 
   el.innerHTML=etapas.map(e=>{
     const valorTxt=e.valor==null?'—':e.valor;
-    const w=e.valor==null?10:widthPct(e.valor);
+    const w=e.valor==null?15:widthPct(e.valor);
     return `<div style="display:flex;align-items:center;margin-bottom:10px;">
-      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:11px 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;width:${w}%;min-width:210px;box-sizing:border-box;">
-        <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;">${e.icon} ${e.label}</span>
-        <span style="font-size:16px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:11px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
+      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;width:${w}%;min-width:170px;box-sizing:border-box;">
+        <span style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;">${e.icon} ${e.label}</span>
+        <span style="font-size:15px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:10px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
       </div>
     </div>`;
   }).join('');
@@ -2439,6 +2454,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
   document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
+  window._lastValorFechado=totalVendasCRM;
+  renderFunilResumido();
 
   // Entradas — manual com senha
   const _entradaManual=getManualOverride('entrada');
@@ -2483,6 +2500,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
 
   // Funil visual — formato triângulo (trapézios decrescentes)
+  // ⚠️ Seção "Funil geral" removida da tela (14/07/2026, substituída pelo funil
+  // em barras "Dados descritivos") — guarda de null evita quebrar o resto da
+  // função caso o elemento não exista mais na página.
   const maxF=Math.max(leadsBase,agend,comp,contratos,1);
   const funnelStages=[
     {label:'Leads',val:leadsBase,pct:'',color:'#A18B6C'},
@@ -2490,7 +2510,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     {label:'Comparecimentos',val:comp,pct:pct(comp,agend),color:'#6b5940'},
     {label:'Contratos',val:contratos,pct:pct(contratos,comp),color:'#4a3d2b'},
   ];
-  document.getElementById('t-funnel').innerHTML='<div class="funnel-tri">'+funnelStages.map(f=>{
+  const _tFunnelEl=document.getElementById('t-funnel');
+  if(_tFunnelEl)_tFunnelEl.innerHTML='<div class="funnel-tri">'+funnelStages.map(f=>{
     const widthPct=Math.max(f.val/maxF*100,f.val>0?14:8);
     return `<div class="funnel-tri-row" style="width:100%;">
       <div class="funnel-tri-shape" style="width:${widthPct}%;background:${f.color};border-radius:6px;">
@@ -2508,7 +2529,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Origem visual
   const totalO=Object.values(origens).reduce((a,b)=>a+b,0)||1;
-  document.getElementById('t-origem').innerHTML=Object.entries(origens).sort((a,b)=>b[1]-a[1]).map(([o,n])=>`
+  const _tOrigemEl=document.getElementById('t-origem');
+  if(_tOrigemEl)_tOrigemEl.innerHTML=Object.entries(origens).sort((a,b)=>b[1]-a[1]).map(([o,n])=>`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
       <span style="font-size:11px;color:#9a8c7e;width:90px;text-align:right;flex-shrink:0;">${o}</span>
       <div style="flex:1;background:#ede6dc;border-radius:3px;height:18px;overflow:hidden;">
