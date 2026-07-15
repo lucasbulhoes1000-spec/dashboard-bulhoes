@@ -310,10 +310,10 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="two-col" style="align-items:stretch;">
               <div id="t-funil-resumido"></div>
               <div class="row r2" style="gap:12px;">
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Leads</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-leads">—</div></div>
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Agendados</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-agend">—</div></div>
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Comparecimentos</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-comp">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor total de oportunidades</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-oport">—</div></div>
                 <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor fechado</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-valor">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Total de Entradas</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-entradas">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Ticket Médio</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-ticket">—</div></div>
               </div>
             </div>
             <div id="bloco-detalhes-trafego" style="display:none;">
@@ -1834,14 +1834,17 @@ function renderFunilResumido(){
   }
 
   // Preenche os 4 cards ao lado do funil
-  const elLeads=document.getElementById('t-funil-card-leads');
-  const elAgend=document.getElementById('t-funil-card-agend');
-  const elComp=document.getElementById('t-funil-card-comp');
+  const elOport=document.getElementById('t-funil-card-oport');
   const elValor=document.getElementById('t-funil-card-valor');
-  if(elLeads)elLeads.textContent=leads||'—';
-  if(elAgend)elAgend.textContent=agendados!=null?agendados:'—';
-  if(elComp)elComp.textContent=comparecimentos!=null?comparecimentos:'—';
+  const elEntradas=document.getElementById('t-funil-card-entradas');
+  const elTicket=document.getElementById('t-funil-card-ticket');
+  const totalOport=window._lastTotalOport||0;
+  const totalEntradas=window._lastTotalEntradas||0;
+  const ticketCRM=window._lastTicketCRM||0;
+  if(elOport)elOport.textContent=totalOport>0?fmt(totalOport):'—';
   if(elValor)elValor.textContent=valorFechado>0?fmt(valorFechado):'—';
+  if(elEntradas)elEntradas.textContent=totalEntradas>0?fmt(totalEntradas):'—';
+  if(elTicket)elTicket.textContent=ticketCRM>0?fmt(ticketCRM):'—';
 
   const fmtPct=(v,base)=>(base>0?((v/base)*100).toFixed(2):'0,00')+'%';
   const degraus=[100,82,64,46];
@@ -1855,7 +1858,7 @@ function renderFunilResumido(){
 
   el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
     const valorTxt=e.valor==null?'—':e.valor;
-    return `<div style="display:flex;">
+    return `<div style="display:flex;justify-content:center;">
       <div style="background:${e.cor};color:#fff;border-radius:24px;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:${degraus[i]}%;box-sizing:border-box;">
         <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;">${e.icon} ${e.label}</span>
         <span style="font-size:16px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:11px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
@@ -2471,7 +2474,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
   window._lastValorFechado=totalVendasCRM;
-  renderFunilResumido();
+  window._lastTotalOport=totalOport;
+  window._lastTicketCRM=ticketCRM;
 
   // Entradas — manual com senha
   const _entradaManual=getManualOverride('entrada');
@@ -2514,6 +2518,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
   document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
+  window._lastTotalEntradas=totalEntradas;
+  renderFunilResumido();
 
   // Funil visual — formato triângulo (trapézios decrescentes)
   // ⚠️ Seção "Funil geral" removida da tela (14/07/2026, substituída pelo funil
