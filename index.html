@@ -88,6 +88,12 @@ tbody tr:hover td{background:#faf7f3;}
 .progress-fill.danger{background:#b5856a;}
 .sep{border:none;border-top:0.5px solid #e0d8ce;margin:4px 0 14px;}
 .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:12px;}
+.mc-ind{background:#f2ede4;border-radius:14px;padding:16px 18px;min-height:88px;display:flex;flex-direction:column;justify-content:space-between;min-width:0;}
+.mc-ind-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.mc-ind-label{font-size:12px;color:#7a6550;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-ind-icon{width:17px;height:17px;border-radius:50%;background:#8a7a68;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mc-ind-value{font-size:24px;font-weight:700;color:#2a2520;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mc-ind-value.green{color:#5a8a6a;}
 .card{background:#fff;border:0.5px solid #e0d8ce;border-radius:10px;padding:16px;min-width:0;margin-bottom:12px;}
 .card.no-mb{margin-bottom:0;}
 .ctitle{font-size:10px;font-weight:500;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;}
@@ -262,8 +268,8 @@ tbody tr:hover td{background:#faf7f3;}
             <span class="sbadge green" id="badge-cloudia">⬤ Cloudia CRM</span>
           </div>
           <div class="filters" id="filters-trafego">
-            <button class="fb active" onclick="setFilter('trafego','mes',this)">Este mês</button>
-            <button class="fb" onclick="setFilter('trafego','ateHoje',this)">Até hoje</button>
+            <button class="fb" onclick="setFilter('trafego','mes',this)">Este mês</button>
+            <button class="fb active" onclick="setFilter('trafego','ateHoje',this)">Até hoje</button>
             <button class="fb" onclick="setFilter('trafego','hoje',this)">Hoje</button>
             <button class="fb" onclick="setFilter('trafego','ontem',this)">Ontem</button>
             <button class="fb" onclick="setFilter('trafego','7dias',this)">7 dias</button>
@@ -300,13 +306,14 @@ tbody tr:hover td{background:#faf7f3;}
                 </span>
               </label>
             </div>
-            <div class="two-col" style="align-items:flex-start;">
+            <div id="t-periodo-label" style="font-size:12px;color:#8a7a6a;margin-bottom:16px;"></div>
+            <div class="two-col" style="align-items:stretch;">
               <div id="t-funil-resumido"></div>
               <div class="row r2" style="gap:12px;">
-                <div class="mc"><div class="ml">Leads</div><div class="mv" id="t-funil-card-leads">—</div></div>
-                <div class="mc"><div class="ml">Agendados</div><div class="mv" id="t-funil-card-agend">—</div></div>
-                <div class="mc"><div class="ml">Comparecimentos</div><div class="mv" id="t-funil-card-comp">—</div></div>
-                <div class="mc"><div class="ml">Valor fechado</div><div class="mv green" id="t-funil-card-valor">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Leads</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-leads">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Agendados</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-agend">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Comparecimentos</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-comp">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor fechado</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-valor">—</div></div>
               </div>
             </div>
             <div id="bloco-detalhes-trafego" style="display:none;">
@@ -1444,7 +1451,7 @@ const SS_URL='https://script.google.com/macros/s/AKfycbya5tJt56XgbOjzPje_5K2td3r
 
 let currentPage='dashboard';
 let currentDashTab='trafego';
-let filters={trafego:'mes',social:'mes'};
+let filters={trafego:'ateHoje',social:'mes'};
 let customDates={trafego:{from:null,to:null},social:{from:null,to:null}};
 let ssChartInstance=null;
 let allCloudiaRows=[];
@@ -1803,9 +1810,10 @@ function toggleDetalhesTrafego(){
   if(slider)slider.style.background=checked?'#5a8a6a':'#d4c9bc';
   if(knob)knob.style.left=checked?'20px':'2px';
 }
-// Funil resumido em barras decrescentes, estilo "Dados descritivos" — largura
-// proporcional ao total de leads, % de cada etapa relativo à etapa ANTERIOR
-// (não ao total), igual ao relatório de referência do appcrc.
+// Funil resumido em barras decrescentes, estilo "Dados descritivos" — cada
+// etapa ocupa um degrau fixo de largura (100% / 82% / 64% / 46%) pra sempre
+// formar o desenho de funil, com espaço garantido pro texto. O % mostrado no
+// rótulo continua sendo o dado real (etapa atual sobre a etapa anterior).
 function renderFunilResumido(){
   const el=document.getElementById('t-funil-resumido');
   if(!el)return;
@@ -1815,6 +1823,15 @@ function renderFunilResumido(){
   const comparecimentos=agenda?agenda.comparecimentos:null;
   const contratos=window._lastContratos||0;
   const valorFechado=window._lastValorFechado||0;
+
+  // Rótulo do período visualizado (ex.: "De 01/07/2026 até 15/07/2026")
+  const elPeriodo=document.getElementById('t-periodo-label');
+  if(elPeriodo){
+    const rng=getRange('trafego');
+    const f=new Date(rng.since+'T12:00').toLocaleDateString('pt-BR');
+    const t=new Date(rng.until+'T12:00').toLocaleDateString('pt-BR');
+    elPeriodo.textContent=`De ${f} até ${t}`;
+  }
 
   // Preenche os 4 cards ao lado do funil
   const elLeads=document.getElementById('t-funil-card-leads');
@@ -1827,7 +1844,7 @@ function renderFunilResumido(){
   if(elValor)elValor.textContent=valorFechado>0?fmt(valorFechado):'—';
 
   const fmtPct=(v,base)=>(base>0?((v/base)*100).toFixed(2):'0,00')+'%';
-  const widthPct=(v)=>leads>0?Math.max(15,(v/leads)*100):15;
+  const degraus=[100,82,64,46];
 
   const etapas=[
     {label:'Leads Criados',icon:'👥',valor:leads,pctTxt:'100%',cor:'#2a4a45'},
@@ -1836,16 +1853,15 @@ function renderFunilResumido(){
     {label:'Fechamentos',icon:'🏷️',valor:contratos,pctTxt:comparecimentos?fmtPct(contratos,comparecimentos):'—',cor:'#3aaa5a'}
   ];
 
-  el.innerHTML=etapas.map(e=>{
+  el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
     const valorTxt=e.valor==null?'—':e.valor;
-    const w=e.valor==null?15:widthPct(e.valor);
-    return `<div style="display:flex;align-items:center;margin-bottom:10px;">
-      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:11px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;width:${w}%;min-width:170px;box-sizing:border-box;">
-        <span style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;">${e.icon} ${e.label}</span>
-        <span style="font-size:15px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:10px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
+    return `<div style="display:flex;">
+      <div style="background:${e.cor};color:#fff;border-radius:24px;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;width:${degraus[i]}%;box-sizing:border-box;">
+        <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;white-space:nowrap;">${e.icon} ${e.label}</span>
+        <span style="font-size:16px;font-weight:700;white-space:nowrap;">${valorTxt} <span style="font-size:11px;font-weight:400;opacity:.85;">(${e.pctTxt})</span></span>
       </div>
     </div>`;
-  }).join('');
+  }).join('')+`</div>`;
 }
 // Atribui manualmente um anúncio (ad_id) a um telefone, para quando o Cloudia não
 // preencheu ad_id/ad_name no evento original. Uso no console: setAdIdManual('telefone','ad_id')
