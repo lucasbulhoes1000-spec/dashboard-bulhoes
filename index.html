@@ -5762,6 +5762,10 @@ function renderRelOrigem(){
   const origFilt=document.getElementById('ro-origem').value;
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
+  // ⚠️ Telefone excluído manualmente (aba Clientes) não pode contar aqui —
+  // sem isso, "Métricas de Origem" ficava com números diferentes do resto
+  // do dashboard sempre que alguém era apagado (16/07/2026).
+  const excluidosSetRO=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
 
   // Usa dados do dashboard se disponíveis e no mesmo período
   const dashRange=_lastCloudiaFiltered.length>0?getRange('trafego'):null;
@@ -5813,6 +5817,7 @@ function renderRelOrigem(){
     if(avalFilt||tratFilt){const ph2=normalizePhone(r.phone);const dd=ccDataLookup(ph2)||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>tratamentoBate(o.tratamento,tratFilt)))return;}
     const actualOrg=r.origin||'—';
     const ph=normalizePhone(r.phone)||r.name;
+    if(ph&&excluidosSetRO.has(ph))return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!seenLeads.has(ph)){seenLeads.add(ph);map[actualOrg].leads.add(ph);map[actualOrg].leadRows.push(r);const v=parseFloat(r.value||0);if(v>0&&!map[actualOrg].orcPhones.has(ph)){map[actualOrg].orcPhones.add(ph);map[actualOrg].valorOrc+=v;}}
   });
@@ -5820,13 +5825,17 @@ function renderRelOrigem(){
   (useDash?agendRows:eventRows.filter(r=>isAgend(r.stage)||isFaltou(r.stage))).forEach(r=>{
     const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
     const ph=normalizePhone(r.phone)||r.name;if(!ph)return;
+    if(excluidosSetRO.has(ph))return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
   });
-  // COMP: usa _lastCompPhones (mesma fonte do dashboard — já considera consultaTimestamp e CSV)
-  const compSrc=window._lastCompPhones||new Set();
+  // COMP: usa o Clinicorp (mesma base do funil principal e do Funil por Anúncio —
+  // ver getAgendaClinicorpFiltrada/reconciliarAgendCompClinicorpPorAnuncio — pra
+  // essa métrica nunca mais divergir entre as telas do dashboard)
+  const compSrc=new Set(((window._lastAgendaClinicorp&&window._lastAgendaClinicorp.detalheComparecimentos)||[]).map(d=>normalizePhone(d.tel)));
   compSrc.forEach(ph=>{
     const phN=normalizePhone(ph);
+    if(excluidosSetRO.has(phN))return;
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
     const ccD=ccDataLookup(phN);
     const actualOrg=(ccD&&ccD.origemAtual)||getOrigemReal(phN)||(row&&row.origin)||'—';
@@ -5847,6 +5856,7 @@ function renderRelOrigem(){
     });
     if(!temAprov)return;
     const phN=normalizePhone(ph);
+    if(excluidosSetRO.has(phN))return;
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
     const actualOrg=d.origemAtual||getOrigemReal(phN)||(row&&row.origin)||'—';
     if(origFilt&&actualOrg!==origFilt)return;
@@ -5858,6 +5868,7 @@ function renderRelOrigem(){
     if(!isFechou(r.stage))return;
     if(r.type==='CUSTOMER_ACQUISITION_ORI')return;
     const ph=normalizePhone(r.phone);if(!ph||fechadosPhonesRO.has(ph))return;
+    if(excluidosSetRO.has(ph))return;
     const ts=r.type==='CUSTOMER_CREATED'?parseCloudiaDate(r.created_at):parseCloudiaDate(r.timestamp);
     if(!ts)return;
     const ds=localDateStr(ts);
