@@ -498,9 +498,9 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📂 CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
         <button onclick="filtrarContatosDoDia()" style="background:#5a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">📞 Contatos do dia</button>
-        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Comparecimento','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
         <button onclick="exportarParaCloudia('clientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📤 Cloudia</button>
-        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Registro','Data Comparecimento','Telefone','Fase','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Comparecimento','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button id="btn-proximos-contatos" onclick="toggleProximosContatos()" style="background:#7a5a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📅 Próximos contatos</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
@@ -526,7 +526,7 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="tw">
           <table>
             <thead><tr>
-              <th>Nome</th><th>Data do registro</th><th>Data comparecimento</th><th>Telefone</th><th>Fase</th>
+              <th>Nome</th><th>Data comparecimento</th><th>Telefone</th>
               <th>Situação</th><th>Tratamento</th><th>Avaliador</th>
               <th>Próx. contato</th><th>Fase ativ.</th>
               <th style="text-align:right">Valor orçado</th><th style="text-align:right">Valor fechado</th>
@@ -4049,21 +4049,27 @@ function renderClientesPage(){
     const faseAtv=ultimaAtv&&ultimaAtv.fase?ultimaAtv.fase:'—';
     const hoje=localDateStr(new Date());
     const proxStyle=ultimaAtv&&ultimaAtv.proximo&&ultimaAtv.proximo===hoje?'color:#5a8a6a;font-weight:500;':ultimaAtv&&ultimaAtv.proximo&&ultimaAtv.proximo<hoje?'color:#b5856a;font-weight:500;':'';
+    // Tratamento: o texto de um orçamento pode já vir com vários procedimentos
+    // juntos (ex: "Lentes em Resina, Remoção Lentes, Profilaxia..."), deixando a
+    // linha gigante. Mostra só o primeiro (o principal) e indica quantos mais
+    // tem — o texto completo continua acessível no hover (title).
+    const tratStr=orc0&&orc0.tratamento?orc0.tratamento:'';
+    const tratPartes=tratStr.split(',').map(s=>s.trim()).filter(Boolean);
+    const tratPrincipal=tratPartes[0]||'—';
+    const tratExtra=tratPartes.length>1?' <span style="color:#b5a898;">+'+(tratPartes.length-1)+'</span>':'';
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
-      <td class="tm">${fmtDate(r.created_at)}</td>
       <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
       <td>${r.phone||'—'}</td>
-      <td>${getEffectiveAgendInfo(r.phone,r).stage||r.stage||'—'}</td>
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
-      <td style="font-size:12px;">${orc0&&orc0.tratamento?orc0.tratamento:'—'}</td>
+      <td style="font-size:12px;" title="${tratStr.replace(/"/g,'&quot;')}">${tratPrincipal}${tratExtra}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
       <td style="font-size:12px;${proxStyle}">${proxContato}</td>
       <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${faseAtv}">${faseAtv}</td>
       <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
       <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="9" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
+  }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 }
 
 // CRM EXPORT/IMPORT
