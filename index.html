@@ -206,10 +206,6 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-icon">📈</span>
       <span class="nav-label">Métricas de Origem</span>
     </div>
-    <div class="nav-item" onclick="switchPage('rel-comparecidos',this)">
-      <span class="nav-icon">📅</span>
-      <span class="nav-label">Comparecidos x Agend.</span>
-    </div>
     <div class="nav-item" onclick="switchPage('rel-orcamentos',this)">
       <span class="nav-icon">💰</span>
       <span class="nav-label">Orçamentos Fechados</span>
@@ -794,6 +790,14 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== GERENCIAR PAGE ===== -->
     <div class="page" id="page-gerenciar">
+      <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:4px;">Sincronizações com o Clinicorp</div>
+        <div style="font-size:12px;color:#9a8c7e;margin-bottom:12px;">Ações manuais de sincronização — normalmente não precisa mexer aqui, o sistema já atualiza sozinho.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button id="btn-sync-consultas-aval" onclick="sincronizarConsultasAvaliacao()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Atualizar datas de consulta (Clinicorp)</button>
+          <button id="btn-sync-orcamentos" onclick="sincronizarOrcamentosClinicorp()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Puxar orçamentos (Clinicorp)</button>
+        </div>
+      </div>
       <div style="margin-bottom:20px;">
         <div style="display:flex;gap:8px;border-bottom:1px solid #e8e2da;margin-bottom:20px;">
           <button class="tab-btn active" onclick="switchListaTab('origens',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">Origens</button>
@@ -938,29 +942,6 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
     </div>
 
-    <!-- ===== REL COMPARECIDOS x AGENDAMENTO ===== -->
-    <div class="page" id="page-rel-comparecidos">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
-        <div style="font-size:12px;color:#9a8c7e;">Data da consulta puxada automaticamente do Clinicorp (categoria Avaliação).</div>
-        <button id="btn-sync-consultas-aval" onclick="sincronizarConsultasAvaliacao()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Atualizar datas de consulta (Clinicorp)</button>
-      </div>
-      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
-        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="rc-from" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
-        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Data final</label><input type="date" id="rc-to" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;"></div>
-        <div><label style="font-size:11px;color:#9a8c7e;display:block;margin-bottom:3px;">Origem</label>
-          <select id="rc-origem" style="border:0.5px solid #d4c9bc;border-radius:6px;padding:6px 10px;font-size:12px;background:#fff;outline:none;">
-            <option value="">Todas</option>
-          </select></div>
-        <button onclick="renderRelComparecidos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
-      </div>
-      <div style="background:#f5f0ea;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7a6550;">
-        <strong>Legenda:</strong> Distância em dias entre a data em que o agendamento foi CRIADO e a data real da consulta — as duas direto do Clinicorp, sem depender do Cloudia ter marcado "Agendou" (isso deixava de fora agendamento feito direto pela recepção). Essa distância existe independente de comparecimento ou falta. % Comp. = Comparecidos / Agendados dentro dessa faixa de distância.
-      </div>
-      <div class="table-card" id="rc-table-wrap">
-        <div class="tw"><table id="rc-table"><thead><tr id="rc-thead"></tr></thead><tbody id="rc-tbody"></tbody></table></div>
-      </div>
-    </div>
-
     <!-- ===== REL ORÇAMENTOS FECHADOS ===== -->
     <div class="page" id="page-rel-orcamentos">
       <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
@@ -980,7 +961,6 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="">Todos</option>
           </select></div>
         <button onclick="renderRelOrcamentos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
-        <button id="btn-sync-orcamentos" onclick="sincronizarOrcamentosClinicorp()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Puxar orçamentos (Clinicorp)</button>
       </div>
       <div class="table-card">
         <div class="tw">
@@ -1640,7 +1620,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-comparecidos':'Comparecidos x Agendamento','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={dashboard:'Dashboard',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -1664,7 +1644,6 @@ function switchPage(page,el){
     setTimeout(()=>initComissoes(),50);
   }
   else if(page==='rel-origem') setTimeout(()=>initRelOrigem(),50);
-  else if(page==='rel-comparecidos') setTimeout(()=>initRelComparecidos(),50);
   else if(page==='rel-orcamentos') setTimeout(()=>initRelOrcamentos(),50);
 }
 
@@ -4702,7 +4681,6 @@ async function sincronizarConsultasAvaliacao(){
     const r=await res.json();
     if(r.status==='ok'){
       await carregarCRMRemoto(); // recarrega _ccData com as novas datas gravadas pelo Apps Script
-      renderRelComparecidos();
       showToast('success','✅ Datas atualizadas!','Agendamentos de Avaliação no Clinicorp: '+r.totalAgendamentosAvaliacao+'\nDatas de consulta atualizadas: '+r.atualizados+'\nJá tinham data manual (preservadas): '+r.jaTinhamDataManual+'\nSem correspondência no CRM: '+r.semCorrespondenciaNoCRM);
     }else{
       showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
