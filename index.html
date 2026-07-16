@@ -3365,6 +3365,13 @@ function renderClientes(){
 function renderClientesTable(){
   const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;return 1;};
   const phoneMap={};
+  // ⚠️ Lista de exclusão manual — sem checar aqui, um cliente excluído em
+  // "Excluir cliente" podia voltar sozinho assim que qualquer evento novo do
+  // Cloudia chegasse pra aquele telefone (o doPost principal não sabe de
+  // exclusão nenhuma, só os fluxos específicos do Clinicorp sabem). Filtrar
+  // aqui, na hora de montar a lista, garante que excluído nunca mais volta,
+  // não importa a origem do dado.
+  const excluidosSet=new Set((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]);
   // ⚠️ CORRIGIDO (14/07/2026): antes filtrava pelo estágio BRUTO do evento
   // original do Cloudia (r.stage) — isso nunca refletia comparecimento real
   // sincronizado depois via Clinicorp (webhook, botão manual etc.), porque
@@ -3372,6 +3379,8 @@ function renderClientesTable(){
   // EFETIVO (getEffectiveAgendInfo já mescla os dois, dando prioridade pro
   // mais recente).
   allCloudiaRows.filter(r=>{
+    const ph0=normalizePhone(r.phone);
+    if(ph0&&excluidosSet.has(ph0))return false;
     const info=getEffectiveAgendInfo(r.phone,r);
     return isComp(info.stage)||isFechou(info.stage);
   }).forEach(r=>{
@@ -3379,6 +3388,20 @@ function renderClientesTable(){
     if(!phoneMap[ph]||stageRank(r.stage)>stageRank(phoneMap[ph].stage)){phoneMap[ph]={...r};}
     const v=parseFloat(r.value||0);
     if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
+  });
+  // ⚠️ Clientes criados DIRETO pelo Clinicorp (comparecimento real numa
+  // avaliação, sem nenhum lead prévio no Cloudia) nunca tinham linha nenhuma
+  // em allCloudiaRows — o loop acima nunca os alcançava, então "compareceu de
+  // verdade" segundo o Clinicorp mas NUNCA aparecia na aba Clientes. Varre
+  // o _ccData direto e completa quem ficou de fora, sempre respeitando a
+  // exclusão manual também.
+  Object.keys(_ccData).forEach(ph=>{
+    if(ph==='__exclusoes__'||phoneMap[ph]||excluidosSet.has(ph))return;
+    const d=_ccData[ph];
+    if(!d||!d.statusAtual)return;
+    const info=getEffectiveAgendInfo(ph,null);
+    if(!(isComp(info.stage)||isFechou(info.stage)))return;
+    phoneMap[ph]={phone:ph,name:d.nomeAtual||'(sem nome)',origin:d.origemAtual||'',stage:info.stage,value:0,created_at:d.consultaTimestamp||'',timestamp:d.consultaTimestamp||''};
   });
   // Pré-calcula a data de ordenação uma única vez por cliente (evita recalcular getEffectiveAgendInfo
   // repetidamente dentro do comparador do sort, o que era O(N log N) chamadas pesadas)
