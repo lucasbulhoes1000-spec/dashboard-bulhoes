@@ -490,6 +490,13 @@ tbody tr:hover td{background:#faf7f3;}
         <input type="date" id="clientes-to" class="filter-select" onchange="filterClientesTable()" title="Data comparecimento final">
         <button onclick="clearClientesDates()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#9a8c7e;font-size:11px;padding:5px 8px;cursor:pointer;" title="Limpar datas">✕</button>
         <span class="count-badge" id="clientes-count"></span>
+        <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#b5a898;">Exibir:
+          <button onclick="setClientesPerPage(10)" id="cpb-10" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">10</button>
+          <button onclick="setClientesPerPage(20)" id="cpb-20" style="background:#A18B6C;color:#fff;border:0.5px solid #A18B6C;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;font-weight:600;">20</button>
+          <button onclick="setClientesPerPage(50)" id="cpb-50" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">50</button>
+          <button onclick="setClientesPerPage(100)" id="cpb-100" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">100</button>
+          <button onclick="setClientesPerPage(0)" id="cpb-0" style="background:#fff;color:#7a6550;border:0.5px solid #d4c9bc;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;">Todos</button>
+        </span>
         <button onclick="exportarCRM()" style="margin-left:auto;background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">💾 CRM</button>
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📂 CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
@@ -1241,9 +1248,10 @@ tbody tr:hover td{background:#faf7f3;}
       <div id="ent-campos-caixa" style="display:none;gap:10px;margin-bottom:11px;">
         <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantas caixas? *</label>
           <input id="ent-num-caixas" type="number" min="1" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewEntradaCaixa()"></div>
-        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor por caixa (R$) *</label>
+        <div style="flex:1;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Valor total pago (R$) *</label>
           <input id="ent-valor-caixa" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;" oninput="atualizarPreviewEntradaCaixa()"></div>
       </div>
+      <div style="font-size:11px;color:#9a8c7e;margin:-8px 0 11px;">O valor total da nota/compra, somando todas as caixas — não é o valor de uma caixa só.</div>
       <div id="ent-preview-caixa" style="display:none;font-size:12px;color:#5a8a6a;margin-bottom:11px;margin-top:-4px;"></div>
       <div style="display:flex;gap:10px;">
         <button onclick="salvarEntradaEstoque()" style="background:#5a8a6a;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Registrar</button>
@@ -4044,13 +4052,28 @@ function filterClientesTable(){
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
   _clientesFiltrados=filtered;_clientesPage=1;renderClientesPage();
 }
-let _clientesFiltrados=[];let _clientesPage=1;const _clientesPerPage=50;
+let _clientesFiltrados=[];let _clientesPage=1;let _clientesPerPage=20;
+function mudaPagCliente(p){_clientesPage=p;renderClientesPage();}
+function setClientesPerPage(n){
+  _clientesPerPage=n;_clientesPage=1;
+  [10,20,50,100,0].forEach(v=>{
+    const btn=document.getElementById('cpb-'+v);
+    if(!btn)return;
+    const active=v===n;
+    btn.style.background=active?'#A18B6C':'#fff';
+    btn.style.color=active?'#fff':'#7a6550';
+    btn.style.borderColor=active?'#A18B6C':'#d4c9bc';
+    btn.style.fontWeight=active?'600':'normal';
+  });
+  renderClientesPage();
+}
 function renderClientesPage(){
   const filtered=_clientesFiltrados;
   const total=filtered.length;
-  const totalPags=Math.ceil(total/_clientesPerPage);
-  const start=(_clientesPage-1)*_clientesPerPage;
-  const pagina=filtered.slice(start,start+_clientesPerPage);
+  const perPage=_clientesPerPage===0?(total||1):_clientesPerPage;
+  const totalPags=Math.max(1,Math.ceil(total/perPage));
+  const start=(_clientesPage-1)*perPage;
+  const pagina=_clientesPerPage===0?filtered:filtered.slice(start,start+perPage);
   // Atualiza cards conforme filtro atual
   const totalC=filtered.length;
   // Conta como fechado: stage Ganho OU tem orçamento Aprovado no CRM
@@ -4134,6 +4157,16 @@ function renderClientesPage(){
       <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
+
+  const pagC=document.getElementById('clientes-pagination');
+  if(pagC){
+    pagC.innerHTML=`
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #e0d8ce;font-size:12px;color:#9a8c7e;flex-wrap:wrap;">
+        <button onclick="mudaPagCliente(${_clientesPage-1})" ${_clientesPage<=1?'disabled':''} style="background:${_clientesPage<=1?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">‹ Ant</button>
+        <span>${_clientesPerPage===0?'Todos os '+total+' clientes':'Pág. '+_clientesPage+' de '+totalPags+' · '+(total>0?start+1+'-'+Math.min(start+perPage,total):0)+' de '+total}</span>
+        <button onclick="mudaPagCliente(${_clientesPage+1})" ${(_clientesPage>=totalPags||_clientesPerPage===0)?'disabled':''} style="background:${(_clientesPage>=totalPags||_clientesPerPage===0)?'#f5f0ea':'#fff'};border:0.5px solid #d4c9bc;border-radius:5px;padding:4px 10px;cursor:pointer;color:#7a6550;">Próx ›</button>
+      </div>`;
+  }
 }
 
 // CRM EXPORT/IMPORT
@@ -5306,14 +5339,11 @@ function desfazerStageGanho(ph){
 function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataInicio){
   const telLimpo=String(tel||'').replace(/\D/g,'');
   if(!telLimpo||!tratamentoStr)return false;
-  const tratLower=tratamentoStr.toLowerCase();
-  let modelosBatidos=Object.keys(modelos).filter(chave=>tratLower.includes(chave.toLowerCase()));
-  if(modelosBatidos.length===0)modelosBatidos=[null]; // sem modelo configurado — cria genérico mesmo assim
 
   let paciente=pacientes.find(p=>String(p.tel||'').replace(/\D/g,'')===telLimpo);
   let mudou=false;
   if(!paciente){
-    paciente={id:Date.now().toString()+'_'+telLimpo,nome:nome||'(sem nome)',tel:telLimpo,dataInicio:dataInicio||new Date().toISOString().slice(0,10),concluido:false,npsEnviado:false,posVendaEnviado:false,dataConcluido:null,procedimentos:[]};
+    paciente={id:Date.now().toString()+'_'+telLimpo,nome:nome||'(sem nome)',tel:telLimpo,dataInicio:dataInicio||new Date().toISOString().slice(0,10),concluido:false,npsEnviado:false,posVendaEnviado:false,dataConcluido:null,procedimentos:[],procedimentosRemovidos:[],subetapasRemovidas:{}};
     pacientes.push(paciente);
     mudou=true;
   }else{
@@ -5322,16 +5352,62 @@ function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataIn
     paciente.npsEnviado=false;
     paciente.posVendaEnviado=false;
     paciente.dataConcluido=null;
+    if(!paciente.procedimentosRemovidos)paciente.procedimentosRemovidos=[];
+    if(!paciente.subetapasRemovidas)paciente.subetapasRemovidas={};
   }
 
-  modelosBatidos.forEach(chave=>{
-    const nomeProc=chave||tratamentoStr;
+  // Acha o(s) modelo(s) mais específico(s) que batem com um texto — se
+  // "Botox" e "Botox Sorriso Gengival" batem os dois no mesmo texto, fica só
+  // o mais específico (mais longo). Sem isso, "Botox Sorriso Gengival" virava
+  // só "Botox" (perdia a informação de que é um procedimento diferente).
+  function modelosMaisEspecificos(texto){
+    const textoLower=texto.toLowerCase();
+    let batidos=Object.keys(modelos).filter(chave=>textoLower.includes(chave.toLowerCase()));
+    batidos=batidos.filter(chave=>{
+      const chaveLower=chave.toLowerCase();
+      return !batidos.some(outro=>outro!==chave&&outro.toLowerCase().includes(chaveLower)&&outro.length>chave.length);
+    });
+    return batidos;
+  }
+
+  // Processa cada procedimento SEPARADAMENTE — o texto do orçamento pode vir
+  // com vários procedimentos juntos numa string só (ex: "Restauração Direta,
+  // Restauração Direta, Botox Sorriso Gengival"). Processar tudo junto como
+  // antes causava dois problemas: (1) 5 restaurações em dentes diferentes
+  // viravam 1 card só, sem dar pra marcar cada uma; (2) "Botox Sorriso
+  // Gengival" contém "Botox" como substring, então virava um card genérico
+  // de "Botox" — informação errada.
+  const segmentos=tratamentoStr.split(',').map(s=>s.trim()).filter(Boolean);
+  const nomeBasePorSegmento=segmentos.map(seg=>modelosMaisEspecificos(seg)[0]||seg);
+  const contagemNomes={};
+
+  segmentos.forEach((segmento,i)=>{
+    const nomeBase=nomeBasePorSegmento[i];
+    const chave=Object.keys(modelos).includes(nomeBase)?nomeBase:null;
+
+    // Se o mesmo nome aparece mais de uma vez neste orçamento (ex: várias
+    // "Restauração Direta" para dentes diferentes), numera pra virar cards
+    // individuais e dar pra marcar cada um separadamente. Ideal seria usar o
+    // número do dente, mas o Clinicorp não manda esse dado no texto do
+    // procedimento hoje — se descobrirmos o campo certo, dá pra trocar aqui.
+    contagemNomes[nomeBase]=(contagemNomes[nomeBase]||0)+1;
+    const totalOcorrencias=nomeBasePorSegmento.filter(n=>n===nomeBase).length;
+    const nomeProc=totalOcorrencias>1?`${nomeBase} (${contagemNomes[nomeBase]})`:nomeBase;
+
     const jaTem=paciente.procedimentos.some(p=>p.nome===nomeProc);
     if(jaTem)return;
+    // ⚠️ PRIORIDADE DO CRM: se esse procedimento já foi removido manualmente
+    // do card antes, NUNCA recria — decisão de quem mexeu no CRM sempre vale
+    // mais que a sincronização automática.
+    if(paciente.procedimentosRemovidos.includes(nomeProc))return;
+
     const subetapasBase=chave?(modelos[chave]||[]):['Avaliação/Execução'];
-    paciente.procedimentos.push({nome:nomeProc,subetapas:subetapasBase.map(s=>({nome:s,ok:false,data:null}))});
+    const removidasDesse=paciente.subetapasRemovidas[nomeProc]||[];
+    const subetapasFiltradas=subetapasBase.filter(s=>!removidasDesse.includes(s));
+    paciente.procedimentos.push({nome:nomeProc,subetapas:subetapasFiltradas.map(s=>({nome:s,ok:false,data:null}))});
     mudou=true;
   });
+
   return mudou;
 }
 
@@ -6681,13 +6757,13 @@ function atualizarPreviewEntradaCaixa(){
   const p=_estoqueProdutos[nome];
   if(!p||!p.unidPorCaixa)return;
   const numCaixas=Number(document.getElementById('ent-num-caixas').value)||0;
-  const valorCaixa=Number(document.getElementById('ent-valor-caixa').value)||0;
+  const valorTotal=Number(document.getElementById('ent-valor-caixa').value)||0;
   const preview=document.getElementById('ent-preview-caixa');
-  if(numCaixas<=0||valorCaixa<=0){preview.style.display='none';return;}
+  if(numCaixas<=0||valorTotal<=0){preview.style.display='none';return;}
   const totalUnidades=numCaixas*p.unidPorCaixa;
-  const precoUnit=valorCaixa/p.unidPorCaixa;
+  const precoUnit=valorTotal/totalUnidades;
   preview.style.display='block';
-  preview.textContent=`= ${totalUnidades} unidade(s) · ${fmtMoeda(precoUnit)} por unidade · total ${fmtMoeda(numCaixas*valorCaixa)}`;
+  preview.textContent=`= ${totalUnidades} unidade(s) · ${fmtMoeda(precoUnit)} por unidade · total ${fmtMoeda(valorTotal)}`;
 }
 
 document.addEventListener('click',function(e){
@@ -6905,11 +6981,11 @@ function salvarEntradaEstoque(){
   let qtd,valor;
   if(vemCaixa){
     const numCaixas=Number(document.getElementById('ent-num-caixas').value)||0;
-    const valorCaixa=Number(document.getElementById('ent-valor-caixa').value)||0;
+    const valorTotal=Number(document.getElementById('ent-valor-caixa').value)||0;
     if(numCaixas<=0){alert('Informe quantas caixas estão entrando.');return;}
-    if(valorCaixa<=0){alert('Informe o valor pago pela caixa.');return;}
+    if(valorTotal<=0){alert('Informe o valor total pago.');return;}
     qtd=numCaixas*p.unidPorCaixa;
-    valor=numCaixas*valorCaixa;
+    valor=valorTotal;
     // Custo médio ponderado: combina o saldo/preço atual com a nova entrada.
     const saldoAtual=calcularEstoque().find(d=>d.nome===nome)?.saldo||0;
     const precoEntrada=valor/qtd;
@@ -7625,6 +7701,8 @@ function removerAcaoCalendario(idx) {
 // ---- Modal adicionar paciente ----
 let _fluxoAddProcedimentos = []; // estado temporário do modal
 let _fluxoEditandoIdx = -1; // -1 = criando novo paciente; >=0 = editando paciente existente
+let _fluxoProcRemovidosTemp = []; // procedimentos removidos manualmente nesta edição (prioridade do CRM)
+let _fluxoSubRemovidasTemp = {}; // {nomeDoProcedimento: [subetapasRemovidas,...]}
 
 function abrirAdicionarFluxo(idx) {
   _fluxoEditandoIdx = (idx !== undefined && idx !== null) ? idx : -1;
@@ -7633,6 +7711,8 @@ function abrirAdicionarFluxo(idx) {
   if (_fluxoEditandoIdx >= 0) {
     const p = _fluxoPacientes[_fluxoEditandoIdx];
     _fluxoAddProcedimentos = JSON.parse(JSON.stringify(p.procedimentos || []));
+    _fluxoProcRemovidosTemp = JSON.parse(JSON.stringify(p.procedimentosRemovidos || []));
+    _fluxoSubRemovidasTemp = JSON.parse(JSON.stringify(p.subetapasRemovidas || {}));
     document.getElementById('fluxo-add-nome').value = p.nome || '';
     document.getElementById('fluxo-add-tel').value = p.tel || '';
     document.getElementById('fluxo-add-data').value = p.dataInicio || new Date().toISOString().slice(0, 10);
@@ -7640,6 +7720,8 @@ function abrirAdicionarFluxo(idx) {
     if (btnConfirmar) btnConfirmar.textContent = 'Salvar alterações';
   } else {
     _fluxoAddProcedimentos = [];
+    _fluxoProcRemovidosTemp = [];
+    _fluxoSubRemovidasTemp = {};
     document.getElementById('fluxo-add-nome').value = '';
     document.getElementById('fluxo-add-tel').value = '';
     document.getElementById('fluxo-add-data').value = new Date().toISOString().slice(0, 10);
@@ -7706,6 +7788,8 @@ function adicionarProcedimentoCustom() {
 }
 
 function removerProcAddFluxo(pi) {
+  const proc = _fluxoAddProcedimentos[pi];
+  if (proc && !_fluxoProcRemovidosTemp.includes(proc.nome)) _fluxoProcRemovidosTemp.push(proc.nome);
   _fluxoAddProcedimentos.splice(pi, 1);
   renderFluxoAddProcedimentos();
 }
@@ -7716,6 +7800,12 @@ function adicionarSubAddFluxo(pi) {
 }
 
 function removerSubAddFluxo(pi, si) {
+  const proc = _fluxoAddProcedimentos[pi];
+  const sub = proc && proc.subetapas[si];
+  if (proc && sub) {
+    if (!_fluxoSubRemovidasTemp[proc.nome]) _fluxoSubRemovidasTemp[proc.nome] = [];
+    if (!_fluxoSubRemovidasTemp[proc.nome].includes(sub.nome)) _fluxoSubRemovidasTemp[proc.nome].push(sub.nome);
+  }
   _fluxoAddProcedimentos[pi].subetapas.splice(si, 1);
   renderFluxoAddProcedimentos();
 }
@@ -7733,6 +7823,8 @@ function confirmarAdicionarFluxo() {
     p.tel = tel;
     p.dataInicio = data || p.dataInicio;
     p.procedimentos = JSON.parse(JSON.stringify(_fluxoAddProcedimentos));
+    p.procedimentosRemovidos = JSON.parse(JSON.stringify(_fluxoProcRemovidosTemp));
+    p.subetapasRemovidas = JSON.parse(JSON.stringify(_fluxoSubRemovidasTemp));
     // Reavalia concluído (clínico + NPS + pós-venda) — pode ter adicionado etapa
     // nova numa pessoa já concluída, o que reabre o card automaticamente.
     atualizarConclusaoFluxo(p);
@@ -7746,6 +7838,8 @@ function confirmarAdicionarFluxo() {
       id: Date.now().toString(), nome, tel,
       dataInicio: data || new Date().toISOString().slice(0, 10),
       procedimentos: JSON.parse(JSON.stringify(_fluxoAddProcedimentos)),
+      procedimentosRemovidos: JSON.parse(JSON.stringify(_fluxoProcRemovidosTemp)),
+      subetapasRemovidas: JSON.parse(JSON.stringify(_fluxoSubRemovidasTemp)),
       concluido: false, npsEnviado: false, posVendaEnviado: false, dataConcluido: null
     });
     document.getElementById('modal-adicionar-fluxo').style.display = 'none';
