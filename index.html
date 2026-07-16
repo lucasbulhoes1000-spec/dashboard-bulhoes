@@ -1987,7 +1987,9 @@ function getAgendaClinicorpFiltrada(){
   return{
     leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
     totalAgendamentos, // atos de agendamento
-    comparecimentos:detComp.length // pessoas únicas que compareceram
+    comparecimentos:detComp.length, // pessoas únicas que compareceram
+    agendPhones:new Set(detAgend.map(d=>normalizePhone(d.tel))), // pra reconciliar o Funil por Anúncio com a MESMA base
+    compPhones:new Set(detComp.map(d=>normalizePhone(d.tel)))
   };
 }
 // Atualiza os cards do bloco detalhado que vêm do Clinicorp (Agendamentos, Leads na
@@ -2043,6 +2045,45 @@ function atualizarCardsAgendaClinicorp(dados){
   }
   if(elContratosSub)elContratosSub.textContent='';
 }
+
+// Reconcilia Agendou/Compareceu da tabela "Funil por Anúncio" com a MESMA base
+// do Clinicorp (filtrada por origem) usada no funil principal e nos cards —
+// antes, essa tabela reconciliava com _lastAgendPhones/_lastCompPhones (Cloudia),
+// uma fonte diferente e mais incompleta, por isso os totais nunca batiam com
+// o funil de cima. Precisa do window._lastAdMap já montado (por renderTrafego)
+// e do Clinicorp já carregado — se qualquer um faltar, não faz nada agora e
+// tenta de novo no próximo render (chamada em conjunto com atualizarCardsAgendaClinicorp).
+function reconciliarAgendCompClinicorpPorAnuncio(){
+  const adMap=window._lastAdMap;
+  const dados=getAgendaClinicorpFiltrada();
+  if(!adMap||!dados)return;
+
+  const acharKey=(ph)=>{
+    for(const [k,d] of Object.entries(adMap)){
+      if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph))return k;
+    }
+    return '__sem_rastreio__';
+  };
+  const novoBucket=()=>({spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()});
+
+  Object.values(adMap).forEach(d=>{d.agend=0;d.agendPhones=new Set();});
+  (dados.agendPhones||new Set()).forEach(ph=>{
+    const key=acharKey(ph);
+    if(!adMap[key])adMap[key]=novoBucket();
+    adMap[key].agend++;
+    adMap[key].agendPhones.add(ph);
+  });
+
+  Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
+  (dados.compPhones||new Set()).forEach(ph=>{
+    const key=acharKey(ph);
+    if(!adMap[key])adMap[key]=novoBucket();
+    adMap[key].comp++;
+    adMap[key].compPhones.add(ph);
+  });
+
+  if(typeof filterAdTable==='function')filterAdTable();
+}
 // Funil resumido em barras decrescentes, estilo "Dados descritivos" — cada
 // etapa ocupa um degrau fixo de largura (100% / 82% / 64% / 46%) pra sempre
 // formar o desenho de funil, com espaço garantido pro texto. O % mostrado no
@@ -2058,6 +2099,7 @@ function renderFunilResumido(){
   const agendados=dadosClinicorp?dadosClinicorp.leadsAgendados:null;
   const comparecimentos=dadosClinicorp?dadosClinicorp.comparecimentos:null;
   atualizarCardsAgendaClinicorp(dadosClinicorp);
+  reconciliarAgendCompClinicorpPorAnuncio();
   const contratos=window._lastContratos||0;
   const valorFechado=window._lastValorFechado||0;
 
@@ -2856,6 +2898,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   if(adMap['__sem_rastreio__'].leads===0&&adMap['__sem_rastreio__'].agend===0&&adMap['__sem_rastreio__'].comp===0)delete adMap['__sem_rastreio__'];
 
   window._lastAdMap=adMap;
+  reconciliarAgendCompClinicorpPorAnuncio(); // corrige com Clinicorp se já estiver carregado; senão, roda de novo quando carregar
   // Populate filter dropdowns
   const allCampaigns=[...new Set(Object.values(adMap).map(d=>d.campaign||'').filter(c=>c&&c!=='⚠ Sem rastreamento'))].sort();
   const allAdsets=[...new Set(Object.values(adMap).map(d=>d.adset||'').filter(a=>a))].sort();
