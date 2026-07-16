@@ -954,7 +954,7 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="renderRelComparecidos()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:7px 18px;cursor:pointer;font-size:12px;font-weight:500;">Filtrar</button>
       </div>
       <div style="background:#f5f0ea;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#7a6550;">
-        <strong>Legenda:</strong> Distância em dias entre a data em que a SDR criou o agendamento e a data real marcada da consulta (puxada do Clinicorp). Essa distância existe independente de comparecimento ou falta. % Comp. = Comparecidos / Agendados dentro dessa faixa de distância.
+        <strong>Legenda:</strong> Distância em dias entre a data em que o agendamento foi CRIADO e a data real da consulta — as duas direto do Clinicorp, sem depender do Cloudia ter marcado "Agendou" (isso deixava de fora agendamento feito direto pela recepção). Essa distância existe independente de comparecimento ou falta. % Comp. = Comparecidos / Agendados dentro dessa faixa de distância.
       </div>
       <div class="table-card" id="rc-table-wrap">
         <div class="tw"><table id="rc-table"><thead><tr id="rc-thead"></tr></thead><tbody id="rc-tbody"></tbody></table></div>
@@ -5754,7 +5754,7 @@ function openROModal(i,type){
   openModal(titles[type]+' — '+org, hdrs[type], rowsMap[type]);
 }
 
-function renderRelOrigem(){
+async function renderRelOrigem(){
   // Usa os mesmos dados já calculados pelo dashboard para garantir consistência
   // Se o dashboard ainda não foi carregado, busca o Cloudia e usa filtros do relatório
   const since=document.getElementById('ro-from').value;
@@ -5766,6 +5766,16 @@ function renderRelOrigem(){
   // sem isso, "Métricas de Origem" ficava com números diferentes do resto
   // do dashboard sempre que alguém era apagado (16/07/2026).
   const excluidosSetRO=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
+
+  // Busca do Clinicorp com o período PRÓPRIO deste relatório (ro-from/ro-to) —
+  // não reaproveita window._lastAgendaClinicorp porque esse cache é do período
+  // do Dashboard, que pode ser diferente do período escolhido aqui.
+  let agendaClinicorpRO={detalheAgendados:[],detalheComparecimentos:[]};
+  try{
+    const resRO=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until);
+    const rRO=await resRO.json();
+    if(rRO.status==='ok')agendaClinicorpRO=rRO;
+  }catch(e){console.warn('[MÉTRICAS DE ORIGEM] Erro ao buscar Clinicorp:',e);}
 
   // Usa dados do dashboard se disponíveis e no mesmo período
   const dashRange=_lastCloudiaFiltered.length>0?getRange('trafego'):null;
@@ -5821,18 +5831,25 @@ function renderRelOrigem(){
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
     if(!seenLeads.has(ph)){seenLeads.add(ph);map[actualOrg].leads.add(ph);map[actualOrg].leadRows.push(r);const v=parseFloat(r.value||0);if(v>0&&!map[actualOrg].orcPhones.has(ph)){map[actualOrg].orcPhones.add(ph);map[actualOrg].valorOrc+=v;}}
   });
-  // Agend
-  (useDash?agendRows:eventRows.filter(r=>isAgend(r.stage)||isFaltou(r.stage))).forEach(r=>{
-    const actualOrg=r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
-    const ph=normalizePhone(r.phone)||r.name;if(!ph)return;
-    if(excluidosSetRO.has(ph))return;
+  // AGEND: usa o Clinicorp (mesma base do funil principal — detalheAgendados,
+  // pessoas únicas na agenda no período) em vez do Cloudia. Antes disso, dava
+  // pra alguém aparecer em "Compareceu" sem nunca ter aparecido em "Agendado"
+  // (impossível na prática — resolvido usando a MESMA fonte pras duas colunas).
+  const agendSrc=new Set((agendaClinicorpRO.detalheAgendados||[]).map(d=>normalizePhone(d.tel)));
+  agendSrc.forEach(ph=>{
+    const phN=normalizePhone(ph);
+    if(excluidosSetRO.has(phN))return;
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
+    const ccD=ccDataLookup(phN);
+    const actualOrg=(ccD&&ccD.origemAtual)||getOrigemReal(phN)||(row&&row.origin)||'—';
+    if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(!map[actualOrg].agend.has(ph)){map[actualOrg].agend.add(ph);map[actualOrg].agendRows.push(r);}
+    if(!map[actualOrg].agend.has(phN)){map[actualOrg].agend.add(phN);map[actualOrg].agendRows.push(row||{phone:phN,name:(ccD&&ccD.nomeAtual)||'—',origin:actualOrg});}
   });
   // COMP: usa o Clinicorp (mesma base do funil principal e do Funil por Anúncio —
   // ver getAgendaClinicorpFiltrada/reconciliarAgendCompClinicorpPorAnuncio — pra
   // essa métrica nunca mais divergir entre as telas do dashboard)
-  const compSrc=new Set(((window._lastAgendaClinicorp&&window._lastAgendaClinicorp.detalheComparecimentos)||[]).map(d=>normalizePhone(d.tel)));
+  const compSrc=new Set((agendaClinicorpRO.detalheComparecimentos||[]).map(d=>normalizePhone(d.tel)));
   compSrc.forEach(ph=>{
     const phN=normalizePhone(ph);
     if(excluidosSetRO.has(phN))return;
@@ -5937,80 +5954,63 @@ function initRelComparecidos(){
   };
   if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
 }
-function renderRelComparecidos(){
+// IDs de status do Clinicorp que contam como "compareceu de verdade" — mesmos
+// usados no backend (STATUS_COMPARECIMENTO_IDS no .gs): Em atendimento, Atendido.
+const STATUS_COMPARECIMENTO_IDS_FRONT=[4535647399051264,5329595793145856];
+
+async function renderRelComparecidos(){
   const origFilt=document.getElementById('rc-origem').value;
   const since=document.getElementById('rc-from').value;
   const until=document.getElementById('rc-to').value;
 
-  const byPhone={};
-  allCloudiaRows.forEach(r=>{
-    if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
-    if(origFilt&&(r.origin||'')!==origFilt)return;
-    const ph=String(r.phone||'').replace(/\D/g,'')||r.name;
-    if(!ph)return;
-    if(!byPhone[ph])byPhone[ph]=[];
-    byPhone[ph].push(r);
-  });
+  const tbody=document.getElementById('rc-tbody');
+  if(tbody)tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Carregando do Clinicorp...</td></tr>';
 
+  // Busca DIRETO do Clinicorp — cada ato de agendamento no período já vem com
+  // as duas datas que importam (dataCriacao = quando foi marcado, data = a
+  // consulta em si). Não depende mais do Cloudia ter registrado "Agendou"
+  // com timestamp (isso deixava de fora todo agendamento feito direto pela
+  // recepção) — pedido explícito do usuário, 16/07/2026.
+  let detalheAtos=[];
+  try{
+    const url=CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until;
+    const res=await fetch(url);
+    const r=await res.json();
+    if(r.status==='ok')detalheAtos=r.detalheAtos||[];
+    else console.warn('[COMPARECIDOS X AGENDAMENTO] Backend retornou erro:',r.mensagem);
+  }catch(e){console.warn('[COMPARECIDOS X AGENDAMENTO] Erro ao buscar Clinicorp:',e);}
+
+  const excluidosSetRC=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
   const distances=[0,1,2,3,4,5,6,17];
   const distMap={};
   distances.forEach(d=>distMap[d]={agend:0,comp:0,agendRows:[],compRows:[]});
-  const seenAgend=new Set();
 
-  Object.entries(byPhone).forEach(([ph,evts])=>{
-    const ccD=ccDataLookup(ph)||{};
-
-    // Data do agendamento — quando a SDR criou o registro de Agendou no Cloudia.
-    let agendDate=null, agendRow=null;
-    if(ccD.agendTimestamp){
-      agendDate=parseCloudiaDate(ccD.agendTimestamp);
-      agendRow=evts[0];
-    } else {
-      const agendEvts=evts.filter(e=>
-        (isAgend(e.stage)||isFaltou(e.stage)) &&
-        e.type!=='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'
-      ).sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-      if(agendEvts.length>0){agendDate=parseCloudiaDate(agendEvts[0].timestamp);agendRow=agendEvts[0];}
+  detalheAtos.forEach(item=>{
+    if(item.deletado)return; // desmarcado não conta como agendamento de verdade
+    const tel=normalizePhone(item.tel);
+    if(!tel||excluidosSetRC.has(tel))return;
+    if(origFilt){
+      const ccD=ccDataLookup(tel);
+      const org=(ccD&&ccD.origemAtual)||getOrigemReal(tel)||'—';
+      if(org!==origFilt)return;
     }
-    if(!agendDate)return;
-    const agendDs=localDateStr(agendDate);
-    if(agendDs<since||agendDs>until)return;
+    if(!item.data||!item.dataCriacao)return; // precisa das duas datas pra calcular a distância
 
-    // Data REAL da consulta marcada: vem do Clinicorp via consultaTimestamp
-    // (campo gravado pela sincronização "Atualizar datas de consulta (Clinicorp)",
-    // ou editado manualmente no card). Essa data existe SEMPRE que há um
-    // agendamento real — independente de a pessoa ter comparecido ou faltado —
-    // porque é a data marcada na agenda da clínica, não o resultado.
-    const consultaDate=ccD.consultaTimestamp?parseCloudiaDate(ccD.consultaTimestamp):null;
-
-    // Comparecimento real: usado só para a % de comparecimento dentro da faixa,
-    // nunca para decidir se a linha de distância existe.
-    const compareceu=evts.some(e=>isComp(e.stage)||isFechou(e.stage))
-      ||(ccD.orcamentos&&ccD.orcamentos.length>0);
-
-    if(!consultaDate){
-      // Sem data de consulta sincronizada ainda do Clinicorp — não dá pra calcular
-      // a distância real. Conta como agendamento, mas fica fora dos buckets de
-      // distância até a sincronização trazer a data. Não cria mais uma linha de
-      // "pendente" — isso era a confusão anterior entre "sem dado" e "não compareceu".
-      return;
-    }
-
-    const consultaDs=localDateStr(consultaDate);
-    const diff=Math.round((new Date(consultaDs+'T12:00:00')-new Date(agendDs+'T12:00:00'))/(1000*60*60*24));
-    if(diff<0)return; // data de consulta antes do agendamento não faz sentido — ignora
-    const bucket=distances.find(d=>d===diff)||(diff>=17?17:diff>6?6:diff);
+    const diff=Math.round((new Date(item.data+'T12:00:00')-new Date(item.dataCriacao+'T12:00:00'))/(1000*60*60*24));
+    if(diff<0)return; // consulta marcada antes do agendamento não faz sentido — ignora
+    const bucket=diff<=6?diff:17;
 
     if(!distMap[bucket])distMap[bucket]={agend:0,comp:0,agendRows:[],compRows:[]};
-    if(!seenAgend.has(ph)){
-      seenAgend.add(ph);
-      distMap[bucket].agend++;
-      distMap[bucket].agendRows.push(agendRow||evts[0]);
-      if(compareceu){distMap[bucket].comp++;distMap[bucket].compRows.push(evts.find(e=>isComp(e.stage)||isFechou(e.stage))||agendRow||evts[0]);}
+    distMap[bucket].agend++;
+    distMap[bucket].agendRows.push({phone:tel,name:item.nome,origin:(ccDataLookup(tel)||{}).origemAtual||getOrigemReal(tel)||'—',data:item.data,dataCriacao:item.dataCriacao});
+    const compareceu=item.statusId&&STATUS_COMPARECIMENTO_IDS_FRONT.includes(Number(item.statusId));
+    if(compareceu){
+      distMap[bucket].comp++;
+      distMap[bucket].compRows.push({phone:tel,name:item.nome,origin:(ccDataLookup(tel)||{}).origemAtual||getOrigemReal(tel)||'—',data:item.data,dataCriacao:item.dataCriacao});
     }
   });
 
-  const totalAgend=seenAgend.size;
+  const totalAgend=Object.values(distMap).reduce((s,d)=>s+d.agend,0);
   window._rcData={};
   const thead=document.getElementById('rc-thead');
   thead.innerHTML='<th>Distância</th><th style="text-align:right">Agendamentos</th><th style="text-align:right">% do Total</th><th style="text-align:right">Comparecimentos</th><th style="text-align:right">% Comp.</th>';
@@ -6025,7 +6025,7 @@ function renderRelComparecidos(){
       <td style="text-align:right" class="tm">${totalAgend>0?(d.agend/totalAgend*100).toFixed(1)+'%':'—'}</td>
       <td style="text-align:right">${d.comp} <button class="lupa" onclick="openRCModal(${i},'comp')">🔍</button></td>
       <td style="text-align:right" class="tm">${d.agend>0?(d.comp/d.agend*100).toFixed(1)+'%':'—'}</td>
-    </tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Nenhum agendamento com data de consulta sincronizada do Clinicorp neste período. Clique em "Atualizar datas de consulta (Clinicorp)" acima.</td></tr>';
+    </tr>`;}).join('')||'<tr><td colspan="5" style="text-align:center;color:#b5a898;padding:20px;">Nenhum agendamento do Clinicorp com as duas datas (criação + consulta) neste período.</td></tr>';
 }
 function openRCModal(i,type){
   if(!window._rcData||!window._rcData[i]){alert('Clique em Filtrar primeiro.');return;}
@@ -6033,7 +6033,11 @@ function openRCModal(i,type){
   const label=dias==='17'?'17+ dias':dias+' dia(s)';
   const rows=type==='agend'?d.agendRows:d.compRows;
   const title=(type==='agend'?'Agendamentos':'Comparecimentos')+' — '+label;
-  openModal(title,['Data','Nome','Telefone','Origem'],rows.map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r.origin||'—']));
+  openModal(title,['Data','Nome','Telefone','Origem'],rows.map(r=>{
+    const dataStr=type==='agend'?(r.dataCriacao||r.created_at||r.timestamp):(r.data||r.created_at||r.timestamp);
+    const dataFmt=r.dataCriacao!==undefined?fmtDateOnly(dataStr):fmtDate(dataStr); // linhas novas (Clinicorp) são yyyy-mm-dd puro
+    return[dataFmt,r.name||'—',r.phone||'—',r.origin||'—'];
+  }));
 }
 
 // ── ORÇAMENTOS FECHADOS ───────────────────────────────────
