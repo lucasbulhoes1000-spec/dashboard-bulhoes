@@ -1852,6 +1852,16 @@ function filterAgendByRange(rows,tab){
 
 // HELPERS
 // Normaliza telefone BR para uma chave única, removendo variações de DDI (55) e do 9º dígito
+// Compara um procedimento do FILTRO contra o campo "tratamento" de um orçamento —
+// esse campo pode vir com vários procedimentos juntos (ex: "Lentes em Resina,
+// Remoção Lentes, Profilaxia..."), então o filtro precisa bater com QUALQUER
+// procedimento individual da lista, não com o plano inteiro de uma vez.
+function tratamentoBate(tratamentoStr,filtro){
+  if(!filtro)return true;
+  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const alvo=norm(filtro);
+  return (tratamentoStr||'').split(',').some(p=>norm(p)===alvo);
+}
 function normalizePhone(phone){
   let d=String(phone||'').replace(/\D/g,'');
   if(!d)return'';
@@ -3960,8 +3970,8 @@ function filterClientesTable(){
     // (mesma regra usada no resto do dashboard — orçamento aprovado é fonte de verdade).
     const fechou=isFechou(r.stage)||orcs.some(o=>o.status==='Aprovado');
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
+    const tratMatch=!trat||orcs.some(o=>tratamentoBate(o.tratamento,trat));
     const normStr=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-    const tratMatch=!trat||orcs.some(o=>normStr(o.tratamento)===normStr(trat));
     const avalMatch=!aval||orcs.some(o=>normStr(o.avaliador)===normStr(aval));
     let dateMatch=true;
     if(fromV||toV){
@@ -5725,7 +5735,7 @@ function renderRelOrigem(){
   leadRows.forEach(r=>{
     const org=(origFilt?origFilt:null)||r.origin||'—';
     if(origFilt&&(r.origin||'—')!==origFilt)return;
-    if(avalFilt||tratFilt){const ph2=normalizePhone(r.phone);const dd=ccDataLookup(ph2)||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>o.tratamento===tratFilt))return;}
+    if(avalFilt||tratFilt){const ph2=normalizePhone(r.phone);const dd=ccDataLookup(ph2)||{orcamentos:[]};const orcs=dd.orcamentos||[];if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return;if(tratFilt&&!orcs.some(o=>tratamentoBate(o.tratamento,tratFilt)))return;}
     const actualOrg=r.origin||'—';
     const ph=normalizePhone(r.phone)||r.name;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
@@ -5970,7 +5980,7 @@ function renderRelOrcamentos(){
       if(!dataRef||dataRef<since||dataRef>until)return;
       const av=o.avaliador||'Sem avaliador';
       if(avalFilt&&av!==avalFilt)return;
-      if(tratFilt&&o.tratamento!==tratFilt)return;
+      if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return;
       if(origFilt){
         const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
         if(!row||(row.origin||'')!==origFilt)return;
@@ -8514,8 +8524,11 @@ function populateDynamicSelects(){
   const comAval=document.getElementById('com-avaliador');
   if(comAval){const cur=comAval.value;comAval.innerHTML='<option value="">Sem avaliador</option>'+avaisTodos.map(a=>`<option${a===cur?' selected':''}>${a}</option>`).join('');}
 
-  // Tratamentos — inclui os que estão nos orçamentos do _ccData
-  const tratsDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).map(o=>o.tratamento).filter(Boolean)))];
+  // Tratamentos — inclui os que estão nos orçamentos do _ccData, mas SEPARADOS
+  // (o campo tratamento pode vir com vários procedimentos juntos, ex: "Lentes em
+  // Resina, Remoção Lentes, Profilaxia..." — o filtro é por procedimento, não por
+  // plano de tratamento inteiro).
+  const tratsDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).flatMap(o=>(o.tratamento||'').split(',').map(s=>s.trim()).filter(Boolean))))];
   const tratsTodos=[...new Set([...trats,...tratsDoOrc])].sort();
   _todosTratamentosCache=tratsTodos;
   ['orc-tratamento','clientes-trat-filter','ro-trat','rof-trat','pacientes-trat-filter'].forEach(id=>{
