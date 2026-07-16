@@ -2232,6 +2232,30 @@ async function carregarComparecimentoClinicorp(){
     elAgendados.innerHTML='— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
   }
 }
+// Verifica quem tem agendamento FUTURO de verdade no Clinicorp (data da
+// consulta >= hoje), independente do estágio no Cloudia — resolve o caso de
+// lead que já está agendado na clínica (ex: marcado direto pela recepção,
+// sem passar pelo fluxo do bot) mas cujo Cloudia nunca atualizou pra
+// "Agendou". Período fixo (hoje até daqui 1 ano), não depende do filtro do
+// Dashboard — roda uma vez por sessão e alimenta a aba Leads.
+let _agendamentosFuturosClinicorpIniciado=false;
+async function carregarAgendamentosFuturosClinicorp(){
+  if(_agendamentosFuturosClinicorpIniciado)return;
+  _agendamentosFuturosClinicorpIniciado=true;
+  try{
+    const hoje=localDateStr(new Date());
+    const futuro=localDateStr(new Date(Date.now()+365*24*60*60*1000));
+    const url=CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+hoje+'&to='+futuro;
+    const res=await fetch(url);
+    const r=await res.json();
+    if(r.status!=='ok')return;
+    window._lastAgendamentosFuturosClinicorp=new Set((r.detalheAgendados||[]).map(d=>normalizePhone(d.tel)));
+    if(typeof renderLeadsPage==='function'&&leadsData&&leadsData.length)renderLeadsPage();
+  }catch(e){
+    console.warn('[AGENDA FUTURA CLINICORP] Erro (não bloqueia a aba Leads):',e);
+    _agendamentosFuturosClinicorpIniciado=false; // permite tentar de novo no próximo acesso à aba
+  }
+}
 function lupaLeadsAgendadosClinicorp(){
   const r=window._lastAgendaClinicorp;
   if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
@@ -3156,6 +3180,7 @@ let leadsData=[];
 function renderLeads(){
   if(allCloudiaRows.length===0){fetchCloudia().then(()=>renderLeadsTable());}
   else{renderLeadsTable();}
+  carregarAgendamentosFuturosClinicorp();
 }
 function renderLeadsTable(){
   // Primeiro agrupa TODAS as linhas por telefone (sem pré-filtrar por stage),
@@ -3303,8 +3328,15 @@ function renderLeadsPage(){
     const idx=leadsData.indexOf(r);
     const e=applyEdits(r);
     const sl=(e.stage||'').toLowerCase();
+    const phNormLead=normalizePhone(r.phone);
+    const temAgendamentoFuturoClinicorp=phNormLead&&window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(phNormLead);
     let statusBadge;
-    if(sl.includes('faltou')||sl.includes('desmarcou')){
+    if(temAgendamentoFuturoClinicorp){
+      // Confirmado direto na agenda do Clinicorp (data futura, ainda não aconteceu) —
+      // prioriza esse dado sobre o estágio do Cloudia, que pode nunca ter sido
+      // atualizado se o agendamento foi feito direto pela recepção, sem passar pelo bot.
+      statusBadge='<span style="background:#e2ecf0;color:#3a6a8a;border:0.5px solid #3a6a8a;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;" title="Tem consulta futura confirmada na agenda do Clinicorp">📅 Agendado (Clinicorp)</span>';
+    } else if(sl.includes('faltou')||sl.includes('desmarcou')){
       statusBadge='<span style="background:#fdf0ea;color:#b5856a;border:0.5px solid #b5856a;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;">✗ Faltou/Desmarcou</span>';
     } else if(sl.includes('agendou')){
       statusBadge='<span style="background:#f0f5f0;color:#5a8a6a;border:0.5px solid #5a8a6a;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;">📅 Agendado</span>';
@@ -3371,7 +3403,7 @@ function renderClientesTable(){
   // exclusão nenhuma, só os fluxos específicos do Clinicorp sabem). Filtrar
   // aqui, na hora de montar a lista, garante que excluído nunca mais volta,
   // não importa a origem do dado.
-  const excluidosSet=new Set((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]);
+  const excluidosSet=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
   // ⚠️ CORRIGIDO (14/07/2026): antes filtrava pelo estágio BRUTO do evento
   // original do Cloudia (r.stage) — isso nunca refletia comparecimento real
   // sincronizado depois via Clinicorp (webhook, botão manual etc.), porque
@@ -3396,12 +3428,20 @@ function renderClientesTable(){
   // o _ccData direto e completa quem ficou de fora, sempre respeitando a
   // exclusão manual também.
   Object.keys(_ccData).forEach(ph=>{
-    if(ph==='__exclusoes__'||phoneMap[ph]||excluidosSet.has(ph))return;
+    if(ph==='__exclusoes__')return;
+    // ⚠️ CRÍTICO: normaliza a chave antes de comparar — o _ccData tem entradas
+    // antigas salvas com formatos diferentes (com/sem 55, 10 vs 11 dígitos).
+    // Comparar a chave crua contra phoneMap (que usa telefone normalizado)
+    // causava duas coisas ao mesmo tempo: duplicava quem já estava na lista
+    // (mesma pessoa, chave "igual" mas grafada diferente) E deixava passar
+    // quem tinha sido excluído manualmente (mesmo motivo).
+    const phNorm=normalizePhone(ph)||ph;
+    if(phoneMap[phNorm]||excluidosSet.has(phNorm))return;
     const d=_ccData[ph];
     if(!d||!d.statusAtual)return;
-    const info=getEffectiveAgendInfo(ph,null);
+    const info=getEffectiveAgendInfo(phNorm,null);
     if(!(isComp(info.stage)||isFechou(info.stage)))return;
-    phoneMap[ph]={phone:ph,name:d.nomeAtual||'(sem nome)',origin:d.origemAtual||'',stage:info.stage,value:0,created_at:d.consultaTimestamp||'',timestamp:d.consultaTimestamp||''};
+    phoneMap[phNorm]={phone:phNorm,name:d.nomeAtual||'(sem nome)',origin:d.origemAtual||'',stage:info.stage,value:0,created_at:d.consultaTimestamp||'',timestamp:d.consultaTimestamp||''};
   });
   // Pré-calcula a data de ordenação uma única vez por cliente (evita recalcular getEffectiveAgendInfo
   // repetidamente dentro do comparador do sort, o que era O(N log N) chamadas pesadas)
