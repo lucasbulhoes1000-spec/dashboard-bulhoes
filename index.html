@@ -1200,7 +1200,7 @@ tbody tr:hover td{background:#faf7f3;}
         <div id="prod-preview-preco-unit" style="font-size:11px;color:#5a8a6a;margin-top:5px;"></div>
         <div style="font-size:11px;color:#9a8c7e;margin-top:4px;">Da próxima vez que comprar, informe o novo valor direto na Entrada de Estoque — o preço médio se ajusta automaticamente.</div>
       </div>
-      <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade inicial em estoque</label>
+      <div style="margin-bottom:11px;"><label id="prod-qtd-inicial-label" style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Quantidade inicial em estoque</label>
         <input id="prod-qtd-inicial" type="number" min="0" placeholder="0" style="width:100%;border:1px solid #e0d9d0;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;"></div>
       <div style="display:flex;gap:10px;margin-top:6px;">
         <button onclick="salvarProduto()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;">Salvar</button>
@@ -6910,6 +6910,8 @@ function toggleProdVemCaixa(){
   document.getElementById('prod-unid-caixa-wrap').style.display=vemCaixa?'block':'none';
   document.getElementById('prod-preco-normal-wrap').style.display=vemCaixa?'none':'block';
   document.getElementById('prod-preco-caixa-wrap').style.display=vemCaixa?'block':'none';
+  const lblQtd=document.getElementById('prod-qtd-inicial-label');
+  if(lblQtd)lblQtd.textContent=vemCaixa?'Quantidade inicial em estoque (em CAIXAS)':'Quantidade inicial em estoque';
   atualizarPreviewPrecoUnitCadastro();
 }
 function atualizarPreviewPrecoUnitCadastro(){
@@ -6973,8 +6975,14 @@ function salvarProduto(){
     delete _estoqueProdutos[nomeOriginal];
     _estoqueMovs.forEach(m=>{if(m.nome===nomeOriginal)m.nome=nome;});
   } else if(!nomeOriginal&&qtdInicial>0){
-    // Novo produto com estoque inicial
-    _estoqueMovs.push({nome,tipo:'entrada',qtd:qtdInicial,valor:qtdInicial*preco,data:new Date().toISOString()});
+    // Novo produto com estoque inicial — se vem em caixa, a quantidade
+    // inicial é em CAIXAS (mesmo padrão de Entrada/Saída), então converte
+    // pra unidades antes de gravar. Sem isso, o saldo ficava em "número de
+    // caixas" só neste primeiro lançamento, mas o valor total (saldo × preço
+    // unitário) tratava esse número como se já fossem unidades — subestimando
+    // o valor total em estoque por um fator de unidPorCaixa.
+    const qtdInicialReal=vemCaixa?qtdInicial*unidPorCaixa:qtdInicial;
+    _estoqueMovs.push({nome,tipo:'entrada',qtd:qtdInicialReal,valor:qtdInicialReal*preco,data:new Date().toISOString()});
   }
 
   document.getElementById('modal-cadastrar-produto').style.display='none';
