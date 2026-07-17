@@ -5255,6 +5255,22 @@ function openOrcForm(editIdx){
     document.getElementById('orc-status').value=o.status||'';
     document.getElementById('orc-avaliador').value=o.avaliador||'';
     document.getElementById('orc-tratamento').value=o.tratamento||'';
+    // ⚠️ CRÍTICO: o <select> de tratamento agora lista procedimentos
+    // INDIVIDUAIS (corrigido pro filtro funcionar direito), mas o que está
+    // salvo no orçamento pode ser um COMBO de vários procedimentos juntos
+    // (ex: "Coroa em Porcelana, Coroa em Porcelana, Coroa em Porcelana").
+    // Se esse combo não bater com nenhuma opção, o <select> simplesmente não
+    // seleciona nada — e ao salvar, isso apagava o tratamento original
+    // silenciosamente. Injeta uma opção temporária com o texto exato do que
+    // já estava salvo, pra nunca perder o dado.
+    const elTrat=document.getElementById('orc-tratamento');
+    if(o.tratamento&&elTrat.value!==o.tratamento){
+      const optTemp=document.createElement('option');
+      optTemp.value=o.tratamento;
+      optTemp.textContent=o.tratamento;
+      elTrat.insertBefore(optTemp,elTrat.firstChild);
+      elTrat.value=o.tratamento;
+    }
     document.getElementById('orc-pagamento').value=o.pagamento||'';
     document.getElementById('orc-parcelas').value=o.parcelas||'';
     document.getElementById('orc-fech-data').value=o.fechData||o.data||'';
@@ -5539,7 +5555,16 @@ function salvarOrcamento(){
     crcNome:document.getElementById('orc-crc-nome').value.trim(),
     fechamentos:editIdx!==''?(d.orcamentos[parseInt(editIdx)]?d.orcamentos[parseInt(editIdx)].fechamentos||[]:[]):[]
   };
-  if(editIdx!=='')d.orcamentos[parseInt(editIdx)]=orc;
+  if(editIdx!==''){
+    // ⚠️ CRÍTICO: NUNCA substitui o objeto inteiro aqui — isso apagava campos
+    // como _clinicorpId e origemClinicorp que não fazem parte do formulário.
+    // Sem o _clinicorpId, a próxima vez que "Puxar Orçamentos (Clinicorp)"
+    // rodasse, o sistema não reconhecia mais esse orçamento como já
+    // importado e criava um DUPLICADO do zero. Agora funde os campos do
+    // formulário POR CIMA do que já existia, preservando o resto.
+    const orcExistente=d.orcamentos[parseInt(editIdx)]||{};
+    d.orcamentos[parseInt(editIdx)]=Object.assign({},orcExistente,orc);
+  }
   else d.orcamentos.unshift(orc);
   document.getElementById('cc-orc-form').style.display='none';
   refreshOrcamentos(d);
