@@ -1970,6 +1970,12 @@ function origemMatchClinicorp(ph){
 function getAgendaClinicorpFiltrada(){
   const agenda=window._lastAgendaClinicorp;
   if(!agenda)return null;
+  // ⚠️ Cache pode ser de um período/filtro ANTERIOR (a busca nova ainda não
+  // voltou) — nesse caso é melhor devolver null (funil mostra "carregando")
+  // do que mostrar o número de um período diferente do que está selecionado.
+  const rngAtual=getRange('trafego');
+  const per=window._agendaClinicorpPeriodo;
+  if(!per||per.from!==rngAtual.since||per.to!==rngAtual.until)return null;
   const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
   const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
   // "Agendamentos" (atos) sem filtro de origem = usa direto o valor bruto do backend
@@ -2133,7 +2139,7 @@ function renderFunilResumido(){
   ];
 
   el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
-    const valorTxt=e.valor==null?'—':e.valor;
+    const valorTxt=e.valor==null?'carregando...':e.valor;
     return `<div style="display:flex;justify-content:center;">
       <div style="background:${e.cor};color:#fff;border-radius:28px;padding:18px 26px;display:flex;align-items:center;justify-content:space-between;gap:18px;width:${degraus[i]}%;box-sizing:border-box;">
         <span style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap;">${e.icon} ${e.label}</span>
@@ -2190,8 +2196,15 @@ async function carregarComparecimentoClinicorp(){
   const elAgendadosSub=document.getElementById('t-leads-agendados-sub');
   const elCompClinicorp=document.getElementById('t-comp-clinicorp');
   if(!elAgendados)return;
+  const range=getRange('trafego');
+  // ⚠️ Assim que uma busca nova começa, já invalida o cache do período
+  // ANTERIOR — sem isso, o funil ficava mostrando o número do filtro velho
+  // (as vezes por até uns 30s, dependendo da resposta do Clinicorp/Supabase)
+  // como se já fosse do período novo. Melhor mostrar "—" (carregando) que
+  // número errado.
+  window._agendaClinicorpPeriodo=null;
+  renderFunilResumido();
   try{
-    const range=getRange('trafego');
     const url=CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+range.since+'&to='+range.until;
     const res=await fetch(url);
     const r=await res.json();
@@ -2202,6 +2215,7 @@ async function carregarComparecimentoClinicorp(){
     }
 
     window._lastAgendaClinicorp=r; // guarda pra alimentar as lupas
+    window._agendaClinicorpPeriodo={from:range.since,to:range.until}; // pra saber se ainda vale pro filtro atual
     if(elAgendadosSub){
       elAgendadosSub.title='Fonte: Supabase (agenda de avaliações, alimentada por webhook do Clinicorp) — período '+r.periodo.from+' a '+r.periodo.to;
       elAgendadosSub.textContent='únicos na agenda (Clinicorp)';
