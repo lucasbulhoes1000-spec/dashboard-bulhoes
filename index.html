@@ -796,6 +796,19 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
 
     <!-- ===== GERENCIAR PAGE ===== -->
+    <!-- Modal: Prévia detalhada de "Puxar Orçamentos (Clinicorp)" -->
+    <div id="modal-preview-orcamentos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:14px;padding:24px;width:640px;max-width:94vw;max-height:88vh;overflow-y:auto;">
+        <div style="font-size:16px;font-weight:700;color:#2a2520;margin-bottom:4px;">📋 Revisar antes de importar</div>
+        <div id="preview-orc-periodo" style="font-size:12px;color:#9a8c7e;margin-bottom:16px;"></div>
+        <div id="preview-orc-conteudo"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;position:sticky;bottom:0;background:#fff;padding-top:10px;">
+          <button onclick="document.getElementById('modal-preview-orcamentos').style.display='none';showToast('success','Cancelado','Nenhuma alteração foi feita.');" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:9px 18px;font-size:12px;cursor:pointer;color:#7a6550;">Cancelar</button>
+          <button onclick="aplicarImportacaoOrcamentos()" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:12px;font-weight:600;cursor:pointer;">Confirmar importação</button>
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-gerenciar">
       <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:20px;">
         <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:4px;">Sincronizações com o Clinicorp</div>
@@ -3444,7 +3457,11 @@ async function garantirClinicorpParaClientes(){
     const excluidos=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
     let mudou=false;
     (r.detalheAgendados||[]).forEach(item=>{
-      if(!item.comparecimento)return; // só quem realmente compareceu (Em atendimento/Atendido)
+      // ⚠️ CORRIGIDO (18/07/2026): usava "comparecimento" (critério estrito do
+      // Dashboard, só Em atendimento/Atendido) — mas o pedido era pra aba
+      // Clientes já mostrar a partir de "Em espera" também. Agora usa o flag
+      // mais amplo que o backend expõe pra essa finalidade específica.
+      if(!item.deveAparecerEmClientes)return;
       const tel=normalizePhone(item.tel);
       if(!tel||excluidos.has(tel))return; // nunca recria quem foi excluído manualmente
       const d=ccDataLookup(tel);
@@ -4800,6 +4817,8 @@ async function sincronizarConsultasAvaliacao(){
     btn.textContent=textoOriginal;
   }
 }
+let _previewOrcamentosPendente=null;
+
 async function sincronizarOrcamentosClinicorp(){
   const btn=document.getElementById('btn-sync-orcamentos');
   const textoOriginal=btn.textContent;
@@ -4830,34 +4849,95 @@ async function sincronizarOrcamentosClinicorp(){
       return;
     }
 
-    let confirmMsg='Encontrado no Clinicorp ('+p.periodo.from+' a '+p.periodo.to+'):\n\n'+
-      '• '+p.novos+' orçamento(s) novo(s) pra importar\n'+
-      (p.clientesCriados>0?'   ↳ sendo '+p.clientesCriados+' de cliente(s) que ainda NÃO existem no CRM (nunca passaram pelo Cloudia) — serão criados automaticamente com os dados do Clinicorp\n':'')+
-      '• '+p.atualizados+' já importado(s) antes, com status/valor atualizado\n'+
-      (p.semTelefone>0?'• '+p.semTelefone+' sem NENHUM telefone cadastrado no Clinicorp (impossível importar)\n':'');
+    // ⚠️ Antes disso era só um confirm() com CONTAGEM (ex: "3 novos, 11
+    // atualizados") — o usuário tinha que aprovar às cegas, sem ver quem são
+    // ou o que mudou. Agora monta um modal com a lista detalhada (nome,
+    // telefone, tratamento, valor, o que mudou), e só aplica de verdade
+    // quando clicar "Confirmar importação" (18/07/2026, pedido do usuário).
+    _previewOrcamentosPendente=p;
+    document.getElementById('preview-orc-periodo').textContent='Período: '+p.periodo.from+' a '+p.periodo.to+(p.semTelefone>0?' · ⚠️ '+p.semTelefone+' sem telefone no Clinicorp (impossível importar)':'');
+    document.getElementById('preview-orc-conteudo').innerHTML=montarPreviewOrcamentosHtml(p);
+    document.getElementById('modal-preview-orcamentos').style.display='flex';
+  }catch(e){
+    showToast('error','Erro na verificação',e.message);
+  }finally{
+    btn.disabled=false;
+    btn.textContent=textoOriginal;
+  }
+}
 
-    if(p.clientesCriados>0){
-      confirmMsg+='\nℹ️ Clientes criados automaticamente NÃO terão data de comparecimento preenchida (o Clinicorp só nos dá a data do orçamento, não da consulta) — isso evita poluir o relatório de Comparecidos x Agendamento com data inventada. Se precisar da data real, edite manualmente depois.\n';
-    }
+// Monta o HTML detalhado da prévia — cada categoria (cliente novo, orçamento
+// novo, orçamento atualizado, possível duplicata) com nome, telefone,
+// tratamento/valor e o que exatamente mudou, pra decidir com informação de
+// verdade em vez de só uma contagem.
+function montarPreviewOrcamentosHtml(p){
+  const bloco=(titulo,cor,itensHtml)=>itensHtml?`<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:${cor};margin-bottom:8px;">${titulo}</div>${itensHtml}</div>`:'';
+  const linha=(nome,tel,detalhe)=>`<div style="background:#f5f0ea;border-radius:8px;padding:9px 12px;margin-bottom:6px;font-size:12px;color:#2a2520;">
+    <b>${nome||'—'}</b> <span style="color:#9a8c7e;">· ${tel||'—'}</span><br><span style="color:#5a4a3a;">${detalhe}</span>
+  </div>`;
 
-    if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
-      confirmMsg+='\n⚠️ ATENÇÃO: '+p.possiveisDuplicatas.length+' desses novos têm o MESMO VALOR de um orçamento já lançado manualmente pro mesmo telefone — pode ser duplicata:\n';
-      p.possiveisDuplicatas.slice(0,10).forEach(d=>{
-        confirmMsg+='  - '+d.nome+' (R$ '+d.valor+')\n';
+  let html='';
+
+  if(p.candidatosNovoCliente&&p.candidatosNovoCliente.length>0){
+    let itens='';
+    p.candidatosNovoCliente.forEach(c=>{
+      (c.cliente.orcamentos||[]).forEach(o=>{
+        itens+=linha(c.cliente.nomeAtual||c.nome,c.tel,(o.tratamento||'(sem tratamento)')+' — <b>'+fmt(o.valor||0)+'</b> — '+o.status);
       });
-      confirmMsg+='\nSe confirmar, esses SERÃO importados mesmo assim (não temos certeza se é duplicata ou coincidência de valor) — revise manualmente depois na tela do lead.\n';
-    }
+    });
+    html+=bloco('🆕 Clientes novos, criados automaticamente ('+p.candidatosNovoCliente.length+')','#5a8a6a',itens);
+  }
 
-    confirmMsg+='\nConfirmar importação?';
+  if(p.candidatosNovos&&p.candidatosNovos.length>0){
+    let itens='';
+    p.candidatosNovos.forEach(c=>{
+      itens+=linha(c.nomeCompleto||c.nome,c.tel,(c.orcamento.tratamento||'(sem tratamento)')+' — <b>'+fmt(c.orcamento.valor||0)+'</b> — '+c.orcamento.status);
+    });
+    html+=bloco('➕ Orçamentos novos, em cliente já existente ('+p.candidatosNovos.length+')','#2a4a45',itens);
+  }
 
-    const confirmar=confirm(confirmMsg);
-    if(!confirmar){
-      showToast('success','Cancelado','Nenhuma alteração foi feita.');
-      return;
-    }
+  if(p.candidatosAtualizados&&p.candidatosAtualizados.length>0){
+    let itens='';
+    p.candidatosAtualizados.forEach(c=>{
+      const d=_ccData[c.tel];
+      const existente=d&&d.orcamentos&&d.orcamentos.find(o=>o._clinicorpId===c.clinicorpId);
+      const nomeDisp=c.nomeCompleto||(d&&d.nomeAtual)||'—';
+      const mudancas=[];
+      if(existente&&existente.status!==c.status)mudancas.push('status: '+existente.status+' → '+c.status);
+      if(existente&&Number(existente.valor||0)!==Number(c.valor||0))mudancas.push('valor: '+fmt(existente.valor||0)+' → '+fmt(c.valor||0));
+      if(c.pagamento!==undefined&&c.pagamento)mudancas.push('pagamento: '+c.pagamento+(c.parcelas?' ('+c.parcelas+')':''));
+      if(c.entrada!==undefined&&Number(c.entrada)>0)mudancas.push('entrada: '+fmt(c.entrada));
+      if(c.statusGanho)mudancas.push('estágio → Ganho');
+      itens+=linha(nomeDisp,c.tel,mudancas.length?mudancas.join(' · '):'sem mudança visível (reenviado pelo Clinicorp)');
+    });
+    html+=bloco('🔄 Orçamentos já importados, com atualização ('+p.candidatosAtualizados.length+')','#8a7a68',itens);
+  }
 
-    // --- ETAPA 2: aplica os candidatos JÁ BUSCADOS na etapa 1 — não chama o Clinicorp de novo ---
-    btn.textContent='⏳ Gravando...';
+  if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
+    let itens='';
+    p.possiveisDuplicatas.forEach(d=>{
+      itens+=linha(d.nome,d.telefone,(d.tratamento||'')+' — <b>'+fmt(d.valor||0)+'</b> — mesmo valor de um orçamento já lançado manualmente pro mesmo telefone');
+    });
+    html+=bloco('⚠️ Possíveis duplicatas — serão importados mesmo assim, revise depois ('+p.possiveisDuplicatas.length+')','#b5483d',itens);
+  }
+
+  if(p.candidatosNovoCliente&&p.candidatosNovoCliente.length>0){
+    html+='<div style="font-size:11px;color:#9a8c7e;margin-top:6px;">ℹ️ Clientes criados automaticamente não terão data de comparecimento preenchida (o Clinicorp só dá a data do orçamento, não da consulta) — edite manualmente depois, se precisar.</div>';
+  }
+
+  return html||'<div style="font-size:12px;color:#9a8c7e;">Nada pra mostrar em detalhe (só contagem disponível).</div>';
+}
+
+// --- ETAPA 2: aplica os candidatos JÁ BUSCADOS na prévia — não chama o Clinicorp de novo ---
+async function aplicarImportacaoOrcamentos(){
+  const p=_previewOrcamentosPendente;
+  if(!p)return;
+  document.getElementById('modal-preview-orcamentos').style.display='none';
+  const btn=document.getElementById('btn-sync-orcamentos');
+  const textoOriginal=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='⏳ Gravando...';
+  try{
     const res=await fetch(CLOUDIA_URL,{
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
