@@ -5705,18 +5705,38 @@ function refreshAtividades(r,d){
   var manual=d.atividades||[];
   var prox=manual.find(a=>a.proximo);
   document.getElementById('cc-ultimo-contato').textContent=prox?new Date(prox.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
-  var all=manual.concat(auto);
+  const fasesOpcoes=(_listas.fases&&_listas.fases.ativos)||[];
+  // Marca cada atividade MANUAL com seu índice real dentro de d.atividades
+  // (antes de juntar com as automáticas), pra dar pra editar a fase direto
+  // na lista sem precisar reabrir o formulário de "+ Registrar atividade"
+  // (ficava meio escondido lá).
+  var all=manual.map((a,i)=>Object.assign({},a,{_manualIdx:i})).concat(auto);
   document.getElementById('cc-atv-list').innerHTML=all.length===0
     ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhuma atividade</div>'
-    :all.map(a=>`<div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;margin-bottom:8px;">
+    :all.map(a=>{
+      const faseHtml=a.auto
+        ?`<div style="font-size:13px;font-weight:600;color:#2a2520;">${a.fase}</div>`
+        :`<select onchange="editarFaseAtividade(${a._manualIdx},this.value)" style="font-size:13px;font-weight:600;color:#2a2520;border:1px solid #d4c9bc;border-radius:6px;padding:3px 6px;background:#fff;cursor:pointer;max-width:100%;">${fasesOpcoes.map(f=>`<option${f===a.fase?' selected':''}>${f}</option>`).join('')}${fasesOpcoes.includes(a.fase)?'':`<option selected>${a.fase||'(sem fase)'}</option>`}</select>`;
+      return `<div style="display:flex;gap:10px;background:#fff;border:1px solid #e0d9d0;border-radius:8px;padding:11px;margin-bottom:8px;">
       <span style="font-size:16px;">${a.auto?'🔵':'📋'}</span>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.fase}</div>
+        ${faseHtml}
         ${a.prob?`<div style="font-size:11px;color:#A18B6C;">Probabilidade: ${a.prob}/10</div>`:''}
         ${a.proximo?`<div style="font-size:11px;color:#5a8a6a;">Próx. contato: ${new Date(a.proximo+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
         ${a.obs?`<div style="font-size:12px;color:#8a7a6a;margin-top:2px;">${a.obs}</div>`:''}
         <div style="font-size:11px;color:#aaa;margin-top:3px;">${a.data||''}${a.hora?' '+a.hora:''}</div>
-      </div></div>`).join('');
+      </div></div>`;
+    }).join('');
+}
+
+function editarFaseAtividade(idx,novaFase){
+  const ph=document.getElementById('cc-phone')&&document.getElementById('cc-phone').dataset.phone||'';
+  const key=ph||'_unknown';
+  const d=_ccData[key];
+  if(!d||!d.atividades||!d.atividades[idx])return;
+  d.atividades[idx].fase=novaFase;
+  salvarCRMDebounced();
+  showToast('success','✅ Fase atualizada!','');
 }
 
 function salvarAnotacao(){
