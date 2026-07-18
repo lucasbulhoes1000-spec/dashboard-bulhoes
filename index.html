@@ -5401,25 +5401,31 @@ function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataIn
   }
 
   // Processa cada procedimento SEPARADAMENTE — o texto do orçamento pode vir
-  // com vários procedimentos juntos numa string só (ex: "Restauração Direta,
-  // Restauração Direta, Botox Sorriso Gengival"). Processar tudo junto como
-  // antes causava dois problemas: (1) 5 restaurações em dentes diferentes
-  // viravam 1 card só, sem dar pra marcar cada uma; (2) "Botox Sorriso
-  // Gengival" contém "Botox" como substring, então virava um card genérico
-  // de "Botox" — informação errada.
+  // com vários procedimentos juntos numa string só (ex: "Restauração Direta -
+  // Dente 11, Restauração Direta - Dente 47, Botox Sorriso Gengival").
+  // Processar tudo junto como antes causava dois problemas: (1) várias
+  // restaurações em dentes diferentes viravam 1 card só, sem dar pra marcar
+  // cada uma; (2) "Botox Sorriso Gengival" contém "Botox" como substring,
+  // então virava um card genérico de "Botox" — informação errada.
   const segmentos=tratamentoStr.split(',').map(s=>s.trim()).filter(Boolean);
-  const nomeBasePorSegmento=segmentos.map(seg=>modelosMaisEspecificos(seg)[0]||seg);
+  // Pra cada segmento: acha o modelo mais específico que bate (só pra saber
+  // qual template de subetapas usar) — mas o NOME exibido no card preserva o
+  // texto original quando ele já tem uma informação específica a mais (ex:
+  // "- Dente 11"), pra não perder essa distinção reduzindo tudo ao nome
+  // genérico do modelo (18/07/2026 — a API do Clinicorp manda o número do
+  // dente em `Tooth`, e o backend já inclui isso no texto do procedimento).
+  const temInfoEspecifica=seg=>/dente\s*\d/i.test(seg);
+  const chavePorSegmento=segmentos.map(seg=>modelosMaisEspecificos(seg)[0]||null);
+  const nomeBasePorSegmento=segmentos.map((seg,i)=>temInfoEspecifica(seg)?seg:(chavePorSegmento[i]||seg));
   const contagemNomes={};
 
   segmentos.forEach((segmento,i)=>{
     const nomeBase=nomeBasePorSegmento[i];
-    const chave=Object.keys(modelos).includes(nomeBase)?nomeBase:null;
+    const chave=chavePorSegmento[i];
 
-    // Se o mesmo nome aparece mais de uma vez neste orçamento (ex: várias
-    // "Restauração Direta" para dentes diferentes), numera pra virar cards
-    // individuais e dar pra marcar cada um separadamente. Ideal seria usar o
-    // número do dente, mas o Clinicorp não manda esse dado no texto do
-    // procedimento hoje — se descobrirmos o campo certo, dá pra trocar aqui.
+    // Se mesmo assim o mesmo nome se repetir (ex: dois procedimentos iguais
+    // sem nenhuma info que distinga um do outro), numera pra pelo menos virar
+    // cards individuais e dar pra marcar cada um separadamente.
     contagemNomes[nomeBase]=(contagemNomes[nomeBase]||0)+1;
     const totalOcorrencias=nomeBasePorSegmento.filter(n=>n===nomeBase).length;
     const nomeProc=totalOcorrencias>1?`${nomeBase} (${contagemNomes[nomeBase]})`:nomeBase;
