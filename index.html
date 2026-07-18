@@ -551,7 +551,7 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="abrirModalModelos()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;">⚙️ Modelos de Procedimentos</button>
-          <button onclick="backfillFluxoAprovados()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;" title="Cria/completa o card de todo orçamento já Aprovado no CRM">📋 Importar Aprovados</button>
+          <button onclick="backfillFluxoAprovados()" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;color:#5a4a3a;" title="Cria/completa o card de orçamentos Aprovados a partir de 01/07/2026 — nunca mais retroativo antes disso">📋 Importar Aprovados</button>
           <button onclick="abrirAdicionarFluxo()" id="btn-fluxo-novo-paciente" style="background:#A18B6C;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">+ Novo Paciente</button>
         </div>
       </div>
@@ -563,7 +563,7 @@ tbody tr:hover td{background:#faf7f3;}
 
       <div id="fluxo-view-tratamentos">
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-          <input type="text" id="fluxo-search" placeholder="Buscar por nome..." oninput="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
+          <input type="text" id="fluxo-search" placeholder="Buscar por nome ou telefone..." oninput="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:200px;">
           <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
             <option value="">Todos os status</option>
             <option value="em_andamento">Em andamento</option>
@@ -5489,12 +5489,16 @@ async function garantirNoFluxo(tel, nome, tratamentoStr, dataInicio){
 // certo no Fluxo — mesma lógica de sempre (mesclarOrcamentoNoFluxo).
 // ============================================================
 async function backfillFluxoAprovados(){
-  const hoje=new Date();
-  const inicioMes=new Date(hoje.getFullYear(),hoje.getMonth(),1).toISOString().slice(0,10);
-  const fimMes=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).toISOString().slice(0,10);
-  if(!confirm('Isso vai varrer os orçamentos Aprovados DESTE MÊS ('+inicioMes+' a '+fimMes+') e criar/completar o card deles no Fluxo de Tratamento. Orçamentos de meses anteriores (tratamento já entregue) ficam de fora. Continuar?'))return;
+  // ⚠️ Antes usava "mês atual" — uma janela que muda sozinha todo mês (dia 1
+  // de agosto já não incluiria mais julho). Isso tanto deixava passar
+  // orçamento antigo de vez em quando quanto podia excluir orçamento recente
+  // só porque o mês virou. Trocado (18/07/2026) por um piso FIXO: só
+  // considera orçamentos aprovados a partir de 01/07/2026 em diante, pra
+  // sempre — nunca mais volta a pegar coisa de antes disso.
+  const PISO_DATA_FLUXO='2026-07-01';
+  if(!confirm('Isso vai varrer os orçamentos Aprovados a partir de '+PISO_DATA_FLUXO+' e criar/completar o card deles no Fluxo de Tratamento. Orçamentos anteriores a essa data (tratamento já entregue) ficam de fora, agora e sempre. Continuar?'))return;
   try{
-    showToast('success','⏳ Processando...','Varrendo orçamentos aprovados do mês, aguarde...');
+    showToast('success','⏳ Processando...','Varrendo orçamentos aprovados, aguarde...');
     console.log('[BACKFILL FLUXO] Etapa 1: buscando fluxo atual...');
     const resp=await fetch(CLOUDIA_URL+'?action=loadFluxo');
     console.log('[BACKFILL FLUXO] loadFluxo status HTTP:',resp.status);
@@ -5512,13 +5516,13 @@ async function backfillFluxoAprovados(){
       (d.orcamentos||[]).forEach(o=>{
         if(o.status!=='Aprovado')return;
         const dataRef=o.fechData||o.data||'';
-        if(!dataRef||dataRef<inicioMes||dataRef>fimMes){foraDoMes++;return;}
+        if(!dataRef||dataRef<PISO_DATA_FLUXO){foraDoMes++;return;}
         processados++;
         const mudou=mesclarOrcamentoNoFluxo(pacientes,modelos,ph,d.nomeAtual,o.tratamento,dataRef);
         if(mudou)mudancas++;
       });
     });
-    console.log('[BACKFILL FLUXO] Processados:',processados,'| Fora do mês (ignorados):',foraDoMes,'| Mudanças:',mudancas,'| Pacientes no fluxo agora:',pacientes.length);
+    console.log('[BACKFILL FLUXO] Processados:',processados,'| Antes do piso (ignorados):',foraDoMes,'| Mudanças:',mudancas,'| Pacientes no fluxo agora:',pacientes.length);
 
     if(mudancas>0){
       const payload=JSON.stringify({action:'saveFluxo',data:{modelos,pacientes}});
@@ -5531,7 +5535,7 @@ async function backfillFluxoAprovados(){
       }
       if(_fluxoIniciado){_fluxoModelos=modelos;_fluxoPacientes=pacientes;renderFluxoCards();}
     }
-    showToast('success','✅ Backfill concluído','Orçamentos aprovados este mês: '+processados+'\nCards criados/atualizados: '+mudancas+(foraDoMes>0?'\nDe outros meses (ignorados): '+foraDoMes:''));
+    showToast('success','✅ Backfill concluído','Orçamentos aprovados a partir de 01/07/2026: '+processados+'\nCards criados/atualizados: '+mudancas+(foraDoMes>0?'\nAnteriores ao piso (ignorados): '+foraDoMes:''));
   }catch(e){
     console.error('[BACKFILL FLUXO] Erro completo:',e);
     showToast('error','Erro no backfill',e.message+' — veja o console (F12), tem mais detalhe logado lá agora.');
@@ -7217,7 +7221,12 @@ function renderFluxoCards() {
   const busca = (document.getElementById('fluxo-search')?.value || '').toLowerCase();
   const statusFil = document.getElementById('fluxo-status-filter')?.value || '';
   const filtrados = _fluxoPacientes.filter(p => {
-    if (busca && !p.nome.toLowerCase().includes(busca)) return false;
+    if (busca) {
+      const nomeMatch = (p.nome || '').toLowerCase().includes(busca);
+      const buscaDigits = busca.replace(/\D/g, '');
+      const telMatch = buscaDigits.length > 0 && String(p.tel || '').replace(/\D/g, '').includes(buscaDigits);
+      if (!nomeMatch && !telMatch) return false;
+    }
     if (statusFil === 'em_andamento' && p.concluido) return false;
     if (statusFil === 'concluido' && !p.concluido) return false;
     // Limpeza automática: card concluído há mais de 30 dias some da lista
