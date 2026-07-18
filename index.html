@@ -328,7 +328,7 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="slabel">Captação</div>
             <div class="row r5">
-              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
+              <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
               <div class="mc"><div class="ml">Leads na agenda no período</div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
               <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
@@ -2015,7 +2015,7 @@ function atualizarCardsAgendaClinicorp(dados){
     const elAgend=document.getElementById('t-agend');
     if(elAgend){
       const pctAgendTxt=leads>0?(dados.totalAgendamentos/leads*100).toFixed(1)+'%':'—';
-      elAgend.innerHTML=dados.totalAgendamentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctAgendTxt+')</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+      elAgend.innerHTML=dados.totalAgendamentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctAgendTxt+')</span> <button class="lupa" onclick="lupaAgendamentosClinicorp()" title="Ver detalhes">🔍</button>';
     }
     const elAgendSub=document.getElementById('t-agend-sub');
     if(elAgendSub)elAgendSub.textContent='atos de agendamento (Clinicorp)';
@@ -2272,7 +2272,7 @@ async function carregarAgendamentosFuturosClinicorp(){
 function lupaLeadsAgendadosClinicorp(){
   const r=window._lastAgendaClinicorp;
   if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
-  const rows=(r.detalheAgendados||[]).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
+  const rows=(r.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel)).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
     .map(d=>[d.nome,d.tel,d.qtd,d.statusResumo,d.comparecimento?'✅ Sim':'—']);
   openModal('Leads na agenda no período (Avaliação) — Clinicorp — '+rows.length+' registros',
     ['Nome','Telefone','Qtd. agend.','Status na agenda','Compareceu?'],rows);
@@ -2280,10 +2280,24 @@ function lupaLeadsAgendadosClinicorp(){
 function lupaComparecimentoClinicorp(){
   const r=window._lastAgendaClinicorp;
   if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
-  const rows=(r.detalheComparecimentos||[]).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
+  const rows=(r.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel)).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
     .map(d=>[d.nome,d.tel,d.qtd,d.statusResumo]);
   openModal('Comparecimentos reais (Avaliação) — Clinicorp — '+rows.length+' registros',
     ['Nome','Telefone','Qtd. agend.','Status na agenda'],rows);
+}
+// ⚠️ NOVA (18/07/2026) — antes o botão de "Agendamentos" (atos) usava por
+// engano a mesma função da lupa de "Leads na agenda no período" (métrica
+// diferente, filtrada por outra data) — por isso aparecia gente sem nada a
+// ver quando abria. Agora usa detalheAtos de verdade (um registro por ATO de
+// agendamento, filtrado pela data de CRIAÇÃO), com filtro de origem também.
+function lupaAgendamentosClinicorp(){
+  const r=window._lastAgendaClinicorp;
+  if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
+  const rows=(r.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel)&&!d.deletado).slice()
+    .sort((a,b)=>(a.dataCriacao||'').localeCompare(b.dataCriacao||''))
+    .map(d=>[d.nome,d.tel,fmtDateOnly(d.dataCriacao),fmtDateOnly(d.data),d.statusLabel||'—']);
+  openModal('Agendamentos — atos de agendamento (Avaliação) — Clinicorp — '+rows.length+' registros',
+    ['Nome','Telefone','Data do agendamento','Data da consulta','Status'],rows);
 }
 async function loadTrafego(){
   document.getElementById('loading-trafego').style.display='flex';
@@ -4258,7 +4272,7 @@ function lupaComp(){
     return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(dataCadastroVal)||new Date(0)};
   }).sort((a,b)=>b.sortKey-a.sortKey)
     .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
-  openModal('Oportunidades — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
+  openModal('Comparecimentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
 
 function lupaOport(){
