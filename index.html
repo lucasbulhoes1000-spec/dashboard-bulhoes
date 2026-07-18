@@ -1976,17 +1976,21 @@ function getAgendaClinicorpFiltrada(){
   const rngAtual=getRange('trafego');
   const per=window._agendaClinicorpPeriodo;
   if(!per||per.from!==rngAtual.since||per.to!==rngAtual.until)return null;
-  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
-  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
-  // "Agendamentos" (atos) sem filtro de origem = usa direto o valor bruto do backend
-  // (agenda.totalAgendamentos) — é o total de atos filtrados por DATA DE CRIAÇÃO do
-  // agendamento (dataCriacao), uma base diferente de detalheAgendados (que filtra
-  // pela data da CONSULTA) — por isso não dá pra derivar um do outro.
-  // Com filtro de origem, o backend já manda detalheAtos com o telefone de cada ato
-  // (mesma base usada pra calcular totalAgendamentos), então filtra exato por lá —
-  // nada de estimativa/proporção.
-  const detAtos=(agenda.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel));
-  const totalAgendamentos=_origemFilter?detAtos.length:(agenda.totalAgendamentos||0);
+  // ⚠️ Excluído manualmente (aba Clientes) não pode contar aqui — antes só
+  // "Métricas de Origem" respeitava essa lista, e o Dashboard não, causando
+  // divergência entre as duas telas (18/07/2026: Dashboard sempre um pouco
+  // maior porque ainda contava quem já tinha sido excluído).
+  const excluidosSetDash=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
+  const naoExcluido=ph=>!excluidosSetDash.has(normalizePhone(ph));
+  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
+  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
+  // "Agendamentos" (atos) — antes usava o valor bruto do backend
+  // (agenda.totalAgendamentos) quando não tinha filtro de origem, sem
+  // aplicar exclusão nenhuma. Agora sempre calcula a partir de detalheAtos
+  // (que o backend já manda com o telefone de cada ato) já filtrado por
+  // origem E exclusão, pra nunca mais divergir de Métricas de Origem.
+  const detAtos=(agenda.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
+  const totalAgendamentos=detAtos.length;
   return{
     leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
     totalAgendamentos, // atos de agendamento
@@ -3420,6 +3424,41 @@ function renderClientes(){
   }
   if(allCloudiaRows.length===0){fetchCloudia().then(()=>renderClientesTable());}
   else{renderClientesTable();}
+  garantirClinicorpParaClientes();
+}
+// ⚠️ NOVA (18/07/2026): o webhook do Clinicorp às vezes não dispara pra um
+// comparecimento (mesmo padrão de instabilidade já visto nos "agendamentos"
+// do Dashboard) — quando isso acontece, a pessoa nunca aparece na aba
+// Clientes, mesmo tendo sido atendida de verdade (caso real: "Guilherme da
+// Costa"). Essa função busca direto na API do Clinicorp pro período
+// selecionado e completa qualquer comparecimento que o webhook tenha
+// perdido, sem depender só dele. Roda toda vez que a aba Clientes é aberta.
+async function garantirClinicorpParaClientes(){
+  const from=document.getElementById('clientes-from')?.value||'';
+  const to=document.getElementById('clientes-to')?.value||'';
+  if(!from||!to)return;
+  try{
+    const res=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+from+'&to='+to);
+    const r=await res.json();
+    if(r.status!=='ok')return;
+    const excluidos=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
+    let mudou=false;
+    (r.detalheAgendados||[]).forEach(item=>{
+      if(!item.comparecimento)return; // só quem realmente compareceu (Em atendimento/Atendido)
+      const tel=normalizePhone(item.tel);
+      if(!tel||excluidos.has(tel))return; // nunca recria quem foi excluído manualmente
+      const d=ccDataLookup(tel);
+      if(!d){
+        _ccData[tel]={nomeAtual:item.nome||'(sem nome)',origemAtual:'#Clinicorp Direto',statusAtual:'Compareceu',statusAtualEditedAt:new Date().toISOString(),leadImportado:true,orcamentos:[],atividades:[],anotacoes:[]};
+        mudou=true;
+      }else if(!isComp(d.statusAtual)&&!isFechou(d.statusAtual)){
+        d.statusAtual='Compareceu';
+        d.statusAtualEditedAt=new Date().toISOString();
+        mudou=true;
+      }
+    });
+    if(mudou){_ccDataNormIndex=null;salvarCRMDebounced();renderClientesTable();}
+  }catch(e){console.warn('[CLIENTES CLINICORP] Erro (não bloqueia a aba):',e);}
 }
 function renderClientesTable(){
   const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;return 1;};
@@ -4172,6 +4211,13 @@ function renderClientesPage(){
     const tratPartes=tratStr.split(',').map(s=>s.trim()).filter(Boolean);
     const tratPrincipal=tratPartes[0]||'—';
     const tratExtra=tratPartes.length>1?' <span style="color:#b5a898;">+'+(tratPartes.length-1)+'</span>':'';
+    const key=ccKey(r);
+    const fasesOpcoesTabela=(_listas.fases&&_listas.fases.ativos)||[];
+    const faseAtvSelectHtml=`<select onclick="event.stopPropagation()" onchange="editarFaseAtivTabela('${key.replace(/'/g,"\\'")}',this.value)" style="font-size:12px;border:0.5px solid #d4c9bc;border-radius:6px;padding:3px 6px;background:#fff;cursor:pointer;max-width:160px;">
+      <option value=""${faseAtv==='—'?' selected':''}>—</option>
+      ${fasesOpcoesTabela.map(f=>`<option${f===faseAtv?' selected':''}>${f}</option>`).join('')}
+      ${(faseAtv!=='—'&&!fasesOpcoesTabela.includes(faseAtv))?`<option selected>${faseAtv}</option>`:''}
+    </select>`;
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
       <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
@@ -4180,7 +4226,7 @@ function renderClientesPage(){
       <td style="font-size:12px;" title="${tratStr.replace(/"/g,'&quot;')}">${tratPrincipal}${tratExtra}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
       <td style="font-size:12px;${proxStyle}">${proxContato}</td>
-      <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${faseAtv}">${faseAtv}</td>
+      <td style="font-size:12px;max-width:170px;" onclick="event.stopPropagation()">${faseAtvSelectHtml}</td>
       <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
       <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
@@ -5737,6 +5783,23 @@ function editarFaseAtividade(idx,novaFase){
   d.atividades[idx].fase=novaFase;
   salvarCRMDebounced();
   showToast('success','✅ Fase atualizada!','');
+}
+
+// Edita a fase direto pela tabela principal de Clientes (coluna "Fase Ativ."),
+// sem precisar abrir o card do cliente — atualiza a atividade mais recente
+// (ou cria uma, se ainda não tiver nenhuma) com a nova fase escolhida.
+function editarFaseAtivTabela(key,novaFase){
+  if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  const d=_ccData[key];
+  if(!d.atividades)d.atividades=[];
+  if(d.atividades.length>0){
+    d.atividades[0].fase=novaFase;
+  }else{
+    d.atividades.unshift({fase:novaFase,data:localDateStr(new Date()),hora:'',prob:'',proximo:'',obs:''});
+  }
+  salvarCRMDebounced();
+  showToast('success','✅ Fase atualizada!','');
+  renderClientesPage();
 }
 
 function salvarAnotacao(){
