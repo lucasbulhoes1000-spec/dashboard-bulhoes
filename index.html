@@ -2408,7 +2408,12 @@ async function fetchCloudia(){
       const adNome=String(r['Nome do anúncio (+Recente)']||r['nome_anuncio']||r['ad_name']||'').trim();
       if(adNome)r.ad_name=adNome;
       // Define origin
-      if(r.ad_name&&String(r.ad_name).trim()!=='')r.origin='#Instagram ADS';
+      // ⚠️ CORRIGIDO (19/07/2026): essa regra sobrescrevia a origem de QUALQUER
+      // linha com ad_name preenchido — inclusive os leads do Formulário
+      // Facebook, que também têm ad_name (de propósito, pro CPL funcionar).
+      // Sem essa exceção, todo lead do formulário virava "#Instagram ADS"
+      // aqui, mesmo com o dado certo salvo na planilha.
+      if(r.ad_name&&String(r.ad_name).trim()!==''&&r.origin!=='#Formulário Facebook')r.origin='#Instagram ADS';
       if(r.origin&&/^\d+$/.test(String(r.origin).trim())){
         const m={'4067':'Instagram Orgânico','2557':'WhatsApp Direto'};
         r.origin=m[String(r.origin).trim()]||'Conexão '+r.origin;
@@ -6022,7 +6027,7 @@ function updateEntradas(){
 
 // GERENCIAR LISTAS
 var _listas={
-  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling','#Clinicorp Direto'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']},
+  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling','#Clinicorp Direto','#Formulário Facebook'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']},
   status:{ativos:['Em aberto','Aprovado','Reprovado','Cancelado'],desativos:[]},
   tratamentos:{ativos:['#Alinhador Ortodontico','#Aparelho Ortodontico','#Clareamento Conjugado','#Clareamento inferior Conjugado','#Clínico','#Endodontia','#Extração','#Gengivoplastia','#HOF','#Implantes','#Lentes em Porcelana','#Lentes em Resina','#Lentes inferiores','#Lentes unitárias','#Paciente modelo','#Protocolo sobre Implantes','#Reabilitação Oral','#Retrabalho'],desativos:[]},
   fases:{ativos:['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Agendou retorno','Aguardando 1° contato','Aguardando entrada','Avaliação comercial','Fechou','Pós venda','Sem resposta'],desativos:[]},
