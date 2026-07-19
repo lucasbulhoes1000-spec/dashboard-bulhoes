@@ -1981,7 +1981,7 @@ function origemMatchClinicorp(ph){
   if(_origemFilter==='organico')return org.includes('organ');
   if(_origemFilter==='indicacao')return org.includes('indica');
   if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.includes('formulário facebook')||org.includes('formulario facebook');
+  if(_origemFilter==='formulario facebook')return org.includes('facebook');
   return true;
 }
 // Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
@@ -2692,6 +2692,25 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // VENDAS: só quem tem orçamento APROVADO com data dentro do período
   // OPORTUNIDADES: todos os orçamentos de quem compareceu no período
   const compPhonesSet=new Set([...(window._lastCompPhones||[])]);
+  // ⚠️ CORRIGIDO (19/07/2026): compPhonesSet nunca respeitava o filtro de
+  // origem (só fechadosPhones, mais abaixo, respeitava) — isso fazia "Valor
+  // total de oportunidades" somar gente de QUALQUER origem, mesmo com um
+  // filtro de origem específico selecionado (ex: filtrar por "Formulário
+  // Facebook" e ainda assim ver o valor de alguém "#Organico" no total).
+  if(_origemFilter){
+    compPhonesSet.forEach(ph=>{
+      const d=ccDataLookup(ph);
+      const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
+      let match=false;
+      if(_origemFilter==='instagram ads')match=org.includes('instagram');
+      else if(_origemFilter==='organico')match=org.includes('organ');
+      else if(_origemFilter==='indicacao')match=org.includes('indica');
+      else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else match=true;
+      if(!match)compPhonesSet.delete(ph);
+    });
+  }
 
   // Adiciona em fechadosPhones quem tem orçamento Aprovado no período (mesmo sem Ganho no Cloudia)
   // Só adiciona se o phone bate com o filtro de origem
@@ -2709,7 +2728,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
       else match=true;
       if(!match)return;
     }
@@ -2730,7 +2749,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
       else match=true;
       if(!match)return;
     }
@@ -2751,7 +2770,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
       else match=true;
       if(!match)fechadosPhones.delete(ph);
     });
@@ -2814,6 +2833,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   Object.entries(_ccData||{}).forEach(([ph,d])=>{
     if(!d.somenteOrcamento)return;
     if(compPhonesSet.has(ph))return; // já contado acima
+    if(_origemFilter){
+      const org=(d.origemAtual||getOrigemReal(ph)||'').toLowerCase();
+      let match=false;
+      if(_origemFilter==='instagram ads')match=org.includes('instagram');
+      else if(_origemFilter==='organico')match=org.includes('organ');
+      else if(_origemFilter==='indicacao')match=org.includes('indica');
+      else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else match=true;
+      if(!match)return;
+    }
     const orcs=(d.orcamentos||[]).filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
     if(!orcs.length)return;
     const tot=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
@@ -2856,7 +2886,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         else if(_origemFilter==='organico')match=org.includes('organ');
         else if(_origemFilter==='indicacao')match=org.includes('indica');
         else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
+      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
         else match=true;
         if(!match)return false;
       }
@@ -3223,7 +3253,7 @@ function filterCloudiaByOrigin(rows){
     if(_origemFilter==='organico')return org.includes('organ');
     if(_origemFilter==='indicacao')return org.includes('indica');
     if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.includes('formulário facebook')||org.includes('formulario facebook');
+  if(_origemFilter==='formulario facebook')return org.includes('facebook');
     return true;
   });
 }
