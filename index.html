@@ -818,6 +818,13 @@ tbody tr:hover td{background:#faf7f3;}
           <button id="btn-sync-orcamentos" onclick="sincronizarOrcamentosClinicorp()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Puxar orçamentos (Clinicorp)</button>
         </div>
       </div>
+      <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:4px;">Leads — Formulário Facebook/Instagram</div>
+        <div style="font-size:12px;color:#9a8c7e;margin-bottom:12px;">Roda sozinho a cada 10 min (gatilho automático). Esse botão só serve pra rodar na hora, sem esperar.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button id="btn-sync-leads-facebook" onclick="importarLeadsFormularioFacebookManual()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Importar leads do Facebook agora</button>
+        </div>
+      </div>
       <div style="margin-bottom:20px;">
         <div style="display:flex;gap:8px;border-bottom:1px solid #e8e2da;margin-bottom:20px;">
           <button class="tab-btn active" onclick="switchListaTab('origens',this)" style="padding:8px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#A18B6C;border-bottom:2px solid #A18B6C;">Origens</button>
@@ -4831,6 +4838,30 @@ async function sincronizarConsultasAvaliacao(){
   }
 }
 let _previewOrcamentosPendente=null;
+
+async function importarLeadsFormularioFacebookManual(){
+  const btn=document.getElementById('btn-sync-leads-facebook');
+  const textoOriginal=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='⏳ Importando...';
+  try{
+    const res=await fetch(CLOUDIA_URL+'?action=importarLeadsFormularioFacebook');
+    const r=await res.json();
+    if(r.status==='ok'){
+      showToast('success','✅ Leads do Facebook verificados',
+        'Novos importados: '+(r.novos||0)+(r.semTelefone>0?'\nSem telefone (ignorados): '+r.semTelefone:'')+
+        '\nEnvio automático de WhatsApp: '+(r.whatsappAtivo?'ATIVADO':'desligado (só cai no dashboard)'));
+      if(r.novos>0){await fetchCloudia();if(document.getElementById('page-leads').classList.contains('active'))renderLeadsTable();}
+    }else{
+      showToast('error','Erro ao importar',r.mensagem||JSON.stringify(r));
+    }
+  }catch(e){
+    showToast('error','Erro de conexão',e.message);
+  }finally{
+    btn.disabled=false;
+    btn.textContent=textoOriginal;
+  }
+}
 
 async function sincronizarOrcamentosClinicorp(){
   const btn=document.getElementById('btn-sync-orcamentos');
