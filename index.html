@@ -291,6 +291,7 @@ tbody tr:hover td{background:#faf7f3;}
               <option value="organico">#Orgânico</option>
               <option value="indicacao">#Indicação</option>
               <option value="social selling">#Social Selling</option>
+              <option value="formulario facebook">#Formulário Facebook</option>
             </select>
             <span style="font-size:11px;color:#b5a898;" id="origem-count"></span>
           </div>
@@ -1980,6 +1981,7 @@ function origemMatchClinicorp(ph){
   if(_origemFilter==='organico')return org.includes('organ');
   if(_origemFilter==='indicacao')return org.includes('indica');
   if(_origemFilter==='social selling')return org.includes('social');
+  if(_origemFilter==='formulario facebook')return org.includes('formulário facebook')||org.includes('formulario facebook');
   return true;
 }
 // Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
@@ -2707,6 +2709,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
       else match=true;
       if(!match)return;
     }
@@ -2727,6 +2730,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
       else match=true;
       if(!match)return;
     }
@@ -2747,6 +2751,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
       else match=true;
       if(!match)fechadosPhones.delete(ph);
     });
@@ -2851,6 +2856,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         else if(_origemFilter==='organico')match=org.includes('organ');
         else if(_origemFilter==='indicacao')match=org.includes('indica');
         else if(_origemFilter==='social selling')match=org.includes('social');
+      else if(_origemFilter==='formulario facebook')match=org.includes('formulário facebook')||org.includes('formulario facebook');
         else match=true;
         if(!match)return false;
       }
@@ -3217,6 +3223,7 @@ function filterCloudiaByOrigin(rows){
     if(_origemFilter==='organico')return org.includes('organ');
     if(_origemFilter==='indicacao')return org.includes('indica');
     if(_origemFilter==='social selling')return org.includes('social');
+  if(_origemFilter==='formulario facebook')return org.includes('formulário facebook')||org.includes('formulario facebook');
     return true;
   });
 }
