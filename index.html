@@ -3531,7 +3531,20 @@ function renderClientesTable(){
   const clientesArr=Object.values(phoneMap);
   clientesArr.forEach(r=>{
     const info=getEffectiveAgendInfo(r.phone,r);
-    r._sortDate=parseCloudiaDate(info.consultaTs)||parseCloudiaDate(r.created_at||r.timestamp)||new Date(0);
+    // ⚠️ CORRIGIDO (19/07/2026, caso "Guilherme da Costa"): clientes criados
+    // direto do Clinicorp (via orçamento) não têm consultaTs nem
+    // created_at/timestamp preenchidos — de propósito, pra nunca inventar
+    // uma data de comparecimento falsa. Mas isso fazia _sortDate cair pro
+    // epoch (1970), o que os excluía de QUALQUER filtro de data na tela
+    // (fromV/toV), mesmo a pessoa sendo uma cliente real e recente. Agora,
+    // como ÚLTIMO recurso antes do epoch, usa a data do próprio orçamento
+    // só pra ORDENAR/FILTRAR — a coluna "Data Comparecimento" exibida
+    // continua vindo de r.timestamp normalmente (mostra "—"), essa data
+    // aqui não aparece pro usuário, só evita o sumiço da lista.
+    const dcc=ccDataLookup(r.phone);
+    const orcs=dcc&&dcc.orcamentos;
+    const dataOrcamentoFallback=(orcs&&orcs.length>0)?parseCloudiaDate(orcs[0].fechData||orcs[0].data):null;
+    r._sortDate=parseCloudiaDate(info.consultaTs)||parseCloudiaDate(r.created_at||r.timestamp)||dataOrcamentoFallback||new Date(0);
   });
   clientesData=clientesArr.sort((a,b)=>b._sortDate-a._sortDate);
   // Atualiza selects de filtro
