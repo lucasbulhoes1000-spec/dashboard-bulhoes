@@ -4901,7 +4901,13 @@ function montarPreviewOrcamentosHtml(p){
     p.candidatosAtualizados.forEach(c=>{
       const d=_ccData[c.tel];
       const existente=d&&d.orcamentos&&d.orcamentos.find(o=>o._clinicorpId===c.clinicorpId);
-      const nomeDisp=c.nomeCompleto||(d&&d.nomeAtual)||'—';
+      // ⚠️ CORRIGIDO: antes usava c.nomeCompleto (o nome NOVO) tanto no
+      // cabeçalho quanto na linha de mudança — os dois ficavam iguais e
+      // parecia que "nada mudou" mesmo quando o nome realmente mudou. Agora
+      // o cabeçalho mostra o nome ATUAL (antes da mudança, ainda em
+      // _ccData nesse momento da prévia) e a linha de baixo mostra a
+      // transição de verdade.
+      const nomeDisp=(d&&d.nomeAtual)||c.nomeCompleto||'—';
       const mudancas=[];
       if(existente&&existente.status!==c.status)mudancas.push('status: '+existente.status+' → '+c.status);
       if(existente&&Number(existente.valor||0)!==Number(c.valor||0))mudancas.push('valor: '+fmt(existente.valor||0)+' → '+fmt(c.valor||0));
@@ -4920,7 +4926,7 @@ function montarPreviewOrcamentosHtml(p){
         if(pagAntes!==pagDepois||parcAntes!==parcDepois)mudancas.push('pagamento: '+pagAntes+' ('+parcAntes+') → '+pagDepois+' ('+parcDepois+')');
         if(entAntes!==entDepois)mudancas.push('entrada: '+fmt(entAntes)+' → '+fmt(entDepois));
       }
-      if(c.nomeCompleto)mudancas.push('nome → '+c.nomeCompleto);
+      if(c.nomeCompleto)mudancas.push('nome: '+((d&&d.nomeAtual)||'(vazio)')+' → '+c.nomeCompleto);
       if(c.statusGanho)mudancas.push('estágio → Ganho');
       itens+=linha(nomeDisp,c.tel,mudancas.length?mudancas.join(' · '):'⚠️ Clinicorp reenviou esse orçamento, mas nada mudou nos campos que acompanhamos aqui — provavelmente só reprocessamento interno deles, sem efeito real');
     });
@@ -4932,7 +4938,7 @@ function montarPreviewOrcamentosHtml(p){
     p.possiveisDuplicatas.forEach(d=>{
       itens+=linha(d.nome,d.telefone,(d.tratamento||'')+' — <b>'+fmt(d.valor||0)+'</b> — mesmo valor de '+(d.origemConflito||'um orçamento já lançado manualmente pro mesmo telefone'));
     });
-    html+=bloco('⚠️ Possíveis duplicatas — serão importados mesmo assim, revise depois ('+p.possiveisDuplicatas.length+')','#b5483d',itens);
+    html+=bloco('🚫 Bloqueados por duplicata — mesmo valor de outro orçamento já existente, NÃO serão importados ('+p.possiveisDuplicatas.length+')','#b5483d',itens);
   }
 
   if(p.candidatosNovoCliente&&p.candidatosNovoCliente.length>0){
@@ -4985,7 +4991,7 @@ async function aplicarImportacaoOrcamentos(){
         (r.clientesCriados>0?' (sendo '+r.clientesCriados+' cliente(s) novo(s) criado(s))':'')+
         '\nAtualizados (mudança de status): '+r.atualizados;
       if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
-        msg+='\n\n⚠️ '+p.possiveisDuplicatas.length+' importado(s) com valor igual a um orçamento manual existente — revise manualmente.';
+        msg+='\n\n🚫 '+p.possiveisDuplicatas.length+' bloqueado(s) por ter o mesmo valor de um orçamento já existente pro mesmo telefone — NÃO foram importados. Revise manualmente se algum for um caso legítimo.';
       }
       showToast('success','✅ Orçamentos sincronizados!',msg);
     }else{
