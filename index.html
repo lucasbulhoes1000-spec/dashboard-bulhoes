@@ -4850,6 +4850,7 @@ async function importarLeadsFormularioFacebookManual(){
     if(r.status==='ok'){
       showToast('success','✅ Leads do Facebook verificados',
         'Novos importados: '+(r.novos||0)+(r.semTelefone>0?'\nSem telefone (ignorados): '+r.semTelefone:'')+
+        (r.reativados>0?'\nJá existiam no CRM (origem/status atualizados): '+r.reativados:'')+
         '\nEnvio automático de WhatsApp: '+(r.whatsappAtivo?'ATIVADO':'desligado (só cai no dashboard)'));
       if(r.novos>0){await fetchCloudia();if(document.getElementById('page-leads').classList.contains('active'))renderLeadsTable();}
     }else{
