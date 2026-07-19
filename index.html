@@ -3248,7 +3248,14 @@ function excluirSocialSelling(rows){
 function filterCloudiaByOrigin(rows){
   if(!_origemFilter)return rows;
   return rows.filter(r=>{
-    const org=(r.origin||'').toLowerCase();
+    // ⚠️ CORRIGIDO (19/07/2026): antes usava só r.origin (a linha BRUTA
+    // individual daquele evento específico) — se a pessoa tem várias linhas
+    // (ex: uma interação antiga + uma nova do formulário), a linha específica
+    // sendo avaliada podia ter origem diferente da origem RECONCILIADA da
+    // pessoa (_ccData.origemAtual, a mesma fonte que Clientes/Métricas de
+    // Origem já usam), fazendo a pessoa inteira ficar de fora do filtro.
+    const d=ccDataLookup(r.phone);
+    const org=((d&&d.origemAtual)||getOrigemReal(r.phone)||r.origin||'').toLowerCase();
     if(_origemFilter==='instagram ads')return org.includes('instagram');
     if(_origemFilter==='organico')return org.includes('organ');
     if(_origemFilter==='indicacao')return org.includes('indica');
