@@ -1,4 +1,4 @@
-[<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -4905,10 +4905,24 @@ function montarPreviewOrcamentosHtml(p){
       const mudancas=[];
       if(existente&&existente.status!==c.status)mudancas.push('status: '+existente.status+' → '+c.status);
       if(existente&&Number(existente.valor||0)!==Number(c.valor||0))mudancas.push('valor: '+fmt(existente.valor||0)+' → '+fmt(c.valor||0));
-      if(c.pagamento!==undefined&&c.pagamento)mudancas.push('pagamento: '+c.pagamento+(c.parcelas?' ('+c.parcelas+')':''));
-      if(c.entrada!==undefined&&Number(c.entrada)>0)mudancas.push('entrada: '+fmt(c.entrada));
+      // ⚠️ Antes só mostrava pagamento/entrada quando o valor calculado era
+      // "verdadeiro" (não vazio/não zero) — isso escondia mudanças reais,
+      // tipo o pagamento IR PRA VAZIO (perda de dado) ou a entrada MUDAR DE
+      // VALOR sem virar zero. Agora sempre compara antes → depois quando o
+      // backend tentou recalcular pagamento nessa execução (c.pagamento!==undefined).
+      if(c.pagamento!==undefined){
+        const pagAntes=existente?(existente.pagamento||'(vazio)'):'—';
+        const pagDepois=c.pagamento||'(vazio)';
+        const parcAntes=existente?(existente.parcelas||'(vazio)'):'—';
+        const parcDepois=c.parcelas||'(vazio)';
+        const entAntes=existente?Number(existente.entrada||0):0;
+        const entDepois=Number(c.entrada||0);
+        if(pagAntes!==pagDepois||parcAntes!==parcDepois)mudancas.push('pagamento: '+pagAntes+' ('+parcAntes+') → '+pagDepois+' ('+parcDepois+')');
+        if(entAntes!==entDepois)mudancas.push('entrada: '+fmt(entAntes)+' → '+fmt(entDepois));
+      }
+      if(c.nomeCompleto)mudancas.push('nome → '+c.nomeCompleto);
       if(c.statusGanho)mudancas.push('estágio → Ganho');
-      itens+=linha(nomeDisp,c.tel,mudancas.length?mudancas.join(' · '):'sem mudança visível (reenviado pelo Clinicorp)');
+      itens+=linha(nomeDisp,c.tel,mudancas.length?mudancas.join(' · '):'⚠️ Clinicorp reenviou esse orçamento, mas nada mudou nos campos que acompanhamos aqui — provavelmente só reprocessamento interno deles, sem efeito real');
     });
     html+=bloco('🔄 Orçamentos já importados, com atualização ('+p.candidatosAtualizados.length+')','#8a7a68',itens);
   }
@@ -4916,7 +4930,7 @@ function montarPreviewOrcamentosHtml(p){
   if(p.possiveisDuplicatas&&p.possiveisDuplicatas.length>0){
     let itens='';
     p.possiveisDuplicatas.forEach(d=>{
-      itens+=linha(d.nome,d.telefone,(d.tratamento||'')+' — <b>'+fmt(d.valor||0)+'</b> — mesmo valor de um orçamento já lançado manualmente pro mesmo telefone');
+      itens+=linha(d.nome,d.telefone,(d.tratamento||'')+' — <b>'+fmt(d.valor||0)+'</b> — mesmo valor de '+(d.origemConflito||'um orçamento já lançado manualmente pro mesmo telefone'));
     });
     html+=bloco('⚠️ Possíveis duplicatas — serão importados mesmo assim, revise depois ('+p.possiveisDuplicatas.length+')','#b5483d',itens);
   }
