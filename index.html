@@ -219,6 +219,7 @@ tbody tr:hover td{background:#faf7f3;}
     <span class="topbar-title" id="topbar-title">Dashboard</span>
     <div class="topbar-right">
       <span class="last-update" id="last-update"></span>
+      <button class="btn-top" onclick="pedirPermissaoNotificacao()" title="Ativar notificações de novo lead do Formulário Facebook">🔔</button>
       <button class="btn-top" onclick="reloadCurrent()">↻ Atualizar</button>
       <button class="btn-top" onclick="fazerLogout()" style="background:#e8e2da;color:#8a7a6a;margin-left:4px;" title="Sair">⎋ Sair</button>
     </div>
@@ -1641,6 +1642,119 @@ let _origemFilter='';
 var _ccData={};
 var _currentClienteIdx=-1;
 let clientesData=[];
+
+// ===== NOTIFICAÇÃO DE NOVOS LEADS DO FORMULÁRIO FACEBOOK =====
+// ⚠️ Guardado em memória (variável JS), NÃO em localStorage — segue a regra
+// do projeto de nunca usar localStorage/sessionStorage. Efeito prático: ao
+// recarregar a página, o controle de "quem já vi" reseta, e a primeira
+// checagem da nova sessão marca todo mundo que já existe como visto sem
+// notificar (mesmo comportamento pedido, só que por sessão de página aberta
+// em vez de por navegador).
+var _leadsFacebookVistos=new Set();
+var _leadsFacebookPrimeiraChecagem=true;
+var _checagemLeadsFacebookIniciada=false;
+
+function pedirPermissaoNotificacao(){
+  if(!('Notification' in window)){
+    showToast('error','Notificações não suportadas','Este navegador não suporta notificações nativas.');
+    return;
+  }
+  if(Notification.permission==='granted'){
+    showToast('success','Notificações já ativadas','Você já vai receber avisos de novos leads do Formulário Facebook.');
+    return;
+  }
+  if(Notification.permission==='denied'){
+    showToast('error','Notificações bloqueadas','Ative manualmente nas configurações do navegador para este site.');
+    return;
+  }
+  Notification.requestPermission().then(function(perm){
+    if(perm==='granted'){
+      showToast('success','Notificações ativadas','Você vai receber um aviso quando um novo lead do Formulário Facebook chegar.');
+    } else {
+      showToast('error','Permissão não concedida','Você não vai receber notificações nativas — o aviso na tela (toast) continua funcionando normalmente.');
+    }
+  });
+}
+
+function tocarBeepNotificacao(){
+  try{
+    var AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)return;
+    var ctx=new AudioCtx();
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type='sine';
+    osc.frequency.value=880;
+    gain.gain.setValueAtTime(0.0001,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3,ctx.currentTime+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.4);
+  }catch(e){
+    console.warn('[NOTIF LEADS FACEBOOK] Não foi possível tocar o beep:',e);
+  }
+}
+
+function notificarNovoLeadFacebook(nome,telefone){
+  var titulo='📥 Novo lead — Formulário Facebook';
+  var corpo=(nome||'(sem nome)')+' — '+(telefone||'');
+  tocarBeepNotificacao();
+  showToast('success',titulo,corpo);
+  if(('Notification' in window)&&Notification.permission==='granted'){
+    try{
+      new Notification(titulo,{body:corpo});
+    }catch(e){
+      console.warn('[NOTIF LEADS FACEBOOK] Erro ao criar notificação nativa:',e);
+    }
+  }
+}
+
+async function verificarNovosLeadsFacebook(){
+  try{
+    var res=await fetch(CLOUDIA_URL);
+    var raw=await res.json();
+    if(!Array.isArray(raw)||raw.length<2)return;
+    var h=raw[0];
+    var idxType=h.indexOf('type');
+    var idxPhone=h.indexOf('phone');
+    var idxName=h.indexOf('name');
+    var idxOrigin=h.indexOf('origin');
+    if(idxType===-1||idxPhone===-1||idxOrigin===-1)return;
+
+    var leadsFacebookAtuais=[];
+    for(var i=1;i<raw.length;i++){
+      var r=raw[i];
+      if(r[idxType]!=='CUSTOMER_CREATED')continue;
+      if(String(r[idxOrigin]||'').trim()!=='#Formulário Facebook')continue;
+      var tel=String(r[idxPhone]||'').replace(/\D/g,'');
+      if(!tel)continue;
+      leadsFacebookAtuais.push({tel:tel,nome:r[idxName]||''});
+    }
+
+    if(_leadsFacebookPrimeiraChecagem){
+      leadsFacebookAtuais.forEach(function(l){_leadsFacebookVistos.add(l.tel);});
+      _leadsFacebookPrimeiraChecagem=false;
+      return;
+    }
+
+    leadsFacebookAtuais.forEach(function(l){
+      if(_leadsFacebookVistos.has(l.tel))return;
+      _leadsFacebookVistos.add(l.tel);
+      notificarNovoLeadFacebook(l.nome,l.tel);
+    });
+  }catch(e){
+    console.warn('[NOTIF LEADS FACEBOOK] Erro ao checar novos leads:',e);
+  }
+}
+
+function iniciarChecagemLeadsFacebook(){
+  if(_checagemLeadsFacebookIniciada)return;
+  _checagemLeadsFacebookIniciada=true;
+  verificarNovosLeadsFacebook();
+  setInterval(verificarNovosLeadsFacebook,2*60*1000);
+}
 
 // PAGE NAVIGATION
 function switchPage(page,el){
@@ -8347,6 +8461,7 @@ function iniciarApp(){
   carregarCRMRemoto();
   loadTrafego();
   setTimeout(populateDynamicSelects, 1500); // garante que _listas já foi carregado
+  iniciarChecagemLeadsFacebook();
 }
 
 
