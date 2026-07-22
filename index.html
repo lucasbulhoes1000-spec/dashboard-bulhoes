@@ -1713,6 +1713,16 @@ function notificarNovoLeadFacebook(nome,telefone){
 
 async function verificarNovosLeadsFacebook(){
   try{
+    // ⚠️ Força a importação do Formulário Facebook AGORA, em vez de esperar
+    // o gatilho automático de 10 em 10 min (importarLeadsFormularioFacebook,
+    // no .gs) — sem isso, o lead podia ficar até ~12min sem notificar (10min
+    // do gatilho + 2min desta checagem). O endpoint é idempotente: se não
+    // tem nada novo, só responde rápido e não faz nada. O gatilho de 10min
+    // continua existindo como rede de segurança pra quando nenhum dashboard
+    // estiver aberto pra disparar essa importação sob demanda.
+    try{ await fetch(CLOUDIA_URL+'?action=importarLeadsFormularioFacebook'); }
+    catch(eImport){ console.warn('[NOTIF LEADS FACEBOOK] Falha ao forçar importação:',eImport); }
+
     var res=await fetch(CLOUDIA_URL);
     var raw=await res.json();
     if(!Array.isArray(raw)||raw.length<2)return;
