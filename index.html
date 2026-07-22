@@ -1701,10 +1701,14 @@ function notificarNovoLeadFacebook(nome,telefone){
   var titulo='📥 Novo lead — Formulário Facebook';
   var corpo=(nome||'(sem nome)')+' — '+(telefone||'');
   tocarBeepNotificacao();
-  showToast('success',titulo,corpo);
+  showToast('success',titulo,corpo,true); // true = persistente, fica até fechar manualmente
   if(('Notification' in window)&&Notification.permission==='granted'){
     try{
-      new Notification(titulo,{body:corpo});
+      // requireInteraction:true — a notificação fica fixa na tela até a
+      // pessoa clicar ou descartar manualmente, em vez de sumir sozinha em
+      // poucos segundos. Importante pro caso da SDR não estar de olho na
+      // hora exata que o lead cai (pedido do usuário, 22/07/2026).
+      new Notification(titulo,{body:corpo,requireInteraction:true});
     }catch(e){
       console.warn('[NOTIF LEADS FACEBOOK] Erro ao criar notificação nativa:',e);
     }
@@ -4940,20 +4944,39 @@ function atualizarBadgeUltimaSync(){
   const d=new Date(window._seedPacientesUltimaSync);
   el.textContent='Última sincronização com o Clinicorp: '+d.toLocaleDateString('pt-BR')+' às '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
-function showToast(tipo,titulo,corpo){
+function showToast(tipo,titulo,corpo,persistente){
   const container=document.getElementById('toast-container');
   if(!container)return;
   const el=document.createElement('div');
   el.className='toast toast-'+(tipo==='error'?'error':'success');
   el.innerHTML='<div class="toast-title">'+titulo+'</div>'+(corpo?'<div class="toast-body"></div>':'');
   if(corpo)el.querySelector('.toast-body').textContent=corpo;
+  if(persistente){
+    // Toast persistente (ex: novo lead) — fica na tela até a pessoa fechar
+    // manualmente, em vez de sumir sozinho. Botão × no canto pra descartar.
+    el.style.position='relative';
+    el.style.paddingRight='30px';
+    const btnFechar=document.createElement('button');
+    btnFechar.textContent='×';
+    btnFechar.setAttribute('aria-label','Fechar');
+    btnFechar.style.cssText='position:absolute;top:8px;right:10px;background:none;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;opacity:0.7;padding:0;';
+    btnFechar.onmouseover=()=>btnFechar.style.opacity='1';
+    btnFechar.onmouseout=()=>btnFechar.style.opacity='0.7';
+    btnFechar.onclick=()=>{
+      el.classList.remove('show');
+      setTimeout(()=>el.remove(),300);
+    };
+    el.appendChild(btnFechar);
+  }
   container.appendChild(el);
   requestAnimationFrame(()=>el.classList.add('show'));
-  const duracao=tipo==='error'?7000:5000;
-  setTimeout(()=>{
-    el.classList.remove('show');
-    setTimeout(()=>el.remove(),300);
-  },duracao);
+  if(!persistente){
+    const duracao=tipo==='error'?7000:5000;
+    setTimeout(()=>{
+      el.classList.remove('show');
+      setTimeout(()=>el.remove(),300);
+    },duracao);
+  }
 }
 async function sincronizarClinicorp(){
   const btn=document.getElementById('btn-sync-clinicorp');
