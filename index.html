@@ -1770,6 +1770,31 @@ function iniciarChecagemLeadsFacebook(){
   setInterval(verificarNovosLeadsFacebook,2*60*1000);
 }
 
+// ⚠️ NOVO (22/07/2026, caso "Hyuri"): antes, um comparecimento real (webhook
+// do Clinicorp marcando "Em atendimento"/"Atendido", que já vira "Compareceu"
+// no CRM do lado do backend) só aparecia na tela depois que alguém desse um
+// F5 na página inteira — o dashboard não buscava dado novo sozinho. Agora,
+// a cada poucos minutos, busca a planilha do Cloudia + o CRM de novo e
+// redesenha a tela (se a pessoa estiver em Leads ou Clientes), sem precisar
+// de nenhuma ação manual. Roda em paralelo com iniciarChecagemLeadsFacebook,
+// mas em função separada — atualiza tudo, não só leads do Formulário Facebook.
+var _autoRefreshDadosIniciado=false;
+async function verificarAtualizacoesDados(){
+  try{
+    const [rows]=await Promise.all([fetchCloudia(),carregarCRMRemoto()]);
+    rebuildStageIndex(rows);
+    if(currentPage==='leads')renderLeadsTable();
+    else if(currentPage==='clientes')renderClientesTable();
+  }catch(e){
+    console.warn('[AUTO REFRESH] Erro ao atualizar dados em segundo plano:',e);
+  }
+}
+function iniciarAutoRefreshDados(){
+  if(_autoRefreshDadosIniciado)return;
+  _autoRefreshDadosIniciado=true;
+  setInterval(verificarAtualizacoesDados,2*60*1000);
+}
+
 // PAGE NAVIGATION
 function switchPage(page,el){
   currentPage=page;
@@ -1813,10 +1838,46 @@ function switchDashTab(tab,el){
   reloadCurrent();
 }
 
-function reloadCurrent(){
-  if(currentPage!=='dashboard')return;
-  if(currentDashTab==='trafego')loadTrafego();
-  else loadSocial();
+// ⚠️ CORRIGIDO (22/07/2026, caso "Hyuri"): antes, "↻ Atualizar" só fazia
+// alguma coisa quando currentPage==='dashboard' — em qualquer outra página
+// (Leads, Clientes, Pacientes...) o botão simplesmente não fazia NADA
+// (early return). E mesmo dentro do Dashboard, só refrescava o Tráfego, sem
+// nunca buscar dados novos da planilha do Cloudia. Como Leads/Clientes só
+// buscam a planilha UMA VEZ (na primeira vez que a página é aberta na sessão
+// — allCloudiaRows.length===0), a tela ficava "congelada" com o estágio de
+// cada lead do jeito que estava no momento do login, não importa quanto
+// tempo passasse ou quantas vezes alguém clicasse em Atualizar. Um
+// comparecimento real do Clinicorp podia levar HORAS pra aparecer na aba
+// Clientes, só reaparecendo depois de um F5 na página inteira.
+//
+// Agora "↻ Atualizar" SEMPRE busca a planilha de novo, reconstrói o índice
+// de estágios, e re-renderiza a página que estiver aberta no momento —
+// funciona em Leads, Clientes, Pacientes e Dashboard.
+async function reloadCurrent(){
+  const btn=document.querySelector('.btn-top[onclick="reloadCurrent()"]');
+  const textoOriginal=btn?btn.textContent:null;
+  if(btn){btn.disabled=true;btn.textContent='⏳ Atualizando...';}
+  try{
+    if(currentPage==='dashboard'){
+      if(currentDashTab==='trafego')await loadTrafego();
+      else loadSocial();
+      return;
+    }
+    // Busca a planilha do Cloudia de novo e reconstrói o índice de estágios
+    // ANTES de re-renderizar — sem isso, a página re-renderiza com o mesmo
+    // dado velho que já estava em memória.
+    const rows=await fetchCloudia();
+    rebuildStageIndex(rows);
+    if(currentPage==='leads')renderLeadsTable();
+    else if(currentPage==='clientes')renderClientesTable();
+    else if(currentPage==='pacientes'&&typeof renderTabelaPacientes==='function')renderTabelaPacientes();
+    document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){
+    console.warn('[ATUALIZAR] Erro ao atualizar:',e);
+    showToast('error','Erro ao atualizar',e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=textoOriginal;}
+  }
 }
 
 // FILTERS
@@ -2453,6 +2514,25 @@ function lupaAgendamentosClinicorp(){
   openModal('Agendamentos — atos de agendamento (Avaliação) — Clinicorp — '+rows.length+' registros',
     ['Nome','Telefone','Data do agendamento','Data da consulta','Status'],rows);
 }
+// Extraído de loadTrafego() (22/07/2026) pra poder ser chamado também pelo
+// refresh universal (reloadCurrent) sem precisar recarregar o Dashboard
+// inteiro — antes, esse índice só era reconstruído dentro de loadTrafego(),
+// que só rodava ao entrar no Dashboard/Tráfego. Isso deixava Leads/Clientes
+// com o estágio "congelado" no que era verdade na hora do login, mesmo horas
+// depois de um comparecimento real acontecer (caso "Hyuri", 22/07/2026).
+function rebuildStageIndex(cloudiaRows){
+  window._stageUpdatesByPhone={};
+  cloudiaRows.forEach(row=>{
+    if(row.type!=='CUSTOMER_STAGE_UPDATED'||!row.stage)return;
+    const ph=normalizePhone(row.phone);
+    if(!ph)return;
+    if(!window._stageUpdatesByPhone[ph])window._stageUpdatesByPhone[ph]=[];
+    window._stageUpdatesByPhone[ph].push(row);
+  });
+  Object.values(window._stageUpdatesByPhone).forEach(arr=>{
+    arr.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+  });
+}
 async function loadTrafego(){
   document.getElementById('loading-trafego').style.display='flex';
   document.getElementById('content-trafego').style.display='none';
@@ -2465,17 +2545,7 @@ async function loadTrafego(){
     // Construído uma única vez aqui para evitar que getEffectiveAgendInfo faça um .filter()
     // completo em _lastCloudiaRows (milhares de linhas) a cada chamada — isso causava lentidão
     // extrema na tela de Clientes, onde a função é chamada uma vez por cliente para ordenar.
-    window._stageUpdatesByPhone={};
-    cloudiaRows.forEach(row=>{
-      if(row.type!=='CUSTOMER_STAGE_UPDATED'||!row.stage)return;
-      const ph=normalizePhone(row.phone);
-      if(!ph)return;
-      if(!window._stageUpdatesByPhone[ph])window._stageUpdatesByPhone[ph]=[];
-      window._stageUpdatesByPhone[ph].push(row);
-    });
-    Object.values(window._stageUpdatesByPhone).forEach(arr=>{
-      arr.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
-    });
+    rebuildStageIndex(cloudiaRows);
     // Usa allCloudiaRows que já inclui importados reconstruídos pelo fetchCloudia
     // Exclui Social Selling do Dashboard Principal: esses já são contabilizados na aba própria.
     const semSocial=excluirSocialSelling(allCloudiaRows);
@@ -3454,7 +3524,26 @@ function renderLeadsTable(){
         break; // saiu da cadeia de ruído — para aqui
       }
     }
-    const s=(vencedor.stage||'').toLowerCase();
+    // ⚠️ CORRIGIDO (22/07/2026): antes decidia quem excluir de Leads olhando SÓ
+    // o evento bruto da planilha do Cloudia (vencedor.stage) — uma promoção via
+    // webhook do Clinicorp ("Em atendimento"/"Atendido" → vira "Compareceu" só
+    // em _ccData.statusAtual, sem gerar linha nova na planilha) nunca fazia a
+    // pessoa sair de Leads, mesmo já aparecendo certinho em Clientes — ficava
+    // duplicada nas duas abas. Agora aplica a MESMA regra de prioridade que a
+    // aba Clientes já usa (getEffectiveAgendInfo): só usa o status manual/
+    // _ccData se ele for mais recente que o evento real do Cloudia.
+    const dCC=ccDataLookup(ph);
+    let stageEfetivo=vencedor.stage;
+    if(dCC&&dCC.statusAtual){
+      const manualTs=dCC.statusAtualEditedAt?parseCloudiaDate(dCC.statusAtualEditedAt):null;
+      const eventoTs=parseCloudiaDate(vencedor.timestamp||vencedor.created_at);
+      if(manualTs&&eventoTs){
+        if(manualTs>=eventoTs)stageEfetivo=dCC.statusAtual;
+      }else if(manualTs&&!eventoTs){
+        stageEfetivo=dCC.statusAtual;
+      }
+    }
+    const s=(stageEfetivo||'').toLowerCase();
     const isLeadStage=s===''||s==='lead'||s.includes('agendou')||s.includes('faltou')||s.includes('desmarcou');
     if(!isLeadStage)return; // já compareceu/fechou de verdade — não é mais "lead"
     phoneMap[ph]=vencedor;
@@ -8539,6 +8628,7 @@ function iniciarApp(){
   loadTrafego();
   setTimeout(populateDynamicSelects, 1500); // garante que _listas já foi carregado
   iniciarChecagemLeadsFacebook();
+  iniciarAutoRefreshDados();
 }
 
 
