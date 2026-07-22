@@ -503,9 +503,9 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="importarCRM()" style="background:#e8e2da;color:#2a2520;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📂 CRM</button>
         <input type="file" id="crm-import-input" accept=".json" style="display:none" onchange="loadCRMFile(event)">
         <button onclick="filtrarContatosDoDia()" style="background:#5a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">📞 Contatos do dia</button>
-        <button onclick="exportTableXLS('clientes-tbody',['Nome','Data Comparecimento','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
+        <button onclick="exportTableXLS('clientes-tbody',['Nome','Fase ativ.','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Data Comparecimento','Orçado','Fechado'],'clientes')" style="background:#5a8a6a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ XLS</button>
         <button onclick="exportarParaCloudia('clientes')" style="background:#1a6b8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📤 Cloudia</button>
-        <button onclick="exportTableCSV('clientes-tbody',['Nome','Data Comparecimento','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Fase ativ.','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
+        <button onclick="exportTableCSV('clientes-tbody',['Nome','Fase ativ.','Telefone','Situação','Tratamento','Avaliador','Próx. contato','Data Comparecimento','Orçado','Fechado'],'clientes')" style="background:#4a7a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↓ CSV</button>
         <button id="btn-proximos-contatos" onclick="toggleProximosContatos()" style="background:#7a5a9a;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">📅 Próximos contatos</button>
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
@@ -531,9 +531,9 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="tw">
           <table>
             <thead><tr>
-              <th>Nome</th><th>Data comparecimento</th><th>Telefone</th>
+              <th>Nome</th><th>Fase ativ.</th><th>Telefone</th>
               <th>Situação</th><th>Tratamento</th><th>Avaliador</th>
-              <th>Próx. contato</th><th>Fase ativ.</th>
+              <th>Próx. contato</th><th>Data comparecimento</th>
               <th style="text-align:right">Valor orçado</th><th style="text-align:right">Valor fechado</th>
             </tr></thead>
             <tbody id="clientes-tbody"></tbody>
@@ -4434,13 +4434,13 @@ function renderClientesPage(){
     </select>`;
     return`<tr style="cursor:pointer;" onclick="openClienteCard(${idx})">
       <td style="cursor:pointer;" onclick="openClienteCard(${idx})"><strong style="color:#2a2520;">${applyEdits(r).name||'—'}</strong></td>
-      <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
+      <td style="font-size:12px;max-width:170px;" onclick="event.stopPropagation()">${faseAtvSelectHtml}</td>
       <td>${r.phone||'—'}</td>
       <td><span class="status-pill ${fechou?'status-fechado':'status-aberto'}">${fechou?'Fechado':'Em aberto'}</span></td>
       <td style="font-size:12px;" title="${tratStr.replace(/"/g,'&quot;')}">${tratPrincipal}${tratExtra}</td>
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
       <td style="font-size:12px;${proxStyle}">${proxContato}</td>
-      <td style="font-size:12px;max-width:170px;" onclick="event.stopPropagation()">${faseAtvSelectHtml}</td>
+      <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
       <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
       <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
     </tr>`;
@@ -6205,9 +6205,50 @@ function renderLista(tab){
     var dEl=document.getElementById(tab+'-desativos');if(dEl)dEl.innerHTML=(lista.desativos||[]).map(t=>makeItem(t,'desativo',tab)).join('');
   }
 }
-function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);populateDynamicSelects();salvarCRMDebounced();}
-function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);populateDynamicSelects();salvarCRMDebounced();}
-function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);populateDynamicSelects();salvarCRMDebounced();}
+// ⚠️ CORRIGIDO (22/07/2026): listas_json (fases/tratamentos/avaliadores/origens
+// do Gerenciar) tinha um bug sério — era salvo JUNTO com o crm_json em TODA
+// ação, mesmo sem relação nenhuma com o Gerenciar (ex: digitar uma anotação
+// num cliente). Se uma aba ficasse aberta com uma versão desatualizada de
+// _listas na memória, qualquer salvamento ali (mesmo de outra coisa)
+// sobrescrevia as fases/listas novas criadas em outra aba/computador — sem
+// aviso nenhum. Agora _listas tem seu próprio salvamento, separado, disparado
+// só quando alguém mexe de fato no Gerenciar (ativarItem/desativarItem/
+// novoItem) — o resto do sistema não encosta mais em listas_json.
+let _listasSaveTimer=null;
+async function salvarListasRemoto(){
+  try{
+    const payload={
+      email_clinica: CRM_SHARED_KEY,
+      listas_json: JSON.stringify(_listas),
+      atualizado_em: new Date().toISOString()
+    };
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_KEY,
+        'Authorization':'Bearer '+SUPABASE_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify(payload)
+    });
+    if(res.ok){
+      console.log('[LISTAS] Salvo no Supabase ✅');
+    }else{
+      console.warn('[LISTAS] Erro Supabase:',await res.text());
+    }
+  }catch(e){
+    console.warn('[LISTAS] Erro:',e);
+  }
+}
+function salvarListasDebounced(){
+  clearTimeout(_listasSaveTimer);
+  _listasSaveTimer=setTimeout(()=>salvarListasRemoto(),1500);
+}
+
+function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
+function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
+function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
 
 // ===== RELATÓRIOS =====
 function initRelDates(fromId, toId){
@@ -6923,6 +6964,10 @@ let _crmSaveTimer=null;
 const CRM_SHARED_KEY='bulhoes-clinica-crm';
 
 // Salva TODO o _ccData no Supabase usando chave compartilhada da clínica
+// ⚠️ (22/07/2026) NÃO inclui mais listas_json aqui — ver salvarListasRemoto()
+// acima. Antes, salvar qualquer coisa do CRM (nota, atividade etc.) também
+// sobrescrevia listas_json com o que estivesse na memória daquela aba,
+// mesmo desatualizado, apagando fases/listas criadas em outra aba/sessão.
 async function salvarCRMRemoto(){
   try{
     const email=CRM_SHARED_KEY;
@@ -6930,7 +6975,6 @@ async function salvarCRMRemoto(){
       email_clinica: email,
       crm_json: JSON.stringify(_ccData),
       comissoes_json: JSON.stringify(_comissoes),
-      listas_json: JSON.stringify(_listas),
       atualizado_em: new Date().toISOString()
     };
     const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
