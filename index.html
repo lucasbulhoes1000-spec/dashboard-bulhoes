@@ -145,6 +145,9 @@ tbody tr:hover td{background:#faf7f3;}
 .toast.toast-error{border-left:3px solid #b5483d;}
 .toast-title{font-weight:700;margin-bottom:4px;}
 .toast-body{color:#d8d0c5;font-size:12px;line-height:1.5;white-space:pre-line;}
+.cal-dia{transition:background .12s;}
+.cal-dia:hover{background:#f5efe5;}
+.cal-dia-hoje{background:#f0e6d4!important;box-shadow:inset 0 0 0 1.5px #A18B6C;}
 </style>
 </head>
 <body>
@@ -8227,6 +8230,8 @@ function renderCalendarioSazonal() {
     });
     const totalDias = diasNoMes(mes, anoSel);
     const offset = primeiroDiaSemanaMes(mes, anoSel);
+    const hoje = new Date();
+    const ehMesAtual = (mes === hoje.getMonth() + 1 && anoSel === hoje.getFullYear());
     let celulas = '';
     for (let b = 0; b < offset; b++) celulas += `<div></div>`;
     for (let d = 1; d <= totalDias; d++) {
@@ -8234,13 +8239,20 @@ function renderCalendarioSazonal() {
       const todasFeitas = doDia && doDia.every(t => t.feito);
       const corDot = !doDia ? 'transparent' : (todasFeitas ? '#5a8a6a' : '#A18B6C');
       const tituloAttr = doDia ? escAttrCalendario(doDia.map(t => t.tarefa).join(' | ')) : '';
-      celulas += `<div title="${tituloAttr}" style="text-align:center;font-size:10px;color:#5a4a3a;padding:3px 0 5px;">
+      const diaSemana = (offset + d - 1) % 7;
+      const ehFimDeSemana = diaSemana === 0 || diaSemana === 6;
+      const ehHoje = ehMesAtual && d === hoje.getDate();
+      const corTexto = ehHoje ? '#5a4530' : (ehFimDeSemana ? '#c0b4a5' : '#5a4a3a');
+      const indicador = !doDia ? '' : (doDia.length > 1
+        ? `<div style="min-width:13px;height:13px;border-radius:7px;background:${corDot};color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:2px auto 0;padding:0 2px;">${doDia.length}</div>`
+        : `<div style="width:6px;height:6px;border-radius:50%;background:${corDot};margin:3px auto 0;"></div>`);
+      celulas += `<div title="${tituloAttr}" class="cal-dia${ehHoje ? ' cal-dia-hoje' : ''}" style="text-align:center;font-size:10px;color:${corTexto};font-weight:${ehHoje ? '700' : '400'};padding:4px 0 6px;border-radius:6px;">
         <div>${d}</div>
-        <div style="width:5px;height:5px;border-radius:50%;background:${corDot};margin:2px auto 0;"></div>
+        ${indicador}
       </div>`;
     }
-    const calendarioHtml = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid #f0ebe4;">
-      ${['D','S','T','Q','Q','S','S'].map(l => `<div style="text-align:center;font-size:9px;color:#b5a898;font-weight:700;">${l}</div>`).join('')}
+    const calendarioHtml = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5px solid #f0ebe4;">
+      ${['D','S','T','Q','Q','S','S'].map(l => `<div style="text-align:center;font-size:9px;color:#c9bcae;font-weight:700;padding-bottom:2px;">${l}</div>`).join('')}
       ${celulas}
     </div>`;
 
@@ -8292,9 +8304,9 @@ function renderCalendarioSazonal() {
       ? `<div style="font-size:11px;color:#b5a898;padding:8px 0;">Nenhuma ação neste mês.</div>`
       : '';
 
-    return `<div style="background:#fff;border:1px solid #e0d8ce;border-radius:12px;padding:16px 18px;">
+    return `<div style="background:#fff;border:1px solid ${ehMesAtual ? '#A18B6C' : '#e0d8ce'};${ehMesAtual ? 'box-shadow:0 0 0 1px #A18B6C;' : ''}border-radius:12px;padding:16px 18px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div style="font-size:14px;font-weight:700;color:#2a2520;">${nomeMes}</div>
+        <div style="font-size:14px;font-weight:700;color:#2a2520;">${nomeMes}${ehMesAtual ? ' <span style="font-size:10px;font-weight:600;color:#A18B6C;">· agora</span>' : ''}</div>
         <button onclick="abrirAdicionarAcaoCalendario(-1,${mes})" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:16px;padding:0;line-height:1;" title="Adicionar campanha em ${nomeMes}">+</button>
       </div>
       ${calendarioHtml}
@@ -8348,20 +8360,46 @@ function renderKanbanCampanha() {
 
     const cartoesHtml = cartoesDaColuna.map(({ t, tIdx }) => {
       const infoLinha = [t.dia ? 'Dia ' + t.dia : '', t.responsavel || ''].filter(Boolean).join(' · ');
-      return `<div draggable="true"
+      const checklist = t.checklist || [];
+      const feitasCheck = checklist.filter(c => c.ok).length;
+      const checklistItensHtml = checklist.map((c, cIdx) => `
+        <div style="display:flex;align-items:center;gap:6px;padding:2px 0;">
+          <input type="checkbox" ${c.ok ? 'checked' : ''} onmousedown="event.stopPropagation();" onclick="event.stopPropagation();" onchange="event.stopPropagation();toggleChecklistItemKanban(${tIdx},${cIdx},this.checked);" style="width:13px;height:13px;cursor:pointer;flex-shrink:0;">
+          <span style="font-size:11px;color:${c.ok ? '#9a8c7e' : '#4a3a2a'};${c.ok ? 'text-decoration:line-through;' : ''}flex:1;">${c.texto}</span>
+          <button onmousedown="event.stopPropagation();" onclick="event.stopPropagation();removerChecklistItemKanban(${tIdx},${cIdx});" style="background:none;border:none;cursor:pointer;color:#c9b0a0;font-size:11px;padding:0 2px;flex-shrink:0;">✕</button>
+        </div>`).join('');
+      const checklistProgressoHtml = checklist.length > 0 ? `
+        <div style="margin-top:6px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+            <div style="flex:1;background:#ede6dc;border-radius:3px;height:5px;overflow:hidden;"><div style="width:${checklist.length ? feitasCheck / checklist.length * 100 : 0}%;height:100%;background:#5a8a6a;"></div></div>
+            <span style="font-size:9px;color:#9a8c7e;flex-shrink:0;">${feitasCheck}/${checklist.length}</span>
+          </div>
+          ${checklistItensHtml}
+        </div>` : '';
+      const addChecklistHtml = `
+        <div style="margin-top:6px;display:flex;gap:4px;" onmousedown="event.stopPropagation();">
+          <input type="text" placeholder="+ subetapa..." onkeydown="event.stopPropagation();if(event.key==='Enter'){adicionarChecklistItemKanban(${tIdx},this.value);this.value='';}" style="flex:1;min-width:0;border:0.5px solid #e0d8ce;border-radius:5px;padding:3px 6px;font-size:11px;outline:none;">
+        </div>`;
+
+      return `<div draggable="true" data-tidx="${tIdx}"
         ondragstart="event.dataTransfer.setData('text/plain','${tIdx}');this.style.opacity='0.4';"
         ondragend="this.style.opacity='1';"
+        ondragover="event.preventDefault();event.stopPropagation();this.style.borderTop='2px solid #A18B6C';"
+        ondragleave="this.style.borderTop='1px solid #e0d8ce';"
+        ondrop="event.preventDefault();event.stopPropagation();this.style.borderTop='1px solid #e0d8ce';moverCartaoKanban(event,'${col.status}',${tIdx});"
         onclick="abrirDetalheTarefaDeKanban(${tIdx})"
         style="background:#fff;border:1px solid #e0d8ce;border-radius:8px;padding:9px 11px;margin-bottom:8px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.05);">
         <div style="font-size:12px;color:#2a2520;${col.status === 'done' ? 'text-decoration:line-through;color:#9a8c7e;' : ''}">${t.tarefa}</div>
         ${infoLinha ? `<div style="font-size:10px;color:#9a8c7e;margin-top:4px;">${infoLinha}</div>` : ''}
+        ${checklistProgressoHtml}
+        ${addChecklistHtml}
       </div>`;
     }).join('');
 
     return `<div style="flex:1;min-width:220px;background:#faf8f5;border-radius:10px;padding:10px;display:flex;flex-direction:column;"
       ondragover="event.preventDefault();this.style.background='#f0ece0';"
       ondragleave="this.style.background='#faf8f5';"
-      ondrop="event.preventDefault();this.style.background='#faf8f5';moverCartaoKanban(event,'${col.status}');">
+      ondrop="event.preventDefault();this.style.background='#faf8f5';moverCartaoKanban(event,'${col.status}',null);">
       <div style="font-size:12px;font-weight:700;color:${col.cor};margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
         <span>${col.titulo}</span><span style="font-size:11px;color:#b5a898;font-weight:400;">${cartoesDaColuna.length}</span>
       </div>
@@ -8371,14 +8409,60 @@ function renderKanbanCampanha() {
   }).join('');
 }
 
+// Checklist inline dentro do cartão do Kanban (igual o estilo do Fluxo de
+// Tratamento) — 23/07/2026, pedido do usuário.
+function toggleChecklistItemKanban(tarefaIdx, itemIdx, checked) {
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  const t = a && a.tarefas && a.tarefas[tarefaIdx];
+  if (!t || !t.checklist || !t.checklist[itemIdx]) return;
+  t.checklist[itemIdx].ok = checked;
+  salvarCalendarioSazonalRemoto();
+  renderKanbanCampanha();
+}
+function removerChecklistItemKanban(tarefaIdx, itemIdx) {
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  const t = a && a.tarefas && a.tarefas[tarefaIdx];
+  if (!t || !t.checklist) return;
+  t.checklist.splice(itemIdx, 1);
+  salvarCalendarioSazonalRemoto();
+  renderKanbanCampanha();
+}
+function adicionarChecklistItemKanban(tarefaIdx, texto) {
+  texto = (texto || '').trim();
+  if (!texto) return;
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  const t = a && a.tarefas && a.tarefas[tarefaIdx];
+  if (!t) return;
+  if (!t.checklist) t.checklist = [];
+  t.checklist.push({ texto, ok: false });
+  salvarCalendarioSazonalRemoto();
+  renderKanbanCampanha();
+}
+
 // Arrastar um cartão pra outra coluna muda o status (e mantém 'feito' em
 // sincronia pra não quebrar o checkbox do mini-calendário/card do mês).
-function moverCartaoKanban(event, novoStatus) {
-  const tIdx = Number(event.dataTransfer.getData('text/plain'));
+// Se soltar em cima de outro cartão (targetIdx != null), reordena — o
+// cartão arrastado entra na posição do alvo, empurrando os outros. Se
+// soltar direto no fundo da coluna (targetIdx == null), vai pro final dela.
+function moverCartaoKanban(event, novoStatus, targetIdx) {
+  const draggedIdx = Number(event.dataTransfer.getData('text/plain'));
   const a = _calendarioAcoes[_kanbanAcaoIdx];
-  if (!a || !a.tarefas || !a.tarefas[tIdx]) return;
-  a.tarefas[tIdx].status = novoStatus;
-  a.tarefas[tIdx].feito = (novoStatus === 'done');
+  if (!a || !a.tarefas || !a.tarefas[draggedIdx]) return;
+  if (targetIdx === draggedIdx) return; // soltou em cima de si mesmo — nada a fazer
+
+  const item = a.tarefas[draggedIdx];
+  item.status = novoStatus;
+  item.feito = (novoStatus === 'done');
+
+  a.tarefas.splice(draggedIdx, 1);
+  let insertAt;
+  if (targetIdx == null) {
+    insertAt = a.tarefas.length; // sem alvo específico — vai pro final da lista
+  } else {
+    insertAt = targetIdx > draggedIdx ? targetIdx - 1 : targetIdx;
+  }
+  a.tarefas.splice(insertAt, 0, item);
+
   salvarCalendarioSazonalRemoto();
   renderKanbanCampanha();
 }
