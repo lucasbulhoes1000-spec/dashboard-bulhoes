@@ -2351,8 +2351,15 @@ function renderFunilResumido(){
   // (ver getAgendaClinicorpFiltrada) — mesma base usada nos cards do bloco detalhado,
   // pra funil e cards nunca divergirem entre si.
   const dadosClinicorp=getAgendaClinicorpFiltrada();
-  const agendados=dadosClinicorp?dadosClinicorp.leadsAgendados:null;
-  const comparecimentos=dadosClinicorp?dadosClinicorp.comparecimentos:null;
+  // ⚠️ CORRIGIDO (23/07/2026): o funil usava direto o valor automático do
+  // Clinicorp, ignorando qualquer edição manual — isso fazia o funil mostrar
+  // um número diferente do card detalhado logo abaixo (ex: funil "Agendados"
+  // 58, mas o card "Leads na agenda no período" já corrigido manualmente pra
+  // 109). Agora o funil sempre respeita o manual, se existir, igual os cards.
+  const agendadosManual=getManualOverride('leadsAgenda');
+  const compManual=getManualOverride('comp');
+  const agendados=agendadosManual!=null?agendadosManual:(dadosClinicorp?dadosClinicorp.leadsAgendados:null);
+  const comparecimentos=compManual!=null?compManual:(dadosClinicorp?dadosClinicorp.comparecimentos:null);
   atualizarCardsAgendaClinicorp(dadosClinicorp);
   reconciliarAgendCompClinicorpPorAnuncio();
   const contratos=window._lastContratos||0;
