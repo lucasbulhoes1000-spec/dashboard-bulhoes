@@ -716,6 +716,17 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
     </div>
 
+    <!-- Modal: Kanban da Campanha (Calendário Sazonal) -->
+    <div id="modal-kanban-campanha" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1050;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:14px;width:820px;max-width:95vw;max-height:88vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div id="kanban-titulo-campanha" style="font-size:16px;font-weight:700;color:#2a2520;">Campanha</div>
+          <button onclick="fecharKanbanCampanha()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+        </div>
+        <div id="kanban-colunas" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+      </div>
+    </div>
+
     <!-- Modal: Modelos de Procedimentos -->
     <div id="modal-fluxo-modelos" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:900;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:14px;width:540px;max-width:96vw;max-height:88vh;overflow-y:auto;padding:28px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
@@ -8243,15 +8254,15 @@ function renderCalendarioSazonal() {
       const cartoesHtml = tarefas.map(t => cardTarefaCalendarioHtml(idx, a.tarefas.indexOf(t), t)).join('');
       return `<div style="background:#f5f0ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
-          <div style="font-size:13px;font-weight:600;color:#2a2520;">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
+          <div onclick="abrirKanbanCampanha(${idx})" style="font-size:13px;font-weight:600;color:#2a2520;cursor:pointer;" title="Abrir quadro Kanban da campanha">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
-            <button onclick="abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar campanha">✏️</button>
-            <button onclick="removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover campanha">✕</button>
+            <button onclick="event.stopPropagation();abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar campanha">✏️</button>
+            <button onclick="event.stopPropagation();removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover campanha">✕</button>
           </div>
         </div>
         ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-bottom:8px;">${a.observacao}</div>` : ''}
         ${cartoesHtml}
-        <button onclick="abrirDetalheTarefa(${idx},-1)" style="background:none;border:none;cursor:pointer;color:#7a6550;font-size:11px;padding:6px 2px;text-align:left;width:100%;">+ Adicionar cartão</button>
+        <button onclick="abrirKanbanCampanha(${idx})" style="background:none;border:none;cursor:pointer;color:#7a6550;font-size:11px;padding:6px 2px;text-align:left;width:100%;">📋 Abrir Kanban / Adicionar cartão</button>
       </div>`;
     }).join('');
 
@@ -8294,7 +8305,98 @@ function renderCalendarioSazonal() {
   }).join('');
 }
 
-// Marca/desmarca um cartão como feito direto na grade, sem precisar abrir o modal
+// ---- Kanban da campanha (23/07/2026) ----
+// Cada cartão agora tem um "status": 'todo' | 'doing' | 'done' — além do
+// campo 'feito' que já existia (mantido em sincronia, pra não quebrar nada
+// que já lia t.feito: o checkbox do mini-calendário e o card simples do mês
+// continuam funcionando exatamente como antes). Cartões antigos que só têm
+// 'feito' (sem 'status') são tratados como 'done' se feito=true, 'todo' se não.
+function getTarefaStatus(t) {
+  if (t.status) return t.status;
+  return t.feito ? 'done' : 'todo';
+}
+let _kanbanAcaoIdx = -1;
+const KANBAN_COLUNAS = [
+  { status: 'todo', titulo: '📋 A Fazer', cor: '#9a8c7e' },
+  { status: 'doing', titulo: '🔧 Fazendo', cor: '#A18B6C' },
+  { status: 'done', titulo: '✅ Feito', cor: '#5a8a6a' }
+];
+
+function abrirKanbanCampanha(acaoIdx) {
+  _kanbanAcaoIdx = acaoIdx;
+  const a = _calendarioAcoes[acaoIdx];
+  if (!a) return;
+  document.getElementById('kanban-titulo-campanha').textContent = (a.recorrente ? '🔁 ' : '') + a.titulo;
+  renderKanbanCampanha();
+  document.getElementById('modal-kanban-campanha').style.display = 'flex';
+}
+
+function fecharKanbanCampanha() {
+  document.getElementById('modal-kanban-campanha').style.display = 'none';
+  renderCalendarioSazonal(); // reflete qualquer mudança de status na grade do mês
+}
+
+function renderKanbanCampanha() {
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  if (!a) return;
+  if (!a.tarefas) a.tarefas = [];
+  const container = document.getElementById('kanban-colunas');
+  container.innerHTML = KANBAN_COLUNAS.map(col => {
+    const cartoesDaColuna = a.tarefas
+      .map((t, tIdx) => ({ t, tIdx }))
+      .filter(({ t }) => getTarefaStatus(t) === col.status);
+
+    const cartoesHtml = cartoesDaColuna.map(({ t, tIdx }) => {
+      const infoLinha = [t.dia ? 'Dia ' + t.dia : '', t.responsavel || ''].filter(Boolean).join(' · ');
+      return `<div draggable="true"
+        ondragstart="event.dataTransfer.setData('text/plain','${tIdx}');this.style.opacity='0.4';"
+        ondragend="this.style.opacity='1';"
+        onclick="abrirDetalheTarefaDeKanban(${tIdx})"
+        style="background:#fff;border:1px solid #e0d8ce;border-radius:8px;padding:9px 11px;margin-bottom:8px;cursor:grab;box-shadow:0 1px 2px rgba(0,0,0,.05);">
+        <div style="font-size:12px;color:#2a2520;${col.status === 'done' ? 'text-decoration:line-through;color:#9a8c7e;' : ''}">${t.tarefa}</div>
+        ${infoLinha ? `<div style="font-size:10px;color:#9a8c7e;margin-top:4px;">${infoLinha}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div style="flex:1;min-width:220px;background:#faf8f5;border-radius:10px;padding:10px;display:flex;flex-direction:column;"
+      ondragover="event.preventDefault();this.style.background='#f0ece0';"
+      ondragleave="this.style.background='#faf8f5';"
+      ondrop="event.preventDefault();this.style.background='#faf8f5';moverCartaoKanban(event,'${col.status}');">
+      <div style="font-size:12px;font-weight:700;color:${col.cor};margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span>${col.titulo}</span><span style="font-size:11px;color:#b5a898;font-weight:400;">${cartoesDaColuna.length}</span>
+      </div>
+      <div style="flex:1;min-height:60px;">${cartoesHtml}</div>
+      <button onclick="abrirDetalheTarefaDeKanban(-1,'${col.status}')" style="background:none;border:none;cursor:pointer;color:#7a6550;font-size:11px;padding:8px 2px 2px;text-align:left;">+ Adicionar cartão</button>
+    </div>`;
+  }).join('');
+}
+
+// Arrastar um cartão pra outra coluna muda o status (e mantém 'feito' em
+// sincronia pra não quebrar o checkbox do mini-calendário/card do mês).
+function moverCartaoKanban(event, novoStatus) {
+  const tIdx = Number(event.dataTransfer.getData('text/plain'));
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  if (!a || !a.tarefas || !a.tarefas[tIdx]) return;
+  a.tarefas[tIdx].status = novoStatus;
+  a.tarefas[tIdx].feito = (novoStatus === 'done');
+  salvarCalendarioSazonalRemoto();
+  renderKanbanCampanha();
+}
+
+// Abre o modal de detalhe do cartão (já existente) a partir do Kanban —
+// mesma tela de edição completa (dia, responsável, descrição), só que agora
+// pode ser aberta tanto da grade do mês quanto do quadro Kanban da campanha.
+// statusPreSelecionado só é usado ao criar um cartão novo direto numa coluna
+// específica (ex: "+ Adicionar cartão" na coluna "Fazendo").
+function abrirDetalheTarefaDeKanban(tarefaIdx, statusPreSelecionado) {
+  abrirDetalheTarefa(_kanbanAcaoIdx, tarefaIdx);
+  if (tarefaIdx < 0 && statusPreSelecionado) {
+    document.getElementById('tarefa-detalhe-feito').dataset.statusNovo = statusPreSelecionado;
+  } else {
+    delete document.getElementById('tarefa-detalhe-feito').dataset.statusNovo;
+  }
+}
+
 function toggleTarefaCalendario(acaoIdx, tarefaIdx, checked) {
   const a = _calendarioAcoes[acaoIdx];
   if (!a || !a.tarefas || !a.tarefas[tarefaIdx]) return;
@@ -8310,6 +8412,7 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
   const a = _calendarioAcoes[acaoIdx];
   if (!a) return;
   document.getElementById('tarefa-detalhe-campanha').textContent = a.titulo;
+  delete document.getElementById('tarefa-detalhe-feito').dataset.statusNovo; // limpa resíduo de uma abertura anterior via Kanban
 
   if (tarefaIdx >= 0) {
     const t = a.tarefas[tarefaIdx];
@@ -8338,9 +8441,16 @@ function salvarDetalheTarefa() {
   if (!a) return;
   const tarefa = document.getElementById('tarefa-detalhe-titulo').value.trim();
   if (!tarefa) { alert('Informe o título do cartão.'); return; }
+  const elFeito = document.getElementById('tarefa-detalhe-feito');
+  const feito = elFeito.checked;
+  // Se o cartão foi criado a partir de uma coluna específica do Kanban (ex:
+  // "+ Adicionar cartão" em "Fazendo"), usa esse status; senão, deriva do
+  // checkbox "feito" como sempre (done/todo).
+  const statusNovo = elFeito.dataset.statusNovo;
   const dados = {
     tarefa,
-    feito: document.getElementById('tarefa-detalhe-feito').checked,
+    feito,
+    status: statusNovo || (feito ? 'done' : 'todo'),
     dia: Number(document.getElementById('tarefa-detalhe-dia').value) || null,
     mes: Number(document.getElementById('tarefa-detalhe-mes').value) || a.mes,
     responsavel: document.getElementById('tarefa-detalhe-responsavel').value.trim(),
@@ -8352,9 +8462,14 @@ function salvarDetalheTarefa() {
   } else {
     a.tarefas.push(dados);
   }
+  delete elFeito.dataset.statusNovo;
   document.getElementById('modal-detalhe-tarefa').style.display = 'none';
   salvarCalendarioSazonalRemoto();
   renderCalendarioSazonal();
+  // Se o Kanban dessa campanha estiver aberto por trás, atualiza ele também
+  if (document.getElementById('modal-kanban-campanha').style.display !== 'none' && _kanbanAcaoIdx === _tarefaDetalheAcaoIdx) {
+    renderKanbanCampanha();
+  }
   showToast('success', '✅ Cartão salvo!', '');
 }
 
@@ -8366,6 +8481,9 @@ function excluirDetalheTarefa() {
   document.getElementById('modal-detalhe-tarefa').style.display = 'none';
   salvarCalendarioSazonalRemoto();
   renderCalendarioSazonal();
+  if (document.getElementById('modal-kanban-campanha').style.display !== 'none' && _kanbanAcaoIdx === _tarefaDetalheAcaoIdx) {
+    renderKanbanCampanha();
+  }
 }
 
 // ---- Modal da campanha (título, mês, estratégia, recorrência — sem cartões) ----
