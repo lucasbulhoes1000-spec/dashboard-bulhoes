@@ -150,11 +150,75 @@ tbody tr:hover td{background:#faf7f3;}
 .cal-dia-hoje{background:#f0e6d4!important;box-shadow:inset 0 0 0 1.5px #A18B6C;}
 .inicio-card{transition:transform .15s,box-shadow .15s,border-color .15s;}
 .inicio-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(42,37,32,.10);border-color:#c9b8a0;}
+
+/* ============================================================
+   RESPONSIVO / MOBILE (23/07/2026, pedido do usuário)
+   O app foi construído pensando em desktop (menu lateral que expande no
+   hover — não existe hover de verdade no celular — e várias telas em grid
+   de 2/3/4 colunas fixas). Este bloco cobre os problemas estruturais mais
+   graves em telas estreitas, sem precisar reescrever cada tela uma por uma.
+   ============================================================ */
+@media (max-width:768px){
+  /* Sidebar: no desktop expande no hover; no celular vira um menu que abre
+     por cima do conteúdo (não empurra a tela) ao tocar no ☰ da topbar. */
+  .sidebar{width:52px;}
+  .sidebar.mobile-open{width:220px;box-shadow:4px 0 20px rgba(0,0,0,.18);}
+  .sidebar.mobile-open .nav-label,
+  .sidebar.mobile-open .nav-section{opacity:1;}
+  .main{margin-left:52px;}
+
+  /* Fundo escurecido atrás do menu aberto no celular, pra fechar tocando fora */
+  #mobile-sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:190;}
+  #mobile-sidebar-backdrop.show{display:block;}
+
+  /* Topbar: título e botões precisam caber numa tela estreita */
+  .topbar{padding:0 10px;gap:6px;}
+  .topbar-title{font-size:12px;}
+  .topbar-right{gap:6px;flex-wrap:wrap;}
+  .btn-top{padding:6px 8px!important;font-size:11px!important;}
+  #hamburger-mobile{display:flex!important;}
+
+  /* Tabelas: em vez de espremer colunas, deixa rolar de lado */
+  table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;}
+
+  /* Grids fixos de 2/3 colunas (cards de métricas, filtros, formulários)
+     viram 1 coluna só — muito mais legível numa tela de celular. Não afeta
+     os grids que já são responsivos sozinhos (auto-fit/auto-fill) nem a
+     grade de dias da semana do calendário (repeat(7,1fr)). */
+  [style*="grid-template-columns:1fr 1fr"],
+  [style*="grid-template-columns:repeat(8,minmax(0,1fr))"],
+  [style*="grid-template-columns:repeat(5,minmax(0,1fr))"],
+  [style*="grid-template-columns:repeat(4,minmax(0,1fr))"],
+  [style*="grid-template-columns:repeat(3,minmax(0,1fr))"],
+  [style*="grid-template-columns:repeat(2,minmax(0,1fr))"],
+  [style*="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"]{
+    grid-template-columns:1fr!important;
+  }
+
+  /* Modais: nunca mais largos que a tela */
+  [style*="width:820px"],[style*="width:720px"],[style*="width:680px"],
+  [style*="width:600px"],[style*="width:540px"]{
+    width:94vw!important;
+  }
+
+  /* Logo/saudação da tela de Início — bem menor no celular */
+  #inicio-saudacao{font-size:20px!important;}
+  #page-inicio img{height:220px!important;margin-bottom:0!important;}
+  #page-inicio > div{padding:10px 14px 24px!important;}
+
+  /* Kanban da campanha (Calendário Sazonal): colunas empilham em vez de
+     ficarem espremidas lado a lado */
+  #kanban-colunas > div{min-width:100%!important;}
+
+  /* Campos de busca com largura fixa em px passam a ocupar a linha toda */
+  input[style*="width:200px"]{width:100%!important;}
+}
 </style>
 </head>
 <body>
 
 <div id="toast-container"></div>
+<div id="mobile-sidebar-backdrop" onclick="toggleMobileSidebar()"></div>
 
 <!-- SIDEBAR -->
 <div class="sidebar">
@@ -221,6 +285,7 @@ tbody tr:hover td{background:#faf7f3;}
 <!-- MAIN -->
 <div id="app-wrapper" class="main">
   <div class="topbar">
+    <button id="hamburger-mobile" onclick="toggleMobileSidebar()" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#2a2520;padding:4px 8px 4px 0;flex-shrink:0;" title="Menu">☰</button>
     <span class="topbar-title" id="topbar-title">Início</span>
     <div class="topbar-right">
       <span class="last-update" id="last-update"></span>
@@ -1904,7 +1969,16 @@ function atualizarSaudacaoInicio() {
   el.textContent = saudacao + ', Bulhões Odontologia';
 }
 
+// Menu lateral no celular (23/07/2026) — no desktop expande no :hover; como
+// touch não tem hover de verdade, aqui vira um menu que abre/fecha por cima
+// do conteúdo ao tocar no ☰ da topbar (ou tocando fora dele).
+function toggleMobileSidebar(){
+  document.querySelector('.sidebar').classList.toggle('mobile-open');
+  document.getElementById('mobile-sidebar-backdrop').classList.toggle('show');
+}
 function switchPage(page,el){
+  document.querySelector('.sidebar').classList.remove('mobile-open');
+  document.getElementById('mobile-sidebar-backdrop').classList.remove('show');
   currentPage=page;
   document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
   el.classList.add('active');
