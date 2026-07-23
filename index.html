@@ -571,6 +571,17 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="em_andamento">Em andamento</option>
             <option value="concluido">Concluído</option>
           </select>
+          <select id="fluxo-semana-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;" title="Filtra pela data de início do tratamento">
+            <option value="">Todas as datas de início</option>
+            <option value="1semana">Até 1 semana atrás</option>
+            <option value="2semanas">1-2 semanas atrás</option>
+            <option value="3semanas">2-3 semanas atrás</option>
+            <option value="4semanas">3-4 semanas atrás</option>
+            <option value="30mais">+30 dias atrás</option>
+          </select>
+          <select id="fluxo-procedimento-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
+            <option value="">Todos os procedimentos</option>
+          </select>
           <span id="fluxo-count" style="font-size:12px;color:#9a8c7e;"></span>
         </div>
         <div id="fluxo-cards" style="display:flex;flex-direction:column;gap:14px;"></div>
@@ -7827,6 +7838,20 @@ async function salvarFluxoRemoto() {
 function renderFluxoCards() {
   const busca = (document.getElementById('fluxo-search')?.value || '').toLowerCase();
   const statusFil = document.getElementById('fluxo-status-filter')?.value || '';
+  const semanaFil = document.getElementById('fluxo-semana-filter')?.value || '';
+  const procFil = document.getElementById('fluxo-procedimento-filter')?.value || '';
+
+  // Popula o filtro de procedimento dinamicamente com os nomes que existem
+  // de verdade nos pacientes atuais do Fluxo — preserva a seleção atual.
+  const selProc = document.getElementById('fluxo-procedimento-filter');
+  if (selProc) {
+    const nomesProc = [...new Set(_fluxoPacientes.flatMap(p => (p.procedimentos || []).map(pr => pr.nome)))].sort();
+    const valorAtual = selProc.value;
+    selProc.innerHTML = '<option value="">Todos os procedimentos</option>' +
+      nomesProc.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+    selProc.value = nomesProc.includes(valorAtual) ? valorAtual : '';
+  }
+
   const filtrados = _fluxoPacientes.filter(p => {
     if (busca) {
       const nomeMatch = (p.nome || '').toLowerCase().includes(busca);
@@ -7836,6 +7861,20 @@ function renderFluxoCards() {
     }
     if (statusFil === 'em_andamento' && p.concluido) return false;
     if (statusFil === 'concluido' && !p.concluido) return false;
+    // Filtro por semana — quanto tempo se passou desde a data de início do tratamento
+    if (semanaFil && p.dataInicio) {
+      const dias = Math.floor((Date.now() - new Date(p.dataInicio + 'T12:00').getTime()) / 86400000);
+      if (semanaFil === '1semana' && !(dias <= 7)) return false;
+      if (semanaFil === '2semanas' && !(dias > 7 && dias <= 14)) return false;
+      if (semanaFil === '3semanas' && !(dias > 14 && dias <= 21)) return false;
+      if (semanaFil === '4semanas' && !(dias > 21 && dias <= 30)) return false;
+      if (semanaFil === '30mais' && !(dias > 30)) return false;
+    }
+    // Filtro por procedimento — só mostra quem tem esse procedimento no fluxo
+    if (procFil) {
+      const temProc = (p.procedimentos || []).some(pr => pr.nome === procFil);
+      if (!temProc) return false;
+    }
     // Limpeza automática: card concluído há mais de 30 dias some da lista
     // (não apaga o dado, só deixa de exibir — ver dataConcluido).
     if (p.concluido && p.dataConcluido) {
