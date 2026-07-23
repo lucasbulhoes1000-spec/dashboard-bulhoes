@@ -7835,6 +7835,17 @@ async function salvarFluxoRemoto() {
 }
 
 // ---- Render cards ----
+// Agrupa variações do mesmo procedimento pro filtro do Fluxo — "Coroa em
+// Resina", "Coroa em Resina (1)", "Coroa em Resina (2)" viram só "Coroa em
+// Resina"; "Gengivoplastia - Dente 11", "- Dente 22" etc. viram só
+// "Gengivoplastia". Usado SÓ pra exibir/filtrar — nunca altera o nome real
+// salvo no procedimento de cada paciente (pedido do usuário, 23/07/2026).
+function normalizarNomeProcedimentoFiltro(nome) {
+  return String(nome || '')
+    .replace(/\s*\(\d+\)\s*$/, '')           // remove "(1)", "(2)", "(3)" no final
+    .replace(/\s*-\s*Dente\s+\d+\s*$/i, '')  // remove "- Dente 22" no final
+    .trim();
+}
 function renderFluxoCards() {
   const busca = (document.getElementById('fluxo-search')?.value || '').toLowerCase();
   const statusFil = document.getElementById('fluxo-status-filter')?.value || '';
@@ -7845,7 +7856,7 @@ function renderFluxoCards() {
   // de verdade nos pacientes atuais do Fluxo — preserva a seleção atual.
   const selProc = document.getElementById('fluxo-procedimento-filter');
   if (selProc) {
-    const nomesProc = [...new Set(_fluxoPacientes.flatMap(p => (p.procedimentos || []).map(pr => pr.nome)))].sort();
+    const nomesProc = [...new Set(_fluxoPacientes.flatMap(p => (p.procedimentos || []).map(pr => normalizarNomeProcedimentoFiltro(pr.nome))))].sort();
     const valorAtual = selProc.value;
     selProc.innerHTML = '<option value="">Todos os procedimentos</option>' +
       nomesProc.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
@@ -7872,7 +7883,7 @@ function renderFluxoCards() {
     }
     // Filtro por procedimento — só mostra quem tem esse procedimento no fluxo
     if (procFil) {
-      const temProc = (p.procedimentos || []).some(pr => pr.nome === procFil);
+      const temProc = (p.procedimentos || []).some(pr => normalizarNomeProcedimentoFiltro(pr.nome) === procFil);
       if (!temProc) return false;
     }
     // Limpeza automática: card concluído há mais de 30 dias some da lista
