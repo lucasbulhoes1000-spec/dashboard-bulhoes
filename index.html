@@ -331,7 +331,7 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="slabel">Captação</div>
             <div class="row r5">
               <div class="mc"><div class="ml">Agendamentos <button onclick="abrirEdicaoManual('agend')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-agend">— <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-agend-sub">atos (Cloudia)</div></div>
-              <div class="mc"><div class="ml">Leads na agenda no período</div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
+              <div class="mc"><div class="ml">Leads na agenda no período <button onclick="abrirEdicaoManual('leadsAgenda')" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente (ex: leads que desmarcaram e sumiram da agenda do Clinicorp)">✏️</button></div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
               <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
               <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
@@ -2237,11 +2237,26 @@ function atualizarCardsAgendaClinicorp(dados){
   if(!dados)return;
   const leads=window._lastLeadsBase||0;
 
-  // Leads na agenda no período (únicos) — não tem override manual
-  const elAgendados=document.getElementById('t-leads-agendados');
-  if(elAgendados){
-    const pctTxt=leads>0?(dados.leadsAgendados/leads*100).toFixed(1)+'%':'—';
-    elAgendados.innerHTML=dados.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+')</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+  // Leads na agenda no período (únicos) — respeita edição manual, se houver.
+  // ⚠️ NOVO (23/07/2026, pedido do usuário): esse número não considera quem
+  // desmarcou e SUMIU da agenda do Clinicorp (a API não devolve mais quem foi
+  // desmarcado — limitação conhecida, documentada desde o backfill de julho).
+  // Como não dá pra reconstruir isso automaticamente com precisão, agora
+  // existe edição manual (mesma senha/padrão dos outros campos manuais) pra
+  // a equipe digitar o valor certo quando souber que o automático está errado.
+  if(getManualOverride('leadsAgenda')==null){
+    const elAgendados=document.getElementById('t-leads-agendados');
+    if(elAgendados){
+      const pctTxt=leads>0?(dados.leadsAgendados/leads*100).toFixed(1)+'%':'—';
+      elAgendados.innerHTML=dados.leadsAgendados+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+')</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+    }
+  }else{
+    const elAgendados=document.getElementById('t-leads-agendados');
+    if(elAgendados){
+      const manualVal=getManualOverride('leadsAgenda');
+      const pctTxt=leads>0?(manualVal/leads*100).toFixed(1)+'%':'—';
+      elAgendados.innerHTML=manualVal+' <span style="font-size:11px;color:#9a8c7e;">('+pctTxt+', manual)</span> <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button>';
+    }
   }
 
   // Agendamentos (atos) — respeita edição manual, se houver
@@ -2260,7 +2275,10 @@ function atualizarCardsAgendaClinicorp(dados){
   if(getManualOverride('comp')==null){
     const elComp=document.getElementById('t-comp');
     if(elComp){
-      const pctCompTxt=dados.leadsAgendados>0?(dados.comparecimentos/dados.leadsAgendados*100).toFixed(1)+'%':'—';
+      // Usa o valor manual de "Leads na agenda", se existir, como base do %
+      // — senão a porcentagem ficaria inconsistente com o número corrigido.
+      const leadsAgendaBase=getManualOverride('leadsAgenda')!=null?getManualOverride('leadsAgenda'):dados.leadsAgendados;
+      const pctCompTxt=leadsAgendaBase>0?(dados.comparecimentos/leadsAgendaBase*100).toFixed(1)+'%':'—';
       elComp.innerHTML=dados.comparecimentos+' <span style="font-size:11px;color:#9a8c7e;">('+pctCompTxt+')</span> <button class="lupa" onclick="lupaComparecimentoClinicorp()" title="Ver detalhes">🔍</button>';
     }
     const elCompSub=document.getElementById('t-comp-sub');
@@ -9384,7 +9402,7 @@ function abrirEdicaoManual(campo){
   _edicaoManualCampo = campo;
   _edicaoManualSenhaOk = false;
   document.getElementById('edicao-manual-titulo') && (document.getElementById('edicao-manual-titulo').textContent = '');
-  const titulosManual={'agend':'✏️ Agendamentos','comp':'✏️ Comparecimentos','entrada':'✏️ Total de Entradas'};
+  const titulosManual={'agend':'✏️ Agendamentos','comp':'✏️ Comparecimentos','entrada':'✏️ Total de Entradas','leadsAgenda':'✏️ Leads na agenda no período'};
   document.getElementById('edicao-manual-title').textContent = titulosManual[campo]||'✏️ Editar valor';
   document.getElementById('edicao-manual-senha').value = '';
   document.getElementById('edicao-manual-senha-erro').style.display = 'none';
