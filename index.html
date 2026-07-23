@@ -2113,11 +2113,30 @@ function getDataCadastroReal(ph){
 // primeira linha qualquer via .find(), que pode ser um evento antigo sem
 // valor (ex: CUSTOMER_CREATED inicial). Mesma família de getOrigemReal/
 // getDataCadastroReal: reconcilia entre todas as linhas do telefone.
-function getValorGanhoReal(ph){
+// ⚠️ CORRIGIDO (23/07/2026): antes buscava um evento "Ganho" em TODO o
+// histórico do telefone, sem filtro de data nenhum, e usava .find() — pegava
+// o PRIMEIRO que aparecesse na lista (ordem arbitrária, não necessariamente
+// o mais recente). Isso inflava "Valor fechado" em filtros Personalizado:
+// um cliente com mais de um evento Ganho no histórico (reabriu e fechou de
+// novo, ou registro duplicado do Cloudia) podia ter o valor de um Ganho
+// ANTIGO somado, mesmo o período selecionado não tendo nada a ver com aquele
+// fechamento específico. Agora, quando um range é informado, só considera
+// eventos Ganho DENTRO do período, e usa o mais recente entre eles.
+function getValorGanhoReal(ph,range){
   if(!ph)return 0;
   const phNorm=normalizePhone(ph);
-  const linhaGanho=allCloudiaRows.find(r=>normalizePhone(r.phone)===phNorm&&isFechou(r.stage)&&parseFloat(r.value||0)>0);
-  return linhaGanho?parseFloat(linhaGanho.value||0):0;
+  let candidatos=allCloudiaRows.filter(r=>normalizePhone(r.phone)===phNorm&&isFechou(r.stage)&&parseFloat(r.value||0)>0);
+  if(range){
+    candidatos=candidatos.filter(r=>{
+      const d=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
+      if(!d)return false;
+      const ds=localDateStr(d);
+      return ds>=range.since&&ds<=range.until;
+    });
+  }
+  if(candidatos.length===0)return 0;
+  candidatos.sort((a,b)=>(parseCloudiaDate(b.timestamp||b.created_at)||new Date(0))-(parseCloudiaDate(a.timestamp||a.created_at)||new Date(0)));
+  return parseFloat(candidatos[0].value||0);
 }
 function getOrigemReal(ph){
   if(!ph)return'';
@@ -3009,11 +3028,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
         // mesmo assim o cliente está em fechadosPhones (ex: via evento Ganho do Cloudia).
         // Usa o valor do evento Ganho real como fallback, para não desaparecer silenciosamente.
-        const vFallback=getValorGanhoReal(ph)||parseFloat((row&&row.value)||0);
+        const vFallback=getValorGanhoReal(ph,_range)||parseFloat((row&&row.value)||0);
         if(vFallback>0){totalVendasCRM+=vFallback;contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback});}
       }
     } else if(row){
-      const v=parseFloat(row.value||0)||getValorGanhoReal(ph);
+      const v=parseFloat(row.value||0)||getValorGanhoReal(ph,_range);
       if(v>0){totalVendasCRM+=v;contratosComValor++;_vendaRows.push({name:nome,ph,value:v});}
     }
   });
