@@ -5573,10 +5573,16 @@ function openClienteCard(idx){
   document.getElementById('cc-agend-hora').value=agendTs?agendTs.substring(11,16)||'08:00':'';
   document.getElementById('cc-consulta-data').value=consultaTs?consultaTs.substring(0,10):'';
   document.getElementById('cc-consulta-hora').value=consultaTs?consultaTs.substring(11,16)||'08:00':'';
-  var val=parseFloat(r.value||0);
-  if(val>0&&d.orcamentos.length===0){
-    d.orcamentos.push({status:isFechou(r.stage)?'Aprovado':'Em aberto',avaliador:'',tratamento:'',pagamento:'',parcelas:'',data:(r.created_at||r.timestamp||'').substring(0,10),valor:val,obs:'Importado do Cloudia',entrada:0,entradaData:'',entradaPgto:'',fechamentos:[]});
-  }
+  // ⚠️ REMOVIDO (23/07/2026, caso "Vítor"): antes, ao abrir o card de um
+  // cliente sem NENHUM orçamento cadastrado, o sistema criava sozinho um
+  // orçamento "de mentirinha" usando o valor bruto do evento Ganho do
+  // Cloudia (obs: "Importado do Cloudia"). Isso não tinha _clinicorpId nem
+  // _treatmentId — então quando o orçamento REAL chegava depois via
+  // sincronização com o Clinicorp (mesmo valor), a checagem de duplicata
+  // no backend podia não pegar a tempo (corrida entre o front-end salvando
+  // o stub e o backend salvando o real), e as duas entradas conviviam,
+  // dobrando o valor contado em "Valor fechado". Removido — orçamentos
+  // agora só entram via Clinicorp (sync) ou cadastro manual da equipe.
   refreshOrcamentos(d);
   refreshAtividades(r,d);
   refreshAnotacoes(d);
