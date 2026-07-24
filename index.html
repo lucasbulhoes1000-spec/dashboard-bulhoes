@@ -5689,6 +5689,10 @@ async function aplicarImportacaoOrcamentos(){
       });
 
       renderRelOrcamentos();
+      // ⚠️ CORRIGIDO (24/07/2026): faltava atualizar a aba Clientes depois de
+      // importar orçamentos — o card "Valor total fechado" ficava com o
+      // valor antigo até a pessoa sair e voltar pra aba manualmente.
+      if(currentPage==='clientes')renderClientesTable();
       let msg='Novos importados: '+r.novos+
         (r.clientesCriados>0?' (sendo '+r.clientesCriados+' cliente(s) novo(s) criado(s))':'')+
         '\nAtualizados (mudança de status): '+r.atualizados;
