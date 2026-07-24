@@ -9239,13 +9239,29 @@ function fecharHistoricoAuditoria(){
   document.getElementById('modal-auditoria').style.display='none';
 }
 
+// ⚠️ FORÇAR LOGOUT DE TODOS (24/07/2026) — o login usa localStorage, então
+// não dá pra invalidar sessão de alguém à distância em tempo real. Mas como
+// todo mundo precisa recarregar a página pra pegar QUALQUER index.html novo
+// mesmo, dá pra aproveitar isso: sempre que precisar forçar todo mundo a
+// logar de novo (ex: limpou logins, mudou controle de acesso), só AUMENTAR
+// esse número — quem tiver uma versão de sessão menor (ou nenhuma, sessão
+// antiga) é automaticamente deslogado na próxima vez que abrir/recarregar o
+// dashboard, e precisa entrar de novo com login e senha válidos.
+const VERSAO_SESSAO_MINIMA=2;
+
 function verificarLogin(){
   const email=localStorage.getItem('bulhoes_email');
   const logado=localStorage.getItem('bulhoes_logado');
-  if(email&&logado==='true'){
+  const versaoSessao=Number(localStorage.getItem('bulhoes_versao_sessao')||0);
+  if(email&&logado==='true'&&versaoSessao>=VERSAO_SESSAO_MINIMA){
     document.getElementById('login-screen').style.display='none';
     return true;
   }
+  // Sessão antiga (ou inexistente) — limpa qualquer resquício e força login novo.
+  localStorage.removeItem('bulhoes_email');
+  localStorage.removeItem('bulhoes_logado');
+  localStorage.removeItem('bulhoes_nome');
+  localStorage.removeItem('bulhoes_versao_sessao');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-wrapper').style.display='none';
   return false;
@@ -9269,6 +9285,7 @@ async function fazerLogin(){
     localStorage.setItem('bulhoes_email',email);
     localStorage.setItem('bulhoes_logado','true');
     localStorage.setItem('bulhoes_nome',user?user.nome:email.split('@')[0]);
+    localStorage.setItem('bulhoes_versao_sessao',String(VERSAO_SESSAO_MINIMA));
     registrarAuditoria('Login',user.nome+' entrou no sistema');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-wrapper').style.display='flex';
