@@ -1761,6 +1761,26 @@ const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
 const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
 const CLINICA_ID=null; // será preenchido após login
 const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbykaZnJfZBI5M7PQWdU3KSno5lf4OyjU8IaERmjh2kMXA5npUNz_5WXMwdfcix9Nw17/exec';
+// ⚠️ SEGURANÇA (24/07/2026): antes, quem descobrisse essa URL (ela fica
+// visível no código-fonte da página, não tem como esconder de verdade num
+// app que roda no navegador) conseguia chamar qualquer ação do backend —
+// excluir lead, importar dados, etc. — sem nunca precisar logar no
+// dashboard. Agora todo pedido pra essa URL leva também um token — o
+// Apps Script (Codigo_completo_v6.gs) só responde se o token bater com o
+// que está salvo nas Script Properties dele. Isso é feito aqui, uma vez,
+// interceptando o fetch() do navegador — não precisa mexer em nenhuma das
+// dezenas de chamadas a CLOUDIA_URL espalhadas pelo resto do código.
+const DASHBOARD_TOKEN='4b88a3c50b1d5152112db15bc4a35c0f774f5ddcb9e50bf0';
+(function(){
+  const _fetchOriginal=window.fetch;
+  window.fetch=function(input,init){
+    if(typeof input==='string'&&input.indexOf(CLOUDIA_URL)===0){
+      const sep=input.indexOf('?')===-1?'?':'&';
+      input=input+sep+'token='+encodeURIComponent(DASHBOARD_TOKEN);
+    }
+    return _fetchOriginal.call(this,input,init);
+  };
+})();
 const SS_SOCIAL='https://script.google.com/macros/s/AKfycbzWcVTrS7K3L9eA3Ei_erMPFT5i75mHT4B_roP7W6ENC-XHSFFQq8pUhxUjgljb1y6u/exec';
 const SS_URL='https://script.google.com/macros/s/AKfycbya5tJt56XgbOjzPje_5K2td3rFlb5qV4fcNV70zwWvrEV8upLVsDwJjLVaH-9MZrH0/exec';
 
@@ -2430,12 +2450,7 @@ function buildCcDataNormIndex(){
 function getDataCadastroReal(ph){
   if(!ph)return'';
   const phNorm=normalizePhone(ph);
-  const linhasComData=allCloudiaRows.filter(r=>
-    normalizePhone(r.phone)===phNorm&&r.created_at&&String(r.created_at).trim()!==''
-  );
-  if(linhasComData.length===0)return'';
-  linhasComData.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-  return linhasComData[0].created_at;
+  return (window._dataCadastroRealPorTelefone&&window._dataCadastroRealPorTelefone[phNorm])||'';
 }
 // Busca o valor (value) da linha "Ganho" específica de um telefone — não a
 // primeira linha qualquer via .find(), que pode ser um evento antigo sem
@@ -2450,12 +2465,15 @@ function getDataCadastroReal(ph){
 // ANTIGO somado, mesmo o período selecionado não tendo nada a ver com aquele
 // fechamento específico. Agora, quando um range é informado, só considera
 // eventos Ganho DENTRO do período, e usa o mais recente entre eles.
+// ⚠️ OTIMIZADO (24/07/2026): os candidatos já vêm pré-filtrados por telefone
+// via _fechouCandidatosPorTelefone (construído uma vez em rebuildStageIndex)
+// — só falta filtrar essa lista pequena pelo período, sem varrer tudo de novo.
 function getValorGanhoReal(ph,range){
   if(!ph)return 0;
   const phNorm=normalizePhone(ph);
-  let candidatos=allCloudiaRows.filter(r=>normalizePhone(r.phone)===phNorm&&isFechou(r.stage)&&parseFloat(r.value||0)>0);
+  let candidatos=(window._fechouCandidatosPorTelefone&&window._fechouCandidatosPorTelefone[phNorm])||[];
   if(range){
-    candidatos=candidatos.filter(r=>{
+    candidatos=candidatos.filter(function(r){
       const d=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
       if(!d)return false;
       const ds=localDateStr(d);
@@ -2463,31 +2481,30 @@ function getValorGanhoReal(ph,range){
     });
   }
   if(candidatos.length===0)return 0;
-  candidatos.sort((a,b)=>(parseCloudiaDate(b.timestamp||b.created_at)||new Date(0))-(parseCloudiaDate(a.timestamp||a.created_at)||new Date(0)));
+  // já vem ordenado do mais recente pro mais antigo (feito em rebuildStageIndex)
   return parseFloat(candidatos[0].value||0);
 }
 function getOrigemReal(ph){
   if(!ph)return'';
   const phNorm=normalizePhone(ph);
-  const linhasComOrigem=allCloudiaRows.filter(r=>
-    normalizePhone(r.phone)===phNorm&&r.origin&&String(r.origin).trim()!==''
-  );
-  if(linhasComOrigem.length===0)return'';
-  linhasComOrigem.sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0));
-  return linhasComOrigem[0].origin;
+  return (window._origemRealPorTelefone&&window._origemRealPorTelefone[phNorm])||'';
 }
 function ccDataLookup(phoneOrKey){
   if(!phoneOrKey)return null;
   if(_ccData[phoneOrKey])return _ccData[phoneOrKey];
   const norm=normalizePhone(phoneOrKey);
   if(_ccData[norm])return _ccData[norm];
+  // ⚠️ CORRIGIDO (24/07/2026, lentidão em Leads): antes, toda vez que um
+  // telefone NÃO era achado no índice — o que acontece o tempo todo, já que
+  // a maioria dos leads nunca vira cliente — a função reconstruía o índice
+  // INTEIRO de novo (varrendo todo o _ccData), só pra confirmar que
+  // continuava sem achar. Numa tabela de centenas de linhas, isso multiplicava
+  // o tempo de renderização várias vezes. O índice já é invalidado
+  // corretamente (_ccDataNormIndex=null) sempre que _ccData muda de verdade
+  // (ver carregarCRMRemoto, salvarEdicao etc.) — não precisa reconstruir "por
+  // garantia" a cada busca que não encontra nada.
   if(!_ccDataNormIndex)buildCcDataNormIndex();
-  let found=_ccDataNormIndex[norm];
-  if(!found){
-    // Pode ser uma chave nova ainda não indexada — tenta reconstruir o índice uma vez
-    buildCcDataNormIndex();
-    found=_ccDataNormIndex[norm];
-  }
+  const found=_ccDataNormIndex[norm];
   return found?_ccData[found]:null;
 }
 function toggleCustosBlock(){
@@ -2894,15 +2911,60 @@ function lupaAgendamentosClinicorp(){
 // depois de um comparecimento real acontecer (caso "Hyuri", 22/07/2026).
 function rebuildStageIndex(cloudiaRows){
   window._stageUpdatesByPhone={};
+  // ⚠️ NOVO (24/07/2026, lentidão em Leads): getOrigemReal/getDataCadastroReal/
+  // getValorGanhoReal eram chamadas em 20+ lugares, e cada uma varria TODO o
+  // allCloudiaRows (milhares de linhas) do zero, toda vez. Numa tabela com
+  // centenas de linhas, isso virava centenas de milhares de operações só pra
+  // desenhar a tela uma vez. Agora os 3 índices abaixo são construídos numa
+  // ÚNICA passada por cloudiaRows (a mesma passada que já existia pro
+  // _stageUpdatesByPhone), e cada função de busca vira uma consulta O(1).
+  window._origemRealPorTelefone={};
+  window._dataCadastroRealPorTelefone={};
+  window._fechouCandidatosPorTelefone={};
+  const _melhorTsOrigem={};
+  const _melhorDtCadastro={};
+
   cloudiaRows.forEach(row=>{
-    if(row.type!=='CUSTOMER_STAGE_UPDATED'||!row.stage)return;
     const ph=normalizePhone(row.phone);
     if(!ph)return;
-    if(!window._stageUpdatesByPhone[ph])window._stageUpdatesByPhone[ph]=[];
-    window._stageUpdatesByPhone[ph].push(row);
+
+    if(row.type==='CUSTOMER_STAGE_UPDATED'&&row.stage){
+      if(!window._stageUpdatesByPhone[ph])window._stageUpdatesByPhone[ph]=[];
+      window._stageUpdatesByPhone[ph].push(row);
+    }
+
+    // Origem real: entre as linhas com origin preenchido, guarda a mais recente
+    if(row.origin&&String(row.origin).trim()!==''){
+      const ts=parseCloudiaDate(row.timestamp)||parseCloudiaDate(row.created_at)||new Date(0);
+      if(!_melhorTsOrigem[ph]||ts>_melhorTsOrigem[ph]){
+        _melhorTsOrigem[ph]=ts;
+        window._origemRealPorTelefone[ph]=row.origin;
+      }
+    }
+
+    // Data de cadastro real: entre as linhas com created_at preenchido, guarda a mais antiga
+    if(row.created_at&&String(row.created_at).trim()!==''){
+      const dt=new Date(row.created_at);
+      if(!_melhorDtCadastro[ph]||dt<_melhorDtCadastro[ph]){
+        _melhorDtCadastro[ph]=dt;
+        window._dataCadastroRealPorTelefone[ph]=row.created_at;
+      }
+    }
+
+    // Candidatos a "Ganho" com valor — guarda TODOS (lista pequena por telefone,
+    // geralmente 1-3), pra getValorGanhoReal(ph,range) filtrar por período depois
+    // sem precisar varrer o dataset inteiro de novo.
+    if(isFechou(row.stage)&&parseFloat(row.value||0)>0){
+      if(!window._fechouCandidatosPorTelefone[ph])window._fechouCandidatosPorTelefone[ph]=[];
+      window._fechouCandidatosPorTelefone[ph].push(row);
+    }
   });
+
   Object.values(window._stageUpdatesByPhone).forEach(arr=>{
     arr.sort((a,b)=>(parseCloudiaDate(b.timestamp)||new Date(0))-(parseCloudiaDate(a.timestamp)||new Date(0)));
+  });
+  Object.values(window._fechouCandidatosPorTelefone).forEach(arr=>{
+    arr.sort((a,b)=>(parseCloudiaDate(b.timestamp||b.created_at)||new Date(0))-(parseCloudiaDate(a.timestamp||a.created_at)||new Date(0)));
   });
 }
 async function loadTrafego(){
@@ -3848,7 +3910,12 @@ function updateOrigemCount(rows){
 // ===== LEADS PAGE =====
 let leadsData=[];
 function renderLeads(){
-  if(allCloudiaRows.length===0){fetchCloudia().then(()=>renderLeadsTable());}
+  // ⚠️ CORRIGIDO (24/07/2026): esse caminho buscava a planilha, mas não
+  // reconstruía os índices (_stageUpdatesByPhone, _origemRealPorTelefone
+  // etc.) — se alguém entrasse em Leads rápido demais (antes do loadTrafego
+  // do login terminar), esses campos podiam aparecer em branco até o
+  // próximo refresh. Agora sempre reconstrói os índices junto.
+  if(allCloudiaRows.length===0){fetchCloudia().then(rows=>{rebuildStageIndex(rows);renderLeadsTable();});}
   else{renderLeadsTable();}
   carregarAgendamentosFuturosClinicorp();
 }
@@ -4080,7 +4147,7 @@ function renderClientes(){
     fromEl.value=y+'-'+m+'-01';
     toEl.value=y+'-'+m+'-'+String(lastDay).padStart(2,'0');
   }
-  if(allCloudiaRows.length===0){fetchCloudia().then(()=>renderClientesTable());}
+  if(allCloudiaRows.length===0){fetchCloudia().then(rows=>{rebuildStageIndex(rows);renderClientesTable();});}
   else{renderClientesTable();}
   garantirClinicorpParaClientes();
 }
@@ -5509,7 +5576,7 @@ async function importarLeadsFormularioFacebookManual(){
         'Novos importados: '+(r.novos||0)+(r.semTelefone>0?'\nSem telefone (ignorados): '+r.semTelefone:'')+
         (r.reativados>0?'\nJá existiam no CRM (origem/status atualizados): '+r.reativados:'')+
         '\nEnvio automático de WhatsApp: '+(r.whatsappAtivo?'ATIVADO':'desligado (só cai no dashboard)'));
-      if(r.novos>0){await fetchCloudia();if(document.getElementById('page-leads').classList.contains('active'))renderLeadsTable();}
+      if(r.novos>0){const rows=await fetchCloudia();rebuildStageIndex(rows);if(document.getElementById('page-leads').classList.contains('active'))renderLeadsTable();}
     }else{
       showToast('error','Erro ao importar',r.mensagem||JSON.stringify(r));
     }
@@ -6791,7 +6858,7 @@ function initRelOrigem(){
     }
     renderRelOrigem();
   };
-  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
+  if(!allCloudiaRows.length){fetchCloudia().then(rows=>{rebuildStageIndex(rows);doRender();});}else{doRender();}
 }
 function openROModal(i,type){
   if(!window._roData||!window._roData[i]){alert('Dados não encontrados. Clique em Filtrar e tente novamente.');return;}
@@ -7005,7 +7072,7 @@ function initRelComparecidos(){
     sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
     renderRelComparecidos();
   };
-  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
+  if(!allCloudiaRows.length){fetchCloudia().then(rows=>{rebuildStageIndex(rows);doRender();});}else{doRender();}
 }
 // IDs de status do Clinicorp que contam como "compareceu de verdade" — mesmos
 // usados no backend (STATUS_COMPARECIMENTO_IDS no .gs): Em atendimento, Atendido.
@@ -7103,7 +7170,7 @@ function initRelOrcamentos(){
     populateDynamicSelects();
     renderRelOrcamentos();
   };
-  if(!allCloudiaRows.length){fetchCloudia().then(doRender);}else{doRender();}
+  if(!allCloudiaRows.length){fetchCloudia().then(rows=>{rebuildStageIndex(rows);doRender();});}else{doRender();}
 }
 function renderRelOrcamentos(){
   const since=document.getElementById('rof-from').value;
@@ -7286,11 +7353,11 @@ function exportarParaCloudia(aba) {
 
 // ===== CRIAR LEAD =====
 function openCriarLead(){const today=new Date().toISOString().split('T')[0];const now=new Date().toTimeString().slice(0,5);document.getElementById('cl-data').value=today;document.getElementById('cl-hora').value=now;document.getElementById('cl-nome').value='';document.getElementById('cl-telefone').value='';document.getElementById('cl-origem').value='';document.getElementById('cl-status').value='Lead';document.getElementById('modal-criar-lead').style.display='flex';}
-async function salvarCriarLead(){const data=document.getElementById('cl-data').value;const hora=document.getElementById('cl-hora').value;const nome=document.getElementById('cl-nome').value.trim();const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cl-origem').value;const status=document.getElementById('cl-status').value;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{console.log('[CRIAR LEAD] Tentando POST para:',CLOUDIA_URL);const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:data+'T'+hora+':00'}})});console.log('[CRIAR LEAD] Resposta recebida, status:',res.status);const r=await res.json();console.log('[CRIAR LEAD] Body:',r);if(r.status==='ok'){document.getElementById('modal-criar-lead').style.display='none';alert('✅ Lead criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderLeadsTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR LEAD] Erro completo:',e);alert('Erro: '+e.message+'\n\nIsso geralmente é um problema de CORS ou conexão com o Google Apps Script. Verifique o console (F12) para mais detalhes.');}}
+async function salvarCriarLead(){const data=document.getElementById('cl-data').value;const hora=document.getElementById('cl-hora').value;const nome=document.getElementById('cl-nome').value.trim();const telefone=document.getElementById('cl-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cl-origem').value;const status=document.getElementById('cl-status').value;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{console.log('[CRIAR LEAD] Tentando POST para:',CLOUDIA_URL);const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,created_at:data+'T'+hora+':00'}})});console.log('[CRIAR LEAD] Resposta recebida, status:',res.status);const r=await res.json();console.log('[CRIAR LEAD] Body:',r);if(r.status==='ok'){document.getElementById('modal-criar-lead').style.display='none';alert('✅ Lead criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;rebuildStageIndex(rows);renderLeadsTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR LEAD] Erro completo:',e);alert('Erro: '+e.message+'\n\nIsso geralmente é um problema de CORS ou conexão com o Google Apps Script. Verifique o console (F12) para mais detalhes.');}}
 
 // ===== CRIAR CLIENTE =====
 function openCriarCliente(){const today=new Date().toISOString().split('T')[0];const now=new Date().toTimeString().slice(0,5);document.getElementById('cc2-data').value=today;document.getElementById('cc2-hora').value=now;document.getElementById('cc2-nome').value='';document.getElementById('cc2-telefone').value='';document.getElementById('cc2-origem').value='';document.getElementById('cc2-status').value='Compareceu';document.getElementById('cc2-valor').value='';document.getElementById('modal-criar-cliente').style.display='flex';}
-async function salvarCriarCliente(){const data=document.getElementById('cc2-data').value;const hora=document.getElementById('cc2-hora').value;const nome=document.getElementById('cc2-nome').value.trim();const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cc2-origem').value;const status=document.getElementById('cc2-status').value;const valor=parseFloat(document.getElementById('cc2-valor').value)||0;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:data+'T'+hora+':00'}})});const r=await res.json();if(r.status==='ok'){document.getElementById('modal-criar-cliente').style.display='none';alert('✅ Cliente criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;renderClientesTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR CLIENTE] Erro completo:',e);alert('Erro: '+e.message);}}
+async function salvarCriarCliente(){const data=document.getElementById('cc2-data').value;const hora=document.getElementById('cc2-hora').value;const nome=document.getElementById('cc2-nome').value.trim();const telefone=document.getElementById('cc2-telefone').value.trim().replace(/\D/g,'');const origem=document.getElementById('cc2-origem').value;const status=document.getElementById('cc2-status').value;const valor=parseFloat(document.getElementById('cc2-valor').value)||0;if(!nome||!telefone){alert('Nome e telefone são obrigatórios');return;}try{const res=await fetch(CLOUDIA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'createLead',lead:{name:nome,phone:telefone,origin:origem,stage:status,value:valor,created_at:data+'T'+hora+':00'}})});const r=await res.json();if(r.status==='ok'){document.getElementById('modal-criar-cliente').style.display='none';alert('✅ Cliente criado!');fetchCloudia().then(rows=>{allCloudiaRows=rows;rebuildStageIndex(rows);renderClientesTable();});}else{alert('Erro retornado pelo servidor: '+JSON.stringify(r));}}catch(e){console.error('[CRIAR CLIENTE] Erro completo:',e);alert('Erro: '+e.message);}}
 
 // ===== IMPORTAR LEADS =====
 function openImportarLeads(){document.getElementById('importar-leads-csv').value='';document.getElementById('importar-leads-preview').style.display='none';document.getElementById('modal-importar-leads').style.display='flex';}
@@ -9168,15 +9235,24 @@ function removerSubModelo(tipo, idx) {
 // ===== FIM FLUXO DE TRATAMENTO =====
 
 // ===== LOGIN =====
+// ⚠️ SEGURANÇA (24/07/2026): senhas guardadas como hash SHA-256, não mais em
+// texto puro — quem abrir "Ver código-fonte" da página não vê mais a senha
+// de ninguém, só uma sequência sem sentido. Não é uma segurança perfeita
+// (ainda dá pra tentar quebrar o hash com muito esforço/tempo), mas fecha o
+// problema de "ver o código = ver a senha de todo mundo na hora".
 const USUARIOS_VALIDOS=[
-  {email:'lucasbulhoes1000@gmail.com',senha:'bulhoes2026',nome:'Lucas'},
-  {email:'victoria@bulhoes',senha:'victoria923',nome:'Victoria'},
-  {email:'livia@bulhoes',senha:'livia923',nome:'Lívia'},
-  {email:'larissa@bulhoes',senha:'larissa923',nome:'Larissa'},
-  {email:'gabi@bulhoes',senha:'gabi923',nome:'Gabi'},
-  {email:'raffaella@bulhoes',senha:'raffaella923',nome:'Raffaella'},
-  {email:'luiza@bulhoes',senha:'luiza923',nome:'Luiza'}
+  {email:'lucasbulhoes1000@gmail.com',senhaHash:'25a432b3aafa00d463cced2a84877b76f47465b2b61cf8541d9011faf12f1afa',nome:'Lucas'},
+  {email:'victoria@bulhoes',senhaHash:'0afe5597e9452291e4acada4e4770f65f88503c36c0f3d8b466839d69cd3e6bb',nome:'Victoria'},
+  {email:'livia@bulhoes',senhaHash:'9451cc002d11584a6174fb5bd2497fd24e81474fcd3b938a7bb719fe6e4ebd6f',nome:'Lívia'},
+  {email:'larissa@bulhoes',senhaHash:'58c929968b93cb3c60c8271d4efd05df579ae338efa1dec585c02f7829645fb3',nome:'Larissa'},
+  {email:'gabi@bulhoes',senhaHash:'4b8608f57eb9ce57dd442d474c9a85a3a9f990663707e8bbdfc7f994e98b3aeb',nome:'Gabi'},
+  {email:'raffaella@bulhoes',senhaHash:'bd18f73b410cc43bbd060e3f468ec59f9d5d7d07d51b09266695cf520cb14d3e',nome:'Raffaella'},
+  {email:'luiza@bulhoes',senhaHash:'faf28381657e264d0a770bed2adaf4c760b3dee8bf92749cbc209905075b1377',nome:'Luiza'}
 ];
+async function sha256Hex(texto){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
 // ============================================================
 // AUDITORIA — quem fez o quê (24/07/2026, pedido do usuário)
@@ -9282,7 +9358,8 @@ async function fazerLogin(){
   errEl.style.display='none';
   
   // Verifica na lista local — lista local tem prioridade absoluta
-  const user=USUARIOS_VALIDOS.find(u=>u.email.toLowerCase()===email&&u.senha===senha);
+  const senhaHashDigitada=await sha256Hex(senha);
+  const user=USUARIOS_VALIDOS.find(u=>u.email.toLowerCase()===email&&u.senhaHash===senhaHashDigitada);
   
   // Se achou na lista local, entra direto sem checar Supabase
   if(user){
