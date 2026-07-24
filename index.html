@@ -143,6 +143,8 @@ tbody tr:hover td{background:#faf7f3;}
 .toast.show{opacity:1;transform:translateY(0);}
 .toast.toast-success{border-left:3px solid #4a7a4a;}
 .toast.toast-error{border-left:3px solid #b5483d;}
+.toast.toast-urgent{border-left:4px solid #c9463a;background:#3a2420;animation:toast-pulse 1s ease-in-out 2;}
+@keyframes toast-pulse{0%,100%{box-shadow:0 8px 24px rgba(0,0,0,.18);}50%{box-shadow:0 8px 30px rgba(201,70,58,.55);}}
 .toast-title{font-weight:700;margin-bottom:4px;}
 .toast-body{color:#d8d0c5;font-size:12px;line-height:1.5;white-space:pre-line;}
 .cal-dia{transition:background .12s;}
@@ -966,6 +968,13 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
 
     <div class="page" id="page-gerenciar">
+      <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:4px;">Auditoria</div>
+        <div style="font-size:12px;color:#9a8c7e;margin-bottom:12px;">Histórico de quem fez login, exclusões, edições manuais e mudanças no Gerenciar.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button onclick="abrirHistoricoAuditoria()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">📋 Ver histórico de alterações</button>
+        </div>
+      </div>
       <div style="background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:16px;margin-bottom:20px;">
         <div style="font-size:12px;font-weight:700;color:#8a7a6a;text-transform:uppercase;margin-bottom:4px;">Sincronizações com o Clinicorp</div>
         <div style="font-size:12px;color:#9a8c7e;margin-bottom:12px;">Ações manuais de sincronização — normalmente não precisa mexer aqui, o sistema já atualiza sozinho.</div>
@@ -1851,11 +1860,39 @@ function tocarBeepNotificacao(){
   }
 }
 
-function notificarNovoLeadFacebook(nome,telefone){
-  var titulo='📥 Novo lead — Formulário Facebook';
-  var corpo=(nome||'(sem nome)')+' — '+(telefone||'');
+// Identidade do usuário logado (24/07/2026) — o login já guarda email/nome
+// em localStorage desde antes (bulhoes_email/bulhoes_nome). Reaproveita isso
+// aqui pra: (1) rastrear "última checagem" por PESSOA, não mais compartilhado
+// entre todo mundo; (2) dar tratamento de urgência específico pra Raffaella
+// (a SDR), que é quem precisa ver um lead novo primeiro.
+function usuarioAtualEmail(){
+  return (localStorage.getItem('bulhoes_email')||'').toLowerCase();
+}
+function ehSDRUrgente(){
+  return usuarioAtualEmail()==='raffaella@bulhoes';
+}
+// Chave por pessoa, sanitizada (Supabase key não aceita @ nem . de forma
+// ambígua com outras chaves — troca por caracteres seguros).
+function chaveNotifPorUsuario(){
+  const email=usuarioAtualEmail()||'desconhecido';
+  return 'bulhoes-notif-leads-'+email.replace(/[^a-z0-9]/g,'-');
+}
+
+function tocarBeepUrgente(){
+  // Pra Raffa (SDR): beep repetido, mais chamativo que o normal — ela precisa
+  // perceber ANTES de qualquer outra pessoa que tenha o dashboard aberto.
   tocarBeepNotificacao();
-  showToast('success',titulo,corpo,true); // true = persistente, fica até fechar manualmente
+  setTimeout(tocarBeepNotificacao,350);
+  setTimeout(tocarBeepNotificacao,700);
+  if(navigator.vibrate)try{navigator.vibrate([200,100,200]);}catch(e){}
+}
+
+function notificarNovoLeadFacebook(nome,telefone){
+  var urgente=ehSDRUrgente();
+  var titulo=(urgente?'🚨 URGENTE — ':'📥 ')+'Novo lead — Formulário Facebook';
+  var corpo=(nome||'(sem nome)')+' — '+(telefone||'');
+  if(urgente)tocarBeepUrgente();else tocarBeepNotificacao();
+  showToast(urgente?'urgent':'success',titulo,corpo,true); // true = persistente, fica até fechar manualmente
   if(('Notification' in window)&&Notification.permission==='granted'){
     try{
       // requireInteraction:true — a notificação fica fixa na tela até a
@@ -1866,6 +1903,54 @@ function notificarNovoLeadFacebook(nome,telefone){
     }catch(e){
       console.warn('[NOTIF LEADS FACEBOOK] Erro ao criar notificação nativa:',e);
     }
+  }
+}
+
+// ⚠️ NOVO (24/07/2026): antes, a primeira checagem de cada sessão só
+// marcava tudo como "já visto" SILENCIOSAMENTE (pra não notificar leads
+// antigos de uma vez ao abrir o dashboard). Isso significava que leads que
+// caíssem de madrugada, com ninguém de olho, nunca geravam nenhum aviso —
+// a SDR só ia descobrir se abrisse a aba Leads manualmente. Agora o sistema
+// guarda no Supabase o horário da ÚLTIMA vez que ESSA PESSOA verificou (uma
+// chave por usuário, não mais compartilhada — evita a situação de uma
+// pessoa "consumir" o aviso de outra sem querer) — e na primeira checagem de
+// uma sessão nova, compara com esse horário pra mostrar um resumo
+// consolidado de quem chegou nesse meio-tempo (ex: durante a noite).
+async function buscarUltimaChecagemLeadsFacebook(){
+  try{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(chaveNotifPorUsuario())+'&select=crm_json',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    const rows=await res.json();
+    if(rows&&rows[0]&&rows[0].crm_json){
+      const parsed=JSON.parse(rows[0].crm_json);
+      return parsed.ultimaChecagem||null;
+    }
+  }catch(e){
+    console.warn('[NOTIF LEADS FACEBOOK] Erro ao buscar última checagem:',e);
+  }
+  return null;
+}
+async function salvarUltimaChecagemLeadsFacebook(ts){
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({email_clinica:chaveNotifPorUsuario(),crm_json:JSON.stringify({ultimaChecagem:ts}),atualizado_em:new Date().toISOString()})
+    });
+  }catch(e){
+    console.warn('[NOTIF LEADS FACEBOOK] Erro ao salvar última checagem:',e);
+  }
+}
+function mostrarResumoLeadsForaDoAr(leads){
+  var urgente=ehSDRUrgente();
+  const titulo=(urgente?'🚨 URGENTE — ':'📥 ')+leads.length+' novo(s) lead'+(leads.length>1?'s':'')+' enquanto você estava fora';
+  const corpo=leads.map(l=>l.nome||'(sem nome)').join('\n');
+  if(urgente)tocarBeepUrgente();else tocarBeepNotificacao();
+  showToast(urgente?'urgent':'success',titulo,corpo,true); // persistente, fica até fechar manualmente
+  if(('Notification' in window)&&Notification.permission==='granted'){
+    try{ new Notification(titulo,{body:corpo,requireInteraction:true}); }
+    catch(e){ console.warn('[NOTIF LEADS FACEBOOK] Erro ao criar notificação nativa:',e); }
   }
 }
 
@@ -1889,6 +1974,7 @@ async function verificarNovosLeadsFacebook(){
     var idxPhone=h.indexOf('phone');
     var idxName=h.indexOf('name');
     var idxOrigin=h.indexOf('origin');
+    var idxCreatedAt=h.indexOf('created_at');
     if(idxType===-1||idxPhone===-1||idxOrigin===-1)return;
 
     var leadsFacebookAtuais=[];
@@ -1898,12 +1984,24 @@ async function verificarNovosLeadsFacebook(){
       if(String(r[idxOrigin]||'').trim()!=='#Formulário Facebook')continue;
       var tel=String(r[idxPhone]||'').replace(/\D/g,'');
       if(!tel)continue;
-      leadsFacebookAtuais.push({tel:tel,nome:r[idxName]||''});
+      leadsFacebookAtuais.push({tel:tel,nome:r[idxName]||'',createdAt:idxCreatedAt!==-1?r[idxCreatedAt]:null});
     }
 
+    var agora=new Date().toISOString();
+
     if(_leadsFacebookPrimeiraChecagem){
+      const ultimaChecagemAnterior=await buscarUltimaChecagemLeadsFacebook();
+      if(ultimaChecagemAnterior){
+        const chegaramForaDoAr=leadsFacebookAtuais.filter(function(l){
+          return l.createdAt && new Date(l.createdAt) > new Date(ultimaChecagemAnterior);
+        });
+        if(chegaramForaDoAr.length>0){
+          mostrarResumoLeadsForaDoAr(chegaramForaDoAr);
+        }
+      }
       leadsFacebookAtuais.forEach(function(l){_leadsFacebookVistos.add(l.tel);});
       _leadsFacebookPrimeiraChecagem=false;
+      await salvarUltimaChecagemLeadsFacebook(agora);
       return;
     }
 
@@ -1912,6 +2010,7 @@ async function verificarNovosLeadsFacebook(){
       _leadsFacebookVistos.add(l.tel);
       notificarNovoLeadFacebook(l.nome,l.tel);
     });
+    await salvarUltimaChecagemLeadsFacebook(agora);
   }catch(e){
     console.warn('[NOTIF LEADS FACEBOOK] Erro ao checar novos leads:',e);
   }
@@ -1976,7 +2075,54 @@ function toggleMobileSidebar(){
   document.querySelector('.sidebar').classList.toggle('mobile-open');
   document.getElementById('mobile-sidebar-backdrop').classList.toggle('show');
 }
+// ============================================================
+// CONTROLE DE ACESSO POR ÁREA (24/07/2026, pedido do usuário)
+// Lucas, Larissa e Gabi sempre têm acesso total a tudo. As demais pessoas
+// só entram direto nas áreas listadas pra elas — em qualquer outra área
+// restrita, precisam da senha (mesma senha 14891 já usada nas edições
+// manuais). O desbloqueio por senha vale só pra sessão atual (some se
+// recarregar a página) — não é salvo em lugar nenhum.
+// ============================================================
+const ACESSO_TOTAL_LOGINS=['lucasbulhoes1000@gmail.com','larissa@bulhoes','gabi@bulhoes'];
+const ACESSO_ORCAMENTOS_FECHADOS=[...ACESSO_TOTAL_LOGINS,'victoria@bulhoes'];
+const SENHA_ACESSO_RESTRITO='14891';
+let _acessoDesbloqueado={estoque:false,'rel-orcamentos':false,gerenciar:false};
+
+function verificarAcessoPagina(page){
+  const email=usuarioAtualEmail();
+  // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi —
+  // pedido explícito do usuário, é a única exceção ao "acesso total".
+  if(page==='gerenciar'){
+    if(_acessoDesbloqueado.gerenciar)return true;
+    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Gerenciar:');
+    if(senha===null)return false;
+    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado.gerenciar=true;return true;}
+    alert('Senha incorreta.');
+    return false;
+  }
+  if(page==='estoque'){
+    if(ACESSO_TOTAL_LOGINS.includes(email))return true;
+    if(_acessoDesbloqueado.estoque)return true;
+    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Estoque:');
+    if(senha===null)return false;
+    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado.estoque=true;return true;}
+    alert('Senha incorreta.');
+    return false;
+  }
+  if(page==='rel-orcamentos'){
+    if(ACESSO_ORCAMENTOS_FECHADOS.includes(email))return true;
+    if(_acessoDesbloqueado['rel-orcamentos'])return true;
+    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Orçamentos Fechados:');
+    if(senha===null)return false;
+    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado['rel-orcamentos']=true;return true;}
+    alert('Senha incorreta.');
+    return false;
+  }
+  return true; // qualquer outra página não tem restrição
+}
+
 function switchPage(page,el){
+  if(!verificarAcessoPagina(page))return;
   document.querySelector('.sidebar').classList.remove('mobile-open');
   document.getElementById('mobile-sidebar-backdrop').classList.remove('show');
   currentPage=page;
@@ -5263,7 +5409,7 @@ function showToast(tipo,titulo,corpo,persistente){
   const container=document.getElementById('toast-container');
   if(!container)return;
   const el=document.createElement('div');
-  el.className='toast toast-'+(tipo==='error'?'error':'success');
+  el.className='toast toast-'+(tipo==='error'?'error':tipo==='urgent'?'urgent':'success');
   el.innerHTML='<div class="toast-title">'+titulo+'</div>'+(corpo?'<div class="toast-body"></div>':'');
   if(corpo)el.querySelector('.toast-body').textContent=corpo;
   if(persistente){
@@ -6567,9 +6713,9 @@ function salvarListasDebounced(){
   _listasSaveTimer=setTimeout(()=>salvarListasRemoto(),1500);
 }
 
-function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
-function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
-function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);populateDynamicSelects();salvarListasDebounced();}
+function ativarItem(tab,texto){var lista=_listas[tab];lista.desativos=lista.desativos.filter(t=>t!==texto);lista.ativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();registrarAuditoria('Gerenciar: ativou item',tab+' — "'+texto+'"');}
+function desativarItem(tab,texto){var lista=_listas[tab];lista.ativos=lista.ativos.filter(t=>t!==texto);lista.desativos.push(texto);renderLista(tab);populateDynamicSelects();salvarListasDebounced();registrarAuditoria('Gerenciar: desativou item',tab+' — "'+texto+'"');}
+function novoItem(tab){var nome=prompt('Nome do novo item:');if(!nome||!nome.trim())return;_listas[tab].ativos.push(nome.trim());renderLista(tab);populateDynamicSelects();salvarListasDebounced();registrarAuditoria('Gerenciar: novo item',tab+' — "'+nome.trim()+'"');}
 
 // ===== RELATÓRIOS =====
 function initRelDates(fromId, toId){
@@ -9020,16 +9166,78 @@ function removerSubModelo(tipo, idx) {
 // ===== LOGIN =====
 const USUARIOS_VALIDOS=[
   {email:'lucasbulhoes1000@gmail.com',senha:'bulhoes2026',nome:'Lucas'},
-  {email:'vitoria@bulhoes.com.br',senha:'vitoria2026',nome:'Vitória'},
   {email:'victoria@bulhoes',senha:'victoria923',nome:'Victoria'},
-  {email:'livia@bulhoes.com.br',senha:'livia923',nome:'Lívia'},
   {email:'livia@bulhoes',senha:'livia923',nome:'Lívia'},
   {email:'larissa@bulhoes',senha:'larissa923',nome:'Larissa'},
   {email:'gabi@bulhoes',senha:'gabi923',nome:'Gabi'},
   {email:'raffaella@bulhoes',senha:'raffaella923',nome:'Raffaella'},
-  {email:'raffa@bulhoes.com.br',senha:'raffaella2026',nome:'Raffaella'},
   {email:'luiza@bulhoes',senha:'luiza923',nome:'Luiza'}
 ];
+
+// ============================================================
+// AUDITORIA — quem fez o quê (24/07/2026, pedido do usuário)
+// Usa uma tabela DEDICADA no Supabase (auditoria_log), diferente da
+// crm_sessions usada pro resto do sistema — cada registro é um INSERT novo
+// (nunca um read-modify-write de um blob só), então funciona bem mesmo com
+// várias pessoas mexendo ao mesmo tempo, sem risco de sobrescrever nada.
+//
+// ⚠️ Pré-requisito: a tabela precisa existir no Supabase antes de funcionar.
+// Rode isso UMA VEZ no SQL Editor do Supabase (Dashboard → SQL Editor):
+//
+//   create table auditoria_log (
+//     id bigint generated always as identity primary key,
+//     criado_em timestamptz default now(),
+//     usuario text,
+//     acao text,
+//     detalhes text
+//   );
+//   alter table auditoria_log enable row level security;
+//   create policy "permitir insert" on auditoria_log for insert to anon with check (true);
+//   create policy "permitir select" on auditoria_log for select to anon using (true);
+//
+// Sem isso, as chamadas abaixo falham silenciosamente (só um warning no
+// console) — não quebra o resto do app, só não registra nada até a tabela existir.
+// ============================================================
+async function registrarAuditoria(acao,detalhes){
+  try{
+    const usuario=localStorage.getItem('bulhoes_nome')||usuarioAtualEmail()||'desconhecido';
+    await fetch(SUPABASE_URL+'/rest/v1/auditoria_log',{
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({usuario:usuario,acao:acao,detalhes:detalhes||''})
+    });
+  }catch(e){
+    console.warn('[AUDITORIA] Erro ao registrar (a tabela auditoria_log existe no Supabase?):',e);
+  }
+}
+async function abrirHistoricoAuditoria(){
+  const modal=document.getElementById('modal-auditoria');
+  const corpo=document.getElementById('auditoria-lista');
+  corpo.innerHTML='<div style="padding:20px;text-align:center;color:#9a8c7e;">Carregando...</div>';
+  modal.style.display='flex';
+  try{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/auditoria_log?select=*&order=criado_em.desc&limit=200',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    const rows=await res.json();
+    if(!Array.isArray(rows)||rows.length===0){
+      corpo.innerHTML='<div style="padding:20px;text-align:center;color:#9a8c7e;">Nenhum registro ainda (ou a tabela auditoria_log não existe no Supabase — veja o comentário no código-fonte com o SQL pra criar).</div>';
+      return;
+    }
+    corpo.innerHTML=rows.map(function(r){
+      const data=new Date(r.criado_em).toLocaleString('pt-BR');
+      return '<div style="padding:8px 4px;border-bottom:1px solid #f0ebe4;font-size:12px;">'+
+        '<strong style="color:#2a2520;">'+(r.usuario||'?')+'</strong> — '+(r.acao||'')+
+        (r.detalhes?'<div style="color:#9a8c7e;font-size:11px;margin-top:2px;">'+r.detalhes+'</div>':'')+
+        '<div style="color:#c9bcae;font-size:10px;margin-top:2px;">'+data+'</div></div>';
+    }).join('');
+  }catch(e){
+    corpo.innerHTML='<div style="padding:20px;text-align:center;color:#c96a5a;">Erro ao carregar — a tabela auditoria_log existe no Supabase?</div>';
+  }
+}
+function fecharHistoricoAuditoria(){
+  document.getElementById('modal-auditoria').style.display='none';
+}
 
 function verificarLogin(){
   const email=localStorage.getItem('bulhoes_email');
@@ -9061,6 +9269,7 @@ async function fazerLogin(){
     localStorage.setItem('bulhoes_email',email);
     localStorage.setItem('bulhoes_logado','true');
     localStorage.setItem('bulhoes_nome',user?user.nome:email.split('@')[0]);
+    registrarAuditoria('Login',user.nome+' entrou no sistema');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-wrapper').style.display='flex';
     iniciarApp();
@@ -9131,17 +9340,40 @@ function initComissoes(){
   if(sel&&!sel.value)sel.value=mesAtual;
   renderComissoes();
 }
+// Comissões: quem não é Lucas/Larissa/Gabi só vê a PRÓPRIA comissão —
+// compara o nome do login (USUARIOS_VALIDOS) com os campos avaliador/crc do
+// lançamento (comparação sem acento/case, por conter, já que o nome
+// completo no lançamento costuma ser mais longo que o nome do login, ex:
+// "Victoria" vs "Victória Silva Sanches de Toledo Mota").
+function normalizarNomeSimples(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+function comissaoPertenceAoUsuarioAtual(c){
+  const email=usuarioAtualEmail();
+  if(ACESSO_TOTAL_LOGINS.includes(email))return true; // Lucas/Larissa/Gabi veem tudo
+  const usuarioAtual=USUARIOS_VALIDOS.find(u=>u.email.toLowerCase()===email);
+  if(!usuarioAtual)return false;
+  const meuNome=normalizarNomeSimples(usuarioAtual.nome);
+  if(!meuNome)return false;
+  const av=normalizarNomeSimples(c.avaliador);
+  const crc=normalizarNomeSimples(c.crc);
+  return (av&&av.indexOf(meuNome)!==-1)||(crc&&crc.indexOf(meuNome)!==-1);
+}
 function renderComissoes(){
   const mesFil=(document.getElementById('com-mes-sel')||{}).value||'';
   const membroFil=(document.getElementById('com-membro-fil')||{}).value||'';
   const statusFil=(document.getElementById('com-status-fil')||{}).value||'';
-  const filtered=_comissoes.filter(c=>{
+  // ⚠️ Restrição por usuário (24/07/2026) — aplicada ANTES de qualquer outro
+  // filtro, pra quem não é admin nunca ver nem o total nem os nomes de
+  // outras pessoas no dropdown "membro".
+  const comissoesVisiveis=_comissoes.filter(comissaoPertenceAoUsuarioAtual);
+  const filtered=comissoesVisiveis.filter(c=>{
     const mesMatch=!mesFil||(c.data||'').substring(0,7)===mesFil;
     const memMatch=!membroFil||(c.avaliador===membroFil||c.crc===membroFil);
     const stMatch=!statusFil||c.status===statusFil;
     return mesMatch&&memMatch&&stMatch;
   });
-  const todos=new Set();_comissoes.forEach(c=>{if(c.avaliador)todos.add(c.avaliador);if(c.crc)todos.add(c.crc);});
+  const todos=new Set();comissoesVisiveis.forEach(c=>{if(c.avaliador)todos.add(c.avaliador);if(c.crc)todos.add(c.crc);});
   const sel=document.getElementById('com-membro-fil');
   if(sel){const cv=sel.value;sel.innerHTML='<option value="">Todos os membros</option>'+[...todos].sort().map(m=>`<option${m===cv?' selected':''}>${m}</option>`).join('');}
   const totalPago=filtered.filter(c=>c.status==='pago').reduce((s,c)=>s+Number(c.comAval||0)+Number(c.comCrc||0),0);
@@ -9658,6 +9890,7 @@ function excluirLead(){
   const r=leadsData[_currentLeadIdx];if(!r)return;
   if(!confirm('Excluir o lead "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
   const ph=String(r.phone||'').replace(/\D/g,'');
+  registrarAuditoria('Excluiu lead',(r.name||'(sem nome)')+' — '+ph);
   // Remove do _ccData
   if(_ccData[ph])delete _ccData[ph];
   // Remove de allCloudiaRows
@@ -9701,6 +9934,7 @@ function excluirCliente(){
   const r=clientesData[_currentClienteIdx];if(!r)return;
   if(!confirm('Excluir o cliente "'+( r.name||'?')+'"? Essa ação não pode ser desfeita.'))return;
   const ph=String(r.phone||'').replace(/\D/g,'');
+  registrarAuditoria('Excluiu cliente',(r.name||'(sem nome)')+' — '+ph);
   // Registra a exclusão numa "lista negra" — sem isso, o próximo "Puxar
   // orçamentos" ou o sync de comparecimento recriaria esse cliente do zero.
   if(!_ccData['__exclusoes__'])_ccData['__exclusoes__']={orcamentos:[],clientes:[]};
@@ -9858,6 +10092,7 @@ function salvarEdicaoManual(){
   } else {
     _ccData.__manuais__[key][_edicaoManualCampo] = parseInt(val);
   }
+  registrarAuditoria('Edição manual',_edicaoManualCampo+' = '+(val||'(limpo)')+' | período: '+key);
   salvarCRMDebounced();
   document.getElementById('modal-edicao-manual').style.display = 'none';
   loadTrafego();
@@ -10101,6 +10336,15 @@ window.addEventListener('load',()=>{
 </div>
 
 <!-- MODAL EDIÇÃO MANUAL MÉTRICAS -->
+<div id="modal-auditoria" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:850;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;width:560px;max-width:94vw;max-height:82vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#2a2520;">📋 Histórico de alterações</div>
+      <button onclick="fecharHistoricoAuditoria()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
+    </div>
+    <div id="auditoria-lista"></div>
+  </div>
+</div>
 <div id="modal-edicao-manual" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:12px;width:360px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
