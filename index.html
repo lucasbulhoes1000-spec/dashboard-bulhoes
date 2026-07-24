@@ -836,6 +836,10 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
           </div>
           <div>
+            <label style="font-size:10px;color:#9a8c7e;text-transform:uppercase;font-weight:600;">📑 Fase (opcional — ex: "Fase 0 — Definições Iniciais")</label>
+            <input type="text" id="tarefa-detalhe-fase" placeholder="Deixe em branco se não usar fases" style="width:100%;box-sizing:border-box;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 10px;font-size:13px;outline:none;margin-top:3px;">
+          </div>
+          <div>
             <label style="font-size:10px;color:#9a8c7e;text-transform:uppercase;font-weight:600;">📝 Descrição</label>
             <textarea id="tarefa-detalhe-descricao" placeholder="Adicione uma descrição mais detalhada..." rows="4" style="width:100%;box-sizing:border-box;border:0.5px solid #d4c9bc;border-radius:6px;padding:9px 10px;font-size:13px;outline:none;resize:vertical;font-family:inherit;margin-top:3px;"></textarea>
           </div>
@@ -852,12 +856,17 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- Modal: Kanban da Campanha (Calendário Sazonal) -->
     <div id="modal-kanban-campanha" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1050;align-items:center;justify-content:center;">
-      <div style="background:#fff;border-radius:14px;width:820px;max-width:95vw;max-height:88vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="background:#fff;border-radius:14px;width:1180px;max-width:97vw;max-height:92vh;overflow-y:auto;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
           <div id="kanban-titulo-campanha" style="font-size:16px;font-weight:700;color:#2a2520;">Campanha</div>
           <button onclick="fecharKanbanCampanha()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid #e8e2da;">
+          <button id="tab-kanban-btn" onclick="mudarAbaCampanha('kanban')" style="background:none;border:none;border-bottom:2px solid #A18B6C;padding:8px 14px;font-size:12px;font-weight:600;color:#2a2520;cursor:pointer;">📋 Kanban</button>
+          <button id="tab-fases-btn" onclick="mudarAbaCampanha('fases')" style="background:none;border:none;border-bottom:2px solid transparent;padding:8px 14px;font-size:12px;font-weight:600;color:#9a8c7e;cursor:pointer;">📑 Fases</button>
+        </div>
         <div id="kanban-colunas" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+        <div id="fases-conteudo" style="display:none;"></div>
       </div>
     </div>
 
@@ -8714,7 +8723,113 @@ function abrirKanbanCampanha(acaoIdx) {
   if (!a) return;
   document.getElementById('kanban-titulo-campanha').textContent = (a.recorrente ? '🔁 ' : '') + a.titulo;
   renderKanbanCampanha();
+  mudarAbaCampanha('kanban');
   document.getElementById('modal-kanban-campanha').style.display = 'flex';
+}
+
+// Alterna entre a visão Kanban (arrastar cartões) e Fases (tabela por etapa
+// do projeto, estilo cronograma) — 24/07/2026, pedido do usuário.
+function mudarAbaCampanha(aba) {
+  const kanbanBtn = document.getElementById('tab-kanban-btn');
+  const fasesBtn = document.getElementById('tab-fases-btn');
+  const kanbanDiv = document.getElementById('kanban-colunas');
+  const fasesDiv = document.getElementById('fases-conteudo');
+  if (aba === 'fases') {
+    kanbanDiv.style.display = 'none';
+    fasesDiv.style.display = 'block';
+    kanbanBtn.style.borderBottomColor = 'transparent';
+    kanbanBtn.style.color = '#9a8c7e';
+    fasesBtn.style.borderBottomColor = '#A18B6C';
+    fasesBtn.style.color = '#2a2520';
+    renderFasesCampanha();
+  } else {
+    kanbanDiv.style.display = 'flex';
+    fasesDiv.style.display = 'none';
+    kanbanBtn.style.borderBottomColor = '#A18B6C';
+    kanbanBtn.style.color = '#2a2520';
+    fasesBtn.style.borderBottomColor = 'transparent';
+    fasesBtn.style.color = '#9a8c7e';
+  }
+}
+
+// Visão "Fases" — agrupa os cartões da campanha pela fase que a equipe
+// escreveu neles (campo livre, ex: "Fase 0 — Definições Iniciais"), numa
+// tabela com Responsável/Data/Status/Observações — igual um cronograma de
+// projeto. Cartões sem fase definida caem em "Sem fase".
+function renderFasesCampanha() {
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  if (!a) return;
+  if (!a.tarefas) a.tarefas = [];
+  const grupos = {}; const ordem = [];
+  a.tarefas.forEach((t, tIdx) => {
+    const fase = (t.fase || '').trim() || 'Sem fase';
+    if (!grupos[fase]) { grupos[fase] = []; ordem.push(fase); }
+    grupos[fase].push({ t, tIdx });
+  });
+  const container = document.getElementById('fases-conteudo');
+  if (ordem.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#9a8c7e;font-size:12px;padding:30px 0;">Nenhum cartão ainda. Adiciona um pelo Kanban, ou clica em "+ Novo cartão com fase" abaixo.</div>';
+  } else {
+    container.innerHTML = ordem.map(fase => {
+      const linhas = grupos[fase].map(({ t, tIdx }) => {
+        const status = getTarefaStatus(t);
+        const statusLabel = status === 'done' ? 'Concluído' : status === 'doing' ? 'Fazendo' : 'Pendente';
+        const statusCor = status === 'done' ? '#5a8a6a' : status === 'doing' ? '#A18B6C' : '#c9a227';
+        return `<tr onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="cursor:pointer;border-top:1px solid #f0ebe4;" onmouseover="this.style.background='#faf8f5'" onmouseout="this.style.background='transparent'">
+          <td style="padding:10px 12px;font-size:13px;color:#2a2520;">${t.tarefa}</td>
+          <td style="padding:10px 12px;font-size:12px;color:#7a6550;white-space:nowrap;">${t.responsavel || '—'}</td>
+          <td style="padding:10px 12px;font-size:12px;color:#7a6550;white-space:nowrap;">${t.dia ? ('Dia ' + t.dia) : '—'}</td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:${statusCor}22;color:${statusCor};padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">${statusLabel}</span></td>
+          <td style="padding:10px 12px;font-size:12px;color:#9a8c7e;">${t.descricao || '—'}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin-bottom:24px;">
+        <div style="font-size:13px;font-weight:700;color:#2a2520;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+          <span>${fase}</span>
+          <button onclick="renomearFaseCampanha(${JSON.stringify(fase)})" style="background:none;border:none;cursor:pointer;color:#b5a898;font-size:11px;" title="Renomear fase">✏️</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8e2da;border-radius:8px;overflow:hidden;">
+          <thead><tr style="background:#faf8f5;">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;"></th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Responsável</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Data</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Status</th>
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Observações</th>
+          </tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>`;
+    }).join('');
+  }
+  container.innerHTML += '<button onclick="adicionarCartaoComFase()" style="background:none;border:1px dashed #d4c9bc;border-radius:8px;padding:10px;width:100%;cursor:pointer;color:#7a6550;font-size:12px;">+ Novo cartão com fase</button>';
+}
+
+// Renomeia uma fase em TODOS os cartões que a usam de uma vez.
+function renomearFaseCampanha(faseAtual) {
+  const a = _calendarioAcoes[_kanbanAcaoIdx];
+  if (!a || !a.tarefas) return;
+  const novoNome = prompt('Novo nome da fase:', faseAtual === 'Sem fase' ? '' : faseAtual);
+  if (novoNome === null) return;
+  const novoNomeLimpo = novoNome.trim();
+  a.tarefas.forEach(t => {
+    const faseDoCartao = (t.fase || '').trim() || 'Sem fase';
+    if (faseDoCartao === faseAtual) t.fase = novoNomeLimpo;
+  });
+  salvarCalendarioSazonalRemoto();
+  renderFasesCampanha();
+}
+
+// Abre o editor de cartão normal, mas já pedindo o nome da fase logo de
+// cara (só faz sentido nesse fluxo, já que na visão Kanban a fase é um
+// campo a mais dentro do editor, não algo que precisa perguntar na hora).
+function adicionarCartaoComFase() {
+  const fase = prompt('Nome da fase (ex: "Fase 0 — Definições Iniciais"):');
+  if (fase === null) return;
+  abrirDetalheTarefaDeKanban(-1);
+  setTimeout(() => {
+    const el = document.getElementById('tarefa-detalhe-fase');
+    if (el) el.value = fase.trim();
+  }, 30);
 }
 
 function fecharKanbanCampanha() {
@@ -8879,6 +8994,7 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
     document.getElementById('tarefa-detalhe-dia').value = t.dia || '';
     document.getElementById('tarefa-detalhe-mes').value = t.mes || a.mes;
     document.getElementById('tarefa-detalhe-responsavel').value = t.responsavel || '';
+    document.getElementById('tarefa-detalhe-fase').value = t.fase || '';
     document.getElementById('tarefa-detalhe-descricao').value = t.descricao || '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = '';
   } else {
@@ -8887,6 +9003,7 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
     document.getElementById('tarefa-detalhe-dia').value = '';
     document.getElementById('tarefa-detalhe-mes').value = a.mes;
     document.getElementById('tarefa-detalhe-responsavel').value = '';
+    document.getElementById('tarefa-detalhe-fase').value = '';
     document.getElementById('tarefa-detalhe-descricao').value = '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = 'none';
   }
@@ -8912,6 +9029,7 @@ function salvarDetalheTarefa() {
     dia: Number(document.getElementById('tarefa-detalhe-dia').value) || null,
     mes: Number(document.getElementById('tarefa-detalhe-mes').value) || a.mes,
     responsavel: document.getElementById('tarefa-detalhe-responsavel').value.trim(),
+    fase: document.getElementById('tarefa-detalhe-fase').value.trim(),
     descricao: document.getElementById('tarefa-detalhe-descricao').value.trim()
   };
   if (!a.tarefas) a.tarefas = [];
@@ -8924,9 +9042,11 @@ function salvarDetalheTarefa() {
   document.getElementById('modal-detalhe-tarefa').style.display = 'none';
   salvarCalendarioSazonalRemoto();
   renderCalendarioSazonal();
-  // Se o Kanban dessa campanha estiver aberto por trás, atualiza ele também
+  // Se o Kanban/Fases dessa campanha estiver aberto por trás, atualiza a aba
+  // que estiver visível no momento (não sempre o Kanban).
   if (document.getElementById('modal-kanban-campanha').style.display !== 'none' && _kanbanAcaoIdx === _tarefaDetalheAcaoIdx) {
-    renderKanbanCampanha();
+    if (document.getElementById('fases-conteudo').style.display !== 'none') renderFasesCampanha();
+    else renderKanbanCampanha();
   }
   showToast('success', '✅ Cartão salvo!', '');
 }
@@ -8940,7 +9060,8 @@ function excluirDetalheTarefa() {
   salvarCalendarioSazonalRemoto();
   renderCalendarioSazonal();
   if (document.getElementById('modal-kanban-campanha').style.display !== 'none' && _kanbanAcaoIdx === _tarefaDetalheAcaoIdx) {
-    renderKanbanCampanha();
+    if (document.getElementById('fases-conteudo').style.display !== 'none') renderFasesCampanha();
+    else renderKanbanCampanha();
   }
 }
 
