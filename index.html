@@ -8642,22 +8642,30 @@ function renderCalendarioSazonal() {
     const acoesHtml = acoesDoMes.map(a => {
       const idx = _calendarioAcoes.indexOf(a);
       if (!a.tarefas) a.tarefas = [];
-      // Só os cartões cujo mês próprio bate com o mês da CAMPANHA aparecem
-      // aqui dentro da lista dela — os de preparação em outro mês aparecem
-      // na seção "Preparação" do mês deles (ver abaixo).
-      const tarefas = a.tarefas.filter(t => (t.mes || a.mes) === mes).slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0));
-      const cartoesHtml = tarefas.map(t => cardTarefaCalendarioHtml(idx, a.tarefas.indexOf(t), t)).join('');
+      // Só os cartões cujo mês próprio bate com o mês da CAMPANHA contam aqui
+      // (os de preparação em outro mês contam na seção "Preparação" do mês deles).
+      const tarefas = a.tarefas.filter(t => (t.mes || a.mes) === mes);
+      // ⚠️ CORRIGIDO (24/07/2026, pedido do usuário): o calendário é só pra
+      // VER as campanhas do ano — os cartões individuais (com checklist etc.)
+      // não aparecem mais aqui dentro, poluindo a grade do mês. Eles só
+      // aparecem de verdade dentro do card grande (Kanban/Fases), que abre
+      // ao clicar na campanha. Aqui fica só um resumo leve (quantos cartões,
+      // quantos concluídos), se houver algum.
+      const feitos = tarefas.filter(t => getTarefaStatus(t) === 'done').length;
+      const resumoHtml = tarefas.length > 0
+        ? `<div style="font-size:11px;color:#9a8c7e;margin-bottom:8px;">${tarefas.length} cartão${tarefas.length > 1 ? 'ões' : ''} · ${feitos} concluído${feitos !== 1 ? 's' : ''}</div>`
+        : '';
       return `<div style="background:#f5f0ea;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;">
-          <div onclick="abrirKanbanCampanha(${idx})" style="font-size:13px;font-weight:600;color:#2a2520;cursor:pointer;" title="Abrir quadro Kanban da campanha">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
+          <div onclick="abrirKanbanCampanha(${idx})" style="font-size:13px;font-weight:600;color:#2a2520;cursor:pointer;" title="Abrir a campanha">${a.recorrente ? '🔁 ' : ''}${a.titulo}</div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
             <button onclick="event.stopPropagation();abrirAdicionarAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:12px;padding:2px;" title="Editar campanha">✏️</button>
             <button onclick="event.stopPropagation();removerAcaoCalendario(${idx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:12px;padding:2px;" title="Remover campanha">✕</button>
           </div>
         </div>
         ${a.observacao ? `<div style="font-size:11px;color:#7a6550;margin-bottom:8px;">${a.observacao}</div>` : ''}
-        ${cartoesHtml}
-        <button onclick="abrirKanbanCampanha(${idx})" style="background:none;border:none;cursor:pointer;color:#7a6550;font-size:11px;padding:6px 2px;text-align:left;width:100%;">📋 Abrir Kanban / Adicionar cartão</button>
+        ${resumoHtml}
+        <button onclick="abrirKanbanCampanha(${idx})" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;padding:8px 10px;text-align:center;width:100%;font-weight:600;">📂 Abrir campanha</button>
       </div>`;
     }).join('');
 
@@ -8675,11 +8683,11 @@ function renderCalendarioSazonal() {
       })
       .filter(x => x.tarefasDoMes.length)
       .map(({ a, idx, tarefasDoMes }) => {
-        const cartoes = tarefasDoMes.slice().sort((t1, t2) => (Number(t1.dia) || 0) - (Number(t2.dia) || 0))
-          .map(t => cardTarefaCalendarioHtml(idx, a.tarefas.indexOf(t), t)).join('');
+        const feitos = tarefasDoMes.filter(t => getTarefaStatus(t) === 'done').length;
         return `<div style="background:#fdf3d9;border:1px solid #e8cf8f;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-          <div style="font-size:11px;font-weight:600;color:#8a6d1a;margin-bottom:6px;">🔥 Preparação — ${a.titulo} <span style="font-weight:400;">(${MESES_NOMES[a.mes - 1]})</span></div>
-          ${cartoes}
+          <div onclick="abrirKanbanCampanha(${idx})" style="font-size:11px;font-weight:600;color:#8a6d1a;margin-bottom:4px;cursor:pointer;">🔥 Preparação — ${a.titulo} <span style="font-weight:400;">(${MESES_NOMES[a.mes - 1]})</span></div>
+          <div style="font-size:11px;color:#9a8663;margin-bottom:6px;">${tarefasDoMes.length} cartão${tarefasDoMes.length > 1 ? 'ões' : ''} · ${feitos} concluído${feitos !== 1 ? 's' : ''}</div>
+          <button onclick="abrirKanbanCampanha(${idx})" style="background:#8a6d1a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;padding:6px 10px;text-align:center;width:100%;font-weight:600;">📂 Abrir campanha</button>
         </div>`;
       }).join('');
 
