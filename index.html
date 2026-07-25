@@ -808,12 +808,7 @@ tbody tr:hover td{background:#faf7f3;}
     <div id="modal-detalhe-tarefa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:10px;width:560px;max-width:92vw;max-height:88vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:0.5px solid #e8e2da;gap:10px;">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0;">
-            <span id="tarefa-detalhe-campanha" style="background:#f0ece4;color:#7a6550;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap;">Campanha</span>
-            <select id="tarefa-detalhe-fase" onchange="onMudarFaseNoEditor(this)" style="border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;background:#e8d9c0;color:#7a5a2a;">
-              <option value="">📑 Sem fase</option>
-            </select>
-          </div>
+          <span id="tarefa-detalhe-campanha" style="background:#f0ece4;color:#7a6550;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap;">Campanha</span>
           <button onclick="document.getElementById('modal-detalhe-tarefa').style.display='none';" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:18px;flex-shrink:0;">✕</button>
         </div>
         <div style="padding:20px;">
@@ -8749,72 +8744,56 @@ function renderFasesCampanha() {
   const a = _calendarioAcoes[_kanbanAcaoIdx];
   if (!a) return;
   if (!a.tarefas) a.tarefas = [];
-  const grupos = {}; const ordem = [];
-  a.tarefas.forEach((t, tIdx) => {
-    const fase = (t.fase || '').trim() || 'Sem fase';
-    if (!grupos[fase]) { grupos[fase] = []; ordem.push(fase); }
-    grupos[fase].push({ t, tIdx });
-  });
   const nomesLogin = USUARIOS_VALIDOS.map(u => u.nome);
   const container = document.getElementById('fases-conteudo');
 
   let html = '';
-  if (ordem.length === 0) {
+  if (a.tarefas.length === 0) {
     html = '<div style="text-align:center;color:#9a8c7e;font-size:12px;padding:30px 0;">Nenhuma atividade ainda. Clica em "+ Nova atividade" abaixo.</div>';
   } else {
-    html = ordem.map(fase => {
-      const feitos = grupos[fase].filter(({ t }) => getTarefaStatus(t) === 'done').length;
-      const linhas = grupos[fase].map(({ t, tIdx }) => {
-        const status = getTarefaStatus(t);
-        const corResp = corParaResponsavel(t.responsavel);
-        const optsResp = ['<option value="">—</option>'].concat(
-          nomesLogin.map(n => `<option value="${n}"${t.responsavel === n ? ' selected' : ''}>${n}</option>`)
-        ).join('');
-        return `<tr style="border-top:1px solid #f0ebe4;">
-          <td onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="padding:9px 12px;font-size:13px;color:#2a2520;cursor:pointer;" title="Clique para editar">${t.tarefa}</td>
-          <td style="padding:6px 12px;">
-            <select onchange="mudarCampoTarefa(${tIdx},'responsavel',this.value)" style="background:${corResp};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;color:#4a3a2a;cursor:pointer;outline:none;">${optsResp}</select>
-          </td>
-          <td style="padding:6px 12px;white-space:nowrap;">
-            <input type="date" value="${dataTarefaParaInput(t)}" onchange="mudarDataTarefaCampo(${tIdx},this.value)" style="border:0.5px solid #e0d8ce;border-radius:6px;padding:4px 6px;font-size:11px;outline:none;color:#7a6550;">
-          </td>
-          <td style="padding:6px 12px;">
-            <select onchange="mudarCampoTarefa(${tIdx},'status',this.value)" style="background:${status === 'done' ? '#5a8a6a22' : status === 'doing' ? '#A18B6C22' : '#c9a22722'};color:${status === 'done' ? '#5a8a6a' : status === 'doing' ? '#A18B6C' : '#c9a227'};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
-              <option value="todo"${status === 'todo' ? ' selected' : ''}>Pendente</option>
-              <option value="doing"${status === 'doing' ? ' selected' : ''}>Fazendo</option>
-              <option value="done"${status === 'done' ? ' selected' : ''}>Concluído</option>
-            </select>
-          </td>
-          <td style="padding:6px 12px;">
-            <input type="text" value="${(t.descricao || '').replace(/"/g, '&quot;')}" placeholder="—" onchange="mudarCampoTarefa(${tIdx},'descricao',this.value)" style="border:0.5px solid #e0d8ce;border-radius:6px;padding:4px 8px;font-size:11px;outline:none;color:#7a6550;width:100%;box-sizing:border-box;">
-          </td>
-          <td style="padding:6px 12px;white-space:nowrap;text-align:right;">
-            <button onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:13px;padding:2px 4px;" title="Editar">✏️</button>
-            <button onclick="excluirCartaoDireto(${tIdx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:13px;padding:2px 4px;" title="Apagar">🗑️</button>
-          </td>
-        </tr>`;
-      }).join('');
-      return `<div style="margin-bottom:24px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div style="font-size:13px;font-weight:700;color:#2a2520;">${fase}</div>
-          <button onclick="renomearFaseCampanha(${JSON.stringify(fase)})" style="background:none;border:none;cursor:pointer;color:#b5a898;font-size:11px;" title="Renomear fase">✏️</button>
-          <div style="font-size:11px;color:#9a8c7e;margin-left:auto;">${feitos}/${grupos[fase].length}</div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8e2da;border-radius:8px;overflow:hidden;">
-          <thead><tr style="background:#faf8f5;">
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Atividades</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Responsável</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Data</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Status</th>
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Observações</th>
-            <th style="padding:8px 12px;"></th>
-          </tr></thead>
-          <tbody>${linhas}</tbody>
-        </table>
-      </div>`;
+    const linhas = a.tarefas.map((t, tIdx) => {
+      const status = getTarefaStatus(t);
+      const corResp = corParaResponsavel(t.responsavel);
+      const optsResp = ['<option value="">—</option>'].concat(
+        nomesLogin.map(n => `<option value="${n}"${t.responsavel === n ? ' selected' : ''}>${n}</option>`)
+      ).join('');
+      return `<tr style="border-top:1px solid #f0ebe4;">
+        <td onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="padding:9px 12px;font-size:13px;color:#2a2520;cursor:pointer;" title="Clique para editar">${t.tarefa}</td>
+        <td style="padding:6px 12px;">
+          <select onchange="mudarCampoTarefa(${tIdx},'responsavel',this.value)" style="background:${corResp};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;color:#4a3a2a;cursor:pointer;outline:none;">${optsResp}</select>
+        </td>
+        <td style="padding:6px 12px;white-space:nowrap;">
+          <input type="date" value="${dataTarefaParaInput(t)}" onchange="mudarDataTarefaCampo(${tIdx},this.value)" style="border:0.5px solid #e0d8ce;border-radius:6px;padding:4px 6px;font-size:11px;outline:none;color:#7a6550;">
+        </td>
+        <td style="padding:6px 12px;">
+          <select onchange="mudarCampoTarefa(${tIdx},'status',this.value)" style="background:${status === 'done' ? '#5a8a6a22' : status === 'doing' ? '#A18B6C22' : '#c9a22722'};color:${status === 'done' ? '#5a8a6a' : status === 'doing' ? '#A18B6C' : '#c9a227'};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
+            <option value="todo"${status === 'todo' ? ' selected' : ''}>Pendente</option>
+            <option value="doing"${status === 'doing' ? ' selected' : ''}>Fazendo</option>
+            <option value="done"${status === 'done' ? ' selected' : ''}>Concluído</option>
+          </select>
+        </td>
+        <td style="padding:6px 12px;">
+          <input type="text" value="${(t.descricao || '').replace(/"/g, '&quot;')}" placeholder="—" onchange="mudarCampoTarefa(${tIdx},'descricao',this.value)" style="border:0.5px solid #e0d8ce;border-radius:6px;padding:4px 8px;font-size:11px;outline:none;color:#7a6550;width:100%;box-sizing:border-box;">
+        </td>
+        <td style="padding:6px 12px;white-space:nowrap;text-align:right;">
+          <button onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:13px;padding:2px 4px;" title="Editar">✏️</button>
+          <button onclick="excluirCartaoDireto(${tIdx})" style="background:none;border:none;cursor:pointer;color:#c96a5a;font-size:13px;padding:2px 4px;" title="Apagar">🗑️</button>
+        </td>
+      </tr>`;
     }).join('');
+    html = `<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e8e2da;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#faf8f5;">
+        <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Atividades</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Responsável</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Data</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Status</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;color:#b5a898;text-transform:uppercase;letter-spacing:.5px;">Observações</th>
+        <th style="padding:8px 12px;"></th>
+      </tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>`;
   }
-  container.innerHTML = html + '<button onclick="adicionarCartaoComFase()" style="background:none;border:1px dashed #d4c9bc;border-radius:8px;padding:10px;width:100%;cursor:pointer;color:#7a6550;font-size:12px;">+ Nova atividade</button>';
+  container.innerHTML = html + '<button onclick="adicionarNovaAtividade()" style="background:none;border:1px dashed #d4c9bc;border-radius:8px;padding:10px;width:100%;cursor:pointer;color:#7a6550;font-size:12px;margin-top:12px;">+ Nova atividade</button>';
 }
 
 // Converte dia+mês+ano da campanha num valor "YYYY-MM-DD" pro <input type="date">
@@ -8858,35 +8837,13 @@ function excluirCartaoDireto(tIdx) {
   renderCalendarioSazonal();
 }
 
-function renomearFaseCampanha(faseAtual) {
-  const a = _calendarioAcoes[_kanbanAcaoIdx];
-  if (!a || !a.tarefas) return;
-  const novoNome = prompt('Novo nome da fase:', faseAtual === 'Sem fase' ? '' : faseAtual);
-  if (novoNome === null) return;
-  const novoNomeLimpo = novoNome.trim();
-  a.tarefas.forEach(t => {
-    const faseDoCartao = (t.fase || '').trim() || 'Sem fase';
-    if (faseDoCartao === faseAtual) t.fase = novoNomeLimpo;
-  });
-  salvarCalendarioSazonalRemoto();
-  renderFasesCampanha();
+// ⚠️ SIMPLIFICADO (24/07/2026, pedido do usuário): sem conceito de "fase"
+// separado — é só escrever o nome da atividade e já vira um cartão na
+// lista. Abre o editor completo direto, sem perguntar mais nada antes.
+function adicionarNovaAtividade() {
+  abrirDetalheTarefaDeKanban(-1);
 }
 
-function adicionarCartaoComFase() {
-  const fase = prompt('Nome da fase (ex: "Fase 0 — Definições Iniciais"):');
-  if (fase === null) return;
-  abrirDetalheTarefaDeKanban(-1);
-  setTimeout(() => {
-    const sel = document.getElementById('tarefa-detalhe-fase');
-    if (sel && fase.trim()) {
-      const opt = document.createElement('option');
-      opt.value = fase.trim();
-      opt.textContent = fase.trim();
-      sel.insertBefore(opt, sel.lastElementChild); // antes de "+ Nova fase..."
-      sel.value = fase.trim();
-    }
-  }, 30);
-}
 
 function fecharKanbanCampanha() {
   document.getElementById('modal-kanban-campanha').style.display = 'none';
@@ -8913,23 +8870,6 @@ function toggleTarefaCalendario(acaoIdx, tarefaIdx, checked) {
 }
 
 // ---- Modal de detalhe do cartão (estilo Trello) ----
-// Quando escolhe "+ Nova fase..." no dropdown do editor, pergunta o nome e
-// adiciona como opção nova (em vez de deixar digitar livre, evitando fase
-// duplicada por erro de digitação/acento).
-function onMudarFaseNoEditor(selectEl) {
-  if (selectEl.value !== '__nova__') return;
-  const nome = prompt('Nome da nova fase (ex: "Fase 0 — Definições Iniciais"):');
-  if (nome && nome.trim()) {
-    const opt = document.createElement('option');
-    opt.value = nome.trim();
-    opt.textContent = nome.trim();
-    selectEl.insertBefore(opt, selectEl.lastElementChild); // antes de "+ Nova fase..."
-    selectEl.value = nome.trim();
-  } else {
-    selectEl.value = ''; // cancelou — volta pra "Sem fase"
-  }
-}
-
 function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
   _tarefaDetalheAcaoIdx = acaoIdx;
   _tarefaDetalheIdx = tarefaIdx;
@@ -8942,15 +8882,6 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
   const selResp = document.getElementById('tarefa-detalhe-responsavel');
   selResp.innerHTML = '<option value="">—</option>' + USUARIOS_VALIDOS.map(u => `<option value="${u.nome}">${u.nome}</option>`).join('');
 
-  // Popula o dropdown de Fase com as fases que já existem nesta campanha
-  // (pra reaproveitar, sem risco de digitar errado e criar uma fase
-  // duplicada por acidente) + opção de criar uma fase nova na hora.
-  const fasesExistentes = [...new Set((a.tarefas || []).map(t2 => (t2.fase || '').trim()).filter(Boolean))];
-  const selFase = document.getElementById('tarefa-detalhe-fase');
-  selFase.innerHTML = '<option value="">📑 Sem fase</option>' +
-    fasesExistentes.map(f => `<option value="${f.replace(/"/g, '&quot;')}">${f}</option>`).join('') +
-    '<option value="__nova__">+ Nova fase...</option>';
-
   if (tarefaIdx >= 0) {
     const t = a.tarefas[tarefaIdx];
     document.getElementById('tarefa-detalhe-titulo').value = t.tarefa || '';
@@ -8958,7 +8889,6 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
     document.getElementById('tarefa-detalhe-dia').value = t.dia || '';
     document.getElementById('tarefa-detalhe-mes').value = t.mes || a.mes;
     selResp.value = t.responsavel || '';
-    selFase.value = (t.fase && fasesExistentes.includes(t.fase.trim())) ? t.fase.trim() : '';
     document.getElementById('tarefa-detalhe-descricao').value = t.descricao || '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = '';
   } else {
@@ -8967,7 +8897,6 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
     document.getElementById('tarefa-detalhe-dia').value = '';
     document.getElementById('tarefa-detalhe-mes').value = a.mes;
     selResp.value = '';
-    selFase.value = '';
     document.getElementById('tarefa-detalhe-descricao').value = '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = 'none';
   }
@@ -8993,7 +8922,6 @@ function salvarDetalheTarefa() {
     dia: Number(document.getElementById('tarefa-detalhe-dia').value) || null,
     mes: Number(document.getElementById('tarefa-detalhe-mes').value) || a.mes,
     responsavel: document.getElementById('tarefa-detalhe-responsavel').value.trim(),
-    fase: document.getElementById('tarefa-detalhe-fase').value.trim(),
     descricao: document.getElementById('tarefa-detalhe-descricao').value.trim()
   };
   if (!a.tarefas) a.tarefas = [];
