@@ -807,9 +807,14 @@ tbody tr:hover td{background:#faf7f3;}
     <!-- Modal: Detalhe do Cartão (tarefa) — estilo Trello -->
     <div id="modal-detalhe-tarefa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1100;align-items:center;justify-content:center;">
       <div style="background:#fff;border-radius:10px;width:560px;max-width:92vw;max-height:88vh;overflow-y:auto;">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:0.5px solid #e8e2da;">
-          <span id="tarefa-detalhe-campanha" style="background:#f0ece4;color:#7a6550;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;">Campanha</span>
-          <button onclick="document.getElementById('modal-detalhe-tarefa').style.display='none';" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:18px;">✕</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:0.5px solid #e8e2da;gap:10px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0;">
+            <span id="tarefa-detalhe-campanha" style="background:#f0ece4;color:#7a6550;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;white-space:nowrap;">Campanha</span>
+            <select id="tarefa-detalhe-fase" onchange="onMudarFaseNoEditor(this)" style="border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;background:#e8d9c0;color:#7a5a2a;">
+              <option value="">📑 Sem fase</option>
+            </select>
+          </div>
+          <button onclick="document.getElementById('modal-detalhe-tarefa').style.display='none';" style="background:none;border:none;cursor:pointer;color:#9a8c7e;font-size:18px;flex-shrink:0;">✕</button>
         </div>
         <div style="padding:20px;">
           <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:20px;">
@@ -832,12 +837,10 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div style="flex:1;min-width:130px;">
               <label style="font-size:10px;color:#9a8c7e;text-transform:uppercase;font-weight:600;">👤 Responsável</label>
-              <input type="text" id="tarefa-detalhe-responsavel" placeholder="Quem faz?" style="width:100%;box-sizing:border-box;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 10px;font-size:13px;outline:none;margin-top:3px;">
+              <select id="tarefa-detalhe-responsavel" style="width:100%;box-sizing:border-box;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 10px;font-size:13px;outline:none;margin-top:3px;">
+                <option value="">—</option>
+              </select>
             </div>
-          </div>
-          <div>
-            <label style="font-size:10px;color:#9a8c7e;text-transform:uppercase;font-weight:600;">📑 Fase (opcional — ex: "Fase 0 — Definições Iniciais")</label>
-            <input type="text" id="tarefa-detalhe-fase" placeholder="Deixe em branco se não usar fases" style="width:100%;box-sizing:border-box;border:0.5px solid #d4c9bc;border-radius:6px;padding:7px 10px;font-size:13px;outline:none;margin-top:3px;">
           </div>
           <div>
             <label style="font-size:10px;color:#9a8c7e;text-transform:uppercase;font-weight:600;">📝 Descrição</label>
@@ -8768,7 +8771,7 @@ function renderFasesCampanha() {
           nomesLogin.map(n => `<option value="${n}"${t.responsavel === n ? ' selected' : ''}>${n}</option>`)
         ).join('');
         return `<tr style="border-top:1px solid #f0ebe4;">
-          <td style="padding:9px 12px;font-size:13px;color:#2a2520;">${t.tarefa}</td>
+          <td onclick="abrirDetalheTarefaDeKanban(${tIdx})" style="padding:9px 12px;font-size:13px;color:#2a2520;cursor:pointer;" title="Clique para editar">${t.tarefa}</td>
           <td style="padding:6px 12px;">
             <select onchange="mudarCampoTarefa(${tIdx},'responsavel',this.value)" style="background:${corResp};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;color:#4a3a2a;cursor:pointer;outline:none;">${optsResp}</select>
           </td>
@@ -8874,8 +8877,14 @@ function adicionarCartaoComFase() {
   if (fase === null) return;
   abrirDetalheTarefaDeKanban(-1);
   setTimeout(() => {
-    const el = document.getElementById('tarefa-detalhe-fase');
-    if (el) el.value = fase.trim();
+    const sel = document.getElementById('tarefa-detalhe-fase');
+    if (sel && fase.trim()) {
+      const opt = document.createElement('option');
+      opt.value = fase.trim();
+      opt.textContent = fase.trim();
+      sel.insertBefore(opt, sel.lastElementChild); // antes de "+ Nova fase..."
+      sel.value = fase.trim();
+    }
   }, 30);
 }
 
@@ -8904,6 +8913,23 @@ function toggleTarefaCalendario(acaoIdx, tarefaIdx, checked) {
 }
 
 // ---- Modal de detalhe do cartão (estilo Trello) ----
+// Quando escolhe "+ Nova fase..." no dropdown do editor, pergunta o nome e
+// adiciona como opção nova (em vez de deixar digitar livre, evitando fase
+// duplicada por erro de digitação/acento).
+function onMudarFaseNoEditor(selectEl) {
+  if (selectEl.value !== '__nova__') return;
+  const nome = prompt('Nome da nova fase (ex: "Fase 0 — Definições Iniciais"):');
+  if (nome && nome.trim()) {
+    const opt = document.createElement('option');
+    opt.value = nome.trim();
+    opt.textContent = nome.trim();
+    selectEl.insertBefore(opt, selectEl.lastElementChild); // antes de "+ Nova fase..."
+    selectEl.value = nome.trim();
+  } else {
+    selectEl.value = ''; // cancelou — volta pra "Sem fase"
+  }
+}
+
 function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
   _tarefaDetalheAcaoIdx = acaoIdx;
   _tarefaDetalheIdx = tarefaIdx;
@@ -8912,14 +8938,27 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
   document.getElementById('tarefa-detalhe-campanha').textContent = a.titulo;
   delete document.getElementById('tarefa-detalhe-feito').dataset.statusNovo; // limpa resíduo de uma abertura anterior via Kanban
 
+  // Popula o dropdown de Responsável com quem tem login no sistema.
+  const selResp = document.getElementById('tarefa-detalhe-responsavel');
+  selResp.innerHTML = '<option value="">—</option>' + USUARIOS_VALIDOS.map(u => `<option value="${u.nome}">${u.nome}</option>`).join('');
+
+  // Popula o dropdown de Fase com as fases que já existem nesta campanha
+  // (pra reaproveitar, sem risco de digitar errado e criar uma fase
+  // duplicada por acidente) + opção de criar uma fase nova na hora.
+  const fasesExistentes = [...new Set((a.tarefas || []).map(t2 => (t2.fase || '').trim()).filter(Boolean))];
+  const selFase = document.getElementById('tarefa-detalhe-fase');
+  selFase.innerHTML = '<option value="">📑 Sem fase</option>' +
+    fasesExistentes.map(f => `<option value="${f.replace(/"/g, '&quot;')}">${f}</option>`).join('') +
+    '<option value="__nova__">+ Nova fase...</option>';
+
   if (tarefaIdx >= 0) {
     const t = a.tarefas[tarefaIdx];
     document.getElementById('tarefa-detalhe-titulo').value = t.tarefa || '';
     document.getElementById('tarefa-detalhe-feito').checked = !!t.feito;
     document.getElementById('tarefa-detalhe-dia').value = t.dia || '';
     document.getElementById('tarefa-detalhe-mes').value = t.mes || a.mes;
-    document.getElementById('tarefa-detalhe-responsavel').value = t.responsavel || '';
-    document.getElementById('tarefa-detalhe-fase').value = t.fase || '';
+    selResp.value = t.responsavel || '';
+    selFase.value = (t.fase && fasesExistentes.includes(t.fase.trim())) ? t.fase.trim() : '';
     document.getElementById('tarefa-detalhe-descricao').value = t.descricao || '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = '';
   } else {
@@ -8927,8 +8966,8 @@ function abrirDetalheTarefa(acaoIdx, tarefaIdx) {
     document.getElementById('tarefa-detalhe-feito').checked = false;
     document.getElementById('tarefa-detalhe-dia').value = '';
     document.getElementById('tarefa-detalhe-mes').value = a.mes;
-    document.getElementById('tarefa-detalhe-responsavel').value = '';
-    document.getElementById('tarefa-detalhe-fase').value = '';
+    selResp.value = '';
+    selFase.value = '';
     document.getElementById('tarefa-detalhe-descricao').value = '';
     document.getElementById('tarefa-detalhe-excluir-btn').style.display = 'none';
   }
@@ -9290,7 +9329,8 @@ const USUARIOS_VALIDOS=[
   {email:'larissa@bulhoes',senhaHash:'58c929968b93cb3c60c8271d4efd05df579ae338efa1dec585c02f7829645fb3',nome:'Larissa'},
   {email:'gabi@bulhoes',senhaHash:'4b8608f57eb9ce57dd442d474c9a85a3a9f990663707e8bbdfc7f994e98b3aeb',nome:'Gabi'},
   {email:'raffaella@bulhoes',senhaHash:'bd18f73b410cc43bbd060e3f468ec59f9d5d7d07d51b09266695cf520cb14d3e',nome:'Raffaella'},
-  {email:'luiza@bulhoes',senhaHash:'faf28381657e264d0a770bed2adaf4c760b3dee8bf92749cbc209905075b1377',nome:'Luiza'}
+  {email:'luiza@bulhoes',senhaHash:'faf28381657e264d0a770bed2adaf4c760b3dee8bf92749cbc209905075b1377',nome:'Luiza'},
+  {email:'madu@bulhoes',senhaHash:'2456296fdb42f3868f512f062625a9503b79ae1c4d9787d6bda204e885fb58c2',nome:'Madu'}
 ];
 async function sha256Hex(texto){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(texto));
