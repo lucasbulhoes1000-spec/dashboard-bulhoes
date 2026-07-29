@@ -6540,6 +6540,13 @@ function salvarOrcamento(){
     entrada:parseFloat(document.getElementById('orc-entrada').value)||0,
     entradaData:document.getElementById('orc-entrada-data').value,
     entradaPgto:document.getElementById('orc-entrada-pgto').value,
+    // ⚠️ NOVO (29/07/2026, caso "Alinne"): marca que uma pessoa da equipe
+    // já editou/confirmou esse orçamento manualmente por aqui — a partir de
+    // agora, a sincronização automática com o Clinicorp NUNCA mais
+    // sobrescreve pagamento/parcelas/entrada desse orçamento específico,
+    // mesmo que a próxima consulta na API traga um valor diferente (o dado
+    // digitado à mão vale mais que o automático).
+    entradaManual:true,
     obs:document.getElementById('orc-obs').value,
     crcParticip:document.getElementById('orc-crc-particip').value,
     crcNome:document.getElementById('orc-crc-nome').value.trim(),
