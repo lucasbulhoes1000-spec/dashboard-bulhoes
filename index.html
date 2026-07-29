@@ -1675,6 +1675,15 @@ tbody tr:hover td{background:#faf7f3;}
         <input id="orc-fech-valor" type="number" placeholder="0,00" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;box-sizing:border-box;"></div>
     </div>
 
+    <!-- Tipo de paciente — novo lead ou já era nosso paciente antes -->
+    <div style="margin-bottom:11px;">
+      <label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Esse cliente...</label>
+      <select id="orc-tipo-paciente" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
+        <option value="novo">É um lead novo (converteu agora)</option>
+        <option value="antigo">Já era nosso paciente (comprou outro tratamento)</option>
+      </select>
+    </div>
+
     <!-- Possui entrada -->
     <div style="margin-bottom:11px;"><label style="font-size:11px;color:#8a7a6a;display:block;margin-bottom:3px;">Possui entrada?</label>
       <select id="orc-tem-entrada" onchange="orcOnEntradaChange(this.value)" style="width:100%;border:1px solid #e0d9d0;border-radius:6px;padding:7px 9px;font-size:12px;background:#fff;">
@@ -3417,10 +3426,39 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   // Contratos = total de phones únicos com fechamento (Cloudia + manuais)
   contratos=fechadosPhones.size; // atualiza após adicionar aprovados do CRM
+
+  // ⚠️ NOVO (29/07/2026, pedido do usuário): separa quem é conversão de LEAD
+  // NOVO de quem já era nosso paciente e só comprou outro tratamento (não
+  // deveria contar como "conversão" — infla a Taxa de conversão sem
+  // representar um lead virando cliente de verdade). Usa o campo
+  // pacienteAntigo marcado no orçamento (por padrão, se não tiver orçamento
+  // correspondente no período — ex: veio só de evento Ganho do Cloudia sem
+  // orçamento no CRM — trata como novo, já que não tem como saber diferente).
+  let contratosNovos=0, contratosAntigos=0;
+  fechadosPhones.forEach(ph=>{
+    const d=ccDataLookup(ph);
+    let ehAntigo=false, temAprovadoNoPeriodo=false;
+    if(d&&d.orcamentos){
+      const aprovNoPeriodo=d.orcamentos.filter(o=>{
+        if(o.status!=='Aprovado')return false;
+        const dataRef=o.fechData||o.data||'';
+        return dataRef>=_range.since&&dataRef<=_range.until;
+      });
+      if(aprovNoPeriodo.length>0){
+        temAprovadoNoPeriodo=true;
+        ehAntigo=aprovNoPeriodo.every(o=>o.pacienteAntigo);
+      }
+    }
+    if(temAprovadoNoPeriodo){ if(ehAntigo)contratosAntigos++; else contratosNovos++; }
+    else contratosNovos++; // sem orçamento pra checar — assume novo por padrão
+  });
+  window._lastContratosNovos=contratosNovos;
+  window._lastContratosAntigos=contratosAntigos;
+
   const cpc2Final=contratos>0?spend/contratos:0;
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento';
-  document.getElementById('t-conv').textContent=pct(contratos,leadsBase);
+  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento · '+contratosNovos+' novo'+(contratosNovos!==1?'s':'')+' · '+contratosAntigos+' recompra'+(contratosAntigos!==1?'s':'');
+  document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
   window._lastLeadsBase=leadsBase;
   window._lastContratos=contratos;
@@ -6286,6 +6324,7 @@ function openOrcForm(editIdx){
     document.getElementById('orc-entrada').value=o.entrada||'';
     document.getElementById('orc-entrada-data').value=o.entradaData||'';
     document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
+    document.getElementById('orc-tipo-paciente').value=o.pacienteAntigo?'antigo':'novo';
     document.getElementById('orc-crc-particip').value=o.crcParticip||'nao';
     document.getElementById('orc-crc-nome').value=o.crcNome||'';
     document.getElementById('orc-obs').value=o.obs||'';
@@ -6302,6 +6341,16 @@ function openOrcForm(editIdx){
     document.getElementById('orc-entrada').value='';
     document.getElementById('orc-entrada-data').value='';
     document.getElementById('orc-entrada-pgto').value='';
+    // Padrão inteligente: se a pessoa já tem outro orçamento no histórico,
+    // provavelmente já era nosso paciente antes — mas continua editável.
+    // Padrão inteligente: considera "já era paciente" se a pessoa já tem
+    // algum orçamento com sinal real de pagamento (aprovado, com entrada
+    // registrada, ou com valor fechado registrado) — não um orçamento em
+    // aberto que nunca virou venda de verdade.
+    const jaTeveFechamento=d.orcamentos.some(o2=>
+      o2.status==='Aprovado'||Number(o2.entrada||0)>0||Number(o2.fechValor||0)>0
+    );
+    document.getElementById('orc-tipo-paciente').value=jaTeveFechamento?'antigo':'novo';
   }
   document.getElementById('cc-orc-form').style.display='block';
 }
@@ -6569,6 +6618,7 @@ function salvarOrcamento(){
     // mesmo que a próxima consulta na API traga um valor diferente (o dado
     // digitado à mão vale mais que o automático).
     entradaManual:true,
+    pacienteAntigo:document.getElementById('orc-tipo-paciente').value==='antigo',
     obs:document.getElementById('orc-obs').value,
     crcParticip:document.getElementById('orc-crc-particip').value,
     crcNome:document.getElementById('orc-crc-nome').value.trim(),
