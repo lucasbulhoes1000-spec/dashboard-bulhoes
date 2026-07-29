@@ -9474,7 +9474,24 @@ function iniciarApp(){
   setTimeout(populateDynamicSelects, 1500); // garante que _listas já foi carregado
   iniciarChecagemLeadsFacebook();
   iniciarAutoRefreshDados();
+  iniciarAutoReloadPagina();
   atualizarSaudacaoInicio();
+}
+
+// F5 automático de verdade (29/07/2026, pedido do usuário) — diferente do
+// auto-refresh de dados (que só busca dado novo em segundo plano sem
+// recarregar a página), isso recarrega a página INTEIRA a cada 15 minutos,
+// limpando qualquer travamento/acúmulo de memória de uma sessão longa. Se
+// tiver algum modal aberto na hora (a pessoa editando algo), pula esse
+// ciclo pra não perder o que está sendo digitado — tenta de novo no
+// próximo ciclo de 15 min.
+function iniciarAutoReloadPagina(){
+  setInterval(()=>{
+    const modais=document.querySelectorAll('[id^="modal-"]');
+    const algumAberto=Array.from(modais).some(m=>getComputedStyle(m).display!=='none');
+    if(algumAberto)return; // tenta de novo no próximo ciclo
+    location.reload();
+  },15*60*1000);
 }
 
 
