@@ -5076,9 +5076,21 @@ function lupaOport(){
 function lupaVendas(){
   const sorted=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
-  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
-  tableRows.push(['TOTAL','',fmt(total)]);
-  openModal('Vendas',['Nome','Telefone','Valor Fechado'],tableRows,sorted.length);
+  // Soma a entrada de todos os orçamentos Aprovado da pessoa — pra dar pra
+  // conferir de olho, lado a lado com o valor fechado (pedido do usuário,
+  // 29/07/2026, caso "Alinne" e a reativação da busca de entrada).
+  function entradaDaPessoa(ph){
+    const d=ccDataLookup(ph);
+    if(!d||!d.orcamentos)return 0;
+    return d.orcamentos.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.entrada||0),0);
+  }
+  const tableRows=sorted.map(r=>{
+    const entradaTotal=entradaDaPessoa(r.ph);
+    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—'];
+  });
+  const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph),0);
+  tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada)]);
+  openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada'],tableRows,sorted.length);
 }
 
 function lupaEntradas(){
