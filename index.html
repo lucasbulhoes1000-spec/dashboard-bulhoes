@@ -3490,6 +3490,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
 
   window._lastVendaRows=_vendaRows;
+  window._lastVendaRange=_range;
   window._lastOportRows=_oportRows;
   const ticketCRM=contratosComValor>0?totalVendasCRM/contratosComValor:0;
 
@@ -5076,13 +5077,22 @@ function lupaOport(){
 function lupaVendas(){
   const sorted=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
-  // Soma a entrada de todos os orçamentos Aprovado da pessoa — pra dar pra
-  // conferir de olho, lado a lado com o valor fechado (pedido do usuário,
-  // 29/07/2026, caso "Alinne" e a reativação da busca de entrada).
+  const range=window._lastVendaRange;
+  // ⚠️ CORRIGIDO (29/07/2026, caso "Thiago"): antes somava a entrada de
+  // TODOS os orçamentos Aprovado da pessoa, sem olhar a data — alguém com
+  // 2 fechamentos (um em maio, outro nesse mês) tinha as duas entradas
+  // somadas juntas, mesmo o "Valor Fechado" já sendo filtrado só pelo mês
+  // selecionado. Agora usa exatamente o mesmo filtro de data (fechData/data
+  // dentro do período) que já é usado pra calcular o Valor Fechado.
   function entradaDaPessoa(ph){
     const d=ccDataLookup(ph);
     if(!d||!d.orcamentos)return 0;
-    return d.orcamentos.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.entrada||0),0);
+    return d.orcamentos.filter(o=>{
+      if(o.status!=='Aprovado')return false;
+      if(!range)return true; // sem período definido (raro) — mantém comportamento antigo
+      const dataRef=o.fechData||o.data||'';
+      return dataRef>=range.since&&dataRef<=range.until;
+    }).reduce((s,o)=>s+Number(o.entrada||0),0);
   }
   const tableRows=sorted.map(r=>{
     const entradaTotal=entradaDaPessoa(r.ph);
