@@ -5302,16 +5302,38 @@ function renderModalRows(){
     :`<tr><td colspan="${headers.length}" class="modal-empty">Nenhum registro encontrado</td></tr>`;
 }
 
+// Abre o card do cliente direto a partir do CRM (_ccData), sem precisar que
+// a pessoa apareça na lista filtrada da tela (Leads/Clientes) — usada como
+// último recurso em abrirCardPorTelefone, ex: quando alguém fechou fora do
+// período de datas selecionado nos filtros, mas ainda está no total do
+// Dashboard (que usa um período diferente). O card puxa os dados reais
+// (orçamentos, atividades, nome, origem) direto do _ccData de qualquer
+// forma — essa linha "sintética" só serve de âncora mínima.
+function abrirCardClienteDireto(ph, dCC) {
+  const rowSintetica = {
+    phone: ph,
+    name: dCC.nomeAtual || '(sem nome)',
+    stage: dCC.statusAtual || '',
+    origin: dCC.origemAtual || '',
+    value: 0,
+    timestamp: dCC.statusAtualEditedAt || dCC.consultaTimestamp || new Date().toISOString(),
+    created_at: dCC.statusAtualEditedAt || dCC.consultaTimestamp || new Date().toISOString(),
+    type: 'CUSTOMER_STAGE_UPDATED'
+  };
+  clientesData.push(rowSintetica);
+  openClienteCard(clientesData.length - 1);
+}
+
 function abrirCardPorTelefone(phone){
   closeModal();
-  const ph=String(phone||'').replace(/\D/g,'');
+  const ph=normalizePhone(phone);
 
   // Garante que clientesData e leadsData estão populados
   if(!clientesData.length)renderClientesTable();
   if(!leadsData.length)renderLeadsTable();
 
   // Tenta em clientesData (compareceu/ganho)
-  let ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  let ciIdx=clientesData.findIndex(r=>normalizePhone(r.phone)===ph);
   if(ciIdx>=0){
     const navEl=document.querySelector('[onclick*=\'clientes\']');
     if(currentPage!=='clientes'&&navEl)switchPage('clientes',navEl);
@@ -5320,7 +5342,7 @@ function abrirCardPorTelefone(phone){
   }
 
   // Tenta em leadsData
-  let liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  let liIdx=leadsData.findIndex(r=>normalizePhone(r.phone)===ph);
   if(liIdx>=0){
     const navEl=document.querySelector('[onclick*=\'leads\']');
     if(currentPage!=='leads'&&navEl)switchPage('leads',navEl);
@@ -5329,24 +5351,41 @@ function abrirCardPorTelefone(phone){
   }
 
   // Fallback: busca em allCloudiaRows e popula as listas
-  const rowInCloudia=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+  const rowInCloudia=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
   if(rowInCloudia){
     const isCliente=isComp(rowInCloudia.stage)||isFechou(rowInCloudia.stage);
     if(isCliente){
       const navEl=document.querySelector('[onclick*=\'clientes\']');
       if(navEl)switchPage('clientes',navEl);
       setTimeout(()=>{
-        ciIdx=clientesData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        ciIdx=clientesData.findIndex(r=>normalizePhone(r.phone)===ph);
         if(ciIdx>=0)openClienteCard(ciIdx);
       },500);
     } else {
       const navEl=document.querySelector('[onclick*=\'leads\']');
       if(navEl)switchPage('leads',navEl);
       setTimeout(()=>{
-        liIdx=leadsData.findIndex(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+        liIdx=leadsData.findIndex(r=>normalizePhone(r.phone)===ph);
         if(liIdx>=0)openLeadCard(liIdx);
       },500);
     }
+    return;
+  }
+
+  // ⚠️ NOVO (29/07/2026): último recurso — busca direto no _ccData (o CRM
+  // de verdade), que pode ter o cliente mesmo quando ele não apareceu em
+  // clientesData/leadsData/allCloudiaRows por causa do filtro de data ativo
+  // na tela (ex: pessoa fechou fora do período selecionado nos filtros de
+  // Leads/Clientes, mas ainda assim entrou no total de "Vendas" do
+  // Dashboard, que usa um período diferente).
+  const dCC=ccDataLookup(ph);
+  if(dCC){
+    const navEl=document.querySelector('[onclick*=\'clientes\']');
+    if(navEl)switchPage('clientes',navEl);
+    showToast('success','Cliente encontrado','Abrindo o card de '+(dCC.nomeAtual||'cliente')+'...');
+    setTimeout(()=>{
+      abrirCardClienteDireto(ph,dCC);
+    },400);
     return;
   }
 
