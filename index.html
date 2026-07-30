@@ -6695,10 +6695,18 @@ function refreshOrcamentos(d){
     ?'<div style="text-align:center;color:#8a7a6a;font-size:13px;padding:20px;">Nenhum orçamento registrado</div>'
     :orcs.map((o,i)=>{
       var sc=o.status==='Aprovado'?'#5a8a6a':o.status==='Reprovado'?'#b5856a':'#A18B6C';
+      // Selo visível de novo/recompra direto no card — antes só aparecia
+      // clicando em "Editar", o que ninguém via de cara (pedido do
+      // usuário, 30/07/2026).
+      var seloTipoPaciente=o.status==='Aprovado'
+        ?(o.pacienteAntigo
+          ?'<span style="background:#A18B6C22;color:#7a5a2a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:6px;">🔄 Recompra</span>'
+          :'<span style="background:#5a8a9a22;color:#3a6a7a;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:6px;">🆕 Novo</span>')
+        :'';
       return`<div style="background:#fff;border:1px solid #e0d9d0;border-radius:10px;padding:14px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
           <div style="font-size:13px;font-weight:700;color:#2a2520;">${o.tratamento||'Sem tratamento'}</div>
-          <span style="background:${sc}22;color:${sc};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${o.status||'Em aberto'}</span>
+          <div style="flex-shrink:0;white-space:nowrap;"><span style="background:${sc}22;color:${sc};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;">${o.status||'Em aberto'}</span>${seloTipoPaciente}</div>
         </div>
         ${o.avaliador?`<div style="font-size:12px;color:#8a7a6a;">Avaliador: ${o.avaliador}</div>`:''}
         ${o.data?`<div style="font-size:12px;color:#8a7a6a;">Orçado em: ${new Date(o.data+'T12:00').toLocaleDateString('pt-BR')}</div>`:''}
