@@ -5299,13 +5299,20 @@ function getEffectiveAgendInfo(phone,fallbackEvt){
     }
     // se !manualTs && cloudiaTs → mantém o stage do Cloudia (mais confiável que edição manual sem data)
   }
-  // Data da consulta: prioriza a edição manual no card (consultaTimestamp). Na ausência dela,
-  // se o paciente já tem Compareceu/Ganho registrado, usa o timestamp REAL desse evento mais
-  // recente (stageTs, vindo de stageUpdates) — não o timestamp do evento Agendou original
-  // (fallbackEvt), que é o que causava "Pendente" mesmo para quem já tinha comparecido.
+  // Data da consulta: prioriza a edição manual no card (consultaTimestamp). Em
+  // seguida, ccD.timestamp — campo que guarda evidência CONCRETA da data real
+  // do evento (ex: importação via CSV/orçamento), quando existe. Só DEPOIS
+  // disso usa o timestamp de um evento "Compareceu/Ganho" vindo direto da
+  // Cloudia (stageTs) — porque esse reflete quando uma TAG foi mudada lá, não
+  // necessariamente quando o atendimento aconteceu de verdade. ⚠️ CORRIGIDO
+  // (10/08/2026, caso "Catiana"): antes, stageTs vencia sobre ccD.timestamp —
+  // uma cliente com comparecimento real registrado em maio (ccD.timestamp)
+  // apareceu no filtro de agosto porque alguém marcou ela como "Ganho" na
+  // Cloudia HOJE, e essa data administrativa (não a do atendimento real)
+  // virou a data de ordenação/filtro dela.
   const stageFinal=(stage||'').toLowerCase();
   const usarStageTsComoConsulta=stageTs&&(stageFinal.includes('compareceu')||stageFinal.includes('ganho'));
-  const consultaTs=(ccD&&ccD.consultaTimestamp)||(usarStageTsComoConsulta?stageTs:'')||(fallbackEvt&&fallbackEvt.timestamp)||'';
+  const consultaTs=(ccD&&ccD.consultaTimestamp)||(ccD&&ccD.timestamp)||(usarStageTsComoConsulta?stageTs:'')||(fallbackEvt&&fallbackEvt.timestamp)||'';
   return{stage:stage,consultaTs:consultaTs};
 }
 function getStatusAgend(stage){
@@ -9983,11 +9990,21 @@ function sincronizarNomesCRM(cloudiaRows){
       // Só sincroniza se não foi editado manualmente (editadoManualmente=true protege)
       if(!data.editadoManualmente){
         const nomeAtual=data.nomeAtual||'';
-        if(nomeAtual&&nomeAtual!==nomeNovo){
+        // ⚠️ CORRIGIDO (10/08/2026): antes, essa sincronização (Cloudia) e a
+        // do Clinicorp (que sempre usa o nome OFICIAL completo) ficavam
+        // brigando — o Clinicorp corrigia pro nome completo, e no próximo
+        // refresh (2 em 2 min) essa função sobrescrevia de volta com o nome
+        // curto/apelido salvo no WhatsApp, sem parar. Agora só deixa a
+        // Cloudia atualizar o nome se o novo for igual ou MAIS completo que
+        // o atual (nunca encurta um nome que já está mais completo — sinal
+        // de que já veio corrigido pelo Clinicorp).
+        if(nomeAtual&&nomeAtual!==nomeNovo&&nomeNovo.length>=nomeAtual.length){
           console.log('[CRM SYNC] Nome Cloudia atualizado:',nomeAtual,'→',nomeNovo,'(',ph,')');
+          data.nomeAtual=nomeNovo;
           alterados++;
+        } else if(!nomeAtual){
+          data.nomeAtual=nomeNovo;
         }
-        data.nomeAtual=nomeNovo;
       }
     }
   });
