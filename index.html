@@ -9768,8 +9768,22 @@ function importarFechamentos(){
   // Cruza _ccData (orçamentos Aprovados) com clientesData (stage Ganho/Compareceu)
   const mesFil=(document.getElementById('com-mes-sel')||{}).value||'';
   let importados=0,ignorados=0,atualizados=0;
-  // Monta set de chaves já lançadas (data+paciente) para evitar duplicata
-  const jaLancados=new Set(_comissoes.map(c=>(c.data||'')+'|'+(c.paciente||'').toLowerCase()));
+  // ⚠️ CORRIGIDO (10/08/2026): a chave de "já foi lançado?" usava
+  // nome+data — mas os nomes MUDAM com o tempo (o "[CRM SYNC]" corrige/
+  // encurta nomes vindos da Cloudia periodicamente, ex: "Fernanda Cesario
+  // da Rocha" → "Fernanda Rocha"). Quando isso acontecia DEPOIS de um
+  // lançamento já existir em Comissões, o sistema parava de reconhecer que
+  // já tinha sido importado (o nome não batia mais) — e a entrada
+  // capturada depois nunca conseguia ser preenchida nesse lançamento
+  // antigo, ficando em branco pra sempre. Agora usa TELEFONE (que não
+  // muda) como chave principal — nome só é usado como plano B pra
+  // lançamentos antigos que ainda não têm telefone salvo.
+  const jaLancadosPorTel=new Map(); // 'telefone|data' -> objeto da comissão
+  const jaLancadosPorNome=new Map(); // 'nome|data' -> objeto da comissão (só pra legado sem telefone)
+  _comissoes.forEach(c=>{
+    if(c.telefone){jaLancadosPorTel.set(c.telefone+'|'+(c.data||''),c);}
+    else{jaLancadosPorNome.set((c.paciente||'').toLowerCase()+'|'+(c.data||''),c);}
+  });
 
   // Percorre todos os clientes no _ccData
   Object.entries(_ccData).forEach(([ph,d])=>{
@@ -9783,28 +9797,29 @@ function importarFechamentos(){
       const dataOrc=o.fechData||o.data||o.entradaData||'';
       // Filtra pelo mês selecionado
       if(mesFil&&dataOrc&&dataOrc.substring(0,7)!==mesFil)return;
-      const chave=dataOrc+'|'+nomePaciente.toLowerCase();
       const vt=Number(o.fechValor||o.valor)||0;
       const ent=Number(o.entrada)||0;
       const crcParticipou=(o.crcParticip==='sim');
-      if(jaLancados.has(chave)){
-        // ⚠️ CORRIGIDO (29/07/2026): antes, se já existia um lançamento pra
-        // esse fechamento, o sistema simplesmente ignorava — mesmo que o
-        // orçamento tivesse sido atualizado depois (ex: entrada capturada
-        // pela sincronização automática com o Clinicorp, que não existia
-        // ainda quando essa comissão foi importada pela primeira vez). Isso
-        // fazia a Entrada ficar em branco pra sempre em Comissões, mesmo já
-        // estando certa no orçamento. Agora, só PREENCHE o que estava
-        // faltando — nunca sobrescreve um valor que já existia (pode ter
-        // sido ajustado manualmente).
-        const existente=_comissoes.find(c=>(c.data||'')+'|'+(c.paciente||'').toLowerCase()===chave);
-        if(existente&&(!existente.entrada||existente.entrada===0)&&ent>0){
+
+      // Procura primeiro por telefone (confiável), depois por nome (legado)
+      let existente=jaLancadosPorTel.get(ph+'|'+dataOrc);
+      if(!existente)existente=jaLancadosPorNome.get(nomePaciente.toLowerCase()+'|'+dataOrc);
+
+      if(existente){
+        // ⚠️ Preenche o que estava faltando — nunca sobrescreve um valor
+        // que já existia (pode ter sido ajustado manualmente). Também
+        // "cura" o lançamento antigo, gravando o telefone nele agora, pra
+        // nunca mais depender do nome (que pode mudar de novo no futuro).
+        let mudou=false;
+        if(!existente.telefone){existente.telefone=ph;mudou=true;}
+        if((!existente.entrada||existente.entrada===0)&&ent>0){
           existente.entrada=ent;
           const rNovo=calcComissaoRegras(vt,ent);
           existente.comAval=rNovo.comAval;
           if(crcParticipou)existente.comCrc=rNovo.comCrc;
-          atualizados++;
+          mudou=true;
         }
+        if(mudou)atualizados++;
         ignorados++;
         return;
       }
@@ -9813,6 +9828,7 @@ function importarFechamentos(){
       const novo={
         data:dataOrc,
         paciente:nomePaciente,
+        telefone:ph,
         avaliador:o.avaliador||'',
         crc:crcParticipou?(o.crcNome||''):'',
         valorTrat:vt,
@@ -9825,7 +9841,7 @@ function importarFechamentos(){
         criadoEm:new Date().toISOString()
       };
       _comissoes.unshift(novo);
-      jaLancados.add(chave);
+      jaLancadosPorTel.set(ph+'|'+dataOrc,novo); // evita duplicata se aparecer de novo no mesmo loop
       importados++;
     });
   });
