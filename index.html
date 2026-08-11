@@ -5777,7 +5777,13 @@ function montarPreviewOrcamentosHtml(p){
     let itens='';
     p.candidatosAtualizados.forEach(c=>{
       const d=_ccData[c.tel];
-      const existente=d&&d.orcamentos&&d.orcamentos.find(o=>o._clinicorpId===c.clinicorpId);
+      // ⚠️ CORRIGIDO (11/08/2026, mesmo bug do Marcelo): sem o fallback por
+      // _treatmentId (+ data, pra não confundir com outro orçamento que
+      // reaproveitou o mesmo _treatmentId), essa busca falhava sempre que o
+      // "id" do Clinicorp vinha diferente do que já estava salvo — o preview
+      // mostrava "—" no "antes" pra tudo, mesmo quando existia um valor
+      // salvo de verdade.
+      const existente=d&&d.orcamentos&&(d.orcamentos.find(o=>o._clinicorpId===c.clinicorpId)||d.orcamentos.find(o=>o._treatmentId&&o._treatmentId===c.treatmentId&&o.data===c.data));
       // ⚠️ CORRIGIDO: antes usava c.nomeCompleto (o nome NOVO) tanto no
       // cabeçalho quanto na linha de mudança — os dois ficavam iguais e
       // parecia que "nada mudou" mesmo quando o nome realmente mudou. Agora
@@ -5859,7 +5865,7 @@ async function aplicarImportacaoOrcamentos(){
       });
       (p.candidatosAtualizados||[]).filter(c=>c.status==='Aprovado').forEach(c=>{
         const entrada=_ccData[c.tel];
-        const orcamentoAtualizado=entrada&&entrada.orcamentos&&entrada.orcamentos.find(o=>o._clinicorpId===c.clinicorpId);
+        const orcamentoAtualizado=entrada&&entrada.orcamentos&&(entrada.orcamentos.find(o=>o._clinicorpId===c.clinicorpId)||entrada.orcamentos.find(o=>o._treatmentId&&o._treatmentId===c.treatmentId&&o.data===c.data));
         if(orcamentoAtualizado)garantirNoFluxo(c.tel,entrada.nomeAtual,orcamentoAtualizado.tratamento,orcamentoAtualizado.fechData||orcamentoAtualizado.data);
       });
 
