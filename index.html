@@ -3439,14 +3439,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // NOVO de quem já era nosso paciente e só comprou outro tratamento (não
   // deveria contar como "conversão" — infla a Taxa de conversão sem
   // representar um lead virando cliente de verdade). Usa o campo
-  // pacienteAntigo marcado no orçamento (por padrão, se não tiver orçamento
-  // correspondente no período — ex: veio só de evento Ganho do Cloudia sem
-  // orçamento no CRM — trata como novo, já que não tem como saber diferente).
+  // pacienteAntigo marcado no orçamento.
+  // ⚠️ CORRIGIDO (12/08/2026, caso "mês inteiro com R$0 de recompra"): antes,
+  // se não achasse um orçamento Aprovado com data batendo EXATAMENTE no
+  // período, desistia e assumia "novo" na hora — mesmo que a pessoa já
+  // tivesse outro orçamento marcado como recompra (ex: data de fechamento
+  // não bateu certinho, ou veio só de um evento Ganho solto do Cloudia).
+  // Agora, antes de desistir, checa se existe QUALQUER orçamento Aprovado
+  // dela marcado como recompra — só cai no "assume novo" de verdade quando
+  // não sobra nenhuma pista.
   let contratosNovos=0, contratosAntigos=0;
   fechadosPhones.forEach(ph=>{
     const d=ccDataLookup(ph);
     let ehAntigo=false, temAprovadoNoPeriodo=false;
+    let temHistoricoRecompra=false;
     if(d&&d.orcamentos){
+      temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
       const aprovNoPeriodo=d.orcamentos.filter(o=>{
         if(o.status!=='Aprovado')return false;
         const dataRef=o.fechData||o.data||'';
@@ -3458,7 +3466,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       }
     }
     if(temAprovadoNoPeriodo){ if(ehAntigo)contratosAntigos++; else contratosNovos++; }
-    else contratosNovos++; // sem orçamento pra checar — assume novo por padrão
+    else if(temHistoricoRecompra){ contratosAntigos++; } // não achou orçamento com data exata no período, mas ela TEM histórico de recompra confirmado
+    else contratosNovos++; // sem orçamento nem histórico pra checar — assume novo por padrão
   });
   window._lastContratosNovos=contratosNovos;
   window._lastContratosAntigos=contratosAntigos;
@@ -3501,8 +3510,16 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
         // mesmo assim o cliente está em fechadosPhones (ex: via evento Ganho do Cloudia).
         // Usa o valor do evento Ganho real como fallback, para não desaparecer silenciosamente.
+        // ⚠️ CORRIGIDO (12/08/2026): antes esse valor sempre caía em "novo",
+        // mesmo quando a pessoa já tinha outro orçamento marcado como
+        // recompra — checa isso antes de assumir "novo" às cegas.
         const vFallback=getValorGanhoReal(ph,_range)||parseFloat((row&&row.value)||0);
-        if(vFallback>0){totalVendasCRM+=vFallback;valorVendasNovas+=vFallback;contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback});}
+        if(vFallback>0){
+          totalVendasCRM+=vFallback;
+          if(d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo))valorVendasRecompra+=vFallback;
+          else valorVendasNovas+=vFallback;
+          contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback});
+        }
       }
     } else if(row){
       const v=parseFloat(row.value||0)||getValorGanhoReal(ph,_range);
