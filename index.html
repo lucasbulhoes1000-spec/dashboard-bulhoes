@@ -2225,7 +2225,15 @@ async function reloadCurrent(){
     // Busca a planilha do Cloudia de novo e reconstrói o índice de estágios
     // ANTES de re-renderizar — sem isso, a página re-renderiza com o mesmo
     // dado velho que já estava em memória.
-    const rows=await fetchCloudia();
+    // ⚠️ CORRIGIDO (11/08/2026, caso "Ingrid"): antes só buscava a planilha
+    // do Cloudia (fetchCloudia) — nunca rebuscava o _ccData (o CRM de
+    // verdade, no Supabase, onde moram orçamentos, clientes criados direto
+    // do Clinicorp e qualquer edição manual). Um cliente que existe só no
+    // _ccData (sem nenhuma linha na planilha do Cloudia) nunca aparecia
+    // atualizado ao clicar "Atualizar" — só um F5 completo da página
+    // resolvia, por acaso (o carregamento inicial da página busca os dois).
+    // Agora busca os dois juntos, sempre.
+    const [rows]=await Promise.all([fetchCloudia(), carregarCRMRemoto()]);
     rebuildStageIndex(rows);
     if(currentPage==='leads')renderLeadsTable();
     else if(currentPage==='clientes')renderClientesTable();
