@@ -2728,6 +2728,13 @@ function renderFunilResumido(){
   reconciliarAgendCompClinicorpPorAnuncio();
   const contratos=window._lastContratos||0;
   const valorFechado=window._lastValorFechado||0;
+  // ⚠️ NOVO (12/08/2026, pedido do usuário): "Fechamentos" no funil e o card
+  // "Valor fechado" agora mostram só CONTRATOS/VALOR de leads NOVOS — sem
+  // recompra da base. O resto (Ticket Médio, CPL, "Contratos fechados" mais
+  // embaixo com o detalhamento novo/recompra) continua usando o total, sem
+  // mudança — só esses dois pontos específicos foram alterados.
+  const contratosNovosParaFunil=window._lastContratosNovos!=null?window._lastContratosNovos:contratos;
+  const valorFechadoNovosParaFunil=window._lastValorVendasNovas!=null?window._lastValorVendasNovas:valorFechado;
 
   // Rótulo do período visualizado (ex.: "De 01/07/2026 até 15/07/2026")
   const elPeriodo=document.getElementById('t-periodo-label');
@@ -2747,7 +2754,7 @@ function renderFunilResumido(){
   const totalEntradas=window._lastTotalEntradas||0;
   const ticketCRM=window._lastTicketCRM||0;
   if(elOport)elOport.textContent=totalOport>0?fmt(totalOport):'—';
-  if(elValor)elValor.textContent=valorFechado>0?fmt(valorFechado):'—';
+  if(elValor)elValor.textContent=valorFechadoNovosParaFunil>0?fmt(valorFechadoNovosParaFunil):'—';
   if(elEntradas)elEntradas.textContent=totalEntradas>0?fmt(totalEntradas):'—';
   if(elTicket)elTicket.textContent=ticketCRM>0?fmt(ticketCRM):'—';
 
@@ -2758,7 +2765,7 @@ function renderFunilResumido(){
     {label:'Leads Criados',icon:'👥',valor:leads,pctTxt:'100%',cor:'#2a4a45'},
     {label:'Agendados',icon:'🏷️',valor:agendados,pctTxt:agendados!=null?fmtPct(agendados,leads):'—',cor:'#8a8a8a'},
     {label:'Comparecimentos',icon:'👤',valor:comparecimentos,pctTxt:(comparecimentos!=null&&agendados)?fmtPct(comparecimentos,agendados):'—',cor:'#1a8a7a'},
-    {label:'Fechamentos',icon:'🏷️',valor:contratos,pctTxt:comparecimentos?fmtPct(contratos,comparecimentos):'—',cor:'#3aaa5a'}
+    {label:'Fechamentos',icon:'🏷️',valor:contratosNovosParaFunil,pctTxt:comparecimentos?fmtPct(contratosNovosParaFunil,comparecimentos):'—',cor:'#3aaa5a'}
   ];
 
   el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
