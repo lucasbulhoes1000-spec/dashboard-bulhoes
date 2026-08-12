@@ -448,10 +448,10 @@ tbody tr:hover td{background:#faf7f3;}
             <div class="two-col" style="align-items:stretch;">
               <div id="t-funil-resumido"></div>
               <div class="row r2" style="gap:12px;">
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor total de oportunidades</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-oport">—</div></div>
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor fechado</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-valor">—</div></div>
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Total de Entradas</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-entradas">—</div></div>
-                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Ticket Médio</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-ticket">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor total de oportunidade de novos pacientes</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-oport">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Valor fechado de novos pacientes</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-valor">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Total de entrada de novos pacientes</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value" id="t-funil-card-entradas">—</div></div>
+                <div class="mc-ind"><div class="mc-ind-top"><span class="mc-ind-label">Ticket médio de novos pacientes</span><span class="mc-ind-icon">?</span></div><div class="mc-ind-value green" id="t-funil-card-ticket">—</div></div>
               </div>
             </div>
             <div id="bloco-detalhes-trafego" style="display:none;">
@@ -481,10 +481,10 @@ tbody tr:hover td{background:#faf7f3;}
             </div>
             <div class="slabel">Vendas</div>
             <div class="row r4">
-              <div class="mc"><div class="ml">Valor total de oportunidades</div><div class="mv" id="t-oport">— <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button></div></div>
+              <div class="mc"><div class="ml">Valor total de oportunidades</div><div class="mv" id="t-oport">— <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-oport-sub"></div></div>
               <div class="mc"><div class="ml">Total de vendas</div><div class="mv green" id="t-vendas">— <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-vendas-sub"></div></div>
-              <div class="mc"><div class="ml">Total de entradas <button onclick="abrirEdicaoManual('entrada')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-entradas" style="color:#4a7a9a;">—</div></div>
-              <div class="mc"><div class="ml">Ticket médio</div><div class="mv green" id="t-ticket">—</div></div>
+              <div class="mc"><div class="ml">Total de entradas <button onclick="abrirEdicaoManual('entrada')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-entradas" style="color:#4a7a9a;">—</div><div class="ms" id="t-entradas-sub"></div></div>
+              <div class="mc"><div class="ml">Ticket médio</div><div class="mv green" id="t-ticket">—</div><div class="ms" id="t-ticket-sub"></div></div>
             </div>
             </div>
             <div style="margin-top:12px;">
@@ -2672,6 +2672,23 @@ function atualizarCardsAgendaClinicorp(dados){
 // o funil de cima. Precisa do window._lastAdMap já montado (por renderTrafego)
 // e do Clinicorp já carregado — se qualquer um faltar, não faz nada agora e
 // tenta de novo no próximo render (chamada em conjunto com atualizarCardsAgendaClinicorp).
+// Monta um par de "pills" coloridos mostrando novo vs recompra, com valor e
+// %, reaproveitado em todos os cards detalhados (pedido do usuário,
+// 12/08/2026 — "deixa isso bem estético"). formatter recebe fmt (dinheiro)
+// ou um formatador simples de número inteiro (contagem de contratos).
+function splitNovoRecompraHTML(vNovo,vRecompra,formatter){
+  const total=vNovo+vRecompra;
+  if(total<=0)return '';
+  const f=formatter||fmt;
+  const pctNovo=Math.round(vNovo/total*100);
+  const pctRecompra=100-pctNovo;
+  return `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
+    <span style="background:#5a8a9a14;color:#3a6a7a;border:1px solid #5a8a9a3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🆕 ${f(vNovo)}<span style="opacity:.65;font-weight:500;">(${pctNovo}%)</span></span>
+    <span style="background:#A18B6C14;color:#7a5a2a;border:1px solid #A18B6C3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🔄 ${f(vRecompra)}<span style="opacity:.65;font-weight:500;">(${pctRecompra}%)</span></span>
+  </div>`;
+}
+function fmtInt(n){return parseInt(n).toLocaleString('pt-BR');}
+
 function reconciliarAgendCompClinicorpPorAnuncio(){
   const adMap=window._lastAdMap;
   const dados=getAgendaClinicorpFiltrada();
@@ -2753,10 +2770,16 @@ function renderFunilResumido(){
   const totalOport=window._lastTotalOport||0;
   const totalEntradas=window._lastTotalEntradas||0;
   const ticketCRM=window._lastTicketCRM||0;
-  if(elOport)elOport.textContent=totalOport>0?fmt(totalOport):'—';
+  // ⚠️ NOVO (12/08/2026, pedido do usuário): os 4 cards do topo mostram só
+  // os valores de leads NOVOS (não a base/recompra) — os cards detalhados
+  // mais embaixo (Vendas/Captação) continuam mostrando os dois lados.
+  const totalOportNovosParaFunil=window._lastTotalOportNovas!=null?window._lastTotalOportNovas:totalOport;
+  const totalEntradasNovosParaFunil=window._lastTotalEntradasNovas!=null?window._lastTotalEntradasNovas:totalEntradas;
+  const ticketNovosParaFunil=window._lastTicketCRMNovos!=null?window._lastTicketCRMNovos:ticketCRM;
+  if(elOport)elOport.textContent=totalOportNovosParaFunil>0?fmt(totalOportNovosParaFunil):'—';
   if(elValor)elValor.textContent=valorFechadoNovosParaFunil>0?fmt(valorFechadoNovosParaFunil):'—';
-  if(elEntradas)elEntradas.textContent=totalEntradas>0?fmt(totalEntradas):'—';
-  if(elTicket)elTicket.textContent=ticketCRM>0?fmt(ticketCRM):'—';
+  if(elEntradas)elEntradas.textContent=totalEntradasNovosParaFunil>0?fmt(totalEntradasNovosParaFunil):'—';
+  if(elTicket)elTicket.textContent=ticketNovosParaFunil>0?fmt(ticketNovosParaFunil):'—';
 
   const fmtPct=(v,base)=>(base>0?((v/base)*100).toFixed(2):'0,00')+'%';
   const degraus=[100,82,64,46];
@@ -3348,7 +3371,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const _range=getRange('trafego');
   let totalOport=0;
   let totalVendasCRM=0;
-  let contratosComValor=0;
+  let contratosComValor=0, contratosComValorNovos=0;
   const _vendaRows=[]; // para lupa
   const _oportRows=[]; // para lupa
 
@@ -3481,7 +3504,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   const cpc2Final=contratos>0?spend/contratos:0;
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-contratos-sub').textContent=pct(contratos,comp)+' de fechamento · '+contratosNovos+' novo'+(contratosNovos!==1?'s':'')+' · '+contratosAntigos+' recompra'+(contratosAntigos!==1?'s':'');
+  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt);
   document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
   window._lastLeadsBase=leadsBase;
@@ -3512,7 +3535,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         if(o.pacienteAntigo)valorVendasRecompra+=v; else valorVendasNovas+=v;
       });
       if(orcsAprov.length>0){
-        contratosComValor++;_vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)});
+        contratosComValor++;
+        if(!orcsAprov.every(o=>o.pacienteAntigo))contratosComValorNovos++;
+        _vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0),classe:orcsAprov.every(o=>o.pacienteAntigo)?'Recompra':'Novo'});
       }else{
         // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
         // mesmo assim o cliente está em fechadosPhones (ex: via evento Ganho do Cloudia).
@@ -3523,29 +3548,35 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         const vFallback=getValorGanhoReal(ph,_range)||parseFloat((row&&row.value)||0);
         if(vFallback>0){
           totalVendasCRM+=vFallback;
-          if(d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo))valorVendasRecompra+=vFallback;
-          else valorVendasNovas+=vFallback;
-          contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback});
+          const ehRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+          if(ehRecompra)valorVendasRecompra+=vFallback;
+          else{valorVendasNovas+=vFallback;contratosComValorNovos++;}
+          contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback,classe:ehRecompra?'Recompra':'Novo'});
         }
       }
     } else if(row){
       const v=parseFloat(row.value||0)||getValorGanhoReal(ph,_range);
-      if(v>0){totalVendasCRM+=v;valorVendasNovas+=v;contratosComValor++;_vendaRows.push({name:nome,ph,value:v});}
+      if(v>0){totalVendasCRM+=v;valorVendasNovas+=v;contratosComValor++;contratosComValorNovos++;_vendaRows.push({name:nome,ph,value:v,classe:'Novo'});}
     }
   });
 
   // Oportunidades — todos os orçamentos de quem compareceu
+  // ⚠️ NOVO (12/08/2026, pedido do usuário): separa também por novo/recompra,
+  // mesmo critério (classificarNovoOuRecompra) já usado nas outras seções.
+  let oportNovas=0, oportRecompra=0;
   compPhonesSet.forEach(ph=>{
     const d=ccDataLookup(ph);
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
+    const classe=classificarNovoOuRecompra(ph,_range);
     if(d&&d.orcamentos&&d.orcamentos.length>0){
       const tot=d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0);
       totalOport+=tot;
-      if(tot>0)_oportRows.push({name:nome,ph,value:tot});
+      if(classe==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
+      if(tot>0)_oportRows.push({name:nome,ph,value:tot,classe});
     } else if(row){
       const v=parseFloat(row.value||0);
-      if(v>0){totalOport+=v;_oportRows.push({name:nome,ph,value:v});}
+      if(v>0){totalOport+=v;if(classe==='Recompra')oportRecompra+=v;else oportNovas+=v;_oportRows.push({name:nome,ph,value:v,classe});}
     }
   });
   // Oportunidades extras — orçamentos criados no período mas sem comparecimento em jan (somenteOrcamento)
@@ -3566,32 +3597,44 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const orcs=(d.orcamentos||[]).filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
     if(!orcs.length)return;
     const tot=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
-    if(tot>0){totalOport+=tot;_oportRows.push({name:d.nomeAtual||'—',ph,value:tot});}
+    if(tot>0){
+      totalOport+=tot;
+      if(classificarNovoOuRecompra(ph,_range)==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
+      _oportRows.push({name:d.nomeAtual||'—',ph,value:tot});
+    }
   });
 
   window._lastVendaRows=_vendaRows;
   window._lastVendaRange=_range;
   window._lastOportRows=_oportRows;
+  const contratosComValorRecompra=contratosComValor-contratosComValorNovos;
   const ticketCRM=contratosComValor>0?totalVendasCRM/contratosComValor:0;
+  const ticketNovos=contratosComValorNovos>0?valorVendasNovas/contratosComValorNovos:0;
+  const ticketRecompra=contratosComValorRecompra>0?valorVendasRecompra/contratosComValorRecompra:0;
 
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
+  document.getElementById('t-oport-sub').innerHTML=splitNovoRecompraHTML(oportNovas,oportRecompra);
+  window._lastTotalOportNovas=oportNovas;
   const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
   const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
   document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-vendas-sub').textContent=totalVendasCRM>0?(fmt(valorVendasNovas)+' novos · '+fmt(valorVendasRecompra)+' recompra'):'';
+  document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra);
   window._lastValorVendasNovas=valorVendasNovas;
   window._lastValorVendasRecompra=valorVendasRecompra;
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
+  document.getElementById('t-ticket-sub').innerHTML=splitNovoRecompraHTML(ticketNovos,ticketRecompra);
   window._lastValorFechado=totalVendasCRM;
   window._lastTotalOport=totalOport;
   window._lastTicketCRM=ticketCRM;
+  window._lastTicketCRMNovos=ticketNovos;
 
   // Entradas — manual com senha
   const _entradaManual=getManualOverride('entrada');
   const entradaTag=_entradaManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
-  let totalEntradas=0;
+  let totalEntradas=0, entradasNovas=0, entradasRecompra=0;
   if(_entradaManual!=null){
     totalEntradas=_entradaManual;
+    entradasNovas=_entradaManual; // valor manual não tem como separar por novo/recompra — conta tudo como "novo" pra não sumir do total
   } else {
     const _entradaRows=[];
     Object.entries(_ccData||{}).forEach(([ph,d])=>(d.orcamentos||[]).filter(o=>{
@@ -3618,9 +3661,10 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       const entVal=Number(o.entrada||0);
       if(entVal>0){
         totalEntradas+=entVal;
+        if(o.pacienteAntigo)entradasRecompra+=entVal;else entradasNovas+=entVal;
         const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
         const nome=(d.nomeAtual)||(row&&row.name)||'—';
-        _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||''});
+        _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||'',classe:o.pacienteAntigo?'Recompra':'Novo'});
       }
     }));
     window._lastEntradaRows=_entradaRows;
@@ -3628,7 +3672,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
   document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
+  document.getElementById('t-entradas-sub').innerHTML=splitNovoRecompraHTML(entradasNovas,entradasRecompra);
   window._lastTotalEntradas=totalEntradas;
+  window._lastTotalEntradasNovas=entradasNovas;
   renderFunilResumido();
 
   // Funil visual — formato triângulo (trapézios decrescentes)
