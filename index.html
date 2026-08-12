@@ -2676,18 +2676,41 @@ function atualizarCardsAgendaClinicorp(dados){
 // %, reaproveitado em todos os cards detalhados (pedido do usuário,
 // 12/08/2026 — "deixa isso bem estético"). formatter recebe fmt (dinheiro)
 // ou um formatador simples de número inteiro (contagem de contratos).
-function splitNovoRecompraHTML(vNovo,vRecompra,formatter){
+// tipo (opcional) — quando informado, os pills viram clicáveis e abrem uma
+// lupa mostrando exatamente quem são as pessoas daquele grupo.
+function splitNovoRecompraHTML(vNovo,vRecompra,formatter,tipo){
   const total=vNovo+vRecompra;
   if(total<=0)return '';
   const f=formatter||fmt;
   const pctNovo=Math.round(vNovo/total*100);
   const pctRecompra=100-pctNovo;
+  const attrNovo=tipo?`onclick="lupaNovoRecompra('${tipo}','Novo')" title="Clique para ver quem são"`:'';
+  const attrRecompra=tipo?`onclick="lupaNovoRecompra('${tipo}','Recompra')" title="Clique para ver quem são"`:'';
+  const cursorStyle=tipo?'cursor:pointer;':'';
   return `<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;">
-    <span style="background:#5a8a9a14;color:#3a6a7a;border:1px solid #5a8a9a3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🆕 ${f(vNovo)}<span style="opacity:.65;font-weight:500;">(${pctNovo}%)</span></span>
-    <span style="background:#A18B6C14;color:#7a5a2a;border:1px solid #A18B6C3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🔄 ${f(vRecompra)}<span style="opacity:.65;font-weight:500;">(${pctRecompra}%)</span></span>
+    <span ${attrNovo} style="background:#5a8a9a14;color:#3a6a7a;border:1px solid #5a8a9a3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;${cursorStyle}">🆕 ${f(vNovo)}<span style="opacity:.65;font-weight:500;">(${pctNovo}%)</span></span>
+    <span ${attrRecompra} style="background:#A18B6C14;color:#7a5a2a;border:1px solid #A18B6C3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;${cursorStyle}">🔄 ${f(vRecompra)}<span style="opacity:.65;font-weight:500;">(${pctRecompra}%)</span></span>
   </div>`;
 }
 function fmtInt(n){return parseInt(n).toLocaleString('pt-BR');}
+
+// Abre a lupa filtrada por novo/recompra, pra qualquer um dos cards
+// (pedido do usuário, 12/08/2026). "contratos" e "ticket" reaproveitam os
+// mesmos registros de "vendas" (é o mesmo grupo de pessoas, só olhado por
+// ângulos diferentes — contagem/ticket médio em vez de valor total).
+function lupaNovoRecompra(tipo,classe){
+  let rows=[];
+  if(tipo==='oport')rows=window._lastOportRows||[];
+  else if(tipo==='vendas'||tipo==='contratos'||tipo==='ticket')rows=window._lastVendaRows||[];
+  else if(tipo==='entradas')rows=window._lastEntradaRows||[];
+  rows=rows.filter(r=>r.classe===classe);
+  const sorted=rows.slice().sort((a,b)=>b.value-a.value);
+  const total=sorted.reduce((s,r)=>s+r.value,0);
+  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
+  tableRows.push(['TOTAL','',fmt(total)]);
+  const emoji=classe==='Novo'?'🆕':'🔄';
+  openModal(emoji+' '+classe+' — '+sorted.length+' registros',['Nome','Telefone','Valor'],tableRows,sorted.length);
+}
 
 function reconciliarAgendCompClinicorpPorAnuncio(){
   const adMap=window._lastAdMap;
@@ -2788,7 +2811,7 @@ function renderFunilResumido(){
     {label:'Leads Criados',icon:'👥',valor:leads,pctTxt:'100%',cor:'#2a4a45'},
     {label:'Agendados',icon:'🏷️',valor:agendados,pctTxt:agendados!=null?fmtPct(agendados,leads):'—',cor:'#8a8a8a'},
     {label:'Comparecimentos',icon:'👤',valor:comparecimentos,pctTxt:(comparecimentos!=null&&agendados)?fmtPct(comparecimentos,agendados):'—',cor:'#1a8a7a'},
-    {label:'Fechamentos',icon:'🏷️',valor:contratosNovosParaFunil,pctTxt:comparecimentos?fmtPct(contratosNovosParaFunil,comparecimentos):'—',cor:'#3aaa5a'}
+    {label:'Fechamentos de novos pacientes',icon:'🏷️',valor:contratosNovosParaFunil,pctTxt:comparecimentos?fmtPct(contratosNovosParaFunil,comparecimentos):'—',cor:'#3aaa5a'}
   ];
 
   el.innerHTML=`<div style="display:flex;flex-direction:column;justify-content:space-between;height:100%;">`+etapas.map((e,i)=>{
@@ -3504,7 +3527,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   const cpc2Final=contratos>0?spend/contratos:0;
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt);
+  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
   document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
   window._lastLeadsBase=leadsBase;
@@ -3599,8 +3622,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const tot=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
     if(tot>0){
       totalOport+=tot;
-      if(classificarNovoOuRecompra(ph,_range)==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
-      _oportRows.push({name:d.nomeAtual||'—',ph,value:tot});
+      const classeExtra=classificarNovoOuRecompra(ph,_range);
+      if(classeExtra==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
+      _oportRows.push({name:d.nomeAtual||'—',ph,value:tot,classe:classeExtra});
     }
   });
 
@@ -3613,16 +3637,16 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const ticketRecompra=contratosComValorRecompra>0?valorVendasRecompra/contratosComValorRecompra:0;
 
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-oport-sub').innerHTML=splitNovoRecompraHTML(oportNovas,oportRecompra);
+  document.getElementById('t-oport-sub').innerHTML=splitNovoRecompraHTML(oportNovas,oportRecompra,fmt,'oport');
   window._lastTotalOportNovas=oportNovas;
   const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
   const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
   document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra);
+  document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra,fmt,'vendas');
   window._lastValorVendasNovas=valorVendasNovas;
   window._lastValorVendasRecompra=valorVendasRecompra;
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
-  document.getElementById('t-ticket-sub').innerHTML=splitNovoRecompraHTML(ticketNovos,ticketRecompra);
+  document.getElementById('t-ticket-sub').innerHTML=splitNovoRecompraHTML(ticketNovos,ticketRecompra,fmt,'ticket');
   window._lastValorFechado=totalVendasCRM;
   window._lastTotalOport=totalOport;
   window._lastTicketCRM=ticketCRM;
@@ -3672,7 +3696,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const pctEntrada=totalVendasCRM>0?Math.round(totalEntradas/totalVendasCRM*100):0;
   const pctTag=totalEntradas>0&&totalVendasCRM>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctEntrada}%)</span>`:'';
   document.getElementById('t-entradas').innerHTML=(totalEntradas>0?fmt(totalEntradas):'—')+pctTag+entradaTag+' <button class="lupa" onclick="lupaEntradas()" title="Ver entradas">🔍</button>';
-  document.getElementById('t-entradas-sub').innerHTML=splitNovoRecompraHTML(entradasNovas,entradasRecompra);
+  document.getElementById('t-entradas-sub').innerHTML=splitNovoRecompraHTML(entradasNovas,entradasRecompra,fmt,'entradas');
   window._lastTotalEntradas=totalEntradas;
   window._lastTotalEntradasNovas=entradasNovas;
   renderFunilResumido();
