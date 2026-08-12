@@ -7341,8 +7341,13 @@ function renderRelOrcamentos(){
       if(avalFilt&&av!==avalFilt)return;
       if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return;
       if(origFilt){
-        const row=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-        if(!row||(row.origin||'')!==origFilt)return;
+        // ⚠️ CORRIGIDO (11/08/2026): mesmo bug do nome em Comissões — buscar
+        // a origem numa linha do Cloudia (allCloudiaRows) por telefone sem
+        // normalizar falhava pra clientes criados direto do Clinicorp (sem
+        // nenhuma linha lá) ou com chave "55" na frente, fazendo essa
+        // pessoa SUMIR do relatório sempre que um filtro de origem era
+        // aplicado — mesmo tendo a origem certa salva em d.origemAtual.
+        if((d.origemAtual||'')!==origFilt)return;
       }
       const valorFech=Number(o.fechValor||o.valor||0);
       const entrada=Number(o.entrada||0);
@@ -9810,9 +9815,14 @@ function importarFechamentos(){
   Object.entries(_ccData).forEach(([ph,d])=>{
     const orcs=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&o.valor>0);
     if(!orcs.length)return;
-    // Pega nome do cliente a partir do Cloudia
-    const clienteRow=allCloudiaRows.find(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
-    const nomePaciente=clienteRow?clienteRow.name||'—':'—';
+    // ⚠️ CORRIGIDO (11/08/2026): antes buscava o nome numa linha da planilha
+    // do Cloudia (allCloudiaRows), comparando telefone SEM normalizar contra
+    // a chave do _ccData — isso falhava sempre que a chave tinha o "55" na
+    // frente (ex: casos como o Marcelo) OU quando o cliente nunca teve
+    // NENHUMA linha no Cloudia (clientes criados direto do Clinicorp, ex:
+    // Ingrid, Joice), fazendo o nome aparecer como "—" em Comissões mesmo
+    // com o valor certo. d.nomeAtual já é o nome correto e sempre existe.
+    const nomePaciente=d.nomeAtual||'—';
     orcs.forEach(o=>{
       // Usa fechData (data do fechamento) para filtrar, fallback para data do orçamento
       const dataOrc=o.fechData||o.data||o.entradaData||'';
