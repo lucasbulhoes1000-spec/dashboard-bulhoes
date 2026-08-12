@@ -5150,6 +5150,25 @@ function lupaOport(){
   openModal('Oportunidades',['Nome','Telefone','Valor Orçado'],tableRows,sorted.length);
 }
 
+// Classifica um telefone como "Novo" ou "Recompra" — mesma lógica usada no
+// cálculo agregado do Dashboard (contratosNovos/contratosAntigos e a
+// separação de valor), reaproveitada aqui pra mostrar nas lupas de
+// detalhe, célula a célula, pra dar pra conferir se está classificando
+// certo (pedido do usuário, 12/08/2026).
+function classificarNovoOuRecompra(ph,range){
+  const d=ccDataLookup(ph);
+  if(!d||!d.orcamentos)return 'Novo';
+  const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+  if(range){
+    const aprovNoPeriodo=d.orcamentos.filter(o=>{
+      if(o.status!=='Aprovado')return false;
+      const dataRef=o.fechData||o.data||'';
+      return dataRef>=range.since&&dataRef<=range.until;
+    });
+    if(aprovNoPeriodo.length>0)return aprovNoPeriodo.every(o=>o.pacienteAntigo)?'Recompra':'Novo';
+  }
+  return temHistoricoRecompra?'Recompra':'Novo';
+}
 function lupaVendas(){
   const sorted=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
@@ -5172,11 +5191,11 @@ function lupaVendas(){
   }
   const tableRows=sorted.map(r=>{
     const entradaTotal=entradaDaPessoa(r.ph);
-    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—'];
+    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',classificarNovoOuRecompra(r.ph,range)];
   });
   const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph),0);
-  tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada)]);
-  openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada'],tableRows,sorted.length);
+  tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada),'']);
+  openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada','Novo/Recompra'],tableRows,sorted.length);
 }
 
 function lupaEntradas(){
