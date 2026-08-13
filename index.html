@@ -468,7 +468,7 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="mc"><div class="ml">Leads na agenda no período <button onclick="abrirEdicaoManual('leadsAgenda')" style="background:none;border:none;cursor:pointer;color:#A18B6C;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente (ex: leads que desmarcaram e sumiram da agenda do Clinicorp)">✏️</button></div><div class="mv" id="t-leads-agendados">— <button class="lupa" onclick="lupaLeadsAgendadosClinicorp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-leads-agendados-sub">únicos na agenda (Clinicorp)</div></div>
               <div class="mc"><div class="ml">Comparecimentos <button onclick="abrirEdicaoManual('comp')" style="background:none;border:none;cursor:pointer;color:#CCBCA6;font-size:11px;padding:0;margin-left:2px;" title="Editar manualmente">✏️</button></div><div class="mv" id="t-comp">— <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-comp-sub">show rate</div><div class="ms" id="t-comp-clinicorp" style="color:#8a9a7a;"></div></div>
               <div class="mc"><div class="ml">Contratos fechados</div><div class="mv green" id="t-contratos">— <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button></div><div class="ms" id="t-contratos-sub">de fechamento</div></div>
-              <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms">lead → contrato</div></div>
+              <div class="mc"><div class="ml">Taxa de conversão</div><div class="mv green" id="t-conv">—</div><div class="ms" id="t-conv-sub">lead → contrato</div></div>
             </div>
             <div class="slabel" style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="toggleCustosBlock()">
               <span>Custos</span>
@@ -2867,6 +2867,52 @@ function fmtDateOnly(str){
 }
 
 // ===== TRÁFEGO =====
+// ============================================================
+// VENDAS REAIS — 12/08/2026, pedido do usuário. "Total de vendas" (baseado
+// só em orçamento aprovado) ficava sempre abaixo do faturamento real do
+// Clinicorp, porque lançamentos manuais (manutenção, procedimentos avulsos)
+// nunca passam pelo fluxo de orçamento. Busca o total real via
+// analyticsVendasReaisClinicorp (financial/list_summary, PostType=REVENUE —
+// confirmado que bate exatamente com a tela Conta Corrente do Clinicorp) e
+// ATUALIZA só os cards de Vendas (Total de vendas + Valor fechado de novos
+// pacientes) — não mexe em Ticket Médio, Entradas nem Oportunidades, que
+// continuam vindo do jeito que já estavam (baseados em orçamento).
+// Não-bloqueante, mesmo padrão de carregarComparecimentoClinicorp — o
+// dashboard já mostra o valor "provisório" (baseado em orçamento) na hora,
+// e troca pelo valor real assim que essa busca (mais lenta, por causa das
+// buscas de telefone por paciente) terminar.
+// ============================================================
+async function carregarVendasReaisClinicorp(){
+  const range=getRange('trafego');
+  window._vendasReaisPeriodo=null;
+  try{
+    const url=CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+range.since+'&to='+range.until;
+    const res=await fetch(url);
+    const r=await res.json();
+    if(r.status!=='ok'){
+      console.warn('[VENDAS REAIS] Erro (mantém o valor baseado em orçamento):',r.mensagem);
+      return;
+    }
+    window._vendasReaisPeriodo={from:range.since,to:range.until};
+    window._lastVendasReais=r;
+    // Substitui as linhas/valores usados pela lupa e pelos pills — a partir
+    // daqui, lupaVendas() e lupaNovoRecompra('vendas',...) mostram o
+    // faturamento real, não só orçamento.
+    window._lastVendaRows=r.registros.map(reg=>({name:reg.nome,ph:reg.telefone,value:reg.valor,classe:reg.classe,descricao:reg.descricao,data:reg.data}));
+    window._lastValorVendasNovas=r.totalNovo;
+    window._lastValorVendasRecompra=r.totalRecompra;
+
+    const elVendas=document.getElementById('t-vendas');
+    const elVendasSub=document.getElementById('t-vendas-sub');
+    const elFunilValor=document.getElementById('t-funil-card-valor');
+    if(elVendas)elVendas.innerHTML=(r.total>0?fmt(r.total):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
+    if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(r.totalNovo,r.totalRecompra,fmt,'vendas');
+    if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
+  }catch(e){
+    console.warn('[VENDAS REAIS] Erro (não bloqueia o dashboard, mantém o valor baseado em orçamento):',e);
+  }
+}
+
 async function carregarComparecimentoClinicorp(){
   const elAgendados=document.getElementById('t-leads-agendados');
   const elAgendadosSub=document.getElementById('t-leads-agendados-sub');
@@ -3064,6 +3110,7 @@ async function loadTrafego(){
     updateOrigemCount(filtered);
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
     carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
+    carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
     console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
@@ -3529,6 +3576,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
   document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
+  document.getElementById('t-conv-sub').innerHTML='lead → contrato'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
   window._lastLeadsBase=leadsBase;
   window._lastContratos=contratos;
