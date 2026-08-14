@@ -2662,7 +2662,11 @@ function atualizarCardsAgendaClinicorp(dados){
     const btnLupaContr=elContratos.querySelector('button.lupa');
     elContratos.innerHTML=contratos+' <span style="font-size:11px;color:#9a8c7e;">('+pctContratos+')</span> '+(btnLupaContr?btnLupaContr.outerHTML:'');
   }
-  if(elContratosSub)elContratosSub.textContent='';
+  // ⚠️ CORRIGIDO (14/08/2026): essa função estava limpando o subtítulo
+  // (com os pills novo/recompra) que outra parte do código já preenchia
+  // certinho — deixando "Contratos fechados" sem a divisão visível. Não
+  // mexe mais nesse elemento, quem cuida dele agora é só o cálculo de
+  // vendas/contratos.
 }
 
 // Reconcilia Agendou/Compareceu da tabela "Funil por Anúncio" com a MESMA base
@@ -2706,10 +2710,10 @@ function lupaNovoRecompra(tipo,classe){
   rows=rows.filter(r=>r.classe===classe);
   const sorted=rows.slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
-  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
-  tableRows.push(['TOTAL','',fmt(total)]);
+  const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value),r.descricao||r.tratamento||'—']);
+  tableRows.push(['TOTAL','',fmt(total),'']);
   const emoji=classe==='Novo'?'🆕':'🔄';
-  openModal(emoji+' '+classe+' — '+sorted.length+' registros',['Nome','Telefone','Valor'],tableRows,sorted.length);
+  openModal(emoji+' '+classe+' — '+sorted.length+' registros',['Nome','Telefone','Valor','Procedimento'],tableRows,sorted.length);
 }
 
 function reconciliarAgendCompClinicorpPorAnuncio(){
@@ -5316,11 +5320,11 @@ function lupaVendas(){
   }
   const tableRows=sorted.map(r=>{
     const entradaTotal=entradaDaPessoa(r.ph);
-    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',classificarNovoOuRecompra(r.ph,range)];
+    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',r.classe||classificarNovoOuRecompra(r.ph,range),r.descricao||r.tratamento||'—'];
   });
   const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph),0);
-  tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada),'']);
-  openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada','Novo/Recompra'],tableRows,sorted.length);
+  tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada),'','']);
+  openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada','Novo/Recompra','Procedimento'],tableRows,sorted.length);
 }
 
 function lupaEntradas(){
