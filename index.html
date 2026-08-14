@@ -2657,10 +2657,13 @@ function atualizarCardsAgendaClinicorp(dados){
   const elContratos=document.getElementById('t-contratos');
   const elContratosSub=document.getElementById('t-contratos-sub');
   if(elContratos){
-    const contratos=window._lastContratos||0;
-    const pctContratos=dados.comparecimentos>0?Math.round(contratos/dados.comparecimentos*100)+'%':'—';
+    // ⚠️ NOVO (14/08/2026, pedido do usuário): número grande agora é só de
+    // contratos NOVOS (mesma lógica já usada em "Fechamentos" no funil e
+    // "Valor fechado") — o total continua disponível na lupa/pill de recompra.
+    const contratosNovosCard=window._lastContratosNovos!=null?window._lastContratosNovos:(window._lastContratos||0);
+    const pctContratos=dados.comparecimentos>0?Math.round(contratosNovosCard/dados.comparecimentos*100)+'%':'—';
     const btnLupaContr=elContratos.querySelector('button.lupa');
-    elContratos.innerHTML=contratos+' <span style="font-size:11px;color:#9a8c7e;">('+pctContratos+')</span> '+(btnLupaContr?btnLupaContr.outerHTML:'');
+    elContratos.innerHTML=contratosNovosCard+' <span style="font-size:11px;color:#9a8c7e;">('+pctContratos+')</span> '+(btnLupaContr?btnLupaContr.outerHTML:'');
   }
   // ⚠️ CORRIGIDO (14/08/2026): essa função estava limpando o subtítulo
   // (com os pills novo/recompra) que outra parte do código já preenchia
@@ -3578,7 +3581,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
 
   const cpc2Final=contratos>0?spend/contratos:0;
   document.getElementById('t-contratos').innerHTML=(contratos||'0')+' <button class="lupa" onclick="lupaContratos()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
+  // ⚠️ NOVO (14/08/2026, pedido do usuário): já que o número grande agora é
+  // só de novos, o subtítulo mostra só a pill de RECOMPRA (clicável, mesma
+  // lupa de sempre) — não repete o novo, que já está em destaque acima.
+  const pillRecompraContratos=contratosAntigos>0?`<div style="margin-top:5px;"><span onclick="lupaNovoRecompra('contratos','Recompra')" title="Clique para ver quem são" style="background:#A18B6C14;color:#7a5a2a;border:1px solid #A18B6C3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">🔄 ${fmtInt(contratosAntigos)} recompra${contratosAntigos!==1?'s':''}</span></div>`:'';
+  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+pillRecompraContratos;
   document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
   document.getElementById('t-conv-sub').innerHTML='lead → contrato'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
