@@ -2892,12 +2892,31 @@ function fmtDateOnly(str){
 async function carregarVendasReaisClinicorp(){
   const range=getRange('trafego');
   window._vendasReaisPeriodo=null;
+
+  // ⚠️ NOVO (14/08/2026, pedido do usuário): mostra "carregando..." em vez
+  // do valor baseado em orçamento (que pode divergir do real) — evita a
+  // confusão de ver um número aparentemente errado trocar sozinho pelo
+  // certo alguns segundos depois, como se tivesse "corrigido um erro".
+  const elVendasLoading=document.getElementById('t-vendas');
+  const elVendasSubLoading=document.getElementById('t-vendas-sub');
+  const elFunilValorLoading=document.getElementById('t-funil-card-valor');
+  if(elVendasLoading){
+    const btnLupaLoading=elVendasLoading.querySelector('button.lupa');
+    elVendasLoading.innerHTML='<span style="color:#9a8c7e;font-size:13px;">carregando valor real...</span> '+(btnLupaLoading?btnLupaLoading.outerHTML:'');
+  }
+  if(elVendasSubLoading)elVendasSubLoading.innerHTML='';
+  if(elFunilValorLoading)elFunilValorLoading.innerHTML='<span style="color:#9a8c7e;font-size:13px;">...</span>';
+
   try{
     const url=CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+range.since+'&to='+range.until;
     const res=await fetch(url);
     const r=await res.json();
     if(r.status!=='ok'){
-      console.warn('[VENDAS REAIS] Erro (mantém o valor baseado em orçamento):',r.mensagem);
+      console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
+      // ⚠️ Sem isso, o card ficava travado em "carregando..." pra sempre se
+      // a busca falhasse — volta pro valor baseado em orçamento (menos
+      // preciso, mas melhor que ficar preso em "carregando").
+      renderFunilResumido();
       return;
     }
     window._vendasReaisPeriodo={from:range.since,to:range.until};
@@ -2916,7 +2935,8 @@ async function carregarVendasReaisClinicorp(){
     if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(r.totalNovo,r.totalRecompra,fmt,'vendas');
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
   }catch(e){
-    console.warn('[VENDAS REAIS] Erro (não bloqueia o dashboard, mantém o valor baseado em orçamento):',e);
+    console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
+    renderFunilResumido();
   }
 }
 
