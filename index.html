@@ -2890,6 +2890,24 @@ function fmtDateOnly(str){
 // buscas de telefone por paciente) terminar.
 // ============================================================
 async function carregarVendasReaisClinicorp(){
+  // 🚨 CORRIGIDO (19/08/2026, bug grave reportado pelo usuário — "150k de
+  // novos contratos sem nenhuma venda a mais"): o endpoint
+  // analyticsVendasReaisClinicorp só recebe período (from/to) — NÃO sabe
+  // filtrar por Origem, porque o dado vem do financeiro bruto do Clinicorp,
+  // sem esse campo. Antes, essa função rodava mesmo com um filtro de Origem
+  // ativo e sobrescrevia "Total de vendas"/"Valor fechado de novos
+  // pacientes" com o total de TODAS as origens somadas — um valor bem maior
+  // que o correto (só da origem filtrada), parecendo "surgir do nada" sem
+  // nenhuma venda nova de verdade. Agora, se houver Origem selecionada, essa
+  // função NEM RODA — sai na hora, sem tocar em nada, e o valor que fica na
+  // tela é o já calculado por renderTrafego() (estimativa por orçamento),
+  // que SIM respeita a Origem corretamente. O valor "real" do financeiro só
+  // é usado quando a visão é de TODAS as origens (única visão em que
+  // "período apenas, sem origem" bate com o que o backend calcula).
+  if(_origemFilter){
+    window._vendasReaisPeriodo=null; // marca como inválido pro guard de renderTrafego() não achar que é dado real
+    return;
+  }
   const range=getRange('trafego');
   window._vendasReaisPeriodo=null;
 
@@ -3721,7 +3739,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // por orçamento se NÃO existir um valor real já carregado pra esse MESMO
   // período — se existir, mantém o real intocado (dado mais preciso vence).
   const vendasReaisValidasParaEstePeriodo = window._vendasReaisPeriodo &&
-    window._vendasReaisPeriodo.from===_range.since && window._vendasReaisPeriodo.until===_range.until;
+    window._vendasReaisPeriodo.from===_range.since && window._vendasReaisPeriodo.to===_range.until;
 
   window._lastVendaRange=_range;
   window._lastOportRows=_oportRows;
