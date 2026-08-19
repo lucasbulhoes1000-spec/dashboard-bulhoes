@@ -2931,10 +2931,17 @@ async function carregarVendasReaisClinicorp(){
     const r=await res.json();
     if(r.status!=='ok'){
       console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
-      // ⚠️ Sem isso, o card ficava travado em "carregando..." pra sempre se
-      // a busca falhasse — volta pro valor baseado em orçamento (menos
-      // preciso, mas melhor que ficar preso em "carregando").
-      renderFunilResumido();
+      // 🚨 CORRIGIDO (19/08/2026, bug grave reportado pelo usuário — "Total de
+      // vendas" travado pra sempre em "carregando valor real..."):
+      // renderFunilResumido() NUNCA tocou em #t-vendas (só nos 4 cards do
+      // funil — Oportunidades/Valor fechado/Entradas/Ticket) — então quando
+      // essa busca falhava ou dava erro, o texto "carregando..." que a gente
+      // escreve ali em cima ficava travado pra sempre, sem fallback nenhum.
+      // Agora chama renderTrafego() completo (com os dados já em cache, sem
+      // nenhuma chamada de rede nova) — ele SIM repinta #t-vendas com a
+      // estimativa por orçamento, exatamente como pretendido no comentário
+      // original.
+      if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
       return;
     }
     window._vendasReaisPeriodo={from:range.since,to:range.until};
@@ -2954,7 +2961,8 @@ async function carregarVendasReaisClinicorp(){
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
   }catch(e){
     console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
-    renderFunilResumido();
+    // Mesma correção do bloco acima — restaura #t-vendas de verdade, não só o funil.
+    if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
   }
 }
 
@@ -10942,7 +10950,7 @@ window.addEventListener('load',()=>{
   </div>
 </div>
 <div id="modal-edicao-manual" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:800;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;width:360px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">
+  <div style="background:#fff;border-radius:12px;width:360px;max-width:95vw;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.15);">   
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
       <div style="font-size:15px;font-weight:700;color:#2a2520;" id="edicao-manual-title">Editar valor</div>
       <button onclick="document.getElementById('modal-edicao-manual').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:#8a7a6a;">✕</button>
