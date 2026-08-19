@@ -3707,7 +3707,22 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     }
   });
 
-  window._lastVendaRows=_vendaRows;
+  // ⚠️ CORRIGIDO (19/08/2026, caso "Total de vendas regride pro valor de
+  // orçamento"): renderTrafego() SEMPRE sobrescrevia _lastVendaRows/t-vendas/
+  // _lastValorVendasNovas com a estimativa por orçamento (totalVendasCRM,
+  // calculada aqui) — mesmo depois de carregarVendasReaisClinicorp() já ter
+  // trazido o valor REAL do financeiro do Clinicorp pro mesmo período. Como
+  // renderTrafego() é chamado direto (sem passar por loadTrafego(), que é o
+  // único lugar que rechama carregarVendasReaisClinicorp()) em vários pontos
+  // — trocar a Origem, editar a data de um agendamento, editar status,
+  // recarregar a aba Métricas de Origem — o valor real virava o valor menos
+  // preciso de novo, e só voltava a ficar certo quando o usuário trocasse o
+  // período (o que força um loadTrafego() novo). Agora só usa a estimativa
+  // por orçamento se NÃO existir um valor real já carregado pra esse MESMO
+  // período — se existir, mantém o real intocado (dado mais preciso vence).
+  const vendasReaisValidasParaEstePeriodo = window._vendasReaisPeriodo &&
+    window._vendasReaisPeriodo.from===_range.since && window._vendasReaisPeriodo.until===_range.until;
+
   window._lastVendaRange=_range;
   window._lastOportRows=_oportRows;
   const contratosComValorRecompra=contratosComValor-contratosComValorNovos;
@@ -3718,12 +3733,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-oport-sub').innerHTML=splitNovoRecompraHTML(oportNovas,oportRecompra,fmt,'oport');
   window._lastTotalOportNovas=oportNovas;
-  const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
-  const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
-  document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra,fmt,'vendas');
-  window._lastValorVendasNovas=valorVendasNovas;
-  window._lastValorVendasRecompra=valorVendasRecompra;
+  if(!vendasReaisValidasParaEstePeriodo){
+    window._lastVendaRows=_vendaRows;
+    const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
+    const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
+    document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
+    document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra,fmt,'vendas');
+    window._lastValorVendasNovas=valorVendasNovas;
+    window._lastValorVendasRecompra=valorVendasRecompra;
+  }
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
   document.getElementById('t-ticket-sub').innerHTML=splitNovoRecompraHTML(ticketNovos,ticketRecompra,fmt,'ticket');
   window._lastValorFechado=totalVendasCRM;
@@ -4109,6 +4127,7 @@ function applyOrigemFilter(){
     _lastCloudiaFilteredAgend=filteredAgend;
     renderTrafego(_lastMetaAds,filtered,filteredEvents,filteredAgend);
     updateOrigemCount(filtered);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real, não a estimativa por orçamento (19/08/2026)
   }
 }
 // Remove registros de origem Social Selling — usado apenas no Dashboard Principal,
@@ -5441,18 +5460,38 @@ function lupaAdComp(adKey){
     .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
   openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
 }
+// ⚠️ CORRIGIDO (19/08/2026, pedido do usuário — "confere todas as lupas"):
+// antes, lupaAdFechou/lupaAdVendas pegavam QUALQUER orçamento Aprovado da
+// pessoa (de qualquer data, mesmo de anos atrás), enquanto a tabela agregada
+// do Funil por Anúncio (linha ~3897, adMap[key].vendas) já filtrava certinho
+// só os orçamentos com fechData/data DENTRO do período selecionado. Isso
+// fazia a lupa mostrar um valor diferente do número agregado na tabela —
+// exatamente o tipo de "lupa não acompanha o filtro" reportado. Agora as
+// duas usam o mesmo filtro de data (dr>=since&&dr<=until, ou sem data —
+// mantém, mesma regra de segurança já usada na tabela).
+function orcamentosAprovadosNoPeriodo(ph,range){
+  const d=ccDataLookup(ph)||{};
+  return (d.orcamentos||[]).filter(o=>{
+    if(o.status!=='Aprovado')return false;
+    if(!range)return true;
+    const dr=o.fechData||o.data||'';
+    return !dr||(dr>=range.since&&dr<=range.until);
+  });
+}
 function lupaAdFechou(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
+  const range=getRange('trafego');
   const rows=[...adPhones].map(ph=>{
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
     const e=applyEdits({...row,phone:row.phone||ph});
     const ccD=ccDataLookup(ph)||{};
     const nome=(ccD.nomeAtual)||e.name||'—';
     const origem=(ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
-    const orc=ccD.orcamentos&&ccD.orcamentos.find(o=>o.status==='Aprovado');
-    const valFech=orc?fmt(Number(orc.valor||0)):'—';
+    const orcsPeriodo=orcamentosAprovadosNoPeriodo(ph,range);
+    const valFechNum=orcsPeriodo.reduce((s,o)=>s+Number(o.valor||0),0);
+    const valFech=valFechNum>0?fmt(valFechNum):'—';
     const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
     const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
     return{dataCadastro,nome,telefone:e.phone||ph,origem,valFech,sortKey:parseCloudiaDate(dataCadastroVal)||new Date(0)};
@@ -5464,13 +5503,14 @@ function lupaAdVendas(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
   const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
+  const range=getRange('trafego');
   const rows=[];let total=0;
   adPhones.forEach(ph=>{
     const d=ccDataLookup(ph)||{};
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
     const nome=(d.nomeAtual)||(row&&row.name)||'—';
-    const orcsAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado');
-    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
+    const orcsPeriodo=orcamentosAprovadosNoPeriodo(ph,range);
+    const val=orcsPeriodo.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
     if(val>0){total+=val;rows.push([nome,ph,fmt(val)]);}
   });
   rows.sort((a,b)=>parseFloat(b[2].replace(/\D/g,''))-parseFloat(a[2].replace(/\D/g,'')));
@@ -6434,6 +6474,7 @@ function salvarDatasCC(){
     _lastCloudiaFilteredEvents=filtEvts;
     _lastCloudiaFilteredAgend=filtAgend;
     renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real, não a estimativa por orçamento (19/08/2026)
   }
   // Atualiza ou cria evento Agendou com a nova data
   if(agendData){
@@ -6467,6 +6508,7 @@ function salvarDatasCC(){
       _lastCloudiaFilteredEvents=filtEvts;
       _lastCloudiaFilteredAgend=filtAgend;
       renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+      carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real, não a estimativa por orçamento (19/08/2026)
     }
     filterClientesTable();
   }
@@ -7209,6 +7251,7 @@ function initRelOrigem(){
       const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
       const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(allCloudiaRows,'trafego'));
       renderTrafego(_lastMetaAds||[],filtered,filteredEvents,filteredAgend);
+      carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real, não a estimativa por orçamento (19/08/2026)
     }
     renderRelOrigem();
   };
@@ -10413,6 +10456,7 @@ function salvarLeadCard(){
     _lastCloudiaFilteredEvents=filtEvts;
     _lastCloudiaFilteredAgend=filtAgend;
     renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real, não a estimativa por orçamento (19/08/2026)
   }
 
   salvarCRMDebounced();
