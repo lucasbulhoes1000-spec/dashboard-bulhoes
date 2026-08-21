@@ -4031,9 +4031,33 @@ function lupaSSDesq(){
   const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('DESQUALIFICADO'));
   abrirModalSS('Desqualificados',linhas);
 }
+// Hierarquia do funil de Social Selling — usada pra tornar as contagens
+// CUMULATIVAS (19/08/2026, pedido do usuário): "RESULTADO" guarda só a etapa
+// MAIS RECENTE de cada pessoa (a planilha é 1 linha por pessoa, atualizada
+// conforme ela avança) — então antes, se alguém já tinha virado "VENDA", ela
+// deixava de contar em "Comparecimentos"/"Agendamentos", porque o texto
+// literal da célula não é mais "COMPARECEU"/"AGENDADO". Isso sub-contava
+// todo mundo que avançou além da primeira etapa. Agora usa RANK: quem está
+// em VENDA conta em VENDA + COMPARECEU + AGENDADO + RESPOSTAS; quem está em
+// COMPARECEU conta em COMPARECEU + AGENDADO + RESPOSTAS; e assim por diante
+// — cada etapa posterior automaticamente inclui as anteriores.
+// FOLLOW UP 1/2/3 fica de fora dessa hierarquia (rank 0, não indica que a
+// pessoa avançou pra nenhuma etapa do funil ainda) — só DESQUALIFICADO
+// continua contado à parte, sem entrar nessa lógica de "avançou".
+var RANK_SS = { 'AGENDADO': 1, 'COMPARECEU': 2, 'VENDA': 3 };
+function rankResultadoSS(res) {
+  return RANK_SS[res] || 0;
+}
 function renderSocial(rows){
-  const metaAgend=22;
   const range=getRange('social');
+  // Meta proporcional ao período (19/08/2026, pedido do usuário): 22 é a
+  // meta MENSAL — antes ficava fixa em 22 não importa o período escolhido
+  // (um filtro de 7 dias tinha a mesma meta de um filtro de 1 ano inteiro).
+  // Agora escala 22 pelos dias do período selecionado, sobre uma base de 30
+  // dias (mês padrão) — mesmo estilo de cálculo de "dias no período" já
+  // usado em outras partes do sistema.
+  const diasNoPeriodoSS = Math.round((new Date(range.until + 'T12:00') - new Date(range.since + 'T12:00')) / 86400000) + 1;
+  const metaAgend = Math.max(1, Math.round(22 * diasNoPeriodoSS / 30));
   const s=new Date(range.since),u=new Date(range.until+'T23:59:59');
   const filtered=rows.filter(r=>{const d=parseDateSS(r['DATA']||r['data']);return d&&d>=s&&d<=u;});
   window._lastSSFiltered=filtered;
@@ -4045,10 +4069,21 @@ function renderSocial(rows){
     const tipo=(r['TIPO']||'').toString().trim();
     const res=(r['RESULTADO']||'').toString().toUpperCase().trim();
     const fol=parseFloat(r['Tentativas de Follow']||0);
-    if(rs==='SIM')resp++;follow+=fol;
-    if(res.includes('AGENDADO'))agend++;if(res.includes('COMPARECEU'))comp++;
-    if(res.includes('VENDA'))vendas++;if(res.includes('DESQUALIFICADO'))desq++;
-    if(tipo){tipos[tipo]=(tipos[tipo]||0)+1;if(res.includes('AGENDADO'))tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;if(res.includes('COMPARECEU'))tipoComp[tipo]=(tipoComp[tipo]||0)+1;}
+    const rankAtual=rankResultadoSS(res);
+    // Respostas: conta se o campo RESPONDEU?='SIM' OU se já avançou pra
+    // qualquer etapa do funil (avançar implica ter respondido antes, mesmo
+    // que a equipe tenha esquecido de marcar RESPONDEU?='SIM' manualmente).
+    if(rs==='SIM'||rankAtual>=1)resp++;
+    follow+=fol;
+    if(rankAtual>=1)agend++;
+    if(rankAtual>=2)comp++;
+    if(rankAtual>=3)vendas++;
+    if(res.includes('DESQUALIFICADO'))desq++;
+    if(tipo){
+      tipos[tipo]=(tipos[tipo]||0)+1;
+      if(rankAtual>=1)tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;
+      if(rankAtual>=2)tipoComp[tipo]=(tipoComp[tipo]||0)+1;
+    }
     if(res)resultados[res]=(resultados[res]||0)+1;
   });
   const txResp=abord>0?Math.round(resp/abord*100):0;
