@@ -2898,6 +2898,20 @@ function fmtDateOnly(str){
 // buscas de telefone por paciente) terminar.
 // ============================================================
 async function carregarVendasReaisClinicorp(){
+  // 🚨 CORRIGIDO (reaplicado 19/08/2026 — já tinha sido corrigido hoje mais
+  // cedo, mas foi perdido quando o arquivo voltou pro original após o
+  // incidente do R$150k): analyticsVendasReaisClinicorp só recebe período
+  // (from/to) — NÃO sabe filtrar por Origem, porque o dado vem do
+  // financeiro bruto do Clinicorp, sem esse campo. Se rodar com um filtro
+  // de Origem ativo, sobrescreveria "Total de vendas" com o total de TODAS
+  // as origens somadas, um valor maior que o correto. Se houver Origem
+  // selecionada, essa função nem roda — o valor que fica na tela é o já
+  // calculado por renderTrafego() (estimativa por orçamento), que respeita
+  // a Origem corretamente.
+  if(_origemFilter){
+    window._vendasReaisPeriodo=null;
+    return;
+  }
   const range=getRange('trafego');
   window._vendasReaisPeriodo=null;
 
@@ -2921,10 +2935,12 @@ async function carregarVendasReaisClinicorp(){
     const r=await res.json();
     if(r.status!=='ok'){
       console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
-      // ⚠️ Sem isso, o card ficava travado em "carregando..." pra sempre se
-      // a busca falhasse — volta pro valor baseado em orçamento (menos
-      // preciso, mas melhor que ficar preso em "carregando").
-      renderFunilResumido();
+      // 🚨 CORRIGIDO (reaplicado 19/08/2026): renderFunilResumido() NUNCA
+      // tocou em #t-vendas (só nos 4 cards do funil) — então quando essa
+      // busca falhava, o texto "carregando..." ficava travado pra sempre,
+      // sem fallback nenhum. Agora chama renderTrafego() completo (dados já
+      // em cache, sem chamada de rede nova), que SIM repinta #t-vendas.
+      if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
       return;
     }
     window._vendasReaisPeriodo={from:range.since,to:range.until};
@@ -2944,7 +2960,8 @@ async function carregarVendasReaisClinicorp(){
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
   }catch(e){
     console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
-    renderFunilResumido();
+    // Mesma correção do bloco acima — restaura #t-vendas de verdade.
+    if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
   }
 }
 
@@ -3715,7 +3732,18 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     }
   });
 
-  window._lastVendaRows=_vendaRows;
+  // ⚠️ CORRIGIDO (reaplicado 19/08/2026): renderTrafego() sempre sobrescrevia
+  // _lastVendaRows/t-vendas/_lastValorVendasNovas com a estimativa por
+  // orçamento — mesmo depois de carregarVendasReaisClinicorp() já ter
+  // trazido o valor REAL do financeiro do Clinicorp pro mesmo período.
+  // Como renderTrafego() é chamado direto (sem passar por loadTrafego())
+  // em vários pontos — trocar a Origem, editar data de agendamento, editar
+  // status, recarregar Métricas de Origem — o valor real virava a
+  // estimativa de novo. Agora só usa a estimativa se NÃO existir um valor
+  // real já carregado pra esse MESMO período.
+  const vendasReaisValidasParaEstePeriodo = window._vendasReaisPeriodo &&
+    window._vendasReaisPeriodo.from===_range.since && window._vendasReaisPeriodo.to===_range.until;
+
   window._lastVendaRange=_range;
   window._lastOportRows=_oportRows;
   const contratosComValorRecompra=contratosComValor-contratosComValorNovos;
@@ -3726,12 +3754,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-oport').innerHTML=(totalOport>0?fmt(totalOport):'—')+' <button class="lupa" onclick="lupaOport()" title="Ver detalhes">🔍</button>';
   document.getElementById('t-oport-sub').innerHTML=splitNovoRecompraHTML(oportNovas,oportRecompra,fmt,'oport');
   window._lastTotalOportNovas=oportNovas;
-  const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
-  const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
-  document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra,fmt,'vendas');
-  window._lastValorVendasNovas=valorVendasNovas;
-  window._lastValorVendasRecompra=valorVendasRecompra;
+  if(!vendasReaisValidasParaEstePeriodo){
+    window._lastVendaRows=_vendaRows;
+    const pctVendasOport=totalOport>0?Math.round(totalVendasCRM/totalOport*100):0;
+    const pctVendasTag=pctVendasOport>0?`<span style="font-size:12px;color:#8a7a6a;font-weight:400;margin-left:6px;">(${pctVendasOport}% das oport.)</span>`:'';
+    document.getElementById('t-vendas').innerHTML=(totalVendasCRM>0?fmt(totalVendasCRM):'—')+pctVendasTag+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
+    document.getElementById('t-vendas-sub').innerHTML=splitNovoRecompraHTML(valorVendasNovas,valorVendasRecompra,fmt,'vendas');
+    window._lastValorVendasNovas=valorVendasNovas;
+    window._lastValorVendasRecompra=valorVendasRecompra;
+  }
   document.getElementById('t-ticket').textContent=ticketCRM>0?fmt(ticketCRM):'—';
   document.getElementById('t-ticket-sub').innerHTML=splitNovoRecompraHTML(ticketNovos,ticketRecompra,fmt,'ticket');
   window._lastValorFechado=totalVendasCRM;
@@ -4158,6 +4189,7 @@ function applyOrigemFilter(){
     _lastCloudiaFilteredAgend=filteredAgend;
     renderTrafego(_lastMetaAds,filtered,filteredEvents,filteredAgend);
     updateOrigemCount(filtered);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real (reaplicado 19/08/2026)
   }
 }
 // Remove registros de origem Social Selling — usado apenas no Dashboard Principal,
@@ -6481,6 +6513,7 @@ function salvarDatasCC(){
     _lastCloudiaFilteredEvents=filtEvts;
     _lastCloudiaFilteredAgend=filtAgend;
     renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real (reaplicado 19/08/2026)
   }
   // Atualiza ou cria evento Agendou com a nova data
   if(agendData){
@@ -6514,6 +6547,7 @@ function salvarDatasCC(){
       _lastCloudiaFilteredEvents=filtEvts;
       _lastCloudiaFilteredAgend=filtAgend;
       renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+      carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real (reaplicado 19/08/2026)
     }
     filterClientesTable();
   }
@@ -7256,6 +7290,7 @@ function initRelOrigem(){
       const filteredEvents=filterCloudiaByOrigin(filterEventsByRange(allCloudiaRows,'trafego'));
       const filteredAgend=filterCloudiaByOrigin(filterAgendByRange(allCloudiaRows,'trafego'));
       renderTrafego(_lastMetaAds||[],filtered,filteredEvents,filteredAgend);
+      carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real (reaplicado 19/08/2026)
     }
     renderRelOrigem();
   };
@@ -10460,6 +10495,7 @@ function salvarLeadCard(){
     _lastCloudiaFilteredEvents=filtEvts;
     _lastCloudiaFilteredAgend=filtAgend;
     renderTrafego(_lastMetaAds,filt,filtEvts,filtAgend);
+    carregarVendasReaisClinicorp(); // não-bloqueante — garante que "Total de vendas" use o dado real (reaplicado 19/08/2026)
   }
 
   salvarCRMDebounced();
