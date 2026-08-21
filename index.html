@@ -70,6 +70,7 @@ tbody tr:hover td{background:#faf7f3;}
 .r3{grid-template-columns:repeat(3,minmax(0,1fr));}
 .r4{grid-template-columns:repeat(4,minmax(0,1fr));}
 .r5{grid-template-columns:repeat(5,minmax(0,1fr));}
+.r6{grid-template-columns:repeat(6,minmax(0,1fr));}
 .r8{grid-template-columns:repeat(8,minmax(0,1fr));}
 .mc{background:#fff;border:0.5px solid #e0d8ce;border-radius:8px;padding:12px 14px;min-width:0;}
 .ccard{background:#fff;border:0.5px solid #A18B6C;border-radius:8px;padding:12px 14px;min-width:0;}
@@ -541,15 +542,22 @@ tbody tr:hover td{background:#faf7f3;}
               <div class="meta-header"><span class="meta-title">Meta de agendamentos</span><span id="ss-meta-numbers" style="font-size:11px;color:#9a8c7e;"></span></div>
               <div class="progress-track"><div class="progress-fill" id="ss-meta-bar" style="width:0%"></div></div>
             </div>
-            <div class="row r8">
+            <div class="row r6">
               <div class="mc"><div class="ml">Abordagens</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv" id="ss-abord">0</div><button class="lupa" onclick="lupaSSAbord()" title="Ver abordagens">🔍</button></div></div>
               <div class="mc"><div class="ml">Respostas</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv" id="ss-resp">0</div><button class="lupa" onclick="lupaSSResp()" title="Ver respostas">🔍</button></div><div class="ms" id="ss-resp-sub">0%</div></div>
-              <div class="mc"><div class="ml">Follow-ups</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv" id="ss-follow">0</div><button class="lupa" onclick="lupaSSFollow()" title="Ver follow-ups">🔍</button></div></div>
               <div class="mc"><div class="ml">Agendamentos</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv green" id="ss-agend">0</div><button class="lupa" onclick="lupaSSAgend()" title="Ver agendamentos">🔍</button></div><div class="ms" id="ss-agend-sub">0%</div></div>
               <div class="mc"><div class="ml">Comparecimentos</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv green" id="ss-comp">0</div><button class="lupa" onclick="lupaSSComp()" title="Ver comparecimentos">🔍</button></div><div class="ms" id="ss-comp-sub">0%</div></div>
               <div class="mc"><div class="ml">Vendas</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv green" id="ss-vendas">0</div><button class="lupa" onclick="lupaSSVendas()" title="Ver vendas">🔍</button></div><div class="ms" id="ss-vendas-sub">0%</div></div>
-              <div class="mc"><div class="ml">Desqualificados</div><div style="display:flex;align-items:baseline;gap:2px;"><div class="mv" id="ss-desq">0</div><button class="lupa" onclick="lupaSSDesq()" title="Ver desqualificados">🔍</button></div></div>
               <div class="mc"><div class="ml">Conv. geral</div><div class="mv green" id="ss-conv">0%</div></div>
+              <!-- ⚠️ REMOVIDO (19/08/2026, pedido do usuário): cards "Follow-ups" e
+              "Desqualificados" tirados do dashboard — o JS ainda calcula "follow" e
+              "desq" internamente (variáveis follow/desq em renderSocial), só não
+              escreve mais em nenhum elemento visível pra esses dois. Os elementos
+              #ss-follow e #ss-desq não existem mais no HTML — se algum código
+              tentar usar document.getElementById('ss-follow'/'ss-desq'), vai
+              retornar null; qualquer chamada futura precisa checar isso antes de
+              usar .textContent nesses ids. -->
+
             </div>
             <div class="sep"></div>
             <div class="two-col">
@@ -4007,29 +4015,33 @@ function abrirModalSS(titulo,linhas){
 function lupaSSAbord(){
   abrirModalSS('Abordagens',window._lastSSFiltered||[]);
 }
+// ⚠️ CORRIGIDO (19/08/2026, bug reportado pelo usuário — "card mostra 10,
+// lupa mostra só 6"): essas lupas filtravam pelo texto LITERAL de
+// RESULTADO (ex: só "AGENDADO" exato), enquanto os cards já contam de
+// forma CUMULATIVA (rank — ver rankResultadoSS/RANK_SS abaixo): quem já
+// avançou pra "COMPARECEU" ou "VENDA" também deveria aparecer em
+// "Agendamentos", porque pra chegar lá ela precisou ter sido agendada
+// antes. Agora as lupas usam o mesmo critério dos cards, então o número
+// do card e a quantidade de linhas na lupa sempre batem.
 function lupaSSResp(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESPONDEU?']||'').toString().toUpperCase()==='SIM');
+  const linhas=(window._lastSSFiltered||[]).filter(r=>{
+    const rs=(r['RESPONDEU?']||'').toString().toUpperCase();
+    const res=(r['RESULTADO']||'').toString().toUpperCase().trim();
+    return rs==='SIM'||rankResultadoSS(res)>=1;
+  });
   abrirModalSS('Respostas',linhas);
 }
-function lupaSSFollow(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>parseFloat(r['Tentativas de Follow']||0)>0);
-  abrirModalSS('Follow-ups',linhas);
-}
 function lupaSSAgend(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('AGENDADO'));
+  const linhas=(window._lastSSFiltered||[]).filter(r=>rankResultadoSS((r['RESULTADO']||'').toString().toUpperCase().trim())>=1);
   abrirModalSS('Agendamentos',linhas);
 }
 function lupaSSComp(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('COMPARECEU'));
+  const linhas=(window._lastSSFiltered||[]).filter(r=>rankResultadoSS((r['RESULTADO']||'').toString().toUpperCase().trim())>=2);
   abrirModalSS('Comparecimentos',linhas);
 }
 function lupaSSVendas(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('VENDA'));
+  const linhas=(window._lastSSFiltered||[]).filter(r=>rankResultadoSS((r['RESULTADO']||'').toString().toUpperCase().trim())>=3);
   abrirModalSS('Vendas',linhas);
-}
-function lupaSSDesq(){
-  const linhas=(window._lastSSFiltered||[]).filter(r=>(r['RESULTADO']||'').toString().toUpperCase().includes('DESQUALIFICADO'));
-  abrirModalSS('Desqualificados',linhas);
 }
 // Hierarquia do funil de Social Selling — usada pra tornar as contagens
 // CUMULATIVAS (19/08/2026, pedido do usuário): "RESULTADO" guarda só a etapa
@@ -4084,7 +4096,11 @@ function renderSocial(rows){
       if(rankAtual>=1)tipoAgend[tipo]=(tipoAgend[tipo]||0)+1;
       if(rankAtual>=2)tipoComp[tipo]=(tipoComp[tipo]||0)+1;
     }
-    if(res)resultados[res]=(resultados[res]||0)+1;
+    // ⚠️ REMOVIDO (19/08/2026, pedido do usuário): "Follow up 1/2/3" e
+    // "Desqualificado" tirados do gráfico/legenda "Distribuição de
+    // Resultados" — continuam sendo contados em follow/desq (variáveis
+    // internas), só não aparecem mais nessa visualização específica.
+    if(res&&!res.includes('FOLLOW UP')&&res!=='DESQUALIFICADO')resultados[res]=(resultados[res]||0)+1;
   });
   const txResp=abord>0?Math.round(resp/abord*100):0;
   const txAgend=resp>0?Math.round(agend/resp*100):0;
@@ -4095,14 +4111,12 @@ function renderSocial(rows){
   document.getElementById('ss-abord').textContent=abord;
   document.getElementById('ss-resp').textContent=resp;
   document.getElementById('ss-resp-sub').textContent=txResp+'% tx. resposta';
-  document.getElementById('ss-follow').textContent=Math.round(follow);
   document.getElementById('ss-agend').textContent=agend;
   document.getElementById('ss-agend-sub').textContent=txAgend+'% das resp.';
   document.getElementById('ss-comp').textContent=comp;
   document.getElementById('ss-comp-sub').textContent=showRate+'% show rate';
   document.getElementById('ss-vendas').textContent=vendas;
   document.getElementById('ss-vendas-sub').textContent=txVenda+'% fechamento';
-  document.getElementById('ss-desq').textContent=desq;
   document.getElementById('ss-conv').textContent=conv+'%';
   document.getElementById('ss-meta-numbers').innerHTML=agend+' / '+metaAgend+' <span style="color:#b5a898;font-size:10px;">('+metaPct+'%)</span>';
   const bar=document.getElementById('ss-meta-bar');bar.style.width=metaPct+'%';
@@ -4846,8 +4860,6 @@ function gerarRelatorioSocialPDF(){
   const abord=getCleanMetricText('ss-abord');
   const resp=getCleanMetricText('ss-resp');
   const respSub=getCleanMetricText('ss-resp-sub');
-  const follow=getCleanMetricText('ss-follow');
-  const desq=getCleanMetricText('ss-desq');
   const agend=getCleanMetricText('ss-agend');
   const agendSub=getCleanMetricText('ss-agend-sub');
   const comp=getCleanMetricText('ss-comp');
@@ -4882,7 +4894,7 @@ function gerarRelatorioSocialPDF(){
   ctx.fillText('Resumo do período',20,y);
   y+=14;
 
-  y=desenharCardsRelatorio(ctx,canvasW,y,[['Abordagens',abord],['Respostas',resp,respSub],['Follow-ups',follow],['Desqualif.',desq]],'#f5efe8');
+  y=desenharCardsRelatorio(ctx,canvasW,y,[['Abordagens',abord],['Respostas',resp,respSub]],'#f5efe8');
   y=desenharCardsRelatorio(ctx,canvasW,y,[['Agendamentos',agend,agendSub],['Comparecim.',comp,compSub],['Vendas',vendasN,vendasSub],['Conv. geral',conv]],'#e8f3ec','#3a7a50');
 
   ctx.strokeStyle='#e0d8ce';
