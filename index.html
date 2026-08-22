@@ -2897,8 +2897,27 @@ function fmtDateOnly(str){
 // e troca pelo valor real assim que essa busca (mais lenta, por causa das
 // buscas de telefone por paciente) terminar.
 // ============================================================
+// Contador global de chamadas a carregarVendasReaisClinicorp() — usado pra
+// descartar respostas desatualizadas (ver comentário dentro da função).
+var _vendasReaisRequestId = 0;
+
 async function carregarVendasReaisClinicorp(){
-  // 🚨 CORRIGIDO (reaplicado 19/08/2026 — já tinha sido corrigido hoje mais
+  // 🚨 CORRIGIDO (19/08/2026, "às vezes aparece o valor errado"): essa
+  // função agora é chamada de 6 pontos diferentes do sistema (trocar
+  // Origem, editar data, editar status, Métricas de Origem, carregamento
+  // normal...). Se o usuário disparar uma chamada nova ANTES da anterior
+  // terminar (ex: trocou o filtro rápido, ou editou algo enquanto uma
+  // busca de período diferente ainda estava em andamento), a resposta MAIS
+  // LENTA podia chegar DEPOIS da mais nova e sobrescrever o valor certo com
+  // um valor de um período/contexto que já não é mais o atual — sem
+  // nenhum aviso, parecia só "às vezes dá errado" de forma aleatória.
+  // Agora cada chamada pega um número sequencial (meuRequestId); antes de
+  // escrever qualquer coisa na tela (sucesso OU erro), checa se ainda é a
+  // chamada MAIS RECENTE — se uma chamada mais nova já começou nesse meio
+  // tempo, essa resposta é descartada silenciosamente, sem tocar em nada.
+  const meuRequestId = ++_vendasReaisRequestId;
+
+  // ⚠️ CORRIGIDO (reaplicado 19/08/2026 — já tinha sido corrigido hoje mais
   // cedo, mas foi perdido quando o arquivo voltou pro original após o
   // incidente do R$150k): analyticsVendasReaisClinicorp só recebe período
   // (from/to) — NÃO sabe filtrar por Origem, porque o dado vem do
@@ -2909,11 +2928,11 @@ async function carregarVendasReaisClinicorp(){
   // calculado por renderTrafego() (estimativa por orçamento), que respeita
   // a Origem corretamente.
   if(_origemFilter){
-    window._vendasReaisPeriodo=null;
+    if(meuRequestId===_vendasReaisRequestId)window._vendasReaisPeriodo=null;
     return;
   }
   const range=getRange('trafego');
-  window._vendasReaisPeriodo=null;
+  if(meuRequestId===_vendasReaisRequestId)window._vendasReaisPeriodo=null;
 
   // ⚠️ NOVO (14/08/2026, pedido do usuário): mostra "carregando..." em vez
   // do valor baseado em orçamento (que pode divergir do real) — evita a
@@ -2933,6 +2952,11 @@ async function carregarVendasReaisClinicorp(){
     const url=CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+range.since+'&to='+range.until;
     const res=await fetch(url);
     const r=await res.json();
+
+    // Enquanto esperávamos a resposta, uma chamada MAIS NOVA já começou —
+    // essa resposta está desatualizada, descarta sem tocar em nada.
+    if(meuRequestId!==_vendasReaisRequestId)return;
+
     if(r.status!=='ok'){
       console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
       // 🚨 CORRIGIDO (reaplicado 19/08/2026): renderFunilResumido() NUNCA
@@ -2960,7 +2984,9 @@ async function carregarVendasReaisClinicorp(){
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
   }catch(e){
     console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
-    // Mesma correção do bloco acima — restaura #t-vendas de verdade.
+    // Mesma proteção contra corrida do bloco try acima — se uma chamada
+    // mais nova já começou, não mexe em nada.
+    if(meuRequestId!==_vendasReaisRequestId)return;
     if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
   }
 }
@@ -3741,7 +3767,19 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // status, recarregar Métricas de Origem — o valor real virava a
   // estimativa de novo. Agora só usa a estimativa se NÃO existir um valor
   // real já carregado pra esse MESMO período.
-  const vendasReaisValidasParaEstePeriodo = window._vendasReaisPeriodo &&
+  //
+  // ⚠️ CORRIGIDO (19/08/2026, "filtrei por Instagram ADS e o valor não
+  // mudou"): faltava checar `!_origemFilter` aqui também. Sem isso, ao
+  // trocar de "Todas as origens" pra uma origem específica, essa trava
+  // ainda achava o valor real (de TODAS as origens, carregado antes)
+  // válido — porque só comparava a DATA do período, que não mudou — e
+  // continuava mostrando o valor de todas as origens, sem filtrar,
+  // mesmo com uma Origem selecionada. Isso acontecia mesmo já existindo a
+  // proteção dentro de carregarVendasReaisClinicorp() (que não roda com
+  // Origem ativa), porque renderTrafego() roda ANTES dela nessa sequência
+  // de chamadas — corrigir aqui, direto na trava, resolve independente da
+  // ordem de quem chama o quê.
+  const vendasReaisValidasParaEstePeriodo = !_origemFilter && window._vendasReaisPeriodo &&
     window._vendasReaisPeriodo.from===_range.since && window._vendasReaisPeriodo.to===_range.until;
 
   window._lastVendaRange=_range;
