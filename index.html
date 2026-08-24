@@ -2561,7 +2561,7 @@ function origemMatchClinicorp(ph){
   if(_origemFilter==='organico')return org.includes('organ');
   if(_origemFilter==='indicacao')return org.includes('indica');
   if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.includes('facebook');
+  if(_origemFilter==='formulario facebook')return org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
   return true;
 }
 // Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
@@ -2606,7 +2606,22 @@ function getAgendaClinicorpFiltrada(){
 // MESMA base filtrada por origem usada no funil. Roda toda vez que o funil é
 // re-renderizado (troca de origem, troca de período, chegada do fetch do Clinicorp).
 function atualizarCardsAgendaClinicorp(dados){
-  if(!dados)return;
+  // ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "Leads na
+  // agenda mostrando 95 no filtro Hoje, deveria ser bem menor"): quando o
+  // período/filtro muda e a busca nova ainda não voltou, dados vem null
+  // (de propósito, pra sinalizar "ainda não é seguro mostrar"). Antes,
+  // isso só fazia a função sair sem fazer nada — o número do período
+  // ANTERIOR ficava preso na tela, parecendo válido pro período novo. Only
+  // "Agendados" no funil resumido mostrava "carregando..." certinho
+  // (lógica separada); esses 3 cards aqui (Leads na agenda, Agendamentos,
+  // Comparecimentos) ficavam com o valor antigo, sem nenhum aviso.
+  if(!dados){
+    ['t-leads-agendados','t-agend','t-comp'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el)el.innerHTML='<span style="color:#9a8c7e;font-size:13px;">carregando...</span>';
+    });
+    return;
+  }
   const leads=window._lastLeadsBase||0;
 
   // Leads na agenda no período (únicos) — respeita edição manual, se houver.
@@ -3069,9 +3084,22 @@ async function carregarAgendamentosFuturosClinicorp(){
     _agendamentosFuturosClinicorpIniciado=false; // permite tentar de novo no próximo acesso à aba
   }
 }
+// ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "9
+// comparecimentos hoje, só teve 1 de verdade"): essas 3 lupas usavam
+// window._lastAgendaClinicorp direto, sem checar se esse cache já é do
+// período/filtro ATUAL — se alguém clicasse na lupa enquanto a busca nova
+// ainda estava "carregando..." (ex: acabou de trocar pra "Hoje"), a lupa
+// mostrava o cache do período ANTERIOR (ex: "Este mês"), com gente de
+// meses atrás aparecendo como se fosse de hoje. Agora usa a mesma
+// checagem de período que já existia em getAgendaClinicorpFiltrada().
+function agendaClinicorpCacheValidaProPeriodoAtual(){
+  const rngAtual=getRange('trafego');
+  const per=window._agendaClinicorpPeriodo;
+  return per&&per.from===rngAtual.since&&per.to===rngAtual.until;
+}
 function lupaLeadsAgendadosClinicorp(){
   const r=window._lastAgendaClinicorp;
-  if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
+  if(!r||!agendaClinicorpCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const rows=(r.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel)).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
     .map(d=>[d.nome,d.tel,d.qtd,d.statusResumo,d.comparecimento?'✅ Sim':'—']);
   openModal('Leads na agenda no período (Avaliação) — Clinicorp — '+rows.length+' registros',
@@ -3079,7 +3107,7 @@ function lupaLeadsAgendadosClinicorp(){
 }
 function lupaComparecimentoClinicorp(){
   const r=window._lastAgendaClinicorp;
-  if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
+  if(!r||!agendaClinicorpCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const rows=(r.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel)).slice().sort((a,b)=>a.nome.localeCompare(b.nome))
     .map(d=>[d.nome,d.tel,d.qtd,d.statusResumo]);
   openModal('Comparecimentos reais (Avaliação) — Clinicorp — '+rows.length+' registros',
@@ -3092,7 +3120,7 @@ function lupaComparecimentoClinicorp(){
 // agendamento, filtrado pela data de CRIAÇÃO), com filtro de origem também.
 function lupaAgendamentosClinicorp(){
   const r=window._lastAgendaClinicorp;
-  if(!r){showToast('error','Sem dados','Aguarde o carregamento do Dashboard terminar e tente de novo.');return;}
+  if(!r||!agendaClinicorpCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const rows=(r.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel)&&!d.deletado).slice()
     .sort((a,b)=>(a.dataCriacao||'').localeCompare(b.dataCriacao||''))
     .map(d=>[d.nome,d.tel,fmtDateOnly(d.dataCriacao),fmtDateOnly(d.data),d.statusLabel||'—']);
@@ -3552,7 +3580,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
       else match=true;
       if(!match)compPhonesSet.delete(ph);
     });
@@ -3574,7 +3602,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
       else match=true;
       if(!match)return;
     }
@@ -3595,7 +3623,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
       else match=true;
       if(!match)return;
     }
@@ -3616,7 +3644,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
       else match=true;
       if(!match)fechadosPhones.delete(ph);
     });
@@ -3755,7 +3783,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
       else match=true;
       if(!match)return;
     }
@@ -3844,7 +3872,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         else if(_origemFilter==='organico')match=org.includes('organ');
         else if(_origemFilter==='indicacao')match=org.includes('indica');
         else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.includes('facebook');
+      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
         else match=true;
         if(!match)return false;
       }
@@ -4263,7 +4291,7 @@ function filterCloudiaByOrigin(rows){
     if(_origemFilter==='organico')return org.includes('organ');
     if(_origemFilter==='indicacao')return org.includes('indica');
     if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.includes('facebook');
+  if(_origemFilter==='formulario facebook')return org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
     return true;
   });
 }
@@ -5454,7 +5482,20 @@ function classificarNovoOuRecompra(ph,range){
   }
   return temHistoricoRecompra?'Recompra':'Novo';
 }
+// ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "6 contratos
+// fechados hoje, mas só teve 2 de verdade"): mesma causa raiz das lupas de
+// agenda corrigidas acima — essas 3 lupas usavam window._lastVendaRows /
+// _lastEntradaRows direto, sem checar se esse cache já é do período/filtro
+// ATUAL. Se alguém abrisse a lupa enquanto a busca nova (pra um período
+// recém-selecionado, ex: "Hoje") ainda não tinha voltado, aparecia gente
+// de meses atrás, do período anterior que ainda estava em cache.
+function vendaCacheValidaProPeriodoAtual(){
+  const rngAtual=getRange('trafego');
+  const rngCache=window._lastVendaRange;
+  return rngCache&&rngCache.since===rngAtual.since&&rngCache.until===rngAtual.until;
+}
 function lupaVendas(){
+  if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const sorted=(window._lastVendaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
   const range=window._lastVendaRange;
@@ -5484,6 +5525,7 @@ function lupaVendas(){
 }
 
 function lupaEntradas(){
+  if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const rows=(window._lastEntradaRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=rows.reduce((s,r)=>s+r.value,0);
   const tableRows=rows.map(r=>[r.data?new Date(r.data+'T12:00').toLocaleDateString('pt-BR'):'—',r.name,r.ph,fmt(r.value),r.pgto||'—']);
@@ -5491,6 +5533,7 @@ function lupaEntradas(){
   openModal('Entradas',['Data','Nome','Telefone','Valor','Pgto'],tableRows,rows.length);
 }
 function lupaContratos(){
+  if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
   const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>{
     const da=(ccDataLookup(a.ph)&&ccDataLookup(a.ph).created_at)||'';
