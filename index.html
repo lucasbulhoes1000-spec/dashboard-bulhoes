@@ -3388,8 +3388,20 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   }
 
   // --- STEP 3: Conta leads únicos por telefone (filtrado por created_at) ---
+  // ⚠️ NOVO (19/08/2026, pedido do usuário): quem tem origemAtual='#Paciente'
+  // (paciente antigo, marcado manualmente pela equipe direto no Cloudia,
+  // sem nenhuma origem de marketing de verdade pra atribuir) NÃO conta como
+  // lead — some inteiramente de "Leads Criados" e de todo o funil derivado
+  // dele (Agendados, Comparecimentos etc., que usam leadsBase como
+  // denominador).
   const leadsPhones=new Set();
-  filtered.forEach(r=>{const ph=normalizePhone(r.phone);if(ph)leadsPhones.add(ph);});
+  filtered.forEach(r=>{
+    const ph=normalizePhone(r.phone);
+    if(!ph)return;
+    const d=ccDataLookup(ph);
+    if(d&&d.origemAtual==='#Paciente')return; // paciente antigo — não é lead
+    leadsPhones.add(ph);
+  });
   const cloudiaLeadsCount=leadsPhones.size;
 
   // STEP 4: Casa telefones com anúncios — usa TODOS os rows (não só os filtrados)
