@@ -3730,7 +3730,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       if(orcsAprov.length>0){
         contratosComValor++;
         if(!orcsAprov.every(o=>o.pacienteAntigo))contratosComValorNovos++;
-        _vendaRows.push({name:nome,ph,value:orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0),classe:orcsAprov.every(o=>o.pacienteAntigo)?'Recompra':'Novo'});
+        // ⚠️ CORRIGIDO (19/08/2026, caso "Rui Dantas Pereira de Lima" — tinha
+        // um orçamento Novo (R$2.200) e um Recompra (R$4.600) no mesmo
+        // período, e apareciam somados numa linha só (R$6.800, "Novo"),
+        // impossível de editar cada um separadamente. Agora cria uma linha
+        // por ORÇAMENTO (igual o financeiro real do Clinicorp já faz),
+        // não mais uma linha somada por PESSOA.
+        orcsAprov.forEach(o=>{
+          _vendaRows.push({name:nome,ph,value:Number(o.fechValor||o.valor||0),classe:o.pacienteAntigo?'Recompra':'Novo',descricao:o.tratamento||''});
+        });
       }else{
         // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
         // mesmo assim o cliente está em fechadosPhones (ex: via evento Ganho do Cloudia).
@@ -5506,18 +5514,30 @@ function lupaVendas(){
   // somadas juntas, mesmo o "Valor Fechado" já sendo filtrado só pelo mês
   // selecionado. Agora usa exatamente o mesmo filtro de data (fechData/data
   // dentro do período) que já é usado pra calcular o Valor Fechado.
-  function entradaDaPessoa(ph){
+  //
+  // ⚠️ CORRIGIDO #2 (19/08/2026, caso "Rui Dantas Pereira de Lima" — 2
+  // orçamentos aprovados no MESMO período, um Novo outro Recompra): agora
+  // cada linha da tabela representa UM orçamento específico, não mais uma
+  // pessoa inteira — então a entrada também precisa casar pelo VALOR
+  // específico dessa linha, senão a entrada de AMBOS os orçamentos
+  // aparecia duplicada nas duas linhas (e o total somava em dobro).
+  function entradaDaPessoa(ph,valorEspecifico){
     const d=ccDataLookup(ph);
     if(!d||!d.orcamentos)return 0;
-    return d.orcamentos.filter(o=>{
+    const candidatos=d.orcamentos.filter(o=>{
       if(o.status!=='Aprovado')return false;
       if(!range)return true; // sem período definido (raro) — mantém comportamento antigo
       const dataRef=o.fechData||o.data||'';
       return dataRef>=range.since&&dataRef<=range.until;
-    }).reduce((s,o)=>s+Number(o.entrada||0),0);
+    });
+    if(valorEspecifico!=null){
+      const match=candidatos.find(o=>Math.abs(Number(o.fechValor||o.valor||0)-valorEspecifico)<0.01);
+      return match?Number(match.entrada||0):0;
+    }
+    return candidatos.reduce((s,o)=>s+Number(o.entrada||0),0);
   }
   const tableRows=sorted.map(r=>{
-    const entradaTotal=entradaDaPessoa(r.ph);
+    const entradaTotal=entradaDaPessoa(r.ph,r.value);
     const classeAtual=r.classe||classificarNovoOuRecompra(r.ph,range);
     // ⚠️ NOVO (19/08/2026, pedido do usuário): classificação Novo/Recompra
     // agora é clicável — clicar alterna e marca como editado manualmente
@@ -5527,7 +5547,7 @@ function lupaVendas(){
     const classeClicavel=`<button onclick="toggleNovoRecompraManual('${r.ph}',${r.value},this)" title="Clique pra alternar Novo/Recompra (fica manual, sempre prevalece)" style="background:none;border:1px solid #d4c9bc;border-radius:4px;padding:2px 8px;cursor:pointer;color:${classeAtual==='Novo'?'#3a7a50':'#A18B6C'};font-size:12px;font-weight:500;">${classeAtual} ✏️</button>`;
     return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',classeClicavel,r.descricao||r.tratamento||'—'];
   });
-  const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph),0);
+  const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph,r.value),0);
   tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada),'','']);
   openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada','Novo/Recompra','Procedimento'],tableRows,sorted.length);
 }
