@@ -5456,6 +5456,7 @@ function lupaComp(){
 }
 
 function lupaOport(){
+  if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const sorted=(window._lastOportRows||[]).slice().sort((a,b)=>b.value-a.value);
   const total=sorted.reduce((s,r)=>s+r.value,0);
   const tableRows=sorted.map(r=>[r.name,r.ph,fmt(r.value)]);
@@ -5517,13 +5518,43 @@ function lupaVendas(){
   }
   const tableRows=sorted.map(r=>{
     const entradaTotal=entradaDaPessoa(r.ph);
-    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',r.classe||classificarNovoOuRecompra(r.ph,range),r.descricao||r.tratamento||'—'];
+    const classeAtual=r.classe||classificarNovoOuRecompra(r.ph,range);
+    // ⚠️ NOVO (19/08/2026, pedido do usuário): classificação Novo/Recompra
+    // agora é clicável — clicar alterna e marca como editado manualmente
+    // (entradaManual=true no orçamento correspondente), que passa a
+    // SEMPRE prevalecer sobre a classificação automática, inclusive no
+    // financeiro real do backend (analyticsVendasReaisClinicorp).
+    const classeClicavel=`<button onclick="toggleNovoRecompraManual('${r.ph}',${r.value},this)" title="Clique pra alternar Novo/Recompra (fica manual, sempre prevalece)" style="background:none;border:1px solid #d4c9bc;border-radius:4px;padding:2px 8px;cursor:pointer;color:${classeAtual==='Novo'?'#3a7a50':'#A18B6C'};font-size:12px;font-weight:500;">${classeAtual} ✏️</button>`;
+    return[r.name,r.ph,fmt(r.value),entradaTotal>0?fmt(entradaTotal):'—',classeClicavel,r.descricao||r.tratamento||'—'];
   });
   const totalEntrada=sorted.reduce((s,r)=>s+entradaDaPessoa(r.ph),0);
   tableRows.push(['TOTAL','',fmt(total),fmt(totalEntrada),'','']);
   openModal('Vendas',['Nome','Telefone','Valor Fechado','Valor de Entrada','Novo/Recompra','Procedimento'],tableRows,sorted.length);
 }
 
+// ⚠️ NOVO (19/08/2026, pedido do usuário): permite trocar manualmente a
+// classificação Novo/Recompra direto na lupa de Vendas, sem precisar abrir
+// o orçamento pra editar. Marca entradaManual=true no orçamento
+// correspondente — a MESMA flag que já existe pra "equipe editou aqui,
+// nunca mais sobrescreve automático" — e que agora também faz o
+// financeiro real do backend (analyticsVendasReaisClinicorp) SEMPRE
+// respeitar essa escolha, mesmo que a descrição do lançamento tenha
+// palavra-chave de recompra (manutenção, ajuste, etc.).
+function toggleNovoRecompraManual(ph, valorFechado, botaoEl){
+  const d=ccDataLookup(ph);
+  if(!d||!d.orcamentos){showToast('error','Não encontrado','Não achei o orçamento correspondente pra editar.');return;}
+  const orc=d.orcamentos.find(o=>o.status==='Aprovado'&&Math.abs(Number(o.fechValor||o.valor||0)-valorFechado)<0.01);
+  if(!orc){showToast('error','Não encontrado','Não achei um orçamento Aprovado com esse valor exato pra marcar manualmente. Edite o orçamento diretamente pelo card do cliente.');return;}
+  orc.pacienteAntigo=!orc.pacienteAntigo;
+  orc.entradaManual=true; // sempre prevalece daqui pra frente, inclusive no financeiro real do backend
+  salvarCRMDebounced();
+  const novaClasse=orc.pacienteAntigo?'Recompra':'Novo';
+  if(botaoEl){
+    botaoEl.textContent=novaClasse+' ✏️';
+    botaoEl.style.color=novaClasse==='Novo'?'#3a7a50':'#A18B6C';
+  }
+  showToast('success','Classificação alterada',`Marcado como "${novaClasse}" manualmente — vai prevalecer sempre, inclusive no financeiro real.`);
+}
 function lupaEntradas(){
   if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
   const rows=(window._lastEntradaRows||[]).slice().sort((a,b)=>b.value-a.value);
