@@ -3771,7 +3771,15 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     const classe=classificarNovoOuRecompra(ph,_range);
     if(d&&d.orcamentos&&d.orcamentos.length>0){
-      const tot=d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0);
+      // ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "filtro
+      // Hoje puxando oportunidade de gente da lista antiga"): antes somava
+      // TODOS os orçamentos da pessoa, de qualquer data, sem filtro de
+      // período nenhum — mesmo filtrando "Hoje", orçamentos de semanas
+      // atrás entravam na conta. Agora só conta orçamentos CRIADOS dentro
+      // do período selecionado, igual o bloco "orçamentos extras" logo
+      // abaixo já fazia certo.
+      const orcsNoPeriodo=d.orcamentos.filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
+      const tot=orcsNoPeriodo.reduce((s,o)=>s+Number(o.valor||0),0);
       totalOport+=tot;
       if(classe==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
       if(tot>0)_oportRows.push({name:nome,ph,value:tot,classe});
