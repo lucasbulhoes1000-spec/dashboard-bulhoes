@@ -7554,6 +7554,19 @@ async function renderRelOrigem(){
   // do dashboard sempre que alguém era apagado (16/07/2026).
   const excluidosSetRO=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
 
+
+  // Os filtros de Avaliador/Tratamento precisam valer para TODAS as colunas do
+  // relatório, não só para Leads. Antes, Agendados/Compareceu/Fechados ignoravam
+  // esses filtros e a tabela misturava bases diferentes.
+  const passaFiltrosCRM_RO=(ph)=>{
+    if(!avalFilt&&!tratFilt)return true;
+    const dd=ccDataLookup(normalizePhone(ph))||{orcamentos:[]};
+    const orcs=dd.orcamentos||[];
+    if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return false;
+    if(tratFilt&&!orcs.some(o=>tratamentoBate(o.tratamento,tratFilt)))return false;
+    return true;
+  };
+
   // Busca do Clinicorp com o período PRÓPRIO deste relatório (ro-from/ro-to) —
   // não reaproveita window._lastAgendaClinicorp porque esse cache é do período
   // do Dashboard, que pode ser diferente do período escolhido aqui.
@@ -7626,6 +7639,7 @@ async function renderRelOrigem(){
   agendSrc.forEach(ph=>{
     const phN=normalizePhone(ph);
     if(excluidosSetRO.has(phN))return;
+    if(!passaFiltrosCRM_RO(phN))return;
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
     const ccD=ccDataLookup(phN);
     const actualOrg=(ccD&&ccD.origemAtual)||getOrigemReal(phN)||(row&&row.origin)||'—';
@@ -7640,6 +7654,7 @@ async function renderRelOrigem(){
   compSrc.forEach(ph=>{
     const phN=normalizePhone(ph);
     if(excluidosSetRO.has(phN))return;
+    if(!passaFiltrosCRM_RO(phN))return;
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
     const ccD=ccDataLookup(phN);
     const actualOrg=(ccD&&ccD.origemAtual)||getOrigemReal(phN)||(row&&row.origin)||'—';
@@ -7648,48 +7663,37 @@ async function renderRelOrigem(){
     if(!map[actualOrg].comp.has(phN)){map[actualOrg].comp.add(phN);map[actualOrg].compRows.push(row||{phone:phN,name:(ccD&&ccD.nomeAtual)||'—',origin:actualOrg});}
   });
 
-  // FECHOU: orçamentos aprovados no período (CRM) + stage Ganho Cloudia
-  const fechadosPhonesRO=new Set();
-  const fechRowMap={};
-  // 1. Orçamentos aprovados no CRM
+  // FECHOU: fonte única = orçamentos APROVADOS no CRM dentro do período.
+  // Não soma mais stage Ganho do Cloudia como fallback: isso criava fechamentos
+  // extras e fazia o relatório divergir do mês/filtros selecionados.
   Object.entries(_ccData||{}).forEach(([ph,d])=>{
-    const temAprov=(d.orcamentos||[]).some(o=>{
+    if(ph==='__exclusoes__'||!d)return;
+    const phN=normalizePhone(ph);
+    if(!phN||excluidosSetRO.has(phN))return;
+
+    const orcsPeriodo=(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
       const dr=o.fechData||o.data||'';
-      return dr&&dr>=since&&dr<=until;
+      if(!dr||dr<since||dr>until)return false;
+      if(avalFilt&&o.avaliador!==avalFilt)return false;
+      if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
+      return true;
     });
-    if(!temAprov)return;
-    const phN=normalizePhone(ph);
-    if(excluidosSetRO.has(phN))return;
+    if(!orcsPeriodo.length)return;
+
     const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===phN);
     const actualOrg=d.origemAtual||getOrigemReal(phN)||(row&&row.origin)||'—';
     if(origFilt&&actualOrg!==origFilt)return;
-    fechadosPhonesRO.add(phN);
-    fechRowMap[phN]=row||{phone:phN,name:d.nomeAtual||'—',origin:actualOrg};
-  });
-  // 2. Stage Ganho no Cloudia no período
-  allCloudiaRows.forEach(r=>{
-    if(!isFechou(r.stage))return;
-    if(r.type==='CUSTOMER_ACQUISITION_ORI')return;
-    const ph=normalizePhone(r.phone);if(!ph||fechadosPhonesRO.has(ph))return;
-    if(excluidosSetRO.has(ph))return;
-    const ts=r.type==='CUSTOMER_CREATED'?parseCloudiaDate(r.created_at):parseCloudiaDate(r.timestamp);
-    if(!ts)return;
-    const ds=localDateStr(ts);
-    if(ds>=since&&ds<=until){fechadosPhonesRO.add(ph);fechRowMap[ph]=r;}
-  });
-  fechadosPhonesRO.forEach(ph=>{
-    const r=fechRowMap[ph];if(!r)return;
-    const ccD=ccDataLookup(ph);
-    const actualOrg=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||r.origin||'—';if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
-    if(!map[actualOrg].fechPhones.has(ph)){
-      map[actualOrg].fechou.add(ph);map[actualOrg].fechPhones.add(ph);map[actualOrg].fechRows.push(r);
-      const d=ccDataLookup(ph);
-      const orcsAprov=(d&&d.orcamentos||[]).filter(o=>o.status==='Aprovado');
-      const val=orcsAprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0)||parseFloat(r.value||0);
-      map[actualOrg].valorFech+=val;
+
+    if(!map[actualOrg].fechPhones.has(phN)){
+      map[actualOrg].fechou.add(phN);
+      map[actualOrg].fechPhones.add(phN);
+      map[actualOrg].fechRows.push(row||{phone:phN,name:d.nomeAtual||'—',origin:actualOrg,created_at:orcsPeriodo[0].fechData||orcsPeriodo[0].data});
     }
+    // Valor fechado também respeita o período e os filtros. Antes somava TODOS
+    // os orçamentos aprovados históricos do paciente depois que ele entrava no mês.
+    map[actualOrg].valorFech+=orcsPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
@@ -7847,10 +7851,10 @@ function renderRelOrcamentos(){
   const tratFilt=document.getElementById('rof-trat').value;
 
   const avalMap={};
-  const pgtoMap={};
-  const todosFechados=[]; // pra lupa do TOTAL
+  const todosFechados=[];
 
   Object.entries(_ccData).forEach(([ph,d])=>{
+    if(ph==='__exclusoes__'||!d)return;
     (d.orcamentos||[]).forEach(o=>{
       if(o.status!=='Aprovado')return;
       const dataRef=o.fechData||o.data||'';
@@ -7858,35 +7862,21 @@ function renderRelOrcamentos(){
       const av=o.avaliador||'Sem avaliador';
       if(avalFilt&&av!==avalFilt)return;
       if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return;
-      if(origFilt){
-        // ⚠️ CORRIGIDO (11/08/2026): mesmo bug do nome em Comissões — buscar
-        // a origem numa linha do Cloudia (allCloudiaRows) por telefone sem
-        // normalizar falhava pra clientes criados direto do Clinicorp (sem
-        // nenhuma linha lá) ou com chave "55" na frente, fazendo essa
-        // pessoa SUMIR do relatório sempre que um filtro de origem era
-        // aplicado — mesmo tendo a origem certa salva em d.origemAtual.
-        if((d.origemAtual||'')!==origFilt)return;
-      }
+      if(origFilt&&(d.origemAtual||getOrigemReal(ph)||'—')!==origFilt)return;
+
       const valorFech=Number(o.fechValor||o.valor||0);
       const entrada=Number(o.entrada||0);
-      const pgto=o.pagamento||'—';
-
-      if(!avalMap[av])avalMap[av]={fechados:0,total:0,entradas:0,parcelas:[],pgtos:{},rows:[]};
+      if(!avalMap[av])avalMap[av]={fechados:0,total:0,entradas:0,rows:[]};
       avalMap[av].fechados++;
       avalMap[av].total+=valorFech;
       avalMap[av].entradas+=entrada;
-      const nomeCliente=d.nomeAtual||'—';
-      const itemFechado={nome:nomeCliente,telefone:ph,valor:valorFech,data:dataRef,tratamento:o.tratamento||'—',avaliador:av};
+
+      const itemFechado={
+        nome:d.nomeAtual||'—',telefone:ph,valor:valorFech,data:dataRef,
+        tratamento:o.tratamento||'—',avaliador:av
+      };
       avalMap[av].rows.push(itemFechado);
       todosFechados.push(itemFechado);
-      if(o.parcelas&&o.parcelas!=='—'&&o.parcelas!=='À vista'){
-        const n=parseInt(o.parcelas);if(n>0)avalMap[av].parcelas.push(n);
-      }
-      if(pgto&&pgto!=='—'){
-        avalMap[av].pgtos[pgto]=(avalMap[av].pgtos[pgto]||0)+valorFech;
-        if(!pgtoMap[pgto])pgtoMap[pgto]={fechados:0,total:0};
-        pgtoMap[pgto].fechados++;pgtoMap[pgto].total+=valorFech;
-      }
     });
   });
   window._lastOrcFechados={porAvaliador:avalMap,total:todosFechados};
@@ -7894,11 +7884,13 @@ function renderRelOrcamentos(){
   const entries=Object.entries(avalMap).sort((a,b)=>b[1].total-a[1].total);
   let tF=0,tV=0,tE=0;
   entries.forEach(([,d])=>{tF+=d.fechados;tV+=d.total;tE+=d.entradas;});
-  const avgParc=arr=>{const f=arr.filter(x=>x>0);return f.length?Math.round(f.reduce((a,b)=>a+b,0)/f.length)+'x':'—';};
 
-  // Atualiza cabeçalho
+  // Parcelamento médio e vendas por forma de pagamento foram removidos desta
+  // tela. O /payment/list do Clinicorp não expõe de forma completa o pagamento
+  // de todos os contratos; mostrar uma média/parcial como se fosse 100% seria
+  // mais perigoso do que não mostrar a métrica.
   const thead=document.querySelector('#page-rel-orcamentos thead tr');
-  if(thead)thead.innerHTML='<th>Avaliador</th><th style="text-align:right">Fechados</th><th style="text-align:right">Total Fechado</th><th style="text-align:right">Ticket Médio</th><th style="text-align:right">Entradas</th><th style="text-align:right">% Entrada</th><th style="text-align:right">Parcel. Médio</th><th>Por Pagamento</th>';
+  if(thead)thead.innerHTML='<th>Avaliador</th><th style="text-align:right">Fechados</th><th style="text-align:right">Total Fechado</th><th style="text-align:right">Ticket Médio</th><th style="text-align:right">Entradas</th><th style="text-align:right">% Entrada</th>';
 
   document.getElementById('rof-tbody').innerHTML=entries.map(([av,d])=>`
     <tr>
@@ -7908,8 +7900,6 @@ function renderRelOrcamentos(){
       <td style="text-align:right" class="tg">${d.fechados>0?fmt(d.total/d.fechados):'—'}</td>
       <td style="text-align:right" class="ta">${d.entradas>0?fmt(d.entradas):'—'}</td>
       <td style="text-align:right" class="tm">${d.total>0?Math.round(d.entradas/d.total*100)+'%':'—'}</td>
-      <td style="text-align:right" class="tm">${avgParc(d.parcelas)}</td>
-      <td style="font-size:11px;color:#8a7a6a;">${Object.entries(d.pgtos).sort((a,b)=>b[1]-a[1]).map(([p,v])=>`${p}: ${fmt(v)}`).join(' | ')||'—'}</td>
     </tr>`).join('')+`
     <tr style="font-weight:600;background:#faf7f3;">
       <td>TOTAL</td>
@@ -7918,17 +7908,7 @@ function renderRelOrcamentos(){
       <td style="text-align:right" class="tg">${tF>0?fmt(tV/tF):'—'}</td>
       <td style="text-align:right" class="ta">${tE>0?fmt(tE):'—'}</td>
       <td style="text-align:right" class="tm">${tV>0?Math.round(tE/tV*100)+'%':'—'}</td>
-      <td colspan="2"></td>
-    </tr>
-    ${Object.keys(pgtoMap).length>0?`<tr><td colspan="8" style="padding-top:16px;">
-      <div style="font-size:10px;color:#9a8c7e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Vendas por forma de pagamento</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">${Object.entries(pgtoMap).sort((a,b)=>b[1].total-a[1].total).map(([p,d])=>`
-        <div style="background:#f5f0ea;border-radius:8px;padding:10px 16px;min-width:120px;">
-          <div style="font-size:11px;color:#7a6550;font-weight:600;margin-bottom:4px;">${p}</div>
-          <div style="font-size:16px;font-weight:700;color:#2a2520;">${fmt(d.total)}</div>
-          <div style="font-size:10px;color:#9a8c7e;">${d.fechados} contrato(s)</div>
-        </div>`).join('')}
-      </div></td></tr>`:''}`;
+    </tr>`;
 }
 function lupaOrcFechados(avaliador){
   const dados=window._lastOrcFechados;
