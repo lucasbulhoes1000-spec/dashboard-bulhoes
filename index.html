@@ -2823,7 +2823,7 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   // VENDAS: quando o Dashboard já recebeu a resposta "valor real",
   // usa EXATAMENTE essas mesmas linhas; nada de recalcular por anúncio.
   const vendasPeriodo=window._dashVendasFonteMestraPeriodo;
-  if(vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._dashVendasFonteMestraRows){
+  if(window._dashVendasFonteMestraOficial&&vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._dashVendasFonteMestraRows){
     Object.values(adMap).forEach(d=>{d.vendas=0;d.vendaRows=[];});
     (window._dashVendasFonteMestraRows||[]).forEach(v=>{
       const ph=normalizePhone(v.ph);
@@ -3054,14 +3054,24 @@ async function carregarVendasReaisClinicorp(){
     window._lastValorVendasNovas=r.totalNovo;
     window._lastValorVendasRecompra=r.totalRecompra;
 
+    // FONTE-MESTRA REAL: só é preenchida AGORA, com a MESMA resposta que
+    // acabou de corrigir o card "Total de vendas" do Dashboard.
+    // Portanto Métricas de Origem e Funil por Anúncio passam a distribuir
+    // exatamente estas linhas e este total — não o cálculo provisório anterior.
+    window._dashVendasFonteMestraRows=window._lastVendaRows.map(v=>({...v}));
+    window._dashVendasFonteMestraTotal=Number(r.total||0);
+    window._dashVendasFonteMestraPeriodo={from:range.since,to:range.until};
+    window._dashVendasFonteMestraOficial=true;
+
     const elVendas=document.getElementById('t-vendas');
     const elVendasSub=document.getElementById('t-vendas-sub');
     const elFunilValor=document.getElementById('t-funil-card-valor');
     if(elVendas)elVendas.innerHTML=(r.total>0?fmt(r.total):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
     if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(r.totalNovo,r.totalRecompra,fmt,'vendas');
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
-    // O funil por anúncio não calcula vendas sozinho: espelha o Dashboard.
+    // Funil e Métricas não calculam vendas sozinhos: espelham o Dashboard.
     if(typeof reconciliarAgendCompClinicorpPorAnuncio==='function')reconciliarAgendCompClinicorpPorAnuncio();
+    if(currentPage==='rel-origem'&&typeof renderRelOrigem==='function')renderRelOrigem();
   }catch(e){
     console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
     // Mesma proteção contra corrida do bloco try acima — se uma chamada
@@ -3861,12 +3871,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     }
   });
 
-  // FONTE-MESTRA PARA RELATÓRIOS: guarda EXATAMENTE o cálculo que o Dashboard
-  // acabou de fazer aqui, antes de qualquer busca financeira assíncrona.
-  // Métricas de Origem e Funil por Anúncio devem SOMENTE distribuir estas linhas,
-  // nunca recalcular vendas por outra fonte.
-  window._dashVendasFonteMestraRows=_vendaRows.map(r=>({...r}));
-  window._dashVendasFonteMestraTotal=totalVendasCRM;
+  // IMPORTANTE: este valor ainda é PROVISÓRIO (baseado em orçamento).
+  // NÃO pode virar fonte-mestra dos relatórios. O Dashboard ainda vai buscar
+  // o valor oficial assíncrono em carregarVendasReaisClinicorp().
+  // Foi exatamente aqui que os relatórios ficavam presos em ~R$223k enquanto
+  // o card do Dashboard, alguns segundos depois, corrigia para ~R$177k.
+  window._dashVendasFonteMestraOficial=false;
+  window._dashVendasFonteMestraRows=[];
+  window._dashVendasFonteMestraTotal=0;
   window._dashVendasFonteMestraPeriodo={from:_range.since,to:_range.until};
 
   // Oportunidades — todos os orçamentos de quem compareceu
@@ -7870,8 +7882,17 @@ async function renderRelOrigem(){
   // Não chama analyticsVendasReaisClinicorp aqui. Isso elimina a divergência
   // em que a Métrica/Funil chegavam a R$ 223k enquanto o Dashboard estava certo.
   const fmPeriodo=window._dashVendasFonteMestraPeriodo;
-  const fmValida=fmPeriodo&&fmPeriodo.from===since&&fmPeriodo.to===until;
+  const fmValida=!!(
+    window._dashVendasFonteMestraOficial &&
+    fmPeriodo &&
+    fmPeriodo.from===since &&
+    fmPeriodo.to===until
+  );
   const fmRows=fmValida?(window._dashVendasFonteMestraRows||[]):[];
+
+  if(!fmValida){
+    console.warn('[MÉTRICAS DE ORIGEM] Vendas oficiais do Dashboard ainda não estão disponíveis para este período. O relatório NÃO vai usar o valor provisório.');
+  }
   fmRows.forEach(v=>{
     const ph=normalizePhone(v.ph||v.telefone);
     if(!ph||!pacienteBate(ph))return;
