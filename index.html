@@ -2826,11 +2826,24 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   if(window._dashVendasFonteMestraOficial&&vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._dashVendasFonteMestraRows){
     Object.values(adMap).forEach(d=>{d.vendas=0;d.vendaRows=[];});
     (window._dashVendasFonteMestraRows||[]).forEach(v=>{
-      const ph=normalizePhone(v.ph);
+      let ph=normalizePhone(v.ph||v.telefone);
+      // Alguns lançamentos financeiros chegam sem telefone. Resolve pelo nome
+      // somente se existir UMA pessoa inequívoca no CRM/Cloudia.
+      if(!ph){
+        const nn=normStr(v.name||v.nome||'');
+        if(nn){
+          const keys=Object.keys(_ccData||{}).filter(k=>k!=='__exclusoes__'&&_ccData[k]&&normStr(_ccData[k].nomeAtual||'')===nn);
+          if(keys.length===1)ph=normalizePhone(keys[0]);
+          if(!ph){
+            const phones=[...new Set(allCloudiaRows.filter(r=>normStr(r.name||'')===nn).map(r=>normalizePhone(r.phone)).filter(Boolean))];
+            if(phones.length===1)ph=phones[0];
+          }
+        }
+      }
       const key=acharKey(ph);
       if(!adMap[key])adMap[key]=novoBucket();
       adMap[key].vendas+=Number(v.value||0);
-      adMap[key].vendaRows.push(v);
+      adMap[key].vendaRows.push({...v,ph:ph||v.ph});
     });
   }
 
@@ -7763,6 +7776,47 @@ function calcularFechamentosComoDashboard(range, avalFilt, tratFilt){
   return resultado;
 }
 
+
+// Resolve a origem ATUAL do paciente para distribuir lançamentos financeiros.
+// A linha financeira não decide a origem: edição manual/reconciliação do CRM vence.
+function getOrigemFinalLancamento(ph,nome){
+  ph=normalizePhone(ph);
+  if(ph){
+    const d=ccDataLookup(ph);
+    if(d&&d.origemAtual)return d.origemAtual;
+    const real=getOrigemReal(ph);
+    if(real)return real;
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    if(row){
+      const e=applyEdits(row);
+      if(e&&e.origin)return e.origin;
+      if(row.origin)return row.origin;
+    }
+  }
+  // Financeiro às vezes não traz telefone. Só casa por nome quando é inequívoco.
+  const nn=normStr(nome||'');
+  if(nn){
+    const keys=Object.keys(_ccData||{}).filter(k=>k!=='__exclusoes__'&&_ccData[k]&&normStr(_ccData[k].nomeAtual||'')===nn);
+    if(keys.length===1){
+      const d=_ccData[keys[0]];
+      if(d.origemAtual)return d.origemAtual;
+      const p=normalizePhone(keys[0]);
+      const real=p?getOrigemReal(p):'';
+      if(real)return real;
+    }
+    const rows=allCloudiaRows.filter(r=>normStr(r.name||'')===nn);
+    const phones=[...new Set(rows.map(r=>normalizePhone(r.phone)).filter(Boolean))];
+    if(phones.length===1){
+      const p=phones[0],d=ccDataLookup(p);
+      if(d&&d.origemAtual)return d.origemAtual;
+      const real=getOrigemReal(p); if(real)return real;
+      const e=applyEdits(rows[0]); if(e&&e.origin)return e.origin;
+      if(rows[0].origin)return rows[0].origin;
+    }
+  }
+  return '—';
+}
+
 async function renderRelOrigem(){
   const since=document.getElementById('ro-from').value;
   const until=document.getElementById('ro-to').value;
@@ -7897,7 +7951,7 @@ async function renderRelOrigem(){
     const ph=normalizePhone(v.ph||v.telefone);
     if(!ph||!pacienteBate(ph))return;
     const row=rowTel(ph);
-    const org=origem(ph,row);
+    const org=getOrigemFinalLancamento(ph,v.name||v.nome||(row&&row.name)||'');
     if(!passaOrig(org))return;
     const b=bucket(org);
     b.valorFech+=Number(v.value||v.valor||0);
