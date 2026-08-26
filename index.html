@@ -2774,19 +2774,28 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   if(!adMap||!dados)return;
 
   const acharKey=(ph)=>{
+    ph=normalizePhone(ph);
+    const manualMap=window._lastPhoneAdKeyMap||{};
+    if(ph&&manualMap[ph]&&adMap[manualMap[ph]])return manualMap[ph];
     for(const [k,d] of Object.entries(adMap)){
       if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph))return k;
     }
     return '__sem_rastreio__';
   };
-  const novoBucket=()=>({spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()});
+  const novoBucket=()=>({
+    spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,
+    adset:'',campaign:'',label:'⚠ Sem rastreamento',
+    phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set(),
+    vendaRows:[]
+  });
 
+  // AGENDA/COMPARECIMENTO: exatamente a base oficial do Clinicorp usada acima.
   Object.values(adMap).forEach(d=>{d.agend=0;d.agendPhones=new Set();});
   (dados.agendPhones||new Set()).forEach(ph=>{
     const key=acharKey(ph);
     if(!adMap[key])adMap[key]=novoBucket();
     adMap[key].agend++;
-    adMap[key].agendPhones.add(ph);
+    adMap[key].agendPhones.add(normalizePhone(ph));
   });
 
   Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
@@ -2794,8 +2803,36 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
     const key=acharKey(ph);
     if(!adMap[key])adMap[key]=novoBucket();
     adMap[key].comp++;
-    adMap[key].compPhones.add(ph);
+    adMap[key].compPhones.add(normalizePhone(ph));
   });
+
+  // FECHAMENTOS: usa o MESMO Set que o Dashboard já calculou.
+  const rng=getRange('trafego');
+  const periodo=window._dashFechadosPeriodo;
+  const fechamentoValido=periodo&&periodo.from===rng.since&&periodo.to===rng.until;
+  if(fechamentoValido&&window._dashFechadosPhones){
+    Object.values(adMap).forEach(d=>{d.fechou=0;d.fechouPhones=new Set();});
+    window._dashFechadosPhones.forEach(ph=>{
+      const key=acharKey(ph);
+      if(!adMap[key])adMap[key]=novoBucket();
+      adMap[key].fechou++;
+      adMap[key].fechouPhones.add(normalizePhone(ph));
+    });
+  }
+
+  // VENDAS: quando o Dashboard já recebeu a resposta "valor real",
+  // usa EXATAMENTE essas mesmas linhas; nada de recalcular por anúncio.
+  const vendasPeriodo=window._vendasReaisPeriodo;
+  if(vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._lastVendaRows){
+    Object.values(adMap).forEach(d=>{d.vendas=0;d.vendaRows=[];});
+    (window._lastVendaRows||[]).forEach(v=>{
+      const ph=normalizePhone(v.ph);
+      const key=acharKey(ph);
+      if(!adMap[key])adMap[key]=novoBucket();
+      adMap[key].vendas+=Number(v.value||0);
+      adMap[key].vendaRows.push(v);
+    });
+  }
 
   if(typeof filterAdTable==='function')filterAdTable();
 }
@@ -3023,6 +3060,8 @@ async function carregarVendasReaisClinicorp(){
     if(elVendas)elVendas.innerHTML=(r.total>0?fmt(r.total):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
     if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(r.totalNovo,r.totalRecompra,fmt,'vendas');
     if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
+    // O funil por anúncio não calcula vendas sozinho: espelha o Dashboard.
+    if(typeof reconciliarAgendCompClinicorpPorAnuncio==='function')reconciliarAgendCompClinicorpPorAnuncio();
   }catch(e){
     console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
     // Mesma proteção contra corrida do bloco try acima — se uma chamada
@@ -3469,6 +3508,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     const key=ccManualAd?findAdKey({ad_id:ccManualAd}):findAdKey(r);
     if(key){const ph=ph0;if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
   });
+  window._lastPhoneAdKeyMap=phoneAdKeyMap;
   // STEP 5: Conta eventos do período — deduplicado por telefone por anúncio
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenAdPhone={agend:{},comp:{},fechou:{}};
@@ -3715,6 +3755,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // dela marcado como recompra — só cai no "assume novo" de verdade quando
   // não sobra nenhuma pista.
   let contratosNovos=0, contratosAntigos=0;
+  // Espelho somente-leitura das pessoas que o DASHBOARD já decidiu contar.
+  // Não altera nenhuma conta; serve para Métricas de Origem/Funil por anúncio
+  // consumirem exatamente a mesma verdade do Dashboard.
+  const _dashNovosPhones=new Set();
+  const _dashRecompraPhones=new Set();
   fechadosPhones.forEach(ph=>{
     const d=ccDataLookup(ph);
     let ehAntigo=false, temAprovadoNoPeriodo=false;
@@ -3731,10 +3776,17 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         ehAntigo=aprovNoPeriodo.every(o=>o.pacienteAntigo);
       }
     }
-    if(temAprovadoNoPeriodo){ if(ehAntigo)contratosAntigos++; else contratosNovos++; }
-    else if(temHistoricoRecompra){ contratosAntigos++; } // não achou orçamento com data exata no período, mas ela TEM histórico de recompra confirmado
-    else contratosNovos++; // sem orçamento nem histórico pra checar — assume novo por padrão
+    if(temAprovadoNoPeriodo){
+      if(ehAntigo){contratosAntigos++;_dashRecompraPhones.add(ph);}
+      else{contratosNovos++;_dashNovosPhones.add(ph);}
+    }
+    else if(temHistoricoRecompra){contratosAntigos++;_dashRecompraPhones.add(ph);}
+    else{contratosNovos++;_dashNovosPhones.add(ph);}
   });
+  window._dashFechadosPhones=new Set(fechadosPhones);
+  window._dashFechadosNovosPhones=_dashNovosPhones;
+  window._dashFechadosRecompraPhones=_dashRecompraPhones;
+  window._dashFechadosPeriodo={from:_range.since,to:_range.until};
   window._lastContratosNovos=contratosNovos;
   window._lastContratosAntigos=contratosAntigos;
 
@@ -7566,19 +7618,13 @@ function openROModal(i,type){
   const {org,d}=window._roData[i];
   const titles={leads:'Leads',atos:'Atos de agendamento',agend:'Agendados',comp:'Comparecimentos',fechou:'Contratos/Vendas'};
   const rowsMap={
-    leads:(d.leadRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e._origemFinal||e.origin||'—'];}),
+    leads:(d.leadRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—',r._origemFinal||r.origin||'—']),
     atos:(d.atosRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
     agend:(d.agendRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
     comp:(d.compRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
     fechou:(d.fechRows||[]).map(r=>[fmtDateOnly(r.dataFechamento||r.created_at),r.name||'—',r.phone||'—',r.classe||'—',fmt(Number(r.value||0))])
   };
-  const hdrs={
-    leads:['Data','Nome','Telefone','Origem'],
-    atos:['Data','Nome','Telefone'],
-    agend:['Data','Nome','Telefone'],
-    comp:['Data','Nome','Telefone'],
-    fechou:['Data','Nome','Telefone','Classe','Valor']
-  };
+  const hdrs={leads:['Data','Nome','Telefone','Origem'],atos:['Data','Nome','Telefone'],agend:['Data','Nome','Telefone'],comp:['Data','Nome','Telefone'],fechou:['Data','Nome','Telefone','Classe','Valor']};
   openModal(titles[type]+' — '+org, hdrs[type], rowsMap[type]);
 }
 
@@ -7703,209 +7749,155 @@ async function renderRelOrigem(){
   const origFilt=document.getElementById('ro-origem').value;
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
-  const range={since,until};
 
-  // Origem manual deve ser respeitada imediatamente.
   _ccDataNormIndex=null;
   buildCcDataNormIndex();
 
-  const criarBucket=()=>({
+  const novo=()=>({
     leads:new Set(),atos:0,agend:new Set(),comp:new Set(),
-    fechadosTotal:new Set(),fechadosNovos:new Set(),
+    fechados:new Set(),fechadosNovos:new Set(),
     valorOrc:0,valorFech:0,
     leadRows:[],atosRows:[],agendRows:[],compRows:[],fechRows:[]
   });
   const map={};
-  const bucket=org=>map[org]||(map[org]=criarBucket());
+  const bucket=o=>map[o]||(map[o]=novo());
 
-  const origemDoTelefone=(ph,row)=>{
+  const origem=(ph,row)=>{
     const d=ccDataLookup(ph);
-    if(d&&d.origemAtual)return d.origemAtual; // manual vence
+    if(d&&d.origemAtual)return d.origemAtual; // edição manual sempre vence
     const real=getOrigemReal(ph);
     if(real)return real;
-    if(row){
-      const e=applyEdits(row);
-      if(e&&e.origin)return e.origin;
-      if(row.origin)return row.origin;
-    }
-    return '—';
+    const e=row?applyEdits(row):null;
+    return (e&&e.origin)||(row&&row.origin)||'—';
   };
-  const passaOrigem=org=>!origFilt||org===origFilt;
-
-  const orcBateFiltros=o=>{
-    if(avalFilt&&o.avaliador!==avalFilt)return false;
-    if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
-    return true;
-  };
-  const pacienteBateFiltros=ph=>{
+  const rowTel=ph=>allCloudiaRows.find(r=>normalizePhone(r.phone)===normalizePhone(ph))||null;
+  const passaOrig=o=>!origFilt||o===origFilt;
+  const orcBate=o=>(!avalFilt||o.avaliador===avalFilt)&&(!tratFilt||tratamentoBate(o.tratamento,tratFilt));
+  const pacienteBate=ph=>{
     if(!avalFilt&&!tratFilt)return true;
     const d=ccDataLookup(ph);
-    return !!(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(orcBateFiltros));
+    return !!(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(orcBate));
   };
 
-  // ----------------------------------------------------------
-  // LEADS — mesma função que o Dashboard já usa.
-  // NÃO exclui Social Selling daqui: a tabela é justamente por origem.
-  // ----------------------------------------------------------
+  // LEADS: mesma dedupe do Dashboard, mas distribuída pela origem reconciliada atual.
   const rowsPeriodo=allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
-    const dt=parseCloudiaDate(r.created_at);
-    if(!dt)return false;
-    const ds=localDateStr(dt);
-    return ds>=since&&ds<=until;
+    const dt=parseCloudiaDate(r.created_at); if(!dt)return false;
+    const ds=localDateStr(dt); return ds>=since&&ds<=until;
   });
-
-  const leadsUnicos=getLeadsUnicosComOrigem(rowsPeriodo);
-  leadsUnicos.forEach(r=>{
+  getLeadsUnicosComOrigem(rowsPeriodo).forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name;
-    if(!ph||!pacienteBateFiltros(ph))return;
-
-    // Atualiza a origem com a verdade atual do CRM, mesmo que a linha deduplicada
-    // tenha guardado uma origem antiga.
-    const org=origemDoTelefone(ph,r);
-
-    // Mesmo conceito do Dashboard: #Paciente não é lead de aquisição.
-    if(org==='#Paciente')return;
-    if(!passaOrigem(org))return;
-
+    if(!ph||!pacienteBate(ph))return;
+    const org=origem(ph,r);
+    if(org==='#Paciente'||!passaOrig(org))return;
     const b=bucket(org);
-    if(!b.leads.has(ph)){
-      b.leads.add(ph);
-      b.leadRows.push({...r,origin:org,_origemFinal:org});
-    }
+    if(!b.leads.has(ph)){b.leads.add(ph);b.leadRows.push({...r,origin:org,_origemFinal:org});}
   });
 
-  // ----------------------------------------------------------
-  // AGENDA / COMPARECIMENTO — Clinicorp oficial
-  // ----------------------------------------------------------
-  let agenda={detalheAtos:[],detalheAgendados:[],detalheComparecimentos:[]};
+  // AGENDA/COMPARECIMENTO: MESMO endpoint oficial do Dashboard.
+  let ag={detalheAtos:[],detalheAgendados:[],detalheComparecimentos:[]};
   try{
-    const res=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until);
-    const r=await res.json();
-    if(r.status==='ok')agenda=r;
-    else console.warn('[MÉTRICAS DE ORIGEM] agenda:',r.mensagem);
-  }catch(e){
-    console.warn('[MÉTRICAS DE ORIGEM] agenda:',e);
-  }
+    const rr=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until);
+    const j=await rr.json(); if(j.status==='ok')ag=j;
+  }catch(e){console.warn('[ORIGEM] agenda',e);}
 
-  const rowDoTel=ph=>allCloudiaRows.find(r=>normalizePhone(r.phone)===normalizePhone(ph))||null;
-
-  (agenda.detalheAtos||[]).forEach(a=>{
+  (ag.detalheAtos||[]).forEach(a=>{
     if(a.deletado)return;
-    const ph=normalizePhone(a.tel);
-    if(!ph||!pacienteBateFiltros(ph))return;
-    const row=rowDoTel(ph);
-    const org=origemDoTelefone(ph,row);
-    if(!passaOrigem(org))return;
+    const ph=normalizePhone(a.tel);if(!ph||!pacienteBate(ph))return;
+    const row=rowTel(ph),org=origem(ph,row);if(!passaOrig(org))return;
+    const b=bucket(org);b.atos++;
+    b.atosRows.push({phone:ph,name:a.nome||(row&&row.name)||'—',created_at:a.dataCriacao||a.data||'',data:a.data||'',origin:org});
+  });
+  (ag.detalheAgendados||[]).forEach(a=>{
+    const ph=normalizePhone(a.tel);if(!ph||!pacienteBate(ph))return;
+    const row=rowTel(ph),org=origem(ph,row);if(!passaOrig(org))return;
     const b=bucket(org);
-    b.atos++;
-    b.atosRows.push({
-      phone:ph,name:a.nome||(row&&row.name)||((ccDataLookup(ph)||{}).nomeAtual)||'—',
-      created_at:a.dataCriacao||a.data||'',data:a.data||'',origin:org
-    });
+    if(!b.agend.has(ph)){b.agend.add(ph);b.agendRows.push({phone:ph,name:a.nome||(row&&row.name)||'—',created_at:a.data||'',origin:org});}
   });
-
-  (agenda.detalheAgendados||[]).forEach(a=>{
-    const ph=normalizePhone(a.tel);
-    if(!ph||!pacienteBateFiltros(ph))return;
-    const row=rowDoTel(ph);
-    const org=origemDoTelefone(ph,row);
-    if(!passaOrigem(org))return;
+  (ag.detalheComparecimentos||[]).forEach(a=>{
+    const ph=normalizePhone(a.tel);if(!ph||!pacienteBate(ph))return;
+    const row=rowTel(ph),org=origem(ph,row);if(!passaOrig(org))return;
     const b=bucket(org);
-    if(!b.agend.has(ph)){
-      b.agend.add(ph);
-      b.agendRows.push({
-        phone:ph,name:a.nome||(row&&row.name)||((ccDataLookup(ph)||{}).nomeAtual)||'—',
-        created_at:a.data||'',origin:org
-      });
-    }
+    if(!b.comp.has(ph)){b.comp.add(ph);b.compRows.push({phone:ph,name:a.nome||(row&&row.name)||'—',created_at:a.data||'',origin:org});}
   });
 
-  (agenda.detalheComparecimentos||[]).forEach(a=>{
-    const ph=normalizePhone(a.tel);
-    if(!ph||!pacienteBateFiltros(ph))return;
-    const row=rowDoTel(ph);
-    const org=origemDoTelefone(ph,row);
-    if(!passaOrigem(org))return;
-    const b=bucket(org);
-    if(!b.comp.has(ph)){
-      b.comp.add(ph);
-      b.compRows.push({
-        phone:ph,name:a.nome||(row&&row.name)||((ccDataLookup(ph)||{}).nomeAtual)||'—',
-        created_at:a.data||'',origin:org
-      });
-    }
-  });
-
-  // ----------------------------------------------------------
-  // FECHAMENTOS / VENDAS — ESPELHO DO DASHBOARD BOM
-  // ----------------------------------------------------------
-  const fechamentos=calcularFechamentosComoDashboard(range,avalFilt,tratFilt);
-
-  fechamentos.forEach(f=>{
-    const row=rowDoTel(f.ph);
-    const org=origemDoTelefone(f.ph,row);
-    if(!passaOrigem(org))return;
-    const b=bucket(org);
-
-    b.fechadosTotal.add(f.ph);
-    if(f.fechadoNovo)b.fechadosNovos.add(f.ph);
-    b.valorFech+=Number(f.valor||0);
-    b.fechRows.push({
-      phone:f.ph,name:f.nome,origin:org,
-      dataFechamento:f.dataFech,created_at:f.dataFech,
-      value:Number(f.valor||0),classe:f.classe
-    });
-  });
-
-  // ----------------------------------------------------------
-  // VALOR ORÇADO — mesma regra do Dashboard:
-  // orçamentos criados no período para quem compareceu +
-  // somenteOrcamento do período.
-  // ----------------------------------------------------------
-  Object.entries(map).forEach(([org,b])=>{
-    b.comp.forEach(ph=>{
-      const d=ccDataLookup(ph);
-      if(!d||!Array.isArray(d.orcamentos))return;
-      const orcs=d.orcamentos.filter(o=>{
-        if(!o.data||o.data<since||o.data>until)return false;
-        return orcBateFiltros(o);
-      });
-      b.valorOrc+=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
-    });
-  });
-
+  // FECHADOS: copia literalmente a regra do Dashboard desta versão.
+  const fechadosPhones=new Set();
   Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
-    if(phRaw==='__exclusoes__'||!d||!d.somenteOrcamento)return;
+    if(!d||!Array.isArray(d.orcamentos))return;
     const ph=normalizePhone(phRaw)||phRaw;
-    if(!pacienteBateFiltros(ph))return;
-    if(Object.values(map).some(b=>b.comp.has(ph)))return;
-
-    const row=rowDoTel(ph);
-    const org=origemDoTelefone(ph,row);
-    if(!passaOrigem(org))return;
-
-    const orcs=(d.orcamentos||[]).filter(o=>{
-      if(!o.data||o.data<since||o.data>until)return false;
-      return orcBateFiltros(o);
+    const tem=d.orcamentos.some(o=>{
+      if(o.status!=='Aprovado'||!orcBate(o))return false;
+      return (o.fechData&&o.fechData>=since&&o.fechData<=until) ||
+             ((!o.fechData)&&o.data&&o.data>=since&&o.data<=until);
     });
-    if(orcs.length)bucket(org).valorOrc+=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
+    if(tem)fechadosPhones.add(ph);
+  });
+  const evts=filterEventsByRange(allCloudiaRows,'trafego');
+  allCloudiaRows.forEach(r=>{
+    if(!isFechou(r.stage))return;
+    const dt=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);if(!dt)return;
+    const ds=localDateStr(dt);if(ds<since||ds>until)return;
+    const ph=normalizePhone(r.phone);if(!ph||!pacienteBate(ph))return;
+    fechadosPhones.add(ph);
   });
 
-  // ----------------------------------------------------------
-  // RENDER
-  // Fechados = contratos TOTAIS, igual ao card "Contratos fechados".
-  // Conversão = novos fechados / leads, igual à lógica do funil.
-  // Valor Fechado = TOTAL de vendas, para bater com o Dashboard.
-  // ----------------------------------------------------------
-  const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
-  let tL=0,tAtos=0,tA=0,tC=0,tFT=0,tFN=0,tO=0,tV=0;
-  entries.forEach(([,d])=>{
-    tL+=d.leads.size;tAtos+=d.atos;tA+=d.agend.size;tC+=d.comp.size;
-    tFT+=d.fechadosTotal.size;tFN+=d.fechadosNovos.size;
-    tO+=d.valorOrc;tV+=d.valorFech;
+  fechadosPhones.forEach(ph=>{
+    const d=ccDataLookup(ph),row=rowTel(ph),org=origem(ph,row);
+    if(!passaOrig(org))return;
+    let antigo=false,temPeriodo=false,histRecompra=false;
+    if(d&&Array.isArray(d.orcamentos)){
+      histRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+      const ap=d.orcamentos.filter(o=>{
+        if(o.status!=='Aprovado'||!orcBate(o))return false;
+        const dr=o.fechData||o.data||'';return dr>=since&&dr<=until;
+      });
+      if(ap.length){temPeriodo=true;antigo=ap.every(o=>o.pacienteAntigo);}
+    }
+    const b=bucket(org);b.fechados.add(ph);
+    if(!(temPeriodo?antigo:histRecompra))b.fechadosNovos.add(ph);
   });
-  const pct2=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
+
+  // VALOR FECHADO: NÃO recalcula. Chama a MESMA action que corrige o Dashboard.
+  // Portanto o TOTAL desta coluna é matematicamente o mesmo "Total de vendas".
+  try{
+    const rr=await fetch(CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+since+'&to='+until);
+    const vr=await rr.json();
+    if(vr.status==='ok'){
+      (vr.registros||[]).forEach(v=>{
+        const ph=normalizePhone(v.telefone);
+        const row=ph?rowTel(ph):null;
+        const org=origem(ph,row);
+        if(!passaOrig(org))return;
+        const b=bucket(org);
+        b.valorFech+=Number(v.valor||0);
+        b.fechRows.push({phone:ph,name:v.nome||((row&&row.name)||'—'),origin:org,dataFechamento:v.data,created_at:v.data,value:Number(v.valor||0),classe:v.classe||'—'});
+      });
+      window._roVendasTotalOficial=Number(vr.total||0);
+    }
+  }catch(e){console.warn('[ORIGEM] vendas oficiais',e);}
+
+  // OPORTUNIDADE: replica o mesmo bloco temporal do Dashboard.
+  Object.entries(map).forEach(([,b])=>{
+    b.comp.forEach(ph=>{
+      const d=ccDataLookup(ph);if(!d||!Array.isArray(d.orcamentos))return;
+      b.valorOrc+=d.orcamentos.filter(o=>o.data&&o.data>=since&&o.data<=until&&orcBate(o))
+        .reduce((s,o)=>s+Number(o.valor||0),0);
+    });
+  });
+  Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
+    if(!d||!d.somenteOrcamento)return;
+    const ph=normalizePhone(phRaw)||phRaw;if(!pacienteBate(ph))return;
+    if(Object.values(map).some(b=>b.comp.has(ph)))return;
+    const org=origem(ph,rowTel(ph));if(!passaOrig(org))return;
+    const os=(d.orcamentos||[]).filter(o=>o.data&&o.data>=since&&o.data<=until&&orcBate(o));
+    if(os.length)bucket(org).valorOrc+=os.reduce((s,o)=>s+Number(o.valor||0),0);
+  });
+
+  const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
+  let tL=0,tAt=0,tA=0,tC=0,tF=0,tFN=0,tO=0,tV=0;
+  entries.forEach(([,d])=>{tL+=d.leads.size;tAt+=d.atos;tA+=d.agend.size;tC+=d.comp.size;tF+=d.fechados.size;tFN+=d.fechadosNovos.size;tO+=d.valorOrc;tV+=d.valorFech;});
+  const pc=(a,b)=>b>0?(a/b*100).toFixed(1)+'%':'—';
 
   window._roData={};
   document.getElementById('ro-tbody').innerHTML=entries.map(([org,d],i)=>{
@@ -7914,38 +7906,25 @@ async function renderRelOrigem(){
       <td><span class="origem-pill">${org}</span></td>
       <td style="text-align:right">${d.leads.size} <button class="lupa" onclick="openROModal(${i},'leads')">🔍</button></td>
       <td style="text-align:right">${d.atos} <button class="lupa" onclick="openROModal(${i},'atos')">🔍</button></td>
-      <td style="text-align:right" class="tm">${pct2(d.agend.size,d.leads.size)}</td>
+      <td style="text-align:right" class="tm">${pc(d.agend.size,d.leads.size)}</td>
       <td style="text-align:right">${d.agend.size} <button class="lupa" onclick="openROModal(${i},'agend')">🔍</button></td>
       <td style="text-align:right">${d.comp.size} <button class="lupa" onclick="openROModal(${i},'comp')">🔍</button></td>
-      <td style="text-align:right" class="tm">${pct2(d.comp.size,d.agend.size)}</td>
-      <td style="text-align:right" class="tg">${d.fechadosTotal.size} <button class="lupa" onclick="openROModal(${i},'fechou')">🔍</button></td>
-      <td style="text-align:right" class="tm">${pct2(d.fechadosTotal.size,d.comp.size)}</td>
-      <td style="text-align:right" class="ta">${d.valorOrc>0?fmt(d.valorOrc):'—'}</td>
-      <td style="text-align:right" class="tg">${d.valorFech>0?fmt(d.valorFech):'—'}</td>
-      <td style="text-align:right" class="tm">${pct2(d.fechadosNovos.size,d.leads.size)}</td>
-      <td style="text-align:right" class="tg">${d.fechadosTotal.size>0?fmt(d.valorFech/d.fechadosTotal.size):'—'}</td>
+      <td style="text-align:right" class="tm">${pc(d.comp.size,d.agend.size)}</td>
+      <td style="text-align:right" class="tg">${d.fechados.size} <button class="lupa" onclick="openROModal(${i},'fechou')">🔍</button></td>
+      <td style="text-align:right" class="tm">${pc(d.fechados.size,d.comp.size)}</td>
+      <td style="text-align:right" class="ta">${d.valorOrc?fmt(d.valorOrc):'—'}</td>
+      <td style="text-align:right" class="tg">${d.valorFech?fmt(d.valorFech):'—'}</td>
+      <td style="text-align:right" class="tm">${pc(d.fechadosNovos.size,d.leads.size)}</td>
+      <td style="text-align:right" class="tg">${d.fechados.size?fmt(d.valorFech/d.fechados.size):'—'}</td>
     </tr>`;
-  }).join('')+`
-    <tr style="font-weight:600;background:#faf7f3;">
-      <td>TOTAL</td>
-      <td style="text-align:right">${tL}</td>
-      <td style="text-align:right">${tAtos}</td>
-      <td style="text-align:right" class="tm">${pct2(tA,tL)}</td>
-      <td style="text-align:right">${tA}</td>
-      <td style="text-align:right">${tC}</td>
-      <td style="text-align:right" class="tm">${pct2(tC,tA)}</td>
-      <td style="text-align:right" class="tg">${tFT}</td>
-      <td style="text-align:right" class="tm">${pct2(tFT,tC)}</td>
-      <td style="text-align:right" class="ta">${tO>0?fmt(tO):'—'}</td>
-      <td style="text-align:right" class="tg">${tV>0?fmt(tV):'—'}</td>
-      <td style="text-align:right" class="tm">${pct2(tFN,tL)}</td>
-      <td style="text-align:right" class="tg">${tFT>0?fmt(tV/tFT):'—'}</td>
-    </tr>`;
-
-  console.log('[MÉTRICAS DE ORIGEM] Espelho do Dashboard:',{
-    leads:tL,atos:tAtos,agendados:tA,comparecimentos:tC,
-    contratos:tFT,novos:tFN,vendas:tV
-  });
+  }).join('')+`<tr style="font-weight:600;background:#faf7f3;">
+    <td>TOTAL</td><td style="text-align:right">${tL}</td><td style="text-align:right">${tAt}</td>
+    <td style="text-align:right" class="tm">${pc(tA,tL)}</td><td style="text-align:right">${tA}</td>
+    <td style="text-align:right">${tC}</td><td style="text-align:right" class="tm">${pc(tC,tA)}</td>
+    <td style="text-align:right" class="tg">${tF}</td><td style="text-align:right" class="tm">${pc(tF,tC)}</td>
+    <td style="text-align:right" class="ta">${tO?fmt(tO):'—'}</td><td style="text-align:right" class="tg">${tV?fmt(tV):'—'}</td>
+    <td style="text-align:right" class="tm">${pc(tFN,tL)}</td><td style="text-align:right" class="tg">${tF?fmt(tV/tF):'—'}</td>
+  </tr>`;
 }
 // ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
 function initRelComparecidos(){
