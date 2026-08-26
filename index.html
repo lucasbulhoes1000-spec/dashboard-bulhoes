@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- VERSÃO FINAL DEFINITIVA — performance conservadora — 26/08/2026 -->
 <title>Backoffice — Bulhões Odontologia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -2083,20 +2084,37 @@ function iniciarChecagemLeadsFacebook(){
 // de nenhuma ação manual. Roda em paralelo com iniciarChecagemLeadsFacebook,
 // mas em função separada — atualiza tudo, não só leads do Formulário Facebook.
 var _autoRefreshDadosIniciado=false;
+var _autoRefreshDadosExecutando=false;
+var _autoRefreshUltimaExecucao=0;
 async function verificarAtualizacoesDados(){
+  // Performance: não faz consultas pesadas quando a aba do navegador está
+  // em segundo plano e nunca deixa dois refreshes rodarem ao mesmo tempo.
+  if(document.hidden||_autoRefreshDadosExecutando)return;
+  _autoRefreshDadosExecutando=true;
   try{
-    const [rows]=await Promise.all([fetchCloudia(),carregarCRMRemoto()]);
+    const [rows]=await Promise.all([fetchCloudia(),carregarCRMRemoto({silencioso:true})]);
     rebuildStageIndex(rows);
+    _autoRefreshUltimaExecucao=Date.now();
     if(currentPage==='leads')renderLeadsTable();
     else if(currentPage==='clientes')renderClientesTable();
   }catch(e){
     console.warn('[AUTO REFRESH] Erro ao atualizar dados em segundo plano:',e);
+  }finally{
+    _autoRefreshDadosExecutando=false;
   }
 }
 function iniciarAutoRefreshDados(){
   if(_autoRefreshDadosIniciado)return;
   _autoRefreshDadosIniciado=true;
   setInterval(verificarAtualizacoesDados,2*60*1000);
+
+  // Se a pessoa ficou um tempo em outra aba do navegador, atualiza uma vez
+  // ao voltar, em vez de ter gasto processamento durante todo esse período.
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden && Date.now()-_autoRefreshUltimaExecucao>2*60*1000){
+      verificarAtualizacoesDados();
+    }
+  });
 }
 
 // PAGE NAVIGATION
@@ -2253,7 +2271,7 @@ async function reloadCurrent(){
     // atualizado ao clicar "Atualizar" — só um F5 completo da página
     // resolvia, por acaso (o carregamento inicial da página busca os dois).
     // Agora busca os dois juntos, sempre.
-    const [rows]=await Promise.all([fetchCloudia(), carregarCRMRemoto()]);
+    const [rows]=await Promise.all([fetchCloudia(), carregarCRMRemoto({silencioso:true})]);
     rebuildStageIndex(rows);
     if(currentPage==='leads')renderLeadsTable();
     else if(currentPage==='clientes')renderClientesTable();
@@ -8154,6 +8172,11 @@ let _crmSaveTimer=null;
 // (Lucas, Vitória, Victoria, Lívia, Larissa, Gabi, Raffaella) vejam os mesmos dados do CRM,
 // em vez de cada e-mail de login ter seu próprio CRM isolado no Supabase.
 const CRM_SHARED_KEY='bulhoes-clinica-crm';
+// Snapshot da última versão confirmada pelo servidor. Usado pelo salvamento
+// atômico no Apps Script para fazer merge de 3 vias e evitar que duas pessoas
+// usando o CRM ao mesmo tempo apaguem alterações uma da outra.
+let _crmBaseSnapshot={};
+let _comissoesBaseSnapshot=[];
 
 // Salva TODO o _ccData no Supabase usando chave compartilhada da clínica
 // ⚠️ (22/07/2026) NÃO inclui mais listas_json aqui — ver salvarListasRemoto()
@@ -8162,37 +8185,46 @@ const CRM_SHARED_KEY='bulhoes-clinica-crm';
 // mesmo desatualizado, apagando fases/listas criadas em outra aba/sessão.
 async function salvarCRMRemoto(){
   try{
-    const email=CRM_SHARED_KEY;
-    const payload={
-      email_clinica: email,
-      crm_json: JSON.stringify(_ccData),
-      comissoes_json: JSON.stringify(_comissoes),
-      atualizado_em: new Date().toISOString()
-    };
-    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?on_conflict=email_clinica',{
+    // Salva pelo Apps Script (não direto no Supabase). O backend usa LockService
+    // + merge de 3 vias: base que esta aba carregou, estado local editado e
+    // estado remoto mais recente. Assim, alterações simultâneas em pacientes/
+    // campos diferentes são preservadas em vez de "último a salvar vence".
+    const res=await fetch(CRM_URL,{
       method:'POST',
-      headers:{
-        'apikey':SUPABASE_KEY,
-        'Authorization':'Bearer '+SUPABASE_KEY,
-        'Content-Type':'application/json',
-        'Prefer':'resolution=merge-duplicates,return=minimal'
-      },
-      body:JSON.stringify(payload)
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({
+        action:'saveCRMAtomic',
+        baseCrm:_crmBaseSnapshot||{},
+        localCrm:_ccData||{},
+        baseComissoes:_comissoesBaseSnapshot||[],
+        localComissoes:_comissoes||[]
+      })
     });
-    if(res.ok){
-      console.log('[CRM] Salvo no Supabase ✅',Object.keys(_ccData).length,'clientes |',_comissoes.length,'comissões');
+    const r=await res.json();
+    if(r.status==='ok'){
+      // O servidor devolve a versão final já mesclada. Isso é importante:
+      // a aba passa a trabalhar exatamente sobre a mesma versão que ficou salva.
+      if(r.crm&&typeof r.crm==='object')_ccData=r.crm;
+      if(Array.isArray(r.comissoes))_comissoes=r.comissoes;
+      _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData||{}));
+      _comissoesBaseSnapshot=JSON.parse(JSON.stringify(_comissoes||[]));
+      _ccDataNormIndex=null;
       localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
       localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
-    } else {
-      const err=await res.text();
-      console.warn('[CRM] Erro Supabase:',err);
+      console.log('[CRM] Salvo atomicamente ✅',Object.keys(_ccData).length,'clientes |',_comissoes.length,'comissões');
+    }else{
+      console.warn('[CRM] Backend recusou salvamento:',r.mensagem||r);
+      // Mantém cópia local só como contingência; NÃO avança o snapshot-base,
+      // porque o servidor não confirmou a gravação.
       localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
       localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
+      showToast&&showToast('error','CRM não foi salvo',r.mensagem||'Tente atualizar a página e salvar novamente.');
     }
   }catch(e){
-    console.warn('[CRM] Erro:',e);
+    console.warn('[CRM] Erro ao salvar atomicamente:',e);
     localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
     localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
+    if(typeof showToast==='function')showToast('error','CRM não foi salvo','Falha ao comunicar com o servidor. Os dados ficaram preservados neste navegador; tente novamente antes de fechar a página.');
   }
 }
 
@@ -8202,7 +8234,8 @@ function salvarCRMDebounced(){
 }
 
 // Carrega o CRM do Supabase
-async function carregarCRMRemoto(){
+async function carregarCRMRemoto(opcoes){
+  const silencioso=!!(opcoes&&opcoes.silencioso);
   try{
     const email=CRM_SHARED_KEY;
     // Busca do Supabase primeiro
@@ -8214,10 +8247,11 @@ async function carregarCRMRemoto(){
       if(rows[0].crm_json){
         const parsed=JSON.parse(rows[0].crm_json);
         if(parsed&&typeof parsed==='object'&&Object.keys(parsed).length>0){
-          _ccData=parsed;_ccDataNormIndex=null;_ccDataNormIndex=null;
+          _ccData=parsed;_ccDataNormIndex=null;
+          _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));
           localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
           console.log('[CRM] Carregado do Supabase ✅',Object.keys(_ccData).length,'clientes');
-          renderClientesTable();
+          if(!silencioso&&currentPage==='clientes')renderClientesTable();
         }
       }
       if(rows[0].comissoes_json){
@@ -8225,6 +8259,7 @@ async function carregarCRMRemoto(){
           const comParsed=JSON.parse(rows[0].comissoes_json);
           if(Array.isArray(comParsed)){
             _comissoes=comParsed;
+            _comissoesBaseSnapshot=JSON.parse(JSON.stringify(_comissoes));
             localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
             console.log('[CRM] Comissões carregadas do Supabase ✅',_comissoes.length,'registros');
           }
@@ -8249,13 +8284,14 @@ async function carregarCRMRemoto(){
       const parsed=JSON.parse(local);
       if(parsed&&Object.keys(parsed).length>0){
         _ccData=parsed;_ccDataNormIndex=null;
+        _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));
         console.log('[CRM] Carregado do localStorage:',Object.keys(_ccData).length,'clientes');
       }
     }
   }catch(e){
     console.warn('[CRM] Erro ao carregar:',e);
     const local=localStorage.getItem('bulhoes_crm');
-    if(local)try{_ccData=JSON.parse(local);_ccDataNormIndex=null;}catch(e2){}
+    if(local)try{_ccData=JSON.parse(local);_ccDataNormIndex=null;_crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));}catch(e2){}
   }
 }
 
@@ -10112,24 +10148,18 @@ function iniciarApp(){
   setTimeout(populateDynamicSelects, 1500); // garante que _listas já foi carregado
   iniciarChecagemLeadsFacebook();
   iniciarAutoRefreshDados();
-  iniciarAutoReloadPagina();
+  // Performance/estabilidade: sem F5 automático. O auto-refresh acima mantém os dados atuais
+  // sem reconstruir a aplicação inteira e sem interromper o trabalho do usuário.
   atualizarSaudacaoInicio();
 }
 
-// F5 automático de verdade (29/07/2026, pedido do usuário) — diferente do
-// auto-refresh de dados (que só busca dado novo em segundo plano sem
-// recarregar a página), isso recarrega a página INTEIRA a cada 15 minutos,
-// limpando qualquer travamento/acúmulo de memória de uma sessão longa. Se
-// tiver algum modal aberto na hora (a pessoa editando algo), pula esse
-// ciclo pra não perder o que está sendo digitado — tenta de novo no
-// próximo ciclo de 15 min.
+// F5 automático removido na versão final de performance (26/08/2026).
+// O sistema já possui atualização de dados em segundo plano; recarregar a
+// aplicação inteira a cada 15 minutos duplicava trabalho, refazia consultas,
+// reconstruía DOM e caches e podia interromper o uso. O botão ↻ Atualizar e
+// o refresh automático continuam disponíveis normalmente.
 function iniciarAutoReloadPagina(){
-  setInterval(()=>{
-    const modais=document.querySelectorAll('[id^="modal-"]');
-    const algumAberto=Array.from(modais).some(m=>getComputedStyle(m).display!=='none');
-    if(algumAberto)return; // tenta de novo no próximo ciclo
-    location.reload();
-  },15*60*1000);
+  // Mantida como no-op por compatibilidade caso alguma referência antiga exista.
 }
 
 
