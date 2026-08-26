@@ -5959,7 +5959,21 @@ function closeModalOutside(e){if(e.target===document.getElementById('modal-overl
 
 // CRM STATE
 function ccKey(r){var ph=String(r.phone||'').replace(/\D/g,'');return ph.length>6?ph:(r.name||'unknown');}
-function normStr(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^#/,'').trim();}
+function normStr(s){
+  if(s===null || s===undefined) return '';
+  if(typeof s==='object'){
+    if(Array.isArray(s)){
+      s=s.map(v=>{
+        if(v===null||v===undefined)return '';
+        if(typeof v==='object')return v.Name||v.name||v.Description||v.description||v.Label||v.label||'';
+        return String(v);
+      }).filter(Boolean).join(' ');
+    }else{
+      s=s.Name||s.name||s.Description||s.description||s.Label||s.label||JSON.stringify(s);
+    }
+  }
+  return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^#/,'').trim();
+}
 function ccGet(r){var k=ccKey(r);if(!_ccData[k])_ccData[k]={orcamentos:[],atividades:[],anotacoes:[]};return _ccData[k];}
 function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 
