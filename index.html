@@ -2822,10 +2822,10 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
 
   // VENDAS: quando o Dashboard já recebeu a resposta "valor real",
   // usa EXATAMENTE essas mesmas linhas; nada de recalcular por anúncio.
-  const vendasPeriodo=window._vendasReaisPeriodo;
-  if(vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._lastVendaRows){
+  const vendasPeriodo=window._dashVendasFonteMestraPeriodo;
+  if(vendasPeriodo&&vendasPeriodo.from===rng.since&&vendasPeriodo.to===rng.until&&window._dashVendasFonteMestraRows){
     Object.values(adMap).forEach(d=>{d.vendas=0;d.vendaRows=[];});
-    (window._lastVendaRows||[]).forEach(v=>{
+    (window._dashVendasFonteMestraRows||[]).forEach(v=>{
       const ph=normalizePhone(v.ph);
       const key=acharKey(ph);
       if(!adMap[key])adMap[key]=novoBucket();
@@ -3860,6 +3860,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       if(v>0){totalVendasCRM+=v;valorVendasNovas+=v;contratosComValor++;contratosComValorNovos++;_vendaRows.push({name:nome,ph,value:v,classe:'Novo'});}
     }
   });
+
+  // FONTE-MESTRA PARA RELATÓRIOS: guarda EXATAMENTE o cálculo que o Dashboard
+  // acabou de fazer aqui, antes de qualquer busca financeira assíncrona.
+  // Métricas de Origem e Funil por Anúncio devem SOMENTE distribuir estas linhas,
+  // nunca recalcular vendas por outra fonte.
+  window._dashVendasFonteMestraRows=_vendaRows.map(r=>({...r}));
+  window._dashVendasFonteMestraTotal=totalVendasCRM;
+  window._dashVendasFonteMestraPeriodo={from:_range.since,to:_range.until};
 
   // Oportunidades — todos os orçamentos de quem compareceu
   // ⚠️ NOVO (12/08/2026, pedido do usuário): separa também por novo/recompra,
@@ -7858,24 +7866,23 @@ async function renderRelOrigem(){
     if(!(temPeriodo?antigo:histRecompra))b.fechadosNovos.add(ph);
   });
 
-  // VALOR FECHADO: NÃO recalcula. Chama a MESMA action que corrige o Dashboard.
-  // Portanto o TOTAL desta coluna é matematicamente o mesmo "Total de vendas".
-  try{
-    const rr=await fetch(CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+since+'&to='+until);
-    const vr=await rr.json();
-    if(vr.status==='ok'){
-      (vr.registros||[]).forEach(v=>{
-        const ph=normalizePhone(v.telefone);
-        const row=ph?rowTel(ph):null;
-        const org=origem(ph,row);
-        if(!passaOrig(org))return;
-        const b=bucket(org);
-        b.valorFech+=Number(v.valor||0);
-        b.fechRows.push({phone:ph,name:v.nome||((row&&row.name)||'—'),origin:org,dataFechamento:v.data,created_at:v.data,value:Number(v.valor||0),classe:v.classe||'—'});
-      });
-      window._roVendasTotalOficial=Number(vr.total||0);
-    }
-  }catch(e){console.warn('[ORIGEM] vendas oficiais',e);}
+  // VALOR FECHADO: usa SOMENTE a fonte-mestra já calculada pelo Dashboard.
+  // Não chama analyticsVendasReaisClinicorp aqui. Isso elimina a divergência
+  // em que a Métrica/Funil chegavam a R$ 223k enquanto o Dashboard estava certo.
+  const fmPeriodo=window._dashVendasFonteMestraPeriodo;
+  const fmValida=fmPeriodo&&fmPeriodo.from===since&&fmPeriodo.to===until;
+  const fmRows=fmValida?(window._dashVendasFonteMestraRows||[]):[];
+  fmRows.forEach(v=>{
+    const ph=normalizePhone(v.ph||v.telefone);
+    if(!ph||!pacienteBate(ph))return;
+    const row=rowTel(ph);
+    const org=origem(ph,row);
+    if(!passaOrig(org))return;
+    const b=bucket(org);
+    b.valorFech+=Number(v.value||v.valor||0);
+    b.fechRows.push({phone:ph,name:v.name||v.nome||((row&&row.name)||'—'),origin:org,dataFechamento:v.data||'',created_at:v.data||'',value:Number(v.value||v.valor||0),classe:v.classe||'—'});
+  });
+  window._roVendasTotalOficial=fmRows.reduce((s,v)=>s+Number(v.value||v.valor||0),0);
 
   // OPORTUNIDADE: replica o mesmo bloco temporal do Dashboard.
   Object.entries(map).forEach(([,b])=>{
