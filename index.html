@@ -5724,8 +5724,20 @@ function temAgendamentoFuturo(r){
 function getEffectiveAgendInfo(phone,fallbackEvt){
   const ph=normalizePhone(phone);
   const ccD=ccDataLookup(phone);
-  let stage=fallbackEvt?fallbackEvt.stage:'';
-  let stageTs=fallbackEvt?(fallbackEvt.timestamp||fallbackEvt.created_at):null;
+  // ⚠️ CORRIGIDO (19/08/2026, caso "Ana Caroline"/"Ana Clara" — data de
+  // comparecimento virando "hoje" sem nenhum atendimento real): fallbackEvt
+  // podia ser QUALQUER evento do Cloudia (ex: CUSTOMER_ACQUISITION_ORIGIN_
+  // UPDATED, disparado por uma correção de origem em lote) — esses eventos
+  // carregam o "stage" atual da pessoa "de carona" no payload, mas não
+  // representam uma mudança de estágio de verdade. Usar o timestamp DESSE
+  // tipo de evento como se fosse "quando ela compareceu" é o mesmo bug já
+  // corrigido pro caso "Catiana" (stageTs administrativo vencendo data
+  // real), só que entrando por uma porta diferente. Agora só aceita
+  // fallbackEvt como sinal de estágio se ele for de fato um evento de
+  // MUDANÇA de estágio (CUSTOMER_STAGE_UPDATED).
+  const fallbackEhMudancaDeEstagio=fallbackEvt&&fallbackEvt.type==='CUSTOMER_STAGE_UPDATED';
+  let stage=fallbackEhMudancaDeEstagio?fallbackEvt.stage:'';
+  let stageTs=fallbackEhMudancaDeEstagio?(fallbackEvt.timestamp||fallbackEvt.created_at):null;
   const stageUpdates=(window._stageUpdatesByPhone&&window._stageUpdatesByPhone[ph])||null;
   if(stageUpdates&&stageUpdates.length>0){stage=stageUpdates[0].stage;stageTs=stageUpdates[0].timestamp;}
   // Só usa o status manual se ele for mais recente que o último evento real do Cloudia.
@@ -5756,7 +5768,12 @@ function getEffectiveAgendInfo(phone,fallbackEvt){
   // virou a data de ordenação/filtro dela.
   const stageFinal=(stage||'').toLowerCase();
   const usarStageTsComoConsulta=stageTs&&(stageFinal.includes('compareceu')||stageFinal.includes('ganho'));
-  const consultaTs=(ccD&&ccD.consultaTimestamp)||(ccD&&ccD.timestamp)||(usarStageTsComoConsulta?stageTs:'')||(fallbackEvt&&fallbackEvt.timestamp)||'';
+  // ⚠️ CORRIGIDO (19/08/2026, mesmo caso "Ana Caroline"/"Ana Clara"): o
+  // último fallback usava fallbackEvt.timestamp (podia ser de HOJE, de
+  // qualquer tipo de evento, ex: correção de origem em lote) — troca pra
+  // fallbackEvt.created_at (a data real de quando o evento se refere),
+  // com .timestamp só como último recurso se created_at não existir.
+  const consultaTs=(ccD&&ccD.consultaTimestamp)||(ccD&&ccD.timestamp)||(usarStageTsComoConsulta?stageTs:'')||(fallbackEvt&&(fallbackEvt.created_at||fallbackEvt.timestamp))||'';
   return{stage:stage,consultaTs:consultaTs};
 }
 function getStatusAgend(stage){
