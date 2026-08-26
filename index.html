@@ -703,6 +703,7 @@ tbody tr:hover td{background:#faf7f3;}
       <div style="display:flex;gap:8px;margin-bottom:16px;">
         <button class="fluxo-sub-tab active" id="fluxo-sub-tratamentos" onclick="mudarFluxoSubView('tratamentos')" style="background:#A18B6C;color:#fff;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🔄 Tratamentos</button>
         <button class="fluxo-sub-tab" id="fluxo-sub-ortodontia" onclick="mudarFluxoSubView('ortodontia')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🦷 Ortodontia (manutenção mensal)</button>
+        <button class="fluxo-sub-tab" id="fluxo-sub-concluidos" onclick="mudarFluxoSubView('concluidos')" style="background:#f0ece4;color:#7a6550;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">✅ Concluídos</button>
       </div>
 
       <div id="fluxo-view-tratamentos">
@@ -711,7 +712,6 @@ tbody tr:hover td{background:#faf7f3;}
           <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;">
             <option value="">Todos os status</option>
             <option value="em_andamento">Em andamento</option>
-            <option value="concluido">Concluído</option>
           </select>
           <select id="fluxo-semana-filter" onchange="renderFluxoCards()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;" title="Filtra pela data de início do tratamento">
             <option value="">Todas as datas de início</option>
@@ -739,6 +739,18 @@ tbody tr:hover td{background:#faf7f3;}
         </div>
         <div style="font-size:11px;color:#9a8c7e;margin-bottom:14px;">Manutenção mensal do aparelho — cada paciente entra aqui uma vez e fica até você removê-lo. Fica "Atrasado" quando passam mais de 35 dias desde a última manutenção registrada.</div>
         <div id="orto-cards" style="display:flex;flex-direction:column;gap:12px;"></div>
+      </div>
+
+      <div id="fluxo-view-concluidos" style="display:none;">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="fluxo-concluidos-search" placeholder="Buscar por nome ou telefone..." oninput="renderFluxoConcluidos()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;width:240px;">
+          <select id="fluxo-concluidos-procedimento" onchange="renderFluxoConcluidos()" style="border:0.5px solid #d4c9bc;border-radius:8px;padding:7px 12px;font-size:12px;background:#fff;outline:none;min-width:220px;">
+            <option value="">Todos os procedimentos</option>
+          </select>
+          <span id="fluxo-concluidos-count" style="font-size:12px;color:#9a8c7e;"></span>
+        </div>
+        <div style="font-size:11px;color:#9a8c7e;margin-bottom:14px;">Histórico dos tratamentos finalizados. Ao concluir NPS + pós-venda, o paciente sai automaticamente de Tratamentos e passa para cá.</div>
+        <div id="fluxo-concluidos-cards" style="display:flex;flex-direction:column;gap:12px;"></div>
       </div>
     </div>
 
@@ -920,7 +932,7 @@ tbody tr:hover td{background:#faf7f3;}
 
     <div class="page" id="page-pacientes">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
-        <div style="font-size:12px;color:#9a8c7e;">Diagnóstico de manutenção por categoria de procedimento.<br><span id="pac-ultima-sync" style="color:#b0a690;"></span></div>
+        <div style="font-size:12px;color:#9a8c7e;">Base de pacientes por categoria, sincronizada com a agenda real do Clinicorp (inclui reagendamentos e manutenções genéricas reconhecidas pelo histórico).<br><span id="pac-ultima-sync" style="color:#b0a690;"></span></div>
         <button id="btn-sync-clinicorp" onclick="sincronizarClinicorp()" style="background:#2a2520;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔄 Sincronizar Clinicorp</button>
       </div>
       <div id="pac-diagnostico"></div>
@@ -6110,7 +6122,7 @@ async function sincronizarClinicorp(){
       atualizarBadgeUltimaSync();
       renderDiagnosticoPacientes();
       renderTabelaPacientes();
-      showToast('success','✅ Sincronizado!','Período: '+r.periodo.from+' a '+r.periodo.to+'\nAgendamentos encontrados: '+r.totalAgendamentos+'\nPacientes atualizados: '+r.atualizados+'\nPacientes novos: '+r.criados);
+      showToast('success','✅ Sincronizado!','Período: '+r.periodo.from+' a '+r.periodo.to+'\nAgendamentos encontrados: '+r.totalAgendamentos+'\nPacientes atualizados: '+r.atualizados+'\nPacientes novos: '+r.criados+(r.inferidosPorHistorico?'\nManutenções genéricas reconhecidas pelo histórico: '+r.inferidosPorHistorico:'')+(r.naoClassificados?'\nNão classificados acumulados: '+r.naoClassificados:''));
     }else{
       showToast('error','Erro na sincronização',r.mensagem||JSON.stringify(r));
     }
@@ -8820,15 +8832,18 @@ function mudarFluxoSubView(view) {
   _fluxoSubView = view;
   document.getElementById('fluxo-sub-tratamentos').classList.toggle('active', view === 'tratamentos');
   document.getElementById('fluxo-sub-ortodontia').classList.toggle('active', view === 'ortodontia');
+  document.getElementById('fluxo-sub-concluidos').classList.toggle('active', view === 'concluidos');
   document.getElementById('fluxo-view-tratamentos').style.display = view === 'tratamentos' ? '' : 'none';
   document.getElementById('fluxo-view-ortodontia').style.display = view === 'ortodontia' ? '' : 'none';
+  document.getElementById('fluxo-view-concluidos').style.display = view === 'concluidos' ? '' : 'none';
   const btnNovo = document.getElementById('btn-fluxo-novo-paciente');
   if (btnNovo) btnNovo.style.display = view === 'tratamentos' ? '' : 'none';
   if (view === 'ortodontia') renderOrtoCards();
+  if (view === 'concluidos') renderFluxoConcluidos();
 }
 
 async function initFluxoTratamento() {
-  if (_fluxoIniciado) { renderFluxoCards(); renderOrtoCards(); return; }
+  if (_fluxoIniciado) { renderFluxoCards(); renderOrtoCards(); renderFluxoConcluidos(); return; }
   _fluxoIniciado = true;
   try {
     const resp = await fetch(CLOUDIA_URL + '?action=loadFluxo');
@@ -8841,6 +8856,7 @@ async function initFluxoTratamento() {
   } catch(e) { console.warn('[FLUXO] Erro ao carregar:', e); }
   renderFluxoCards();
   renderOrtoCards();
+  renderFluxoConcluidos();
 }
 
 async function salvarFluxoRemoto() {
@@ -8880,6 +8896,8 @@ function renderFluxoCards() {
   }
 
   const filtrados = _fluxoPacientes.filter(p => {
+    // Concluiu tudo? Sai imediatamente da lista principal e fica só na aba Concluídos.
+    if (p.concluido) return false;
     if (busca) {
       const nomeMatch = (p.nome || '').toLowerCase().includes(busca);
       const buscaDigits = busca.replace(/\D/g, '');
@@ -8887,7 +8905,6 @@ function renderFluxoCards() {
       if (!nomeMatch && !telMatch) return false;
     }
     if (statusFil === 'em_andamento' && p.concluido) return false;
-    if (statusFil === 'concluido' && !p.concluido) return false;
     // Filtro por semana — quanto tempo se passou desde a data de início do tratamento
     if (semanaFil && p.dataInicio) {
       const dias = Math.floor((Date.now() - new Date(p.dataInicio + 'T12:00').getTime()) / 86400000);
@@ -8901,12 +8918,6 @@ function renderFluxoCards() {
     if (procFil) {
       const temProc = (p.procedimentos || []).some(pr => normalizarNomeProcedimentoFiltro(pr.nome) === procFil);
       if (!temProc) return false;
-    }
-    // Limpeza automática: card concluído há mais de 30 dias some da lista
-    // (não apaga o dado, só deixa de exibir — ver dataConcluido).
-    if (p.concluido && p.dataConcluido) {
-      const dias = Math.floor((Date.now() - new Date(p.dataConcluido + 'T12:00').getTime()) / 86400000);
-      if (dias > 30) return false;
     }
     return true;
   }).sort((a, b) => {
@@ -9001,6 +9012,61 @@ function renderFluxoCards() {
         <div style="height:5px;background:#f0ebe4;border-radius:3px;"><div style="height:100%;width:${pct}%;background:${p.concluido ? '#5a8a6a' : '#A18B6C'};border-radius:3px;transition:width .3s;"></div></div>
       </div>
       ${procsHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderFluxoConcluidos() {
+  const container = document.getElementById('fluxo-concluidos-cards');
+  if (!container) return;
+  const busca = (document.getElementById('fluxo-concluidos-search')?.value || '').toLowerCase();
+  const procFil = document.getElementById('fluxo-concluidos-procedimento')?.value || '';
+
+  const concluidosTodos = _fluxoPacientes.filter(p => !!p.concluido);
+  const selProc = document.getElementById('fluxo-concluidos-procedimento');
+  if (selProc) {
+    const nomesProc = [...new Set(concluidosTodos.flatMap(p => (p.procedimentos || []).map(pr => normalizarNomeProcedimentoFiltro(pr.nome))))].sort();
+    const atual = selProc.value;
+    selProc.innerHTML = '<option value="">Todos os procedimentos</option>' + nomesProc.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+    selProc.value = nomesProc.includes(atual) ? atual : '';
+  }
+
+  const filtrados = concluidosTodos.filter(p => {
+    if (busca) {
+      const nomeMatch = (p.nome || '').toLowerCase().includes(busca);
+      const digits = busca.replace(/\D/g, '');
+      const telMatch = digits && String(p.tel || '').replace(/\D/g, '').includes(digits);
+      if (!nomeMatch && !telMatch) return false;
+    }
+    if (procFil && !(p.procedimentos || []).some(pr => normalizarNomeProcedimentoFiltro(pr.nome) === procFil)) return false;
+    return true;
+  }).sort((a,b)=>(b.dataConcluido||'').localeCompare(a.dataConcluido||'') || (a.nome||'').localeCompare(b.nome||''));
+
+  const count = document.getElementById('fluxo-concluidos-count');
+  if (count) count.textContent = filtrados.length + ' paciente(s)';
+  if (!filtrados.length) {
+    container.innerHTML = '<div style="text-align:center;color:#b5a898;padding:40px;font-size:13px;">Nenhum tratamento concluído ainda.</div>';
+    return;
+  }
+
+  container.innerHTML = filtrados.map(p => {
+    const idx = _fluxoPacientes.indexOf(p);
+    const procs = (p.procedimentos || []).map(pr => normalizarNomeProcedimentoFiltro(pr.nome)).filter(Boolean);
+    const procsUnicos = [...new Set(procs)];
+    const dataFim = p.dataConcluido ? new Date(p.dataConcluido+'T12:00').toLocaleDateString('pt-BR') : '—';
+    const dataInicio = p.dataInicio ? new Date(p.dataInicio+'T12:00').toLocaleDateString('pt-BR') : '—';
+    return `<div style="background:#fff;border:1px solid #d9e8dc;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.04);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#2a2520;">${p.nome}</div>
+          <div style="font-size:11px;color:#9a8c7e;margin-top:3px;">Início: ${dataInicio} · Concluído: ${dataFim}${p.tel ? ` · <a href="https://wa.me/${String(p.tel).replace(/\D/g,'')}" target="_blank" style="color:#5a8a6a;text-decoration:none;">📱 WhatsApp</a>` : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="background:#dcfce7;color:#166534;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>
+          <button onclick="abrirAdicionarFluxo(${idx})" style="background:#f5f0ea;border:0.5px solid #d4c9bc;border-radius:6px;color:#7a6550;font-size:11px;padding:4px 10px;cursor:pointer;">✏️ Editar</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">${procsUnicos.map(n=>`<span style="background:#f5f0ea;color:#7a6550;border-radius:20px;padding:3px 9px;font-size:10px;">${n}</span>`).join('')}</div>
     </div>`;
   }).join('');
 }
