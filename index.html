@@ -2578,20 +2578,16 @@ function getAgendaClinicorpFiltrada(){
   const rngAtual=getRange('trafego');
   const per=window._agendaClinicorpPeriodo;
   if(!per||per.from!==rngAtual.since||per.to!==rngAtual.until)return null;
-  // ⚠️ Excluído manualmente (aba Clientes) não pode contar aqui — antes só
-  // "Métricas de Origem" respeitava essa lista, e o Dashboard não, causando
-  // divergência entre as duas telas (18/07/2026: Dashboard sempre um pouco
-  // maior porque ainda contava quem já tinha sido excluído).
-  const excluidosSetDash=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
-  const naoExcluido=ph=>!excluidosSetDash.has(normalizePhone(ph));
-  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
-  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
-  // "Agendamentos" (atos) — antes usava o valor bruto do backend
-  // (agenda.totalAgendamentos) quando não tinha filtro de origem, sem
-  // aplicar exclusão nenhuma. Agora sempre calcula a partir de detalheAtos
-  // (que o backend já manda com o telefone de cada ato) já filtrado por
-  // origem E exclusão, pra nunca mais divergir de Métricas de Origem.
-  const detAtos=(agenda.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel)&&naoExcluido(d.tel));
+  // ⚠️ CORRIGIDO (26/08/2026): as métricas do Dashboard precisam refletir
+  // exatamente a base real retornada pelo Clinicorp para o período atual.
+  // A exclusão manual da aba Clientes é uma regra de visualização/CRM e não deve
+  // alterar Agendamentos, Leads na agenda ou Comparecimentos históricos do Clinicorp.
+  // Antes, essa exclusão retirava 7 registros dos cards (ex.: 107→100 e 54→47),
+  // enquanto as lupas continuavam mostrando a base real, criando divergência.
+  // Mantemos apenas o filtro de origem selecionado, igual às lupas.
+  const detAgend=(agenda.detalheAgendados||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const detComp=(agenda.detalheComparecimentos||[]).filter(d=>origemMatchClinicorp(d.tel));
+  const detAtos=(agenda.detalheAtos||[]).filter(d=>origemMatchClinicorp(d.tel)&&!d.deletado);
   const totalAgendamentos=detAtos.length;
   return{
     leadsAgendados:detAgend.length, // pessoas únicas na agenda no período
