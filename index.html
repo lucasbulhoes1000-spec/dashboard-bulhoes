@@ -2943,95 +2943,23 @@ function fmtDateOnly(str){
 var _vendasReaisRequestId = 0;
 
 async function carregarVendasReaisClinicorp(){
-  // 🚨 CORRIGIDO (19/08/2026, "às vezes aparece o valor errado"): essa
-  // função agora é chamada de 6 pontos diferentes do sistema (trocar
-  // Origem, editar data, editar status, Métricas de Origem, carregamento
-  // normal...). Se o usuário disparar uma chamada nova ANTES da anterior
-  // terminar (ex: trocou o filtro rápido, ou editou algo enquanto uma
-  // busca de período diferente ainda estava em andamento), a resposta MAIS
-  // LENTA podia chegar DEPOIS da mais nova e sobrescrever o valor certo com
-  // um valor de um período/contexto que já não é mais o atual — sem
-  // nenhum aviso, parecia só "às vezes dá errado" de forma aleatória.
-  // Agora cada chamada pega um número sequencial (meuRequestId); antes de
-  // escrever qualquer coisa na tela (sucesso OU erro), checa se ainda é a
-  // chamada MAIS RECENTE — se uma chamada mais nova já começou nesse meio
-  // tempo, essa resposta é descartada silenciosamente, sem tocar em nada.
-  const meuRequestId = ++_vendasReaisRequestId;
-
-  // ⚠️ CORRIGIDO (reaplicado 19/08/2026 — já tinha sido corrigido hoje mais
-  // cedo, mas foi perdido quando o arquivo voltou pro original após o
-  // incidente do R$150k): analyticsVendasReaisClinicorp só recebe período
-  // (from/to) — NÃO sabe filtrar por Origem, porque o dado vem do
-  // financeiro bruto do Clinicorp, sem esse campo. Se rodar com um filtro
-  // de Origem ativo, sobrescreveria "Total de vendas" com o total de TODAS
-  // as origens somadas, um valor maior que o correto. Se houver Origem
-  // selecionada, essa função nem roda — o valor que fica na tela é o já
-  // calculado por renderTrafego() (estimativa por orçamento), que respeita
-  // a Origem corretamente.
-  if(_origemFilter){
-    if(meuRequestId===_vendasReaisRequestId)window._vendasReaisPeriodo=null;
-    return;
-  }
-  const range=getRange('trafego');
-  if(meuRequestId===_vendasReaisRequestId)window._vendasReaisPeriodo=null;
-
-  // ⚠️ NOVO (14/08/2026, pedido do usuário): mostra "carregando..." em vez
-  // do valor baseado em orçamento (que pode divergir do real) — evita a
-  // confusão de ver um número aparentemente errado trocar sozinho pelo
-  // certo alguns segundos depois, como se tivesse "corrigido um erro".
-  const elVendasLoading=document.getElementById('t-vendas');
-  const elVendasSubLoading=document.getElementById('t-vendas-sub');
-  const elFunilValorLoading=document.getElementById('t-funil-card-valor');
-  if(elVendasLoading){
-    const btnLupaLoading=elVendasLoading.querySelector('button.lupa');
-    elVendasLoading.innerHTML='<span style="color:#9a8c7e;font-size:13px;">carregando valor real...</span> '+(btnLupaLoading?btnLupaLoading.outerHTML:'');
-  }
-  if(elVendasSubLoading)elVendasSubLoading.innerHTML='';
-  if(elFunilValorLoading)elFunilValorLoading.innerHTML='<span style="color:#9a8c7e;font-size:13px;">...</span>';
-
-  try{
-    const url=CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+range.since+'&to='+range.until;
-    const res=await fetch(url);
-    const r=await res.json();
-
-    // Enquanto esperávamos a resposta, uma chamada MAIS NOVA já começou —
-    // essa resposta está desatualizada, descarta sem tocar em nada.
-    if(meuRequestId!==_vendasReaisRequestId)return;
-
-    if(r.status!=='ok'){
-      console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
-      // 🚨 CORRIGIDO (reaplicado 19/08/2026): renderFunilResumido() NUNCA
-      // tocou em #t-vendas (só nos 4 cards do funil) — então quando essa
-      // busca falhava, o texto "carregando..." ficava travado pra sempre,
-      // sem fallback nenhum. Agora chama renderTrafego() completo (dados já
-      // em cache, sem chamada de rede nova), que SIM repinta #t-vendas.
-      if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
-      return;
-    }
-    window._vendasReaisPeriodo={from:range.since,to:range.until};
-    window._lastVendasReais=r;
-    // Substitui as linhas/valores usados pela lupa e pelos pills — a partir
-    // daqui, lupaVendas() e lupaNovoRecompra('vendas',...) mostram o
-    // faturamento real, não só orçamento.
-    window._lastVendaRows=r.registros.map(reg=>({name:reg.nome,ph:reg.telefone,value:reg.valor,classe:reg.classe,descricao:reg.descricao,data:reg.data}));
-    window._lastValorVendasNovas=r.totalNovo;
-    window._lastValorVendasRecompra=r.totalRecompra;
-
-    const elVendas=document.getElementById('t-vendas');
-    const elVendasSub=document.getElementById('t-vendas-sub');
-    const elFunilValor=document.getElementById('t-funil-card-valor');
-    if(elVendas)elVendas.innerHTML=(r.total>0?fmt(r.total):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-    if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(r.totalNovo,r.totalRecompra,fmt,'vendas');
-    if(elFunilValor)elFunilValor.textContent=r.totalNovo>0?fmt(r.totalNovo):'—';
-  }catch(e){
-    console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
-    // Mesma proteção contra corrida do bloco try acima — se uma chamada
-    // mais nova já começou, não mexe em nada.
-    if(meuRequestId!==_vendasReaisRequestId)return;
-    if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
-  }
+  // DESATIVADO DEFINITIVAMENTE (26/08/2026).
+  //
+  // financial/list_summary é um relatório financeiro/contábil do Clinicorp,
+  // não uma lista confiável de CONTRATOS FECHADOS. Em agosto ele chegou a
+  // atribuir R$ 26 mil à Maria Catiana e elevou o total para ~R$ 223,8 mil,
+  // embora esses valores não correspondessem às vendas/contratos do CRM.
+  //
+  // A fonte única de verdade de VENDAS no Backoffice volta a ser:
+  //   orçamento APROVADO no CRM + data de fechamento no período;
+  //   fallback de evento "Ganho" apenas quando não existe orçamento rastreado.
+  //
+  // Essa é exatamente a lógica que renderTrafego() já calcula e que havia
+  // produzido os números validados antes da integração financeira.
+  window._vendasReaisPeriodo=null;
+  window._lastVendasReais=null;
+  return;
 }
-
 async function carregarComparecimentoClinicorp(){
   const elAgendados=document.getElementById('t-leads-agendados');
   const elAgendadosSub=document.getElementById('t-leads-agendados-sub');
@@ -7564,7 +7492,7 @@ function initRelOrigem(){
 function openROModal(i,type){
   if(!window._roData||!window._roData[i]){alert('Dados não encontrados. Clique em Filtrar e tente novamente.');return;}
   const {org,d}=window._roData[i];
-  const titles={leads:'Leads',atos:'Atos de agendamento',agend:'Agendados',comp:'Comparecimentos',fechou:'Fechados'};
+  const titles={leads:'Leads',atos:'Atos de agendamento',agend:'Agendados',comp:'Comparecimentos',fechou:'Vendas/fechamentos'};
   const rowsMap={
     leads:(d.leadRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e._origemFinal||e.origin||'—'];}),
     atos:(d.atosRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
@@ -7583,88 +7511,87 @@ async function renderRelOrigem(){
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
 
-  // Reconstrói o índice antes do relatório. Isso é barato uma vez por render e
-  // garante que alterações manuais de origem feitas no CRM sejam respeitadas.
+  // Sempre reconstrói o índice: origem editada manualmente no CRM vence.
   _ccDataNormIndex=null;
   buildCcDataNormIndex();
 
   const criarBucket=()=>({
-    leads:new Set(),atos:0,agend:new Set(),comp:new Set(),fechou:new Set(),
-    valorOrc:0,valorFech:0,valorFechFallback:0,
-    leadRows:[],atosRows:[],agendRows:[],compRows:[],fechRows:[]
+    leads:new Set(), atos:0, agend:new Set(), comp:new Set(), fechou:new Set(),
+    valorOrc:0, valorFech:0,
+    leadRows:[], atosRows:[], agendRows:[], compRows:[], fechRows:[]
   });
   const map={};
   const bucket=org=>map[org]||(map[org]=criarBucket());
 
-  // Mapa FRESCO de origem manual, independente de qualquer cache antigo.
-  const origemManualPorTel={};
-  Object.entries(_ccData||{}).forEach(([k,d])=>{
-    if(k==='__exclusoes__'||!d)return;
-    const ph=normalizePhone(k);
-    if(ph&&d.origemAtual)origemManualPorTel[ph]=d.origemAtual;
-  });
-
+  const rowDoTelefone=ph=>allCloudiaRows.find(r=>normalizePhone(r.phone)===normalizePhone(ph))||null;
   const origemDoTelefone=(ph,row)=>{
-    const n=normalizePhone(ph);
-    if(n&&origemManualPorTel[n])return origemManualPorTel[n];
-    const reconc=n?getOrigemReal(n):'';
-    if(reconc)return reconc;
-    const edit=row?applyEdits(row):null;
-    return (edit&&edit.origin)||(row&&row.origin)||'—';
+    const d=ccDataLookup(ph);
+    if(d&&d.origemAtual)return d.origemAtual;   // MANUAL SEMPRE VENCE
+    const real=getOrigemReal(ph);
+    if(real)return real;
+    const e=row?applyEdits(row):null;
+    return (e&&e.origin)||(row&&row.origin)||'—';
   };
   const passaOrigem=org=>!origFilt||org===origFilt;
-  const passaFiltrosOrc=(ph)=>{
-    if(!avalFilt&&!tratFilt)return true;
-    const d=ccDataLookup(ph)||{orcamentos:[]};
-    const orcs=d.orcamentos||[];
-    if(avalFilt&&!orcs.some(o=>o.avaliador===avalFilt))return false;
-    if(tratFilt&&!orcs.some(o=>tratamentoBate(o.tratamento,tratFilt)))return false;
+
+  const orcBateFiltros=o=>{
+    if(avalFilt&&o.avaliador!==avalFilt)return false;
+    if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
     return true;
   };
+  const pacienteBateFiltros=ph=>{
+    if(!avalFilt&&!tratFilt)return true;
+    const d=ccDataLookup(ph);
+    if(!d||!d.orcamentos)return false;
+    return d.orcamentos.some(orcBateFiltros);
+  };
 
-  // LEADS — dedupe pela data de entrada, mas a ORIGEM sempre vem do estado
-  // reconciliado atual do CRM. Assim Carlos Lima vai para #Organico, Breno
-  // Verneck para #Social Selling etc., nunca ficam presos no bucket "—".
-  const leadBase=allCloudiaRows.filter(r=>{
+  // -------------------------
+  // LEADS
+  // -------------------------
+  const rowsPeriodo=allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
-    const d=parseCloudiaDate(r.created_at);
-    return d&&localDateStr(d)>=since&&localDateStr(d)<=until;
+    const dt=parseCloudiaDate(r.created_at);
+    if(!dt)return false;
+    const ds=localDateStr(dt);
+    return ds>=since&&ds<=until;
   });
-  const leadPorTel={};
-  leadBase.forEach(r=>{
+
+  // Mesma dedupe do Dashboard/lupa: telefone único, mantendo entrada mais antiga.
+  const unicos=getLeadsUnicosComOrigem(rowsPeriodo);
+  unicos.forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name;
-    if(!ph)return;
-    const atual=leadPorTel[ph];
-    if(!atual){leadPorTel[ph]=r;return;}
-    const dn=parseCloudiaDate(r.created_at)||new Date(8640000000000000);
-    const da=parseCloudiaDate(atual.created_at)||new Date(8640000000000000);
-    if(dn<da)leadPorTel[ph]=r;
-  });
-  Object.entries(leadPorTel).forEach(([ph,r])=>{
-    if(!passaFiltrosOrc(ph))return;
+    if(!ph||!pacienteBateFiltros(ph))return;
     const org=origemDoTelefone(ph,r);
-    // #Paciente é paciente antigo, mesma regra do Dashboard: não é lead.
+
+    // Paciente antigo não é lead.
     if(org==='#Paciente')return;
     if(!passaOrigem(org))return;
+
     const b=bucket(org);
-    b.leads.add(ph);
-    b.leadRows.push({...r,_origemFinal:org,origin:org});
+    if(!b.leads.has(ph)){
+      b.leads.add(ph);
+      b.leadRows.push({...r,origin:org,_origemFinal:org});
+    }
   });
 
-  // AGENDA — mesma fonte oficial usada pelos cards do Dashboard.
+  // -------------------------
+  // AGENDA / COMPARECIMENTO
+  // -------------------------
   let agenda={detalheAtos:[],detalheAgendados:[],detalheComparecimentos:[]};
   try{
     const res=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until);
     const r=await res.json();
     if(r.status==='ok')agenda=r;
-    else console.warn('[MÉTRICAS DE ORIGEM] Clinicorp:',r.mensagem);
-  }catch(e){console.warn('[MÉTRICAS DE ORIGEM] Erro Clinicorp:',e);}
+  }catch(e){
+    console.warn('[MÉTRICAS DE ORIGEM] Clinicorp agenda:',e);
+  }
 
   (agenda.detalheAtos||[]).forEach(item=>{
     if(item.deletado)return;
     const ph=normalizePhone(item.tel);
-    if(!ph||!passaFiltrosOrc(ph))return;
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    if(!ph||!pacienteBateFiltros(ph))return;
+    const row=rowDoTelefone(ph);
     const org=origemDoTelefone(ph,row);
     if(!passaOrigem(org))return;
     const b=bucket(org);
@@ -7677,8 +7604,8 @@ async function renderRelOrigem(){
 
   (agenda.detalheAgendados||[]).forEach(item=>{
     const ph=normalizePhone(item.tel);
-    if(!ph||!passaFiltrosOrc(ph))return;
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    if(!ph||!pacienteBateFiltros(ph))return;
+    const row=rowDoTelefone(ph);
     const org=origemDoTelefone(ph,row);
     if(!passaOrigem(org))return;
     const b=bucket(org);
@@ -7693,8 +7620,8 @@ async function renderRelOrigem(){
 
   (agenda.detalheComparecimentos||[]).forEach(item=>{
     const ph=normalizePhone(item.tel);
-    if(!ph||!passaFiltrosOrc(ph))return;
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    if(!ph||!pacienteBateFiltros(ph))return;
+    const row=rowDoTelefone(ph);
     const org=origemDoTelefone(ph,row);
     if(!passaOrigem(org))return;
     const b=bucket(org);
@@ -7707,19 +7634,26 @@ async function renderRelOrigem(){
     }
   });
 
-  // FECHADOS — mesma regra do Dashboard para número de novos pacientes.
+  // -------------------------
+  // FECHADOS + VENDAS
+  // FONTE ÚNICA = mesma lógica do Dashboard
+  // -------------------------
   const fechadosPhones=new Set();
   const ganhoPorPhone={};
+
+  // 1) Orçamento APROVADO no período.
   Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
     if(phRaw==='__exclusoes__'||!d||!d.orcamentos)return;
     const ph=normalizePhone(phRaw)||phRaw;
     const aprov=d.orcamentos.filter(o=>{
       if(o.status!=='Aprovado')return false;
       const dr=o.fechData||o.data||'';
-      return dr>=since&&dr<=until;
+      return dr>=since&&dr<=until&&orcBateFiltros(o);
     });
     if(aprov.length)fechadosPhones.add(ph);
   });
+
+  // 2) Fallback "Ganho" do Cloudia para quem fechou sem orçamento rastreado.
   allCloudiaRows.forEach(r=>{
     if(!isFechou(r.stage))return;
     const dt=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
@@ -7727,127 +7661,110 @@ async function renderRelOrigem(){
     const ds=localDateStr(dt);
     if(ds<since||ds>until)return;
     const ph=normalizePhone(r.phone);
-    if(!ph)return;
+    if(!ph||!pacienteBateFiltros(ph))return;
     if(!ganhoPorPhone[ph])ganhoPorPhone[ph]=r;
     fechadosPhones.add(ph);
   });
 
   fechadosPhones.forEach(ph=>{
-    if(!passaFiltrosOrc(ph))return;
     const d=ccDataLookup(ph)||{orcamentos:[]};
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    const row=rowDoTelefone(ph);
     const org=origemDoTelefone(ph,row);
     if(!passaOrigem(org))return;
 
     const aprovPeriodo=(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
       const dr=o.fechData||o.data||'';
-      if(dr<since||dr>until)return false;
-      if(avalFilt&&o.avaliador!==avalFilt)return false;
-      if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
-      return true;
+      return dr>=since&&dr<=until&&orcBateFiltros(o);
     });
-    let ehRecompra=false;
-    if(aprovPeriodo.length)ehRecompra=aprovPeriodo.every(o=>o.pacienteAntigo);
-    else ehRecompra=(d.orcamentos||[]).some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
-    if(ehRecompra)return;
 
-    let valorFallback=0,dataFech='';
+    // Mesmo critério Novo x Recompra do Dashboard.
+    let ehRecompra=false;
     if(aprovPeriodo.length){
-      valorFallback=aprovPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
-      const datas=aprovPeriodo.map(o=>o.fechData||o.data||'').filter(Boolean).sort();
-      dataFech=datas[datas.length-1]||'';
+      ehRecompra=aprovPeriodo.every(o=>o.pacienteAntigo);
+    }else{
+      ehRecompra=(d.orcamentos||[]).some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+    }
+
+    let linhasVenda=[];
+    if(aprovPeriodo.length){
+      linhasVenda=aprovPeriodo.map(o=>({
+        valor:Number(o.fechValor||o.valor||0),
+        data:o.fechData||o.data||'',
+        classe:o.pacienteAntigo?'Recompra':'Novo',
+        descricao:o.tratamento||''
+      }));
     }else{
       const g=ganhoPorPhone[ph];
-      valorFallback=Number((g&&g.value)||getValorGanhoReal(ph,{since:since,until:until})||0);
-      const dg=g&&(g.timestamp||g.created_at);
-      dataFech=dg?localDateStr(parseCloudiaDate(dg)):'';
+      const v=Number(getValorGanhoReal(ph,{since:since,until:until})||(g&&g.value)||0);
+      if(v>0)linhasVenda=[{
+        valor:v,
+        data:g?(g.timestamp||g.created_at||''):'',
+        classe:ehRecompra?'Recompra':'Novo',
+        descricao:''
+      }];
     }
+
     const b=bucket(org);
-    if(!b.fechou.has(ph)){
+
+    // "Fechados" da Métrica de Origem mantém a mesma regra do funil:
+    // conversões NOVAS; recompra não infla taxa de conversão.
+    if(!ehRecompra&&!b.fechou.has(ph)){
       b.fechou.add(ph);
-      b.valorFechFallback+=valorFallback;
-      b.fechRows.push({
-        phone:ph,name:d.nomeAtual||(row&&row.name)||'—',origin:org,
-        dataFechamento:dataFech,created_at:dataFech,value:valorFallback
-      });
     }
+
+    linhasVenda.forEach(v=>{
+      b.valorFech+=v.valor;
+      b.fechRows.push({
+        phone:ph,
+        name:d.nomeAtual||(row&&row.name)||'—',
+        origin:org,
+        dataFechamento:v.data,
+        created_at:v.data,
+        value:v.valor,
+        classe:v.classe,
+        descricao:v.descricao
+      });
+    });
   });
 
-  // VALOR ORÇADO — replica o Dashboard: somente orçamentos CRIADOS dentro do
-  // período de quem compareceu + "somenteOrcamento" do período.
+  // -------------------------
+  // VALOR ORÇADO
+  // -------------------------
   Object.entries(map).forEach(([org,b])=>{
     b.comp.forEach(ph=>{
       const d=ccDataLookup(ph);
       if(!d||!d.orcamentos)return;
-      const validos=(d.orcamentos||[]).filter(o=>{
+      const orcs=(d.orcamentos||[]).filter(o=>{
         if(!o.data||o.data<since||o.data>until)return false;
-        if(avalFilt&&o.avaliador!==avalFilt)return false;
-        if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
-        return true;
+        return orcBateFiltros(o);
       });
-      b.valorOrc+=validos.reduce((s,o)=>s+Number(o.valor||0),0);
+      b.valorOrc+=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
     });
   });
+
   Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
     if(phRaw==='__exclusoes__'||!d||!d.somenteOrcamento)return;
     const ph=normalizePhone(phRaw)||phRaw;
-    if(!passaFiltrosOrc(ph))return;
-    // Se já compareceu, já foi contado no bloco acima.
-    if(Object.values(map).some(b=>b.comp.has(ph)))return;
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    if(!pacienteBateFiltros(ph))return;
+
+    const jaContado=Object.values(map).some(b=>b.comp.has(ph));
+    if(jaContado)return;
+
+    const row=rowDoTelefone(ph);
     const org=origemDoTelefone(ph,row);
     if(!passaOrigem(org))return;
+
     const orcs=(d.orcamentos||[]).filter(o=>{
       if(!o.data||o.data<since||o.data>until)return false;
-      if(avalFilt&&o.avaliador!==avalFilt)return false;
-      if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
-      return true;
+      return orcBateFiltros(o);
     });
     if(orcs.length)bucket(org).valorOrc+=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
   });
 
-  // VALOR FECHADO / TOTAL DE VENDAS — usa EXATAMENTE a mesma fonte real do
-  // Dashboard: financial/list_summary do Clinicorp. O total desta coluna,
-  // portanto, obrigatoriamente bate com "Total de vendas" do Dashboard para
-  // o mesmo período. Agrupa cada lançamento pela origem reconciliada.
-  let vendasReaisOk=false;
-  try{
-    const res=await fetch(CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+since+'&to='+until);
-    const vr=await res.json();
-    if(vr.status==='ok'){
-      vendasReaisOk=true;
-      Object.values(map).forEach(b=>{b.valorFech=0;});
-      (vr.registros||[]).forEach(reg=>{
-        let ph=normalizePhone(reg.telefone);
-        let row=null;
-        // Se o Clinicorp não resolveu o telefone nessa chamada, tenta casar
-        // pelo nome para não jogar venda conhecida no bucket "—".
-        if(!ph&&reg.nome){
-          const nomeNorm=normStr(reg.nome);
-          row=allCloudiaRows.find(r=>normStr(r.name)===nomeNorm)||null;
-          if(row)ph=normalizePhone(row.phone);
-          if(!ph){
-            const chave=Object.keys(_ccData||{}).find(k=>{
-              const d=_ccData[k];
-              return d&&normStr(d.nomeAtual)===nomeNorm;
-            });
-            if(chave)ph=normalizePhone(chave);
-          }
-        }
-        if(!row&&ph)row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
-        const org=origemDoTelefone(ph,row);
-        if(!passaOrigem(org))return;
-        bucket(org).valorFech+=Number(reg.valor||0);
-      });
-    }
-  }catch(e){
-    console.warn('[MÉTRICAS DE ORIGEM] Não foi possível carregar vendas reais:',e);
-  }
-  if(!vendasReaisOk){
-    Object.values(map).forEach(b=>{b.valorFech=b.valorFechFallback||0;});
-  }
-
+  // -------------------------
+  // RENDER
+  // -------------------------
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   let tL=0,tAtos=0,tA=0,tC=0,tF=0,tO=0,tFech=0;
   entries.forEach(([,d])=>{
@@ -7890,6 +7807,9 @@ async function renderRelOrigem(){
       <td style="text-align:right" class="tm">${pct2(tF,tL)}</td>
       <td style="text-align:right" class="tg">${tF>0?fmt(tFech/tF):'—'}</td>
     </tr>`;
+
+  // Diagnóstico no console: este total deve ser o mesmo do card "Total de vendas".
+  console.log('[MÉTRICAS DE ORIGEM] Total vendas CRM:',tFech,'| Fechados novos:',tF);
 }
 // ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
 function initRelComparecidos(){
