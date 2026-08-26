@@ -7117,7 +7117,7 @@ async function backfillFluxoAprovados(){
   }
 }
 
-function salvarOrcamento(){
+async function salvarOrcamento(){
   try{
   var r=(_currentClienteIdx>=0&&clientesData[_currentClienteIdx])||(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]);
   if(!r){alert('Erro: cliente não encontrado. idx='+_currentClienteIdx);return;}
@@ -7163,16 +7163,45 @@ function salvarOrcamento(){
     fechamentos:editIdx!==''?(d.orcamentos[parseInt(editIdx)]?d.orcamentos[parseInt(editIdx)].fechamentos||[]:[]):[]
   };
   if(editIdx!==''){
-    // ⚠️ CRÍTICO: NUNCA substitui o objeto inteiro aqui — isso apagava campos
-    // como _clinicorpId e origemClinicorp que não fazem parte do formulário.
-    // Sem o _clinicorpId, a próxima vez que "Puxar Orçamentos (Clinicorp)"
-    // rodasse, o sistema não reconhecia mais esse orçamento como já
-    // importado e criava um DUPLICADO do zero. Agora funde os campos do
-    // formulário POR CIMA do que já existia, preservando o resto.
+    // Alterações feitas manualmente no Backoffice SEMPRE vencem uma futura
+    // sincronização automática do Clinicorp. Marcamos apenas os campos que
+    // realmente mudaram nesta edição — os demais continuam podendo ser
+    // atualizados automaticamente.
     const orcExistente=d.orcamentos[parseInt(editIdx)]||{};
+    const manualFields=Object.assign({},orcExistente._manualFields||{});
+    [
+      'status','avaliador','tratamento','pagamento','parcelas','fechData',
+      'fechValor','temEntrada','data','valor','entrada','entradaData',
+      'entradaPgto','pacienteAntigo','obs','crcParticip','crcNome'
+    ].forEach(campo=>{
+      const antes=orcExistente[campo];
+      const depois=orc[campo];
+      const norm=v=>(v===null||v===undefined?'':String(v));
+      if(norm(antes)!==norm(depois))manualFields[campo]=true;
+    });
+    orc._manualFields=manualFields;
+
+    // Mantém compatibilidade com a proteção antiga dos campos de pagamento.
+    if(manualFields.pagamento||manualFields.parcelas||manualFields.entrada||
+       manualFields.entradaData||manualFields.entradaPgto||manualFields.temEntrada){
+      orc.entradaManual=true;
+    }else{
+      orc.entradaManual=!!orcExistente.entradaManual;
+    }
+
     d.orcamentos[parseInt(editIdx)]=Object.assign({},orcExistente,orc);
   }
-  else d.orcamentos.unshift(orc);
+  else{
+    // Orçamento criado manualmente: todos os campos preenchidos são autoridade
+    // do Backoffice e não devem ser substituídos por importação automática.
+    orc._manualFields={
+      status:true,avaliador:true,tratamento:true,pagamento:true,parcelas:true,
+      fechData:true,fechValor:true,temEntrada:true,data:true,valor:true,
+      entrada:true,entradaData:true,entradaPgto:true,pacienteAntigo:true,
+      obs:true,crcParticip:true,crcNome:true
+    };
+    d.orcamentos.unshift(orc);
+  }
   document.getElementById('cc-orc-form').style.display='none';
   refreshOrcamentos(d);
   updateEntradas();
@@ -7191,7 +7220,12 @@ function salvarOrcamento(){
     r.stage=outroEvento?outroEvento.stage:r.stage;
   }
   filterClientesTable();
-  salvarCRMDebounced();
+
+  // Orçamento é dado crítico: aguarda o servidor confirmar a gravação antes
+  // de considerar a edição concluída. Isso evita perder uma troca manual de
+  // avaliador/status/etc. se a página for atualizada ou um novo INDEX for
+  // publicado logo depois.
+  await salvarCRMRemoto();
   }catch(e){alert('Erro ao salvar: '+e.message);console.error(e);}
 }
 function excluirOrcamento(idx){
