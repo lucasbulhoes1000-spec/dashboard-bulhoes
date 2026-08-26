@@ -3501,8 +3501,19 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Usa valor manual se definido, senão usa automático
   const _agendManual=getManualOverride('agend');
   const _compManual=getManualOverride('comp');
-  const agend=_agendManual!=null?_agendManual:agendAuto;
-  const comp=_compManual!=null?_compManual:compAuto;
+  // ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "card de
+  // Comparecimentos mostra 47, mas o valor real do Clinicorp é 54, e o
+  // triângulo do funil também mostra o número errado"): agend/comp usavam
+  // só a estimativa baseada no Cloudia (agendAuto/compAuto) ou a edição
+  // manual — nunca o valor REAL do Clinicorp, mesmo quando já carregado
+  // pro período atual. Como o triângulo do funil e várias contas (CPA,
+  // % show rate, etc.) leem essas MESMAS variáveis, corrigir só o card não
+  // bastava — precisa corrigir aqui na origem. Prioridade agora: edição
+  // manual > valor real do Clinicorp (se já carregado pro período atual)
+  // > estimativa do Cloudia (fallback, igual antes).
+  const _agendaClinicorpValidaAgora=typeof agendaClinicorpCacheValidaProPeriodoAtual==='function'&&agendaClinicorpCacheValidaProPeriodoAtual();
+  const agend=_agendManual!=null?_agendManual:(_agendaClinicorpValidaAgora?window._lastAgendaClinicorp.totalAgendamentos:agendAuto);
+  const comp=_compManual!=null?_compManual:(_agendaClinicorpValidaAgora?window._lastAgendaClinicorp.comparecimentos:compAuto);
   // Contratos: usa data do orçamento aprovado no _ccData (mais preciso que timestamp do evento)
   const _rng=getRange('trafego');
   const fechadosPhones=new Set();
@@ -3549,10 +3560,21 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   document.getElementById('t-leads-sub').textContent=(leadsInstagram.size>0?leadsInstagram.size+' leads Meta ADS':'base: '+leadsBase+' leads');
   const agendTag=_agendManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
   const compTag=_compManual!=null?'<span style="font-size:9px;background:#f5efe8;color:#A18B6C;border:0.5px solid #A18B6C;border-radius:4px;padding:1px 5px;vertical-align:middle;margin-left:4px;">manual</span>':'';
-  document.getElementById('t-agend').innerHTML=(agend||'0')+agendTag+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
-  document.getElementById('t-comp').innerHTML=(comp||'0')+compTag+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
-  document.getElementById('t-comp-sub').textContent=pct(comp,agend)+' show rate';
+  // ⚠️ CORRIGIDO (19/08/2026, bug real reportado pelo usuário — "card de
+  // Comparecimentos mostra 47, mas o valor real do Clinicorp é 54"):
+  // renderTrafego() sempre sobrescrevia Agendamentos/Comparecimentos com a
+  // ESTIMATIVA baseada no Cloudia — mesmo depois de
+  // atualizarCardsAgendaClinicorp() já ter carregado o valor REAL do
+  // Clinicorp pro mesmo período. Exatamente o mesmo bug já corrigido pro
+  // "Total de vendas" hoje cedo, só que nesses dois cards específicos.
+  // Agora só usa a estimativa se NÃO existir um valor real já carregado
+  // pra esse MESMO período (mesma checagem de período já usada nas lupas).
+  if(!agendaClinicorpCacheValidaProPeriodoAtual()){
+    document.getElementById('t-agend').innerHTML=(agend||'0')+agendTag+' <button class="lupa" onclick="lupaAgend()" title="Ver detalhes">🔍</button>';
+    document.getElementById('t-agend-sub').textContent=pct(agend,leadsBase)+' dos leads';
+    document.getElementById('t-comp').innerHTML=(comp||'0')+compTag+' <button class="lupa" onclick="lupaComp()" title="Ver detalhes">🔍</button>';
+    document.getElementById('t-comp-sub').textContent=pct(comp,agend)+' show rate';
+  }
   document.getElementById('t-cpa').textContent=agend>0?fmt(cpa):'—';
   document.getElementById('t-cpcomp').textContent=comp>0?fmt(cpcomp):'—';
   // Vendas e oportunidades do _ccData filtradas pelo período
