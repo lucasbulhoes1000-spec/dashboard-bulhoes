@@ -7583,26 +7583,34 @@ async function renderRelOrigem(){
   const avalFilt=document.getElementById('ro-aval').value;
   const tratFilt=document.getElementById('ro-trat').value;
 
+  // Reconstrói o índice antes do relatório. Isso é barato uma vez por render e
+  // garante que alterações manuais de origem feitas no CRM sejam respeitadas.
+  _ccDataNormIndex=null;
+  buildCcDataNormIndex();
+
   const criarBucket=()=>({
-    leads:new Set(),
-    atos:0,
-    agend:new Set(),
-    comp:new Set(),
-    fechou:new Set(),
-    valorOrc:0,
-    valorFech:0,
-    leadRows:[],
-    atosRows:[],
-    agendRows:[],
-    compRows:[],
-    fechRows:[]
+    leads:new Set(),atos:0,agend:new Set(),comp:new Set(),fechou:new Set(),
+    valorOrc:0,valorFech:0,valorFechFallback:0,
+    leadRows:[],atosRows:[],agendRows:[],compRows:[],fechRows:[]
   });
   const map={};
   const bucket=org=>map[org]||(map[org]=criarBucket());
 
+  // Mapa FRESCO de origem manual, independente de qualquer cache antigo.
+  const origemManualPorTel={};
+  Object.entries(_ccData||{}).forEach(([k,d])=>{
+    if(k==='__exclusoes__'||!d)return;
+    const ph=normalizePhone(k);
+    if(ph&&d.origemAtual)origemManualPorTel[ph]=d.origemAtual;
+  });
+
   const origemDoTelefone=(ph,row)=>{
-    const d=ccDataLookup(ph);
-    return (d&&d.origemAtual)||getOrigemReal(ph)||(row&&row.origin)||'—';
+    const n=normalizePhone(ph);
+    if(n&&origemManualPorTel[n])return origemManualPorTel[n];
+    const reconc=n?getOrigemReal(n):'';
+    if(reconc)return reconc;
+    const edit=row?applyEdits(row):null;
+    return (edit&&edit.origin)||(row&&row.origin)||'—';
   };
   const passaOrigem=org=>!origFilt||org===origFilt;
   const passaFiltrosOrc=(ph)=>{
@@ -7614,29 +7622,36 @@ async function renderRelOrigem(){
     return true;
   };
 
-  // LEADS — mesma base do Dashboard principal: Social Selling é retirado do
-  // bloco de leads e a origem é reconciliada por telefone.
-  const leadBase=excluirSocialSelling(allCloudiaRows).filter(r=>{
+  // LEADS — dedupe pela data de entrada, mas a ORIGEM sempre vem do estado
+  // reconciliado atual do CRM. Assim Carlos Lima vai para #Organico, Breno
+  // Verneck para #Social Selling etc., nunca ficam presos no bucket "—".
+  const leadBase=allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const d=parseCloudiaDate(r.created_at);
     return d&&localDateStr(d)>=since&&localDateStr(d)<=until;
   });
-  const leadsUnicos=getLeadsUnicosComOrigem(leadBase);
-  leadsUnicos.forEach(r=>{
+  const leadPorTel={};
+  leadBase.forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name;
-    if(!ph||!passaFiltrosOrc(ph))return;
-    const org=r._origemFinal||origemDoTelefone(ph,r)||'—';
+    if(!ph)return;
+    const atual=leadPorTel[ph];
+    if(!atual){leadPorTel[ph]=r;return;}
+    const dn=parseCloudiaDate(r.created_at)||new Date(8640000000000000);
+    const da=parseCloudiaDate(atual.created_at)||new Date(8640000000000000);
+    if(dn<da)leadPorTel[ph]=r;
+  });
+  Object.entries(leadPorTel).forEach(([ph,r])=>{
+    if(!passaFiltrosOrc(ph))return;
+    const org=origemDoTelefone(ph,r);
+    // #Paciente é paciente antigo, mesma regra do Dashboard: não é lead.
+    if(org==='#Paciente')return;
     if(!passaOrigem(org))return;
     const b=bucket(org);
-    if(!b.leads.has(ph)){
-      b.leads.add(ph);
-      b.leadRows.push(r);
-    }
+    b.leads.add(ph);
+    b.leadRows.push({...r,_origemFinal:org,origin:org});
   });
 
-  // AGENDA — MESMO endpoint/fonte dos cards corretos do Dashboard.
-  // detalheAtos = atos de agendamento; detalheAgendados = pessoas únicas;
-  // detalheComparecimentos = pessoas únicas que compareceram.
+  // AGENDA — mesma fonte oficial usada pelos cards do Dashboard.
   let agenda={detalheAtos:[],detalheAgendados:[],detalheComparecimentos:[]};
   try{
     const res=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+since+'&to='+until);
@@ -7655,11 +7670,8 @@ async function renderRelOrigem(){
     const b=bucket(org);
     b.atos++;
     b.atosRows.push({
-      phone:ph,
-      name:item.nome||(row&&row.name)||((ccDataLookup(ph)||{}).nomeAtual)||'—',
-      origin:org,
-      created_at:item.dataCriacao||item.data||'',
-      data:item.data||''
+      phone:ph,name:item.nome||(row&&row.name)||((ccDataLookup(ph)||{}).nomeAtual)||'—',
+      origin:org,created_at:item.dataCriacao||item.data||'',data:item.data||''
     });
   });
 
@@ -7695,12 +7707,9 @@ async function renderRelOrigem(){
     }
   });
 
-  // FECHADOS — replica a regra do Dashboard: orçamento aprovado no período
-  // + fallback de evento Ganho real; depois separa Novo x Recompra e mostra
-  // aqui SOMENTE os novos, igual ao funil "Fechamentos de novos pacientes".
+  // FECHADOS — mesma regra do Dashboard para número de novos pacientes.
   const fechadosPhones=new Set();
   const ganhoPorPhone={};
-
   Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
     if(phRaw==='__exclusoes__'||!d||!d.orcamentos)return;
     const ph=normalizePhone(phRaw)||phRaw;
@@ -7711,7 +7720,6 @@ async function renderRelOrigem(){
     });
     if(aprov.length)fechadosPhones.add(ph);
   });
-
   allCloudiaRows.forEach(r=>{
     if(!isFechou(r.stage))return;
     const dt=parseCloudiaDate(r.timestamp)||parseCloudiaDate(r.created_at);
@@ -7739,52 +7747,41 @@ async function renderRelOrigem(){
       if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
       return true;
     });
-
     let ehRecompra=false;
-    if(aprovPeriodo.length){
-      ehRecompra=aprovPeriodo.every(o=>o.pacienteAntigo);
-    }else{
-      // Mesma proteção do Dashboard: se não há orçamento com data exata no
-      // período, mas há histórico aprovado marcado como recompra, não conta
-      // como conversão de lead novo.
-      ehRecompra=(d.orcamentos||[]).some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
-    }
+    if(aprovPeriodo.length)ehRecompra=aprovPeriodo.every(o=>o.pacienteAntigo);
+    else ehRecompra=(d.orcamentos||[]).some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
     if(ehRecompra)return;
 
-    let valor=0,dataFech='';
+    let valorFallback=0,dataFech='';
     if(aprovPeriodo.length){
-      valor=aprovPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+      valorFallback=aprovPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
       const datas=aprovPeriodo.map(o=>o.fechData||o.data||'').filter(Boolean).sort();
       dataFech=datas[datas.length-1]||'';
     }else{
       const g=ganhoPorPhone[ph];
-      valor=Number((g&&g.value)||getValorGanhoReal(ph,{since:since,until:until})||0);
+      valorFallback=Number((g&&g.value)||getValorGanhoReal(ph,{since:since,until:until})||0);
       const dg=g&&(g.timestamp||g.created_at);
       dataFech=dg?localDateStr(parseCloudiaDate(dg)):'';
     }
-
     const b=bucket(org);
     if(!b.fechou.has(ph)){
       b.fechou.add(ph);
-      b.valorFech+=valor;
+      b.valorFechFallback+=valorFallback;
       b.fechRows.push({
-        phone:ph,
-        name:d.nomeAtual||(row&&row.name)||'—',
-        origin:org,
-        dataFechamento:dataFech,
-        created_at:dataFech,
-        value:valor
+        phone:ph,name:d.nomeAtual||(row&&row.name)||'—',origin:org,
+        dataFechamento:dataFech,created_at:dataFech,value:valorFallback
       });
     }
   });
 
-  // Oportunidade orçada: mantém apenas orçamentos dos pacientes que
-  // compareceram no período, como no Dashboard.
+  // VALOR ORÇADO — replica o Dashboard: somente orçamentos CRIADOS dentro do
+  // período de quem compareceu + "somenteOrcamento" do período.
   Object.entries(map).forEach(([org,b])=>{
     b.comp.forEach(ph=>{
       const d=ccDataLookup(ph);
       if(!d||!d.orcamentos)return;
       const validos=(d.orcamentos||[]).filter(o=>{
+        if(!o.data||o.data<since||o.data>until)return false;
         if(avalFilt&&o.avaliador!==avalFilt)return false;
         if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
         return true;
@@ -7792,6 +7789,64 @@ async function renderRelOrigem(){
       b.valorOrc+=validos.reduce((s,o)=>s+Number(o.valor||0),0);
     });
   });
+  Object.entries(_ccData||{}).forEach(([phRaw,d])=>{
+    if(phRaw==='__exclusoes__'||!d||!d.somenteOrcamento)return;
+    const ph=normalizePhone(phRaw)||phRaw;
+    if(!passaFiltrosOrc(ph))return;
+    // Se já compareceu, já foi contado no bloco acima.
+    if(Object.values(map).some(b=>b.comp.has(ph)))return;
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    const org=origemDoTelefone(ph,row);
+    if(!passaOrigem(org))return;
+    const orcs=(d.orcamentos||[]).filter(o=>{
+      if(!o.data||o.data<since||o.data>until)return false;
+      if(avalFilt&&o.avaliador!==avalFilt)return false;
+      if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
+      return true;
+    });
+    if(orcs.length)bucket(org).valorOrc+=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
+  });
+
+  // VALOR FECHADO / TOTAL DE VENDAS — usa EXATAMENTE a mesma fonte real do
+  // Dashboard: financial/list_summary do Clinicorp. O total desta coluna,
+  // portanto, obrigatoriamente bate com "Total de vendas" do Dashboard para
+  // o mesmo período. Agrupa cada lançamento pela origem reconciliada.
+  let vendasReaisOk=false;
+  try{
+    const res=await fetch(CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+since+'&to='+until);
+    const vr=await res.json();
+    if(vr.status==='ok'){
+      vendasReaisOk=true;
+      Object.values(map).forEach(b=>{b.valorFech=0;});
+      (vr.registros||[]).forEach(reg=>{
+        let ph=normalizePhone(reg.telefone);
+        let row=null;
+        // Se o Clinicorp não resolveu o telefone nessa chamada, tenta casar
+        // pelo nome para não jogar venda conhecida no bucket "—".
+        if(!ph&&reg.nome){
+          const nomeNorm=normStr(reg.nome);
+          row=allCloudiaRows.find(r=>normStr(r.name)===nomeNorm)||null;
+          if(row)ph=normalizePhone(row.phone);
+          if(!ph){
+            const chave=Object.keys(_ccData||{}).find(k=>{
+              const d=_ccData[k];
+              return d&&normStr(d.nomeAtual)===nomeNorm;
+            });
+            if(chave)ph=normalizePhone(chave);
+          }
+        }
+        if(!row&&ph)row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+        const org=origemDoTelefone(ph,row);
+        if(!passaOrigem(org))return;
+        bucket(org).valorFech+=Number(reg.valor||0);
+      });
+    }
+  }catch(e){
+    console.warn('[MÉTRICAS DE ORIGEM] Não foi possível carregar vendas reais:',e);
+  }
+  if(!vendasReaisOk){
+    Object.values(map).forEach(b=>{b.valorFech=b.valorFechFallback||0;});
+  }
 
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   let tL=0,tAtos=0,tA=0,tC=0,tF=0,tO=0,tFech=0;
@@ -7836,7 +7891,6 @@ async function renderRelOrigem(){
       <td style="text-align:right" class="tg">${tF>0?fmt(tFech/tF):'—'}</td>
     </tr>`;
 }
-
 // ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
 function initRelComparecidos(){
   initRelDates('rc-from','rc-to');
@@ -10804,6 +10858,10 @@ function salvarLeadCard(){
   _ccData[ph].statusAtualEditedAt=new Date().toISOString();
   _ccData[ph].telefoneAtual=novoTel||ph;
   _ccData[ph].editadoManualmente=true;
+  // Qualquer edição manual pode criar/alterar uma chave do CRM. Invalida o
+  // índice de telefone imediatamente para que Métricas de Origem, Dashboard
+  // e demais telas enxerguem a origem nova na mesma sessão.
+  _ccDataNormIndex=null;
   if(agendTimestamp)_ccData[ph].agendTimestamp=agendTimestamp;
   if(consultaTimestamp)_ccData[ph].consultaTimestamp=consultaTimestamp;
   if(novoValor)_ccData[ph].valorAtual=novoValor;
