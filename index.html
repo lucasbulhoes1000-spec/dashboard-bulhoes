@@ -7535,7 +7535,7 @@ function openROModal(i,type){
     leads:(d.leadRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—',e.origin||'—'];}),
     agend:(d.agendRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—'];}),
     comp:(d.compRows||[]).map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at||e.timestamp),e.name||'—',e.phone||'—'];}),
-    fechou:(d.fechRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—','R$ '+parseFloat(r.value||0).toFixed(2)])
+    fechou:(d.fechRows||[]).map(r=>[fmtDateOnly(r.dataFechamento||r.created_at||r.timestamp),r.name||'—',r.phone||'—',fmt(Number(r.value||0))])
   };
   const hdrs={leads:['Data','Nome','Telefone','Origem'],agend:['Data','Nome','Telefone'],comp:['Data','Nome','Telefone'],fechou:['Data','Nome','Telefone','Valor']};
   openModal(titles[type]+' — '+org, hdrs[type], rowsMap[type]);
@@ -7673,7 +7673,7 @@ async function renderRelOrigem(){
 
     const orcsPeriodo=(d.orcamentos||[]).filter(o=>{
       if(o.status!=='Aprovado')return false;
-      const dr=o.fechData||o.data||'';
+      const dr=o.fechData||'';
       if(!dr||dr<since||dr>until)return false;
       if(avalFilt&&o.avaliador!==avalFilt)return false;
       if(tratFilt&&!tratamentoBate(o.tratamento,tratFilt))return false;
@@ -7686,14 +7686,27 @@ async function renderRelOrigem(){
     if(origFilt&&actualOrg!==origFilt)return;
     if(!map[actualOrg])map[actualOrg]={leads:new Set(),agend:new Set(),comp:new Set(),fechou:new Set(),fechPhones:new Set(),orcPhones:new Set(),valorOrc:0,valorFech:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]};
 
+    // A mesma coleção de orçamentos que gera o número/valor da linha também
+    // gera a lupa. Nunca mais reutiliza uma linha antiga do Cloudia (que era a
+    // causa de aparecer 2025/2026 fora do período e R$ 0,00 no modal).
+    const valorFechadoPaciente=orcsPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+    const datasFechamento=orcsPeriodo.map(o=>o.fechData||o.data||'').filter(Boolean).sort();
+    const dataFechamentoPaciente=datasFechamento.length?datasFechamento[datasFechamento.length-1]:'';
+
     if(!map[actualOrg].fechPhones.has(phN)){
       map[actualOrg].fechou.add(phN);
       map[actualOrg].fechPhones.add(phN);
-      map[actualOrg].fechRows.push(row||{phone:phN,name:d.nomeAtual||'—',origin:actualOrg,created_at:orcsPeriodo[0].fechData||orcsPeriodo[0].data});
+      map[actualOrg].fechRows.push({
+        phone:phN,
+        name:d.nomeAtual||(row&&row.name)||'—',
+        origin:actualOrg,
+        dataFechamento:dataFechamentoPaciente,
+        created_at:dataFechamentoPaciente,
+        value:valorFechadoPaciente
+      });
     }
-    // Valor fechado também respeita o período e os filtros. Antes somava TODOS
-    // os orçamentos aprovados históricos do paciente depois que ele entrava no mês.
-    map[actualOrg].valorFech+=orcsPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+    // Valor fechado vem EXATAMENTE dos mesmos orçamentos mostrados na lupa.
+    map[actualOrg].valorFech+=valorFechadoPaciente;
   });
   const entries=Object.entries(map).sort((a,b)=>b[1].leads.size-a[1].leads.size);
   // Totais
@@ -7857,7 +7870,7 @@ function renderRelOrcamentos(){
     if(ph==='__exclusoes__'||!d)return;
     (d.orcamentos||[]).forEach(o=>{
       if(o.status!=='Aprovado')return;
-      const dataRef=o.fechData||o.data||'';
+      const dataRef=o.fechData||'';
       if(!dataRef||dataRef<since||dataRef>until)return;
       const av=o.avaliador||'Sem avaliador';
       if(avalFilt&&av!==avalFilt)return;
