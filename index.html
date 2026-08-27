@@ -428,7 +428,7 @@ tbody tr:hover td{background:#faf7f3;}
               <option value="organico">#Orgânico</option>
               <option value="indicacao">#Indicação</option>
               <option value="social selling">#Social Selling</option>
-              <option value="formulario facebook">#Formulário Facebook</option>
+              <option value="formulario">#Formulário</option>
             </select>
             <span style="font-size:11px;color:#b5a898;" id="origem-count"></span>
           </div>
@@ -2580,19 +2580,83 @@ function toggleDetalhesTrafego(){
   if(slider)slider.style.background=checked?'#5a8a6a':'#d4c9bc';
   if(knob)knob.style.left=checked?'20px':'2px';
 }
+
+// ============================================================
+// ORIGEM CANÔNICA — FONTE ÚNICA PARA CARDS, FILTROS E LUPAS
+// ============================================================
+// Regras finais:
+// • "#Formulário" e "#Formulário Facebook" = MESMA origem → "#Formulário"
+// • "Cloudia - Facebook" é OUTRA origem e NÃO entra em "#Formulário"
+// • edição manual do CRM continua tendo prioridade sobre origem histórica
+function origemGrupoCanonico(origem){
+  const n=normStr(origem||'').replace(/^#/,'').trim();
+  if(!n)return 'sem_origem';
+
+  // Cloudia/Facebook é origem própria. Precisa vir ANTES de qualquer regra
+  // envolvendo a palavra "facebook".
+  if(n.includes('cloudia') && n.includes('facebook'))return 'cloudia_facebook';
+
+  if(n.includes('formulario'))return 'formulario';
+  if(n.includes('instagram') && n.includes('ads'))return 'instagram_ads';
+  if(n==='instagram'||n.includes('instagram ads'))return 'instagram_ads';
+  if(n.includes('organico'))return 'organico';
+  if(n.includes('indicacao'))return 'indicacao';
+  if(n.includes('social selling')||n==='social')return 'social_selling';
+  if(n.includes('clinicorp direto'))return 'clinicorp_direto';
+  if(n.includes('cloudia') && n.includes('whatsapp'))return 'cloudia_whatsapp';
+  if(n.includes('whatsapp') && n.includes('icombot'))return 'whatsapp_icombot';
+  if(n==='#paciente'||n==='paciente')return 'paciente';
+
+  return 'outra:'+n;
+}
+
+function origemLabelCanonico(origem){
+  const g=origemGrupoCanonico(origem);
+  const labels={
+    formulario:'#Formulário',
+    instagram_ads:'#Instagram ADS',
+    organico:'#Orgânico',
+    indicacao:'#Indicação',
+    social_selling:'#Social Selling',
+    clinicorp_direto:'#Clinicorp Direto',
+    cloudia_facebook:'Cloudia - Facebook',
+    cloudia_whatsapp:'Cloudia - Whatsapp',
+    whatsapp_icombot:'WhatsApp - ICOMBOT',
+    paciente:'#Paciente',
+    sem_origem:'—'
+  };
+  if(labels[g])return labels[g];
+  return origem||'—';
+}
+
+function origemBateFiltro(origem,filtro){
+  if(!filtro)return true;
+  return origemGrupoCanonico(origem)===origemGrupoCanonico(filtro);
+}
+
+function origemAtualPaciente(ph,nomeFallback){
+  const p=normalizePhone(ph);
+  if(p){
+    const d=ccDataLookup(p);
+    if(d&&d.origemAtual)return origemLabelCanonico(d.origemAtual);
+    const real=getOrigemReal(p);
+    if(real)return origemLabelCanonico(real);
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===p);
+    if(row){
+      const e=applyEdits(row);
+      if(e&&e.origin)return origemLabelCanonico(e.origin);
+      if(row.origin)return origemLabelCanonico(row.origin);
+    }
+  }
+  return origemLabelCanonico(getOrigemFinalLancamento(p,nomeFallback||''));
+}
+
 // Confere se um telefone bate com a origem selecionada no filtro do Dashboard —
 // usado pra cruzar dados do Clinicorp (que não sabe a origem) com a origem
 // reconciliada de cada telefone (mesma fonte usada no resto do Dashboard).
 function origemMatchClinicorp(ph){
   if(!_origemFilter)return true;
-  const d=ccDataLookup(ph);
-  const org=((d&&d.origemAtual)||getOrigemReal(ph)||'').toLowerCase();
-  if(_origemFilter==='instagram ads')return org.includes('instagram');
-  if(_origemFilter==='organico')return org.includes('organ');
-  if(_origemFilter==='indicacao')return org.includes('indica');
-  if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
-  return true;
+  return origemBateFiltro(origemAtualPaciente(ph,''),_origemFilter);
 }
 // Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
 // filtrados pela origem selecionada, a partir do detalhe por telefone
@@ -3053,17 +3117,7 @@ async function carregarVendasReaisClinicorp(){
     // Para o Dashboard/lupas, aplica o filtro de origem CLIENT-SIDE sobre as
     // linhas oficiais. Assim o total geral continua R$177k, mas #Orgânico mostra
     // somente vendas realmente atribuídas a #Orgânico.
-    const bateFiltroOrigem=v=>{
-      if(!_origemFilter)return true;
-      const org=normStr(v.origemFinal||'').replace(/^#/,'');
-      const fil=normStr(_origemFilter||'').replace(/^#/,'');
-      if(fil==='instagram ads')return org.includes('instagram');
-      if(fil==='organico')return org.includes('organ');
-      if(fil==='indicacao')return org.includes('indica');
-      if(fil==='social selling')return org.includes('social');
-      if(fil==='formulario facebook')return org.includes('formulario')||org.includes('facebook');
-      return org===fil;
-    };
+    const bateFiltroOrigem=v=>origemBateFiltro(v.origemFinal||'',_origemFilter);
 
     const linhas=todasLinhas.filter(bateFiltroOrigem);
     const total=linhas.reduce((s,v)=>s+v.value,0);
@@ -3705,7 +3759,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
       else match=true;
       if(!match)compPhonesSet.delete(ph);
     });
@@ -3727,7 +3781,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
       else match=true;
       if(!match)return;
     }
@@ -3748,7 +3802,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
       else match=true;
       if(!match)return;
     }
@@ -3769,7 +3823,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
       else match=true;
       if(!match)fechadosPhones.delete(ph);
     });
@@ -3946,7 +4000,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       else if(_origemFilter==='organico')match=org.includes('organ');
       else if(_origemFilter==='indicacao')match=org.includes('indica');
       else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
       else match=true;
       if(!match)return;
     }
@@ -4035,7 +4089,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         else if(_origemFilter==='organico')match=org.includes('organ');
         else if(_origemFilter==='indicacao')match=org.includes('indica');
         else if(_origemFilter==='social selling')match=org.includes('social');
-      else if(_origemFilter==='formulario facebook')match=org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
+      else if(origemGrupoCanonico(_origemFilter)==='formulario')match=origemGrupoCanonico(org)==='formulario';
         else match=true;
         if(!match)return false;
       }
@@ -4441,21 +4495,9 @@ function excluirSocialSelling(rows){
 }
 function filterCloudiaByOrigin(rows){
   if(!_origemFilter)return rows;
-  return rows.filter(r=>{
-    // ⚠️ CORRIGIDO (19/07/2026): antes usava só r.origin (a linha BRUTA
-    // individual daquele evento específico) — se a pessoa tem várias linhas
-    // (ex: uma interação antiga + uma nova do formulário), a linha específica
-    // sendo avaliada podia ter origem diferente da origem RECONCILIADA da
-    // pessoa (_ccData.origemAtual, a mesma fonte que Clientes/Métricas de
-    // Origem já usam), fazendo a pessoa inteira ficar de fora do filtro.
-    const d=ccDataLookup(r.phone);
-    const org=((d&&d.origemAtual)||getOrigemReal(r.phone)||r.origin||'').toLowerCase();
-    if(_origemFilter==='instagram ads')return org.includes('instagram');
-    if(_origemFilter==='organico')return org.includes('organ');
-    if(_origemFilter==='indicacao')return org.includes('indica');
-    if(_origemFilter==='social selling')return org.includes('social');
-  if(_origemFilter==='formulario facebook')return org.normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('formulario')||org.includes('facebook');
-    return true;
+  return (rows||[]).filter(r=>{
+    const org=origemAtualPaciente(r.phone,r.name||'');
+    return origemBateFiltro(org,_origemFilter);
   });
 }
 function updateOrigemCount(rows){
@@ -5568,14 +5610,16 @@ function getLeadsUnicosComOrigem(rows){
     else{
       const dNew=new Date(r.created_at||r.timestamp||0);
       const dOld=new Date(phoneMap[ph].created_at||phoneMap[ph].timestamp||0);
-      if(dNew<dOld)phoneMap[ph]=r; // mantém o mais antigo (data de entrada)
+      if(dNew<dOld)phoneMap[ph]=r;
     }
   });
   return Object.values(phoneMap).map(r=>{
     const e=applyEdits(r);
-    return {...e,_origemFinal:e.origin||'—'};
+    const org=origemAtualPaciente(e.phone,e.name||'');
+    return {...e,origin:org,_origemFinal:org};
   });
 }
+
 function lupaLeads(){
   const unicos=getLeadsUnicosComOrigem(_lastCloudiaFiltered)
     .sort((a,b)=>new Date(b.created_at||b.timestamp||0)-new Date(a.created_at||a.timestamp||0));
@@ -5596,7 +5640,7 @@ function lupaAgend(){
   });
   const rows=Object.values(phoneMap)
     .sort((a,b)=>new Date(b.timestamp||b.created_at||0)-new Date(a.timestamp||a.created_at||0))
-    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',e.origin||'—',getStatusAgend(info.stage),fmtDate(info.consultaTs)];});
+    .map(r=>{const e=applyEdits(r);const info=getEffectiveAgendInfo(e.phone,e);const org=origemAtualPaciente(e.phone,e.name||'');return[fmtDate(e.timestamp||e.created_at),e.name||'—',e.phone||'—',org,getStatusAgend(info.stage),fmtDate(info.consultaTs)];});
   openModal('Agendamentos — '+rows.length+' registros',['Data agend.','Nome','Telefone','Origem','Status','Data consulta'],rows);
 }
 function lupaComp(){
@@ -5609,7 +5653,7 @@ function lupaComp(){
     const info=getEffectiveAgendInfo(ph,row);
     const ccD=ccDataLookup(ph);
     const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
+    const origem=origemAtualPaciente(ph,nome);
     const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
     const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
     return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(dataCadastroVal)||new Date(0)};
@@ -5739,23 +5783,44 @@ function lupaEntradas(){
   openModal('Entradas',['Data','Nome','Telefone','Valor','Pgto'],tableRows,rows.length);
 }
 function lupaContratos(){
-  if(!vendaCacheValidaProPeriodoAtual()){showToast('error','Ainda carregando','Aguarde o carregamento terminar pro período/filtro atual e tente de novo.');return;}
-  // Usa _lastVendaRows que já está filtrado por data do orçamento aprovado no período
-  const rows=(window._lastVendaRows||[]).slice().sort((a,b)=>{
-    const da=(ccDataLookup(a.ph)&&ccDataLookup(a.ph).created_at)||'';
-    const db=(ccDataLookup(b.ph)&&ccDataLookup(b.ph).created_at)||'';
-    return da.localeCompare(db);
-  }).map(r=>{
-    const d=ccDataLookup(r.ph)||{};
-    const row=allCloudiaRows.find(cr=>normalizePhone(cr.phone)===r.ph);
-    const dataReg=fmtDate(d.created_at||getDataCadastroReal(r.ph)||(row&&row.created_at)||'');
-    const orc=d.orcamentos&&d.orcamentos.find(o=>o.status==='Aprovado');
-    const valOrc=d.orcamentos&&d.orcamentos.length>0?d.orcamentos.reduce((s,o)=>s+Number(o.valor||0),0):r.value;
-    const origem=(d.origemAtual||getOrigemReal(r.ph)||(row&&row.origin)||'—');
-    return[dataReg,r.name,r.ph,origem,valOrc>0?fmt(valOrc):'—',fmt(r.value)];
-  });
-  openModal('Fechamentos — '+rows.length+' registros',['Data cadastro','Nome','Telefone','Origem','Valor orçado','Valor fechado'],rows);
+  const rng=getRange('trafego');
+  const per=window._dashFechadosPeriodo;
+  if(!per||per.from!==rng.since||per.to!==rng.until){
+    showToast('error','Ainda carregando','Aguarde o Dashboard terminar de carregar o período atual.');
+    return;
+  }
+
+  const phones=[...(window._dashFechadosPhones||new Set())];
+  const rows=phones.map(ph=>{
+    const d=ccDataLookup(ph)||{};
+    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const nome=d.nomeAtual||row.name||'—';
+    const origem=origemAtualPaciente(ph,nome);
+    const classe=(window._dashFechadosRecompraPhones&&window._dashFechadosRecompraPhones.has(ph))?'Recompra':'Novo';
+
+    const aprovados=(d.orcamentos||[]).filter(o=>{
+      if(o.status!=='Aprovado')return false;
+      const dt=o.fechData||o.data||'';
+      return dt>=rng.since&&dt<=rng.until;
+    });
+    const datas=aprovados.map(o=>o.fechData||o.data||'').filter(Boolean).sort();
+    const dataFech=datas[datas.length-1]||'';
+    return{
+      nome,ph,origem,classe,dataFech,
+      sort:dataFech||getDataCadastroReal(ph)||''
+    };
+  }).sort((a,b)=>String(b.sort).localeCompare(String(a.sort)));
+
+  openModal(
+    'Contratos fechados — '+rows.length+' registros',
+    ['Data fechamento','Nome','Telefone','Origem','Tipo'],
+    rows.map(r=>[
+      r.dataFech?new Date(r.dataFech+'T12:00:00').toLocaleDateString('pt-BR'):'—',
+      r.nome,r.ph,r.origem,r.classe
+    ])
+  );
 }
+
 function lupaAdLeads(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
@@ -7645,8 +7710,12 @@ function initRelOrigem(){
   initRelDates('ro-from','ro-to');
   const doRender=async()=>{
     const sel=document.getElementById('ro-origem');
-    const origens=[...new Set(allCloudiaRows.map(r=>r.origin||'').filter(Boolean))].sort();
-    sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option>${o}</option>`).join('');
+    const origensRaw=[
+      ...allCloudiaRows.map(r=>origemAtualPaciente(r.phone,r.name||'')),
+      ...Object.values(_ccData||{}).map(d=>d&&d.origemAtual?origemLabelCanonico(d.origemAtual):'')
+    ].filter(Boolean);
+    const origens=[...new Set(origensRaw.map(origemLabelCanonico))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    sel.innerHTML='<option value="">Todas</option>'+origens.map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
     populateDynamicSelects();
     // Garante que _lastCompPhones está populado (mesmo sem passar pelo dashboard)
     if(!window._lastCompPhones||window._lastCompPhones.size===0){
@@ -7848,18 +7917,14 @@ async function renderRelOrigem(){
     leadRows:[],atosRows:[],agendRows:[],compRows:[],fechRows:[]
   });
   const map={};
-  const bucket=o=>map[o]||(map[o]=novo());
-
-  const origem=(ph,row)=>{
-    const d=ccDataLookup(ph);
-    if(d&&d.origemAtual)return d.origemAtual; // edição manual sempre vence
-    const real=getOrigemReal(ph);
-    if(real)return real;
-    const e=row?applyEdits(row):null;
-    return (e&&e.origin)||(row&&row.origin)||'—';
+  const bucket=o=>{
+    const label=origemLabelCanonico(o);
+    return map[label]||(map[label]=novo());
   };
+
+  const origem=(ph,row)=>origemAtualPaciente(ph,(row&&row.name)||'');
   const rowTel=ph=>allCloudiaRows.find(r=>normalizePhone(r.phone)===normalizePhone(ph))||null;
-  const passaOrig=o=>!origFilt||o===origFilt;
+  const passaOrig=o=>!origFilt||origemBateFiltro(o,origFilt);
   const orcBate=o=>(!avalFilt||o.avaliador===avalFilt)&&(!tratFilt||tratamentoBate(o.tratamento,tratFilt));
   const pacienteBate=ph=>{
     if(!avalFilt&&!tratFilt)return true;
@@ -7965,7 +8030,7 @@ async function renderRelOrigem(){
     const ph=normalizePhone(v.ph||v.telefone);
     if(!ph||!pacienteBate(ph))return;
     const row=rowTel(ph);
-    const org=getOrigemFinalLancamento(ph,v.name||v.nome||(row&&row.name)||'');
+    const org=origemLabelCanonico(getOrigemFinalLancamento(ph,v.name||v.nome||(row&&row.name)||''));
     if(!passaOrig(org))return;
     const b=bucket(org);
     b.valorFech+=Number(v.value||v.valor||0);
