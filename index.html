@@ -4733,9 +4733,54 @@ function setLeadsPerPage(n){
   renderLeadsPage();
 }
 
+
+// ============================================================
+// CLIENTES — FONTE DE VERDADE = ORÇAMENTO ABERTO
+// ============================================================
+// A aba Clientes NÃO é uma lista de quem agendou ou compareceu.
+// Ela mostra quem ABRIU ORÇAMENTO dentro do período selecionado.
+// Isso inclui:
+//   • avaliação que compareceu e gerou orçamento;
+//   • paciente antigo que pediu um novo orçamento sem nova avaliação.
+// E exclui:
+//   • faltou/desmarcou e não teve orçamento;
+//   • agendou e ainda não teve orçamento;
+//   • lead que nunca foi agendado.
+//
+// A data do filtro é a DATA DE CRIAÇÃO DO ORÇAMENTO (o.data).
+function getOrcamentosClienteNoPeriodo(ph,fromV,toV){
+  const d=ccDataLookup(ph);
+  const orcs=d&&Array.isArray(d.orcamentos)?d.orcamentos:[];
+  return orcs.filter(o=>{
+    const dt=String(o.data||'').substring(0,10);
+    if(!dt)return false;
+    if(fromV&&dt<fromV)return false;
+    if(toV&&dt>toV)return false;
+    return true;
+  });
+}
+
+function getDataUltimoOrcamento(ph){
+  const d=ccDataLookup(ph);
+  const orcs=d&&Array.isArray(d.orcamentos)?d.orcamentos:[];
+  const datas=orcs.map(o=>String(o.data||'').substring(0,10)).filter(Boolean).sort();
+  return datas.length?datas[datas.length-1]:'';
+}
+
+function idsOrcamentosCliente(ph){
+  const d=ccDataLookup(ph);
+  const orcs=d&&Array.isArray(d.orcamentos)?d.orcamentos:[];
+  const ids=new Set();
+  orcs.forEach(o=>{
+    if(o._treatmentId)ids.add('t:'+String(o._treatmentId));
+    if(o._clinicorpId)ids.add('c:'+String(o._clinicorpId));
+  });
+  return ids;
+}
+
 // ===== CLIENTES PAGE =====
 function renderClientes(){
-  // Define filtro padrão: mês atual pela data de comparecimento
+  // Define filtro padrão: mês atual pela data de criação do orçamento
   const fromEl=document.getElementById('clientes-from');
   const toEl=document.getElementById('clientes-to');
   if(!fromEl.value&&!toEl.value){
@@ -4758,135 +4803,127 @@ function renderClientes(){
 // selecionado e completa qualquer comparecimento que o webhook tenha
 // perdido, sem depender só dele. Roda toda vez que a aba Clientes é aberta.
 async function garantirClinicorpParaClientes(){
-  const from=document.getElementById('clientes-from')?.value||'';
-  const to=document.getElementById('clientes-to')?.value||'';
-  if(!from||!to)return;
-  try{
-    const res=await fetch(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+from+'&to='+to);
-    const r=await res.json();
-    if(r.status!=='ok')return;
-    const excluidos=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
-    let mudou=false;
-    (r.detalheAgendados||[]).forEach(item=>{
-      // ⚠️ CORRIGIDO (18/07/2026): usava "comparecimento" (critério estrito do
-      // Dashboard, só Em atendimento/Atendido) — mas o pedido era pra aba
-      // Clientes já mostrar a partir de "Em espera" também. Agora usa o flag
-      // mais amplo que o backend expõe pra essa finalidade específica.
-      if(!item.deveAparecerEmClientes)return;
-      const tel=normalizePhone(item.tel);
-      if(!tel||excluidos.has(tel))return; // nunca recria quem foi excluído manualmente
-      const d=ccDataLookup(tel);
-      if(!d){
-        _ccData[tel]={nomeAtual:item.nome||'(sem nome)',origemAtual:'#Clinicorp Direto',statusAtual:'Compareceu',statusAtualEditedAt:new Date().toISOString(),leadImportado:true,orcamentos:[],atividades:[],anotacoes:[]};
-        mudou=true;
-      }else if(!isComp(d.statusAtual)&&!isFechou(d.statusAtual)){
-        d.statusAtual='Compareceu';
-        d.statusAtualEditedAt=new Date().toISOString();
-        mudou=true;
-      }
-    });
-    if(mudou){_ccDataNormIndex=null;salvarCRMDebounced();renderClientesTable();}
-  }catch(e){console.warn('[CLIENTES CLINICORP] Erro (não bloqueia a aba):',e);}
+  // Mantida apenas por compatibilidade.
+  // Não cria/transforma clientes a partir de status da agenda.
+  // A importação de orçamentos é que determina quem entra em Clientes.
+  return;
 }
+
 function renderClientesTable(){
-  const stageRank=s=>{const l=(s||'').toLowerCase();if(l.includes('ganho'))return 4;if(l.includes('compareceu'))return 3;if(l.includes('agendou'))return 2;return 1;};
+  const excluidosSet=new Set(
+    (((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone))
+  );
+
   const phoneMap={};
-  // ⚠️ Lista de exclusão manual — sem checar aqui, um cliente excluído em
-  // "Excluir cliente" podia voltar sozinho assim que qualquer evento novo do
-  // Cloudia chegasse pra aquele telefone (o doPost principal não sabe de
-  // exclusão nenhuma, só os fluxos específicos do Clinicorp sabem). Filtrar
-  // aqui, na hora de montar a lista, garante que excluído nunca mais volta,
-  // não importa a origem do dado.
-  const excluidosSet=new Set((((_ccData['__exclusoes__']&&_ccData['__exclusoes__'].clientes)||[]).map(normalizePhone)));
-  // ⚠️ CORRIGIDO (14/07/2026): antes filtrava pelo estágio BRUTO do evento
-  // original do Cloudia (r.stage) — isso nunca refletia comparecimento real
-  // sincronizado depois via Clinicorp (webhook, botão manual etc.), porque
-  // esse dado mora em _ccData, não no evento original. Agora usa o estágio
-  // EFETIVO (getEffectiveAgendInfo já mescla os dois, dando prioridade pro
-  // mais recente).
-  allCloudiaRows.filter(r=>{
-    const ph0=normalizePhone(r.phone);
-    if(ph0&&excluidosSet.has(ph0))return false;
-    const info=getEffectiveAgendInfo(r.phone,r);
-    return isComp(info.stage)||isFechou(info.stage);
-  }).forEach(r=>{
-    const ph=normalizePhone(r.phone)||r.name||Math.random();
-    if(!phoneMap[ph]||stageRank(r.stage)>stageRank(phoneMap[ph].stage)){phoneMap[ph]={...r};}
-    const v=parseFloat(r.value||0);
-    if(v>parseFloat(phoneMap[ph].value||0))phoneMap[ph].value=v;
+
+  // 1) Fonte principal: _ccData com pelo menos UM orçamento real.
+  Object.keys(_ccData||{}).forEach(k=>{
+    if(k==='__exclusoes__')return;
+    const d=_ccData[k];
+    if(!d||!Array.isArray(d.orcamentos)||d.orcamentos.length===0)return;
+
+    const ph=normalizePhone(k)||k;
+    if(!ph||excluidosSet.has(ph))return;
+
+    const cloudia=allCloudiaRows
+      .filter(r=>normalizePhone(r.phone)===ph)
+      .sort((a,b)=>{
+        const da=parseCloudiaDate(a.created_at||a.timestamp)||new Date(0);
+        const db=parseCloudiaDate(b.created_at||b.timestamp)||new Date(0);
+        return db-da;
+      })[0]||{};
+
+    const info=getEffectiveAgendInfo(ph,cloudia);
+    const ultimoOrc=getDataUltimoOrcamento(ph);
+    const stage=(d.orcamentos||[]).some(o=>o.status==='Aprovado')
+      ? 'Ganho'
+      : (info.stage||d.statusAtual||'Em aberto');
+
+    phoneMap[ph]={
+      ...cloudia,
+      phone:ph,
+      name:d.nomeAtual||cloudia.name||'(sem nome)',
+      origin:d.origemAtual||origemAtualPaciente(ph,cloudia.name||''),
+      stage,
+      value:Math.max(0,...d.orcamentos.map(o=>Number(o.valor||0))),
+      created_at:cloudia.created_at||d.created_at||'',
+      timestamp:info.consultaTs||cloudia.timestamp||'',
+      _ultimoOrcamento:ultimoOrc,
+      _sortDate:ultimoOrc?new Date(ultimoOrc+'T12:00:00'):new Date(0)
+    };
   });
-  // ⚠️ Clientes criados DIRETO pelo Clinicorp (comparecimento real numa
-  // avaliação, sem nenhum lead prévio no Cloudia) nunca tinham linha nenhuma
-  // em allCloudiaRows — o loop acima nunca os alcançava, então "compareceu de
-  // verdade" segundo o Clinicorp mas NUNCA aparecia na aba Clientes. Varre
-  // o _ccData direto e completa quem ficou de fora, sempre respeitando a
-  // exclusão manual também.
-  Object.keys(_ccData).forEach(ph=>{
-    if(ph==='__exclusoes__')return;
-    // ⚠️ CRÍTICO: normaliza a chave antes de comparar — o _ccData tem entradas
-    // antigas salvas com formatos diferentes (com/sem 55, 10 vs 11 dígitos).
-    // Comparar a chave crua contra phoneMap (que usa telefone normalizado)
-    // causava duas coisas ao mesmo tempo: duplicava quem já estava na lista
-    // (mesma pessoa, chave "igual" mas grafada diferente) E deixava passar
-    // quem tinha sido excluído manualmente (mesmo motivo).
-    const phNorm=normalizePhone(ph)||ph;
-    if(phoneMap[phNorm]||excluidosSet.has(phNorm))return;
-    const d=_ccData[ph];
-    if(!d||!d.statusAtual)return;
-    const info=getEffectiveAgendInfo(phNorm,null);
-    if(!(isComp(info.stage)||isFechou(info.stage)))return;
-    phoneMap[phNorm]={phone:phNorm,name:d.nomeAtual||'(sem nome)',origin:d.origemAtual||'',stage:info.stage,value:0,created_at:d.consultaTimestamp||'',timestamp:d.consultaTimestamp||''};
-  });
-  // Pré-calcula a data de ordenação uma única vez por cliente (evita recalcular getEffectiveAgendInfo
-  // repetidamente dentro do comparador do sort, o que era O(N log N) chamadas pesadas)
-  const clientesArr=Object.values(phoneMap);
-  clientesArr.forEach(r=>{
-    const info=getEffectiveAgendInfo(r.phone,r);
-    // ⚠️ CORRIGIDO (19/07/2026, caso "Guilherme da Costa"): clientes criados
-    // direto do Clinicorp (via orçamento) não têm consultaTs nem
-    // created_at/timestamp preenchidos — de propósito, pra nunca inventar
-    // uma data de comparecimento falsa. Mas isso fazia _sortDate cair pro
-    // epoch (1970), o que os excluía de QUALQUER filtro de data na tela
-    // (fromV/toV), mesmo a pessoa sendo uma cliente real e recente. Agora,
-    // como ÚLTIMO recurso antes do epoch, usa a data do próprio orçamento
-    // só pra ORDENAR/FILTRAR — a coluna "Data Comparecimento" exibida
-    // continua vindo de r.timestamp normalmente (mostra "—"), essa data
-    // aqui não aparece pro usuário, só evita o sumiço da lista.
-    const dcc=ccDataLookup(r.phone);
-    const orcs=dcc&&dcc.orcamentos;
-    const dataOrcamentoFallback=(orcs&&orcs.length>0)?parseCloudiaDate(orcs[0].fechData||orcs[0].data):null;
-    r._sortDate=parseCloudiaDate(info.consultaTs)||parseCloudiaDate(r.created_at||r.timestamp)||dataOrcamentoFallback||new Date(0);
-  });
+
+  let clientesArr=Object.values(phoneMap);
+
+  // 2) DEDUPE.
+  // Primeiro telefone normalizado já elimina com/sem 55 e com/sem 9.
+  // Depois elimina duplicata de CRM quando o MESMO paciente ficou salvo em
+  // duas chaves diferentes. Só une nomes iguais quando há forte evidência:
+  // IDs de orçamento compartilhados OU um dos registros não tem IDs.
+  const removidos=new Set();
+  for(let i=0;i<clientesArr.length;i++){
+    if(removidos.has(i))continue;
+    const a=clientesArr[i];
+    const nomeA=normStr(a.name||'');
+    if(!nomeA)continue;
+    const idsA=idsOrcamentosCliente(a.phone);
+
+    for(let j=i+1;j<clientesArr.length;j++){
+      if(removidos.has(j))continue;
+      const b=clientesArr[j];
+      if(normStr(b.name||'')!==nomeA)continue;
+
+      const idsB=idsOrcamentosCliente(b.phone);
+      const compartilha=[...idsA].some(id=>idsB.has(id));
+      const semIds=idsA.size===0||idsB.size===0;
+
+      if(compartilha||semIds){
+        // Mantém a ficha com mais orçamentos; em empate, a de orçamento mais recente.
+        const da=ccDataLookup(a.phone)||{orcamentos:[]};
+        const db=ccDataLookup(b.phone)||{orcamentos:[]};
+        const scoreA=(da.orcamentos||[]).length*1000000+(a._sortDate?.getTime()||0)/1e9;
+        const scoreB=(db.orcamentos||[]).length*1000000+(b._sortDate?.getTime()||0)/1e9;
+        if(scoreB>scoreA){
+          clientesArr[i]=b;
+          removidos.add(j);
+        }else{
+          removidos.add(j);
+        }
+      }
+    }
+  }
+  clientesArr=clientesArr.filter((_,i)=>!removidos.has(i));
+
   clientesData=clientesArr.sort((a,b)=>b._sortDate-a._sortDate);
-  // Atualiza selects de filtro
+
+  // Filtros auxiliares.
   const fasesSel=document.getElementById('clientes-fase-filter');
   fasesSel.innerHTML='<option value="">Todas as fases</option>';
-  // Usa as fases das listas gerenciadas (ativas) + fases dos dados que não estejam na lista
   const fasesAtivas=_listas.fases.ativos||[];
   const fasesNoDado=[...new Set(clientesData.map(r=>r.stage||'').filter(Boolean))];
-  const todasFases=[...new Set([...fasesAtivas,...fasesNoDado])].sort();
-  todasFases.forEach(f=>fasesSel.add(new Option(f,f)));
+  [...new Set([...fasesAtivas,...fasesNoDado])].sort().forEach(f=>fasesSel.add(new Option(f,f)));
+
   const origSel=document.getElementById('clientes-origem-filter');
   origSel.innerHTML='<option value="">Todas as origens</option>';
-  [...new Set(clientesData.map(r=>r.origin||'').filter(Boolean))].sort().forEach(o=>origSel.add(new Option(o,o)));
-  // Popula filtro de fases de atividade (última atividade registrada de cada cliente)
+  [...new Set(clientesData.map(r=>origemAtualPaciente(r.phone,r.name||'')).filter(Boolean))]
+    .sort().forEach(o=>origSel.add(new Option(o,o)));
+
   const faseAtvSel=document.getElementById('clientes-fase-atv-filter');
   if(faseAtvSel){
     const fasesAtv=[...new Set(clientesData.map(r=>{
-      const ph=String(r.phone||'').replace(/\D/g,'');
-      const d=ccDataLookup(ph);
-      return d&&d.atividades&&d.atividades.length>0?d.atividades[0].fase:'';
+      const d=ccDataLookup(r.phone);
+      return d&&d.atividades&&d.atividades.length?d.atividades[0].fase:'';
     }).filter(Boolean))].sort();
-    const curVal=faseAtvSel.value;
+    const cur=faseAtvSel.value;
     faseAtvSel.innerHTML='<option value="">Todas as fases ativ.</option>';
     fasesAtv.forEach(f=>faseAtvSel.add(new Option(f,f)));
-    if(curVal)faseAtvSel.value=curVal;
+    if(cur)faseAtvSel.value=cur;
   }
-  // Popula cards de resumo
-  // Cards agora são atualizados pelo filterClientesTable com base no filtered
+
   populateDynamicSelects();
   filterClientesTable();
 }
+
 // ===== RELATÓRIO PDF =====
 function getPeriodLabel(tab){
   const rng=getRange(tab);
@@ -5415,49 +5452,54 @@ function filterClientesTable(){
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
-  const qDigits2=(q||'').replace(/\D/g,'');
+  const qDigits=(q||'').replace(/\D/g,'');
+
   const filtered=clientesData.filter(r=>{
     const e=applyEdits(r);
-    const phoneClean2=String(e.phone||'').replace(/\D/g,'');
-    const nameMatch2=(e.name||'').toLowerCase().includes(ql||'');
-    const phoneMatch2=qDigits2?phoneClean2.includes(qDigits2):phoneClean2.includes(q||'');
-    const match=!ql||(nameMatch2||phoneMatch2);
+    const ph=normalizePhone(e.phone||r.phone);
+    const d=ccDataLookup(ph)||{orcamentos:[]};
+
+    // REGRA PRINCIPAL: só entra se abriu orçamento no período.
+    const orcsPeriodo=getOrcamentosClienteNoPeriodo(ph,fromV,toV);
+    if(orcsPeriodo.length===0)return false;
+
+    const phoneClean=String(e.phone||'').replace(/\D/g,'');
+    const nameMatch=(e.name||'').toLowerCase().includes(ql||'');
+    const phoneMatch=qDigits?phoneClean.includes(qDigits):phoneClean.includes(q||'');
+    const match=!ql||(nameMatch||phoneMatch);
+
+    // Fechado/aberto considera SOMENTE os orçamentos abertos nesse período.
+    const fechou=orcsPeriodo.some(o=>o.status==='Aprovado');
+
     const faseMatch=!fase||r.stage===fase;
     const faseAtvMatch=(()=>{
       if(!faseAtv)return true;
-      const phA=String(r.phone||'').replace(/\D/g,'');
-      const dA=ccDataLookup(phA);
-      const ultimaA=dA&&dA.atividades&&dA.atividades.length>0?dA.atividades[0]:null;
-      return ultimaA&&ultimaA.fase===faseAtv;
+      const ultima=d&&d.atividades&&d.atividades.length?d.atividades[0]:null;
+      return !!(ultima&&ultima.fase===faseAtv);
     })();
-    const origMatch=!orig||(e.origin||'')===orig;
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph)||{orcamentos:[]};
-    const orcs=d.orcamentos||[];
-    // Fechado = Fase "Ganho" no Cloudia OU orçamento aprovado manualmente no dashboard
-    // (mesma regra usada no resto do dashboard — orçamento aprovado é fonte de verdade).
-    const fechou=isFechou(r.stage)||orcs.some(o=>o.status==='Aprovado');
+
+    const origemEfetiva=origemAtualPaciente(ph,e.name||'');
+    const origMatch=!orig||origemBateFiltro(origemEfetiva,orig);
+
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
-    const tratMatch=!trat||orcs.some(o=>tratamentoBate(o.tratamento,trat));
-    const normStr=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-    const avalMatch=!aval||orcs.some(o=>normStr(o.avaliador)===normStr(aval));
-    let dateMatch=true;
-    if(fromV||toV){
-      // Usa r._sortDate (já calculado via getEffectiveAgendInfo em renderClientesTable),
-      // a MESMA fonte de verdade usada para exibir a coluna "Data Comparecimento" e para
-      // ordenar a tabela. Antes este filtro recalculava com allCloudiaRows.find(), que podia
-      // pegar um evento diferente do exibido (causa de "mês passado" trazer gente de junho).
-      const dd=r._sortDate&&r._sortDate.getTime()>0?r._sortDate:null;
-      const ds=dd?localDateStr(dd):'';
-      if(fromV&&ds&&ds<fromV)dateMatch=false;
-      if(toV&&ds&&ds>toV)dateMatch=false;
-      if(!ds)dateMatch=false;
-    }
-    return match&&faseMatch&&faseAtvMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch&&dateMatch;
+    const tratMatch=!trat||orcsPeriodo.some(o=>tratamentoBate(o.tratamento,trat));
+    const avalMatch=!aval||orcsPeriodo.some(o=>normStr(o.avaliador)===normStr(aval));
+
+    // Guarda o recorte para render/cards; não recalcula histórico inteiro.
+    r._orcamentosPeriodo=orcsPeriodo;
+    r._origemEfetiva=origemEfetiva;
+    const datas=orcsPeriodo.map(o=>String(o.data||'').substring(0,10)).filter(Boolean).sort();
+    r._dataOrcamentoPeriodo=datas[datas.length-1]||'';
+
+    return match&&faseMatch&&faseAtvMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch;
   });
+
   document.getElementById('clientes-count').textContent=filtered.length+' clientes';
-  _clientesFiltrados=filtered;_clientesPage=1;renderClientesPage();
+  _clientesFiltrados=filtered;
+  _clientesPage=1;
+  renderClientesPage();
 }
+
 let _clientesFiltrados=[];let _clientesPage=1;let _clientesPerPage=20;
 function mudaPagCliente(p){_clientesPage=p;renderClientesPage();}
 function setClientesPerPage(n){
@@ -5483,32 +5525,18 @@ function renderClientesPage(){
   // Atualiza cards conforme filtro atual
   const totalC=filtered.length;
   // Conta como fechado: stage Ganho OU tem orçamento Aprovado no CRM
-  const totalF=filtered.filter(r=>{
-    if(isFechou(r.stage))return true;
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph);
-    return d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado');
-  }).length;
+  const totalF=filtered.filter(r=>(r._orcamentosPeriodo||[]).some(o=>o.status==='Aprovado')).length;
   const totalA=totalC-totalF;
-  // Valor orçado: soma todos os orçamentos do CRM dos clientes filtrados
+  // Valor orçado: SOMENTE orçamentos abertos dentro do período filtrado.
   let totalOrcado=0;
   filtered.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph);
-    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
-    if(orcs)orcs.forEach(o=>totalOrcado+=Number(o.valor||0));
-    else totalOrcado+=parseFloat(r.value||0);
+    (r._orcamentosPeriodo||[]).forEach(o=>totalOrcado+=Number(o.valor||0));
   });
   // Valor fechado: orçamentos aprovados de quem é fechado (stage Ganho ou orç aprovado)
   let valorF=0;
   filtered.forEach(r=>{
-    const ph=String(r.phone||'').replace(/\D/g,'');
-    const d=ccDataLookup(ph);
-    const ehFechado=isFechou(r.stage)||(d&&d.orcamentos&&d.orcamentos.some(o=>o.status==='Aprovado'));
-    if(!ehFechado)return;
-    const orcs=d&&d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;
-    if(orcs)orcs.filter(o=>o.status==='Aprovado').forEach(o=>valorF+=Number(o.valor||0));
-    else valorF+=parseFloat(r.value||0);
+    (r._orcamentosPeriodo||[]).filter(o=>o.status==='Aprovado')
+      .forEach(o=>valorF+=Number(o.fechValor||o.valor||0));
   });
   document.getElementById('cc-total-clientes').textContent=totalOrcado>0?fmt(totalOrcado):'—';
   document.getElementById('cc-total-abertos').textContent=totalA;
@@ -5527,15 +5555,15 @@ function renderClientesPage(){
   document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
     const d=mesclarVariacaoSeVazio(ph,ccDataLookup(ph)||{orcamentos:[],atividades:[],anotacoes:[]});
-    // Fechado = Fase "Ganho" no Cloudia OU orçamento aprovado manualmente no dashboard.
-    const fechou=isFechou(r.stage)||(d.orcamentos||[]).some(o=>o.status==='Aprovado');
+    const orcsPeriodo=r._orcamentosPeriodo||[];
+    const fechou=orcsPeriodo.some(o=>o.status==='Aprovado');
     const val=parseFloat(r.value||0);
     const idx=clientesData.indexOf(r);
     // Mostra o orçamento de MAIOR VALOR (não necessariamente o primeiro do
     // array) — evita mostrar um tratamento menor quando a pessoa tem vários
     // orçamentos e o mais caro/relevante está em outra posição.
-    const orc0=d.orcamentos&&d.orcamentos.length>0
-      ?d.orcamentos.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0]
+    const orc0=orcsPeriodo.length>0
+      ?orcsPeriodo.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0]
       :null;
     const ultimaAtv=(d.atividades&&d.atividades.length>0)?d.atividades[0]:null;
     const proxContato=ultimaAtv&&ultimaAtv.proximo?new Date(ultimaAtv.proximo+'T12:00').toLocaleDateString('pt-BR'):'—';
