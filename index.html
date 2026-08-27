@@ -653,9 +653,12 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
-          <select class="filter-select" id="clientes-origem-filter" onchange="filterClientesTable()"><option value="">Todas as origens</option></select>
+          <select class="filter-select" id="clientes-tipo-orc-filter" onchange="filterClientesTable()">
+            <option value="">Todos os orçamentos</option>
+            <option value="novo">Novos pacientes</option>
+            <option value="recompra">Recompras</option>
+          </select>
           <select class="filter-select" id="clientes-fase-filter" onchange="filterClientesTable()"><option value="">Todas as fases</option></select>
-          <select class="filter-select" id="clientes-fase-atv-filter" onchange="filterClientesTable()"><option value="">Todas as fases ativ.</option></select>
           <select class="filter-select" id="clientes-sit-filter" onchange="filterClientesTable()">
             <option value="">Todas as situações</option>
             <option value="fechado">Fechou tratamento</option>
@@ -2458,9 +2461,15 @@ function filterAgendByRange(rows,tab){
 // esse campo pode vir com vários procedimentos juntos (ex: "Lentes em Resina,
 // Remoção Lentes, Profilaxia..."), então o filtro precisa bater com QUALQUER
 // procedimento individual da lista, não com o plano inteiro de uma vez.
+function canonTratamentoCliente(v){
+  let s=String(v||'').trim();
+  s=s.replace(/\s*[-–—]\s*dentes?\s*[0-9\s,\/\-e]+$/i,'').trim();
+  s=s.replace(/\s+dentes?\s*[0-9\s,\/\-e]+$/i,'').trim();
+  return s;
+}
 function tratamentoBate(tratamentoStr,filtro){
   if(!filtro)return true;
-  const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const norm=s=>canonTratamentoCliente(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
   const alvo=norm(filtro);
   return (tratamentoStr||'').split(',').some(p=>norm(p)===alvo);
 }
@@ -5167,30 +5176,21 @@ function renderClientesTable(){
 
   clientesData=clientesArr.sort((a,b)=>b._sortDate-a._sortDate);
 
-  // Filtros auxiliares.
+  // Filtros auxiliares: uma única fase funcional.
   const fasesSel=document.getElementById('clientes-fase-filter');
-  fasesSel.innerHTML='<option value="">Todas as fases</option>';
-  const fasesAtivas=_listas.fases.ativos||[];
-  const fasesNoDado=[...new Set(clientesData.map(r=>r.stage||'').filter(Boolean))];
-  [...new Set([...fasesAtivas,...fasesNoDado])].sort().forEach(f=>fasesSel.add(new Option(f,f)));
-
-  const origSel=document.getElementById('clientes-origem-filter');
-  origSel.innerHTML='<option value="">Todas as origens</option>';
-  [...new Set(clientesData.map(r=>origemAtualPaciente(r.phone,r.name||'')).filter(Boolean))]
-    .sort().forEach(o=>origSel.add(new Option(o,o)));
-
-  const faseAtvSel=document.getElementById('clientes-fase-atv-filter');
-  if(faseAtvSel){
-    const fasesAtv=[...new Set(clientesData.map(r=>{
+  if(fasesSel){
+    const cur=fasesSel.value;
+    const fasesAtivas=_listas.fases.ativos||[];
+    const fasesNoDado=clientesData.flatMap(r=>{
       const d=ccDataLookup(r.phone);
-      return d&&d.atividades&&d.atividades.length?d.atividades[0].fase:'';
-    }).filter(Boolean))].sort();
-    const cur=faseAtvSel.value;
-    faseAtvSel.innerHTML='<option value="">Todas as fases ativ.</option>';
-    fasesAtv.forEach(f=>faseAtvSel.add(new Option(f,f)));
-    if(cur)faseAtvSel.value=cur;
+      const faseAtividade=d&&d.atividades&&d.atividades.length?d.atividades[0].fase:'';
+      return [r.stage||'',faseAtividade||''];
+    }).filter(Boolean);
+    const fasesUnicas=[...new Set([...fasesAtivas,...fasesNoDado])].sort();
+    fasesSel.innerHTML='<option value="">Todas as fases</option>';
+    fasesUnicas.forEach(f=>fasesSel.add(new Option(f,f)));
+    if(cur)fasesSel.value=cur;
   }
-
   populateDynamicSelects();
   filterClientesTable();
 }
@@ -5659,8 +5659,7 @@ function filtrarContatosDoDia(){
   const el2=document.getElementById('clientes-to');if(el2)el2.value='';
   const el3=document.getElementById('clientes-fase-filter');if(el3)el3.value='';
   const el4=document.getElementById('clientes-sit-filter');if(el4)el4.value='';
-  const el5=document.getElementById('clientes-origem-filter');if(el5)el5.value='';
-  const el6=document.getElementById('clientes-fase-atv-filter');if(el6)el6.value='';
+  const el5=document.getElementById('clientes-tipo-orc-filter');if(el5)el5.value='';
   // Filtra manualmente por próximo contato = hoje
   const _clientesContatoHoje=clientesData.filter(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
@@ -5718,8 +5717,7 @@ function filterClientesTable(){
   const fromV=(document.getElementById('clientes-from')||{}).value||'';
   const toV=(document.getElementById('clientes-to')||{}).value||'';
   const fase=(document.getElementById('clientes-fase-filter')||{}).value||'';
-  const faseAtv=(document.getElementById('clientes-fase-atv-filter')||{}).value||'';
-  const orig=(document.getElementById('clientes-origem-filter')||{}).value||'';
+  const tipoOrc=(document.getElementById('clientes-tipo-orc-filter')||{}).value||'';
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
@@ -5731,7 +5729,15 @@ function filterClientesTable(){
     const d=ccDataLookup(ph)||{orcamentos:[]};
 
     // REGRA PRINCIPAL: só entra se abriu orçamento no período.
-    const orcsPeriodo=getOrcamentosClienteNoPeriodo(ph,fromV,toV);
+    const orcsPeriodoTodos=getOrcamentosClienteNoPeriodo(ph,fromV,toV);
+    if(orcsPeriodoTodos.length===0)return false;
+
+    // Novo paciente x Recompra.
+    const orcsPeriodo=orcsPeriodoTodos.filter(o=>{
+      if(tipoOrc==='recompra')return o.pacienteAntigo===true;
+      if(tipoOrc==='novo')return o.pacienteAntigo!==true;
+      return true;
+    });
     if(orcsPeriodo.length===0)return false;
 
     const phoneClean=String(e.phone||'').replace(/\D/g,'');
@@ -5742,15 +5748,10 @@ function filterClientesTable(){
     // Fechado/aberto considera SOMENTE os orçamentos abertos nesse período.
     const fechou=orcsPeriodo.some(o=>o.status==='Aprovado');
 
-    const faseMatch=!fase||r.stage===fase;
-    const faseAtvMatch=(()=>{
-      if(!faseAtv)return true;
-      const ultima=d&&d.atividades&&d.atividades.length?d.atividades[0]:null;
-      return !!(ultima&&ultima.fase===faseAtv);
-    })();
+    const ultimaAtividade=d&&d.atividades&&d.atividades.length?d.atividades[0]:null;
+    const faseMatch=!fase||r.stage===fase||(ultimaAtividade&&ultimaAtividade.fase===fase);
 
     const origemEfetiva=origemAtualPaciente(ph,e.name||'');
-    const origMatch=!orig||origemBateFiltro(origemEfetiva,orig);
 
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
     const tratMatch=!trat||orcsPeriodo.some(o=>tratamentoBate(o.tratamento,trat));
@@ -5762,10 +5763,11 @@ function filterClientesTable(){
     const datas=orcsPeriodo.map(o=>String(o.data||'').substring(0,10)).filter(Boolean).sort();
     r._dataOrcamentoPeriodo=datas[datas.length-1]||'';
 
-    return match&&faseMatch&&faseAtvMatch&&origMatch&&sitMatch&&tratMatch&&avalMatch;
+    return match&&faseMatch&&sitMatch&&tratMatch&&avalMatch;
   });
 
-  document.getElementById('clientes-count').textContent=filtered.length+' clientes';
+  const tipoLabel=tipoOrc==='novo'?' novos pacientes':(tipoOrc==='recompra'?' recompras':' clientes');
+  document.getElementById('clientes-count').textContent=filtered.length+tipoLabel;
   _clientesFiltrados=filtered;
   _clientesPage=1;
   renderClientesPage();
@@ -11543,6 +11545,16 @@ function populateDynamicSelects(){
     el.innerHTML=(isFilter?'<option value="">Todos os tratamentos</option>':'<option value="">Selecione...</option>')
       +tratsTodos.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
   });
+
+  // Na aba Clientes, agrupa procedimentos iguais que só variam pelo dente.
+  const cliTrat=document.getElementById('clientes-trat-filter');
+  if(cliTrat){
+    const curCanon=canonTratamentoCliente(cliTrat.value);
+    const agrupados=[...new Set(tratsTodos.map(canonTratamentoCliente).filter(Boolean))]
+      .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    cliTrat.innerHTML='<option value="">Todos os tratamentos</option>'
+      +agrupados.map(t=>`<option value="${t}"${t===curCanon?' selected':''}>${t}</option>`).join('');
+  }
 
   // Origens nos modais criar lead/cliente e card de lead
   ['cl-origem','cc2-origem','lc-origem'].forEach(id=>{
