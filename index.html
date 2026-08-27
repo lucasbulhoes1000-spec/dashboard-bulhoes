@@ -3414,10 +3414,20 @@ function _metaFinalRowGet(r,...keys){
 }
 
 function aplicarFunilMetaFinal(metaAds, pacote){
-  const base=pacote.base||[];
-  const resumo=pacote.resumo||[];
+  const base=Array.isArray(pacote&&pacote.base)?pacote.base:[];
 
-  // Spend da Meta por AD_ID. Nenhuma métrica clínica é recalculada aqui.
+  // FUNIL POR ANÚNCIO = somente #Instagram ADS.
+  // #Formulário continua existindo nas métricas gerais, mas não entra aqui.
+  // Assim o total de vendas desta tabela precisa reconciliar exatamente
+  // com o valor de Instagram ADS (R$ 73.467,50 no período auditado).
+  const origemInstagram=(v)=>{
+    const n=String(v||'').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/\s+/g,' ').trim();
+    return n==='#instagram ads' || n==='instagram ads';
+  };
+
+  // Spend da Meta por AD_ID.
   const spendById={};
   (metaAds||[]).forEach(ad=>{
     const id=_metaFinalId(ad.ad_id);
@@ -3425,88 +3435,102 @@ function aplicarFunilMetaFinal(metaAds, pacote){
     spendById[id]=(spendById[id]||0)+_metaFinalNum(ad.spend);
   });
 
+  // A fonte real agora é a BASE FINAL, filtrada por origem.
+  // O resumo não é usado para distribuir valores, evitando misturar
+  // #Instagram ADS com #Formulário quando compartilham o mesmo AD_ID.
+  const rows=base.filter(r=>origemInstagram(_metaFinalRowGet(r,'ORIGEM','origem')));
   const adMap={};
-  resumo.forEach(r=>{
-    const id=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
-    const key=id||'__sem_rastreio__';
-    const anuncio=String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'').trim() || (id?id:'⚠ Sem rastreamento histórico');
-    adMap[key]={
-      spend:id?(spendById[id]||0):0,
-      leads:_metaFinalNum(_metaFinalRowGet(r,'LEADS','leads')),
-      agend:_metaFinalNum(_metaFinalRowGet(r,'AGENDADOS','agendados')),
-      comp:_metaFinalNum(_metaFinalRowGet(r,'COMPARECIMENTOS','comparecimentos')),
-      fechou:_metaFinalNum(_metaFinalRowGet(r,'FECHAMENTOS','fechamentos')),
-      contratos:_metaFinalNum(_metaFinalRowGet(r,'CONTRATOS','contratos')),
-      lancamentos:_metaFinalNum(_metaFinalRowGet(r,'LANÇAMENTOS','LANCAMENTOS','lancamentos')),
-      vendas:_metaFinalNum(_metaFinalRowGet(r,'VENDAS','vendas')),
-      adset:String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||''),
-      campaign:String(_metaFinalRowGet(r,'CAMPANHA','campanha')||''),
-      label:anuncio,
-      phones:new Set(),
-      agendPhones:new Set(),
-      compPhones:new Set(),
-      fechouPhones:new Set(),
-      _fonteFinal:true
-    };
+
+  const bucket=(id,r)=>({
+    spend:id?(spendById[id]||0):0,
+    leads:0,agend:0,comp:0,fechou:0,contratos:0,lancamentos:0,vendas:0,
+    adset:String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||''),
+    campaign:String(_metaFinalRowGet(r,'CAMPANHA','campanha')||''),
+    label:String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'').trim()
+      ||(id?id:'⚠ Sem rastreamento histórico'),
+    phones:new Set(),agendPhones:new Set(),compPhones:new Set(),fechouPhones:new Set(),
+    _fonteFinal:true
   });
 
-  // As lupas são construídas da MESMA base que gerou o resumo.
-  base.forEach(r=>{
+  rows.forEach(r=>{
     const id=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
     const key=id||'__sem_rastreio__';
-    if(!adMap[key]){
-      adMap[key]={
-        spend:id?(spendById[id]||0):0,leads:0,agend:0,comp:0,fechou:0,contratos:0,lancamentos:0,vendas:0,
-        adset:String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||''),
-        campaign:String(_metaFinalRowGet(r,'CAMPANHA','campanha')||''),
-        label:String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'⚠ Sem rastreamento histórico'),
-        phones:new Set(),agendPhones:new Set(),compPhones:new Set(),fechouPhones:new Set(),_fonteFinal:true
-      };
-    }
+    if(!adMap[key])adMap[key]=bucket(id,r);
+
+    const d=adMap[key];
     const ph=normalizePhone(_metaFinalRowGet(r,'TELEFONE','telefone'));
-    if(!ph)return;
-    if(_metaFinalSim(_metaFinalRowGet(r,'LEAD NO PERÍODO?','LEAD NO PERIODO?')))adMap[key].phones.add(ph);
-    if(_metaFinalSim(_metaFinalRowGet(r,'AGENDOU NO PERÍODO?','AGENDOU NO PERIODO?')))adMap[key].agendPhones.add(ph);
-    if(_metaFinalSim(_metaFinalRowGet(r,'COMPARECEU NO PERÍODO?','COMPARECEU NO PERIODO?')))adMap[key].compPhones.add(ph);
-    if(_metaFinalSim(_metaFinalRowGet(r,'FECHOU NO PERÍODO?','FECHOU NO PERIODO?')))adMap[key].fechouPhones.add(ph);
+
+    if(_metaFinalSim(_metaFinalRowGet(r,'LEAD NO PERÍODO?','LEAD NO PERIODO?'))){
+      d.leads++;
+      if(ph)d.phones.add(ph);
+    }
+    if(_metaFinalSim(_metaFinalRowGet(r,'AGENDOU NO PERÍODO?','AGENDOU NO PERIODO?'))){
+      d.agend++;
+      if(ph)d.agendPhones.add(ph);
+    }
+    if(_metaFinalSim(_metaFinalRowGet(r,'COMPARECEU NO PERÍODO?','COMPARECEU NO PERIODO?'))){
+      d.comp++;
+      if(ph)d.compPhones.add(ph);
+    }
+    if(_metaFinalSim(_metaFinalRowGet(r,'FECHOU NO PERÍODO?','FECHOU NO PERIODO?'))){
+      d.fechou++;
+      if(ph)d.fechouPhones.add(ph);
+    }
+
+    d.contratos+=_metaFinalNum(_metaFinalRowGet(r,'QTD CONTRATOS','qtd contratos'));
+    d.lancamentos+=_metaFinalNum(_metaFinalRowGet(r,'QTD LANÇAMENTOS','QTD LANCAMENTOS','qtd lancamentos'));
+    d.vendas+=_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'));
   });
 
-  window._funilMetaFinalPacote=pacote;
+  window._funilMetaFinalPacote={
+    ...pacote,
+    baseInstagramAds:rows
+  };
   window._funilMetaFonteFinalAtiva=true;
   window._lastAdMap=adMap;
 
-  // Filtros da tabela, derivados da fonte final.
   const allCampaigns=[...new Set(Object.values(adMap).map(d=>d.campaign||'').filter(Boolean))].sort();
   const allAdsets=[...new Set(Object.values(adMap).map(d=>d.adset||'').filter(Boolean))].sort();
   const campSel=document.getElementById('ad-filter-campaign');
   const adsetSel=document.getElementById('ad-filter-adset');
+
   if(campSel){
     const prev=campSel.value;
-    campSel.innerHTML='<option value="">Todas as campanhas</option>'+allCampaigns.map(c=>`<option value="${c}"${c===prev?' selected':''}>${c}</option>`).join('');
+    campSel.innerHTML='<option value="">Todas as campanhas</option>'
+      +allCampaigns.map(c=>`<option value="${c}"${c===prev?' selected':''}>${c}</option>`).join('');
   }
   if(adsetSel){
     const prev=adsetSel.value;
-    adsetSel.innerHTML='<option value="">Todos os conjuntos</option>'+allAdsets.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+    adsetSel.innerHTML='<option value="">Todos os conjuntos</option>'
+      +allAdsets.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
   }
 
-  // Auditoria visual baseada na própria base final.
   const totalLeads=Object.values(adMap).reduce((s,d)=>s+(d.leads||0),0);
+  const totalAg=Object.values(adMap).reduce((s,d)=>s+(d.agend||0),0);
+  const totalComp=Object.values(adMap).reduce((s,d)=>s+(d.comp||0),0);
+  const totalFechou=Object.values(adMap).reduce((s,d)=>s+(d.fechou||0),0);
+  const totalVendas=Object.values(adMap).reduce((s,d)=>s+(d.vendas||0),0);
   const sem=adMap.__sem_rastreio__||{};
+
   window._auditoriaFunilAnuncio={
     coberturaLeads:totalLeads>0?(totalLeads-(sem.leads||0))/totalLeads:1,
     leadsSemRastreio:sem.leads||0,
     fechamentosSemRastreio:sem.fechou||0,
-    vendasSemRastreio:sem.vendas||0
+    vendasSemRastreio:sem.vendas||0,
+    totalVendas:totalVendas
   };
 
-  filterAdTable(); // já ordena DESC por leads
-  console.log('[FUNIL META FINAL] Fonte única aplicada:', {
-    base:base.length,resumo:resumo.length,
-    leads:Object.values(adMap).reduce((s,d)=>s+(d.leads||0),0),
-    agendados:Object.values(adMap).reduce((s,d)=>s+(d.agend||0),0),
-    comparecimentos:Object.values(adMap).reduce((s,d)=>s+(d.comp||0),0),
-    fechamentos:Object.values(adMap).reduce((s,d)=>s+(d.fechou||0),0),
-    vendas:Object.values(adMap).reduce((s,d)=>s+(d.vendas||0),0)
+  filterAdTable();
+
+  console.log('[FUNIL POR ANÚNCIO — INSTAGRAM ADS]',{
+    pessoas:rows.length,
+    leads:totalLeads,
+    agendados:totalAg,
+    comparecimentos:totalComp,
+    fechamentos:totalFechou,
+    vendas:totalVendas,
+    esperadoAuditoria:73467.50,
+    diferenca:totalVendas-73467.50
   });
 }
 
@@ -4495,7 +4519,7 @@ function filterAdTable(){
     <td style="text-align:right" class="tg">${totVendas>0?fmtK(totVendas):'—'}</td>
     <td style="text-align:right" class="tg">${totTicket>0?fmt(totTicket):'—'}</td>
   </tr>`;
-  document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?adRows.map(([name,d])=>{
+  document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?totalRow+adRows.map(([name,d])=>{
     const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
     const adCpcomp=d.comp>0?d.spend/d.comp:0,adCpc=d.fechou>0?d.spend/d.fechou:0;
     const adTicket=d.fechou>0?d.vendas/d.fechou:0;
@@ -4514,7 +4538,7 @@ function filterAdTable(){
       <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas)+' <button class="lupa" onclick="lupaAdVendas(\''+name+'\')" title="Ver vendas">🔍</button>':'—'}</td>
       <td style="text-align:right" class="tg">${adTicket>0?fmt(adTicket):'—'}</td>
     </tr>`;
-  }).join('')+totalRow:'<tr><td colspan="13" class="empty-state">Nenhum anúncio encontrado</td></tr>';
+  }).join(''):'<tr><td colspan="13" class="empty-state">Nenhum anúncio encontrado</td></tr>';
 }
 
 // ===== SOCIAL SELLING =====
@@ -6076,7 +6100,7 @@ function lupaContratos(){
 
 function _linhasFunilMetaFinal(adKey, campo){
   const pacote=window._funilMetaFinalPacote||{};
-  const base=pacote.base||[];
+  const base=pacote.baseInstagramAds||[];
   const alvo=(adKey==='__sem_rastreio__')?'':_metaFinalId(adKey);
   return base.filter(r=>{
     const rid=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
