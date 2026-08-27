@@ -579,10 +579,6 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== LEADS PAGE ===== -->
     <div class="page" id="page-leads">
-      <div style="display:flex;gap:8px;margin:0 0 12px 0;align-items:center;">
-        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #A18B6C;background:#A18B6C;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
-        <button id="clientes-tab-recompra" onclick="setTipoOrcamentoClientes('recompra')" style="border:0.5px solid #d4c9bc;background:#fff;color:#7a6550;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">↻ Recompras</button>
-      </div>
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome, telefone ou origem..." id="leads-search" oninput="filterLeadsTable()">
         <select class="filter-select" id="leads-origem-filter" onchange="filterLeadsTable()">
@@ -633,6 +629,13 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
       </div>
+
+      <!-- DIVISÃO PRINCIPAL DA ABA CLIENTES -->
+      <div style="display:flex;gap:8px;margin:0 0 12px 0;align-items:center;">
+        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #A18B6C;background:#A18B6C;color:#fff;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
+        <button id="clientes-tab-recompra" onclick="setTipoOrcamentoClientes('recompra')" style="border:0.5px solid #d4c9bc;background:#fff;color:#7a6550;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">↻ Recompras</button>
+      </div>
+
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
         <input type="date" id="clientes-from" class="filter-select" onchange="filterClientesTable()" title="Data comparecimento inicial">
