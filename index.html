@@ -2836,6 +2836,7 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   const adMap=window._lastAdMap;
   const dados=getAgendaClinicorpFiltrada();
   if(!adMap||!dados)return;
+  const elegiveis=window._lastAdEligiblePhones||new Set();
 
   const acharKey=(ph)=>{
     ph=normalizePhone(ph);
@@ -2856,6 +2857,8 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   // AGENDA/COMPARECIMENTO: exatamente a base oficial do Clinicorp usada acima.
   Object.values(adMap).forEach(d=>{d.agend=0;d.agendPhones=new Set();});
   (dados.agendPhones||new Set()).forEach(ph=>{
+    ph=normalizePhone(ph);
+    if(!elegiveis.has(ph))return;
     const key=acharKey(ph);
     if(!adMap[key])adMap[key]=novoBucket();
     adMap[key].agend++;
@@ -2864,6 +2867,8 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
 
   Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
   (dados.compPhones||new Set()).forEach(ph=>{
+    ph=normalizePhone(ph);
+    if(!elegiveis.has(ph))return;
     const key=acharKey(ph);
     if(!adMap[key])adMap[key]=novoBucket();
     adMap[key].comp++;
@@ -2877,6 +2882,9 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
   if(fechamentoValido&&window._dashFechadosPhones){
     Object.values(adMap).forEach(d=>{d.fechou=0;d.fechouPhones=new Set();});
     window._dashFechadosPhones.forEach(ph=>{
+      ph=normalizePhone(ph);
+      if(!elegiveis.has(ph))return;
+      if(!ph||!elegiveis.has(ph))return;
       const key=acharKey(ph);
       if(!adMap[key])adMap[key]=novoBucket();
       adMap[key].fechou++;
@@ -2909,6 +2917,33 @@ function reconciliarAgendCompClinicorpPorAnuncio(){
       adMap[key].vendas+=Number(v.value||0);
       adMap[key].vendaRows.push({...v,ph:ph||v.ph});
     });
+  }
+
+
+  // AUDITORIA EM TEMPO REAL — garante que a tabela não silencie inconsistências.
+  const buckets=Object.entries(adMap);
+  const totLead=buckets.reduce((s,[,d])=>s+Number(d.leads||0),0);
+  const totAg=buckets.reduce((s,[,d])=>s+Number(d.agend||0),0);
+  const totCo=buckets.reduce((s,[,d])=>s+Number(d.comp||0),0);
+  const totFe=buckets.reduce((s,[,d])=>s+Number(d.fechou||0),0);
+  const totVe=buckets.reduce((s,[,d])=>s+Number(d.vendas||0),0);
+  const sem=adMap['__sem_rastreio__']||{};
+  window._auditoriaFunilAnuncio={
+    leadsElegiveis:elegiveis.size,
+    leadsDistribuidos:totLead,
+    leadsSemRastreio:Number(sem.leads||0),
+    agendados:totAg,
+    comparecimentos:totCo,
+    fechamentos:totFe,
+    vendas:totVe,
+    vendasSemRastreio:Number(sem.vendas||0),
+    fechamentosSemRastreio:Number(sem.fechou||0),
+    coberturaLeads:elegiveis.size?((elegiveis.size-Number(sem.leads||0))/elegiveis.size):1
+  };
+  if(totLead!==elegiveis.size){
+    console.error('[AUDITORIA FUNIL] Leads distribuídos não batem com elegíveis',window._auditoriaFunilAnuncio);
+  }else{
+    console.log('[AUDITORIA FUNIL]',window._auditoriaFunilAnuncio);
   }
 
   if(typeof filterAdTable==='function')filterAdTable();
@@ -3535,7 +3570,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Campanhas com outro objetivo (ex: tráfego/visita ao perfil) não têm essa action e ficam de fora.
   const isCaptacaoAd=(ad)=>(ad.actions||[]).some(a=>String(a.action_type||'').includes('messaging_conversation_started'));
   const adMap={};    // chave: ad_id completo da Meta
-  const adNameMap={}; // chave: ad_name normalizado → ad_id
+  const adNameMap={}; // chave: ad_name normalizado → Set de ad_ids (nome pode repetir em conjuntos diferentes)
   metaAds.forEach(ad=>{
     const adSpend=parseFloat(ad.spend||0);
     spend+=adSpend;
@@ -3544,29 +3579,46 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(!key)return;
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:ad.adset_name||'',campaign:ad.campaign_name||'',label:ad.ad_name||key,phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
     adMap[key].spend+=adSpend;
-    if(ad.ad_name)adNameMap[norm(ad.ad_name)]=key;
+    if(ad.ad_name){
+      const nk=norm(ad.ad_name);
+      if(!adNameMap[nk])adNameMap[nk]=new Set();
+      adNameMap[nk].add(key);
+    }
   });
 
 
   // --- STEP 2: Função para casar um row do Cloudia com uma chave do adMap ---
   function findAdKey(r){
-    // Tenta pelo ad_id (extrai dígitos, compara com keys do adMap)
-    const rawId=String(r.ad_id||'').trim();
-    if(rawId&&rawId!=='undefined'){
-      // Compara direto primeiro
+    // REGRA 1 — ad_id exato é autoridade.
+    const rawId=String(r&&r.ad_id||'').trim();
+    if(rawId&&rawId!=='undefined'&&rawId!=='null'){
       if(adMap[rawId])return rawId;
-      // Tenta casar pelos primeiros 15 dígitos (seguro contra perda de float)
-      const id15=rawId.substring(0,15);
-      const found=Object.keys(adMap).find(k=>k.substring(0,15)===id15);
-      if(found)return found;
+
+      // IDs que passaram por planilha/JS podem perder os últimos dígitos.
+      // Só aceita prefixo se houver UM ÚNICO candidato na Meta.
+      const idPrefix=rawId.replace(/\D/g,'').substring(0,15);
+      if(idPrefix.length>=12){
+        const cand=Object.keys(adMap).filter(k=>String(k).replace(/\D/g,'').startsWith(idPrefix));
+        if(cand.length===1)return cand[0];
+      }
     }
-    // Tenta pelo ad_name normalizado
-    const adName=norm(r.ad_name||'');
+
+    // REGRA 2 — nome só serve quando é INEQUÍVOCO.
+    // O mesmo criativo pode existir em conjuntos diferentes (exatamente o que
+    // aparece no dashboard), então nunca escolhe "o último" por nome.
+    const adName=norm(r&&r.ad_name||'');
     if(adName){
-      if(adNameMap[adName])return adNameMap[adName];
-      // Busca parcial nos primeiros 25 chars
-      const found=Object.keys(adNameMap).find(k=>k.startsWith(adName.substring(0,25))||adName.startsWith(k.substring(0,25)));
-      if(found)return adNameMap[found];
+      const exatos=adNameMap[adName];
+      if(exatos&&exatos.size===1)return [...exatos][0];
+
+      // Fallback parcial apenas se também gerar um único ad_id.
+      const candidatos=new Set();
+      Object.entries(adNameMap).forEach(([nome,setIds])=>{
+        if(nome.startsWith(adName.substring(0,25))||adName.startsWith(nome.substring(0,25))){
+          setIds.forEach(id=>candidatos.add(id));
+        }
+      });
+      if(candidatos.size===1)return [...candidatos][0];
     }
     return null;
   }
@@ -3600,23 +3652,52 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   window._lastAdEligiblePhones=adEligiblePhones;
 
-  // STEP 4: Casa telefones com anúncios — usa TODOS os rows (não só os filtrados)
-  // Monta mapa phone → adKey para usar nos eventos de agendamento/comparecimento
+  // STEP 4: Casa telefone → anúncio de forma DETERMINÍSTICA.
+  // Prioridade:
+  //   1. atribuição manual explícita no CRM;
+  //   2. ad_id/ad_name do PRÓPRIO lead criado no período;
+  // Nunca usa um ad histórico de outro mês para preencher buraco atual.
   const phoneAdKeyMap={};
-  allCloudiaRows.forEach(r=>{
-    const ph0=normalizePhone(r.phone);
-    // Override manual: se o lead não tem ad_id/ad_name no Cloudia, mas foi atribuído
-    // manualmente a um anúncio via _ccData.adIdManual, usa isso primeiro.
-    const ccManualAd=ph0&&_ccData[ph0]&&_ccData[ph0].adIdManual;
-    const key=ccManualAd?findAdKey({ad_id:ccManualAd}):findAdKey(r);
-    if(key){const ph=ph0;if(ph){adMap[key].phones.add(ph);phoneAdKeyMap[ph]=key;}}
+
+  // 4.1 Overrides manuais.
+  adEligiblePhones.forEach(ph=>{
+    const d=ccDataLookup(ph);
+    const manual=d&&d.adIdManual;
+    if(!manual)return;
+    const key=findAdKey({ad_id:manual});
+    if(key){
+      phoneAdKeyMap[ph]=key;
+      adMap[key].phones.add(ph);
+    }
   });
+
+  // 4.2 Linhas de aquisição do próprio período, em ordem cronológica.
+  // A primeira atribuição válida vence; isso evita uma atualização posterior
+  // sobrescrever a origem inicial do lead.
+  const linhasAquisicaoPeriodo=(filtered||[]).slice().sort((a,b)=>{
+    const da=parseCloudiaDate(a.created_at)||new Date(0);
+    const db=parseCloudiaDate(b.created_at)||new Date(0);
+    return da-db;
+  });
+
+  linhasAquisicaoPeriodo.forEach(r=>{
+    const ph=normalizePhone(r.phone);
+    if(!ph||!adEligiblePhones.has(ph)||phoneAdKeyMap[ph])return;
+    const key=findAdKey(r);
+    if(key){
+      phoneAdKeyMap[ph]=key;
+      adMap[key].phones.add(ph);
+    }
+  });
+
   window._lastPhoneAdKeyMap=phoneAdKeyMap;
+
   // STEP 5: Conta eventos do período — deduplicado por telefone por anúncio
   const evtsParaFunil=filteredEvents&&filteredEvents.length>0?filteredEvents:filtered;
   const seenAdPhone={agend:{},comp:{},fechou:{}};
   evtsParaFunil.forEach(r=>{
-    const ph=normalizePhone(r.phone);if(!ph)return;
+    const ph=normalizePhone(r.phone);
+    if(!ph||!adEligiblePhones.has(ph))return;
     let matchKey=null;
     for(const [k,d] of Object.entries(adMap)){if(d.phones&&d.phones.has(ph)){matchKey=k;break;}}
     if(!matchKey)matchKey=phoneAdKeyMap[ph]||null;
@@ -4255,6 +4336,17 @@ function filterAdTable(){
   const totComp=adRows.reduce((s,[,d])=>s+(d.comp||0),0);
   const totFechou=adRows.reduce((s,[,d])=>s+(d.fechou||0),0);
   const totVendas=adRows.reduce((s,[,d])=>s+(d.vendas||0),0);
+
+  // Indicador de confiabilidade para decisão de mídia.
+  const aud=window._auditoriaFunilAnuncio;
+  const auditEl=document.getElementById('ad-tracking-audit');
+  if(auditEl&&aud){
+    const pctCov=(aud.coberturaLeads*100).toFixed(1).replace('.',',');
+    auditEl.innerHTML=`Rastreamento de anúncios: <b>${pctCov}%</b> dos leads pagos identificados`
+      +(aud.leadsSemRastreio?` · ${aud.leadsSemRastreio} lead(s) sem anúncio`:'')
+      +(aud.fechamentosSemRastreio?` · ${aud.fechamentosSemRastreio} fechamento(s) sem anúncio`:'')
+      +(aud.vendasSemRastreio?` · ${fmt(aud.vendasSemRastreio)} em vendas sem anúncio`:'');
+  }
   const totCpl=totLeads>0?totSpend/totLeads:0;
   const totCpa=totAgend>0?totSpend/totAgend:0;
   const totCpcomp=totComp>0?totSpend/totComp:0;
@@ -4939,7 +5031,7 @@ function getPeriodLabel(tab){
 function gerarRelatorioFunilAnuncioJPG(){
   const periodo=getPeriodLabel('trafego');
   const adMap=window._lastAdMap||{};
-  const adRowsRaw=Object.entries(adMap).filter(([,d])=>(d.leads||0)>0).sort((a,b)=>(b[1].spend||0)-(a[1].spend||0));
+  const adRowsRaw=Object.entries(adMap).filter(([,d])=>(d.leads||0)>0).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0)||(b[1].spend||0)-(a[1].spend||0));
 
   const rows=adRowsRaw.map(([name,d])=>{
     const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
@@ -5855,29 +5947,24 @@ function lupaContratos(){
 function lupaAdLeads(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
-  const phoneMap={};
-  // Só leads do período (filtrado por created_at)
-  _lastCloudiaFiltered.filter(r=>{
-    const rawId=String(r.ad_id||'');
-    const rawName=String(r.ad_name||'');
-    if(rawId){
-      const normId=rawId.replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp))));
-      if(normId===adKey)return true;
-    }
-    if(rawName&&adInfo&&adInfo.label){
-      if(rawName.trim().toLowerCase().startsWith(adInfo.label.trim().toLowerCase().substring(0,20)))return true;
-      if(adInfo.label.trim().toLowerCase().startsWith(rawName.trim().toLowerCase().substring(0,20)))return true;
-    }
-    return false;
-  }).forEach(r=>{
-    const ph=normalizePhone(r.phone)||r.name;
-    if(!phoneMap[ph])phoneMap[ph]=r;
-  });
-  const rows=Object.values(phoneMap)
-    .sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0))
-    .map(r=>{const e=applyEdits(r);return[fmtDate(e.created_at),e.name||'—',e.phone||'—',e.stage||'—'];});
-  openModal('Leads — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Etapa'],rows);
+  const elegiveis=window._lastAdEligiblePhones||new Set();
+  const phones=adInfo&&adInfo.phones
+    ? [...adInfo.phones].filter(ph=>elegiveis.has(normalizePhone(ph)))
+    : [];
+
+  const rows=phones.map(ph=>{
+    ph=normalizePhone(ph);
+    const candidates=(_lastCloudiaFiltered||[]).filter(r=>normalizePhone(r.phone)===ph)
+      .sort((a,b)=>(parseCloudiaDate(a.created_at)||new Date(0))-(parseCloudiaDate(b.created_at)||new Date(0)));
+    const row=candidates[0]||allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const e=applyEdits({...row,phone:row.phone||ph});
+    return [fmtDate(e.created_at),e.name||((ccDataLookup(ph)||{}).nomeAtual)||'—',ph,e.stage||'—'];
+  }).sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+
+  openModal('Leads — '+label.substring(0,30)+' — '+rows.length+' registros',
+    ['Data cadastro','Nome','Telefone','Etapa'],rows);
 }
+
 function lupaAdAgend(adKey){
   const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
   const label=adInfo?(adInfo.label||adKey):adKey;
