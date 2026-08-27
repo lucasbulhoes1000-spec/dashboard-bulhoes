@@ -579,6 +579,10 @@ tbody tr:hover td{background:#faf7f3;}
 
     <!-- ===== LEADS PAGE ===== -->
     <div class="page" id="page-leads">
+      <div style="display:flex;gap:8px;margin:0 0 12px 0;align-items:center;">
+        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #A18B6C;background:#A18B6C;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
+        <button id="clientes-tab-recompra" onclick="setTipoOrcamentoClientes('recompra')" style="border:0.5px solid #d4c9bc;background:#fff;color:#7a6550;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">↻ Recompras</button>
+      </div>
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome, telefone ou origem..." id="leads-search" oninput="filterLeadsTable()">
         <select class="filter-select" id="leads-origem-filter" onchange="filterLeadsTable()">
@@ -624,8 +628,8 @@ tbody tr:hover td{background:#faf7f3;}
     <div class="page" id="page-clientes">
       <!-- CARDS RESUMO -->
       <div class="row r4" style="margin-bottom:16px;">
-        <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms">valor total em orçamentos</div></div>
-        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms">em aberto</div></div>
+        <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms" id="cc-total-clientes-label">orçamentos de novos pacientes</div></div>
+        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">novos pacientes em aberto</div></div>
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
       </div>
@@ -653,11 +657,6 @@ tbody tr:hover td{background:#faf7f3;}
         <button onclick="openCriarCliente()" style="background:#A18B6C;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;font-weight:600;">+ Cliente</button>
         <button onclick="openImportarClientes()" style="background:#7a6550;color:#fff;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;">↑ Importar</button>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;width:100%;">
-          <select class="filter-select" id="clientes-tipo-orc-filter" onchange="filterClientesTable()">
-            <option value="">Todos os orçamentos</option>
-            <option value="novo">Novos pacientes</option>
-            <option value="recompra">Recompras</option>
-          </select>
           <select class="filter-select" id="clientes-fase-filter" onchange="filterClientesTable()"><option value="">Todas as fases</option></select>
           <select class="filter-select" id="clientes-sit-filter" onchange="filterClientesTable()">
             <option value="">Todas as situações</option>
@@ -2463,6 +2462,7 @@ function filterAgendByRange(rows,tab){
 // procedimento individual da lista, não com o plano inteiro de uma vez.
 function canonTratamentoCliente(v){
   let s=String(v||'').trim();
+  // Remove somente identificação do dente; mantém diferenças clínicas reais.
   s=s.replace(/\s*[-–—]\s*dentes?\s*[0-9\s,\/\-e]+$/i,'').trim();
   s=s.replace(/\s+dentes?\s*[0-9\s,\/\-e]+$/i,'').trim();
   return s;
@@ -5659,7 +5659,7 @@ function filtrarContatosDoDia(){
   const el2=document.getElementById('clientes-to');if(el2)el2.value='';
   const el3=document.getElementById('clientes-fase-filter');if(el3)el3.value='';
   const el4=document.getElementById('clientes-sit-filter');if(el4)el4.value='';
-  const el5=document.getElementById('clientes-tipo-orc-filter');if(el5)el5.value='';
+
   // Filtra manualmente por próximo contato = hoje
   const _clientesContatoHoje=clientesData.filter(r=>{
     const ph=String(r.phone||'').replace(/\D/g,'');
@@ -5711,13 +5711,41 @@ function toggleProximosContatos(){
   document.getElementById('clientes-count').textContent=comProximo.length+' clientes com próx. contato';
   _clientesFiltrados=comProximo;_clientesPage=1;renderClientesPage();
 }
+let _clientesTipoOrcamento='novo';
+function setTipoOrcamentoClientes(tipo){
+  _clientesTipoOrcamento=(tipo==='recompra')?'recompra':'novo';
+
+  const bNovo=document.getElementById('clientes-tab-novo');
+  const bRec=document.getElementById('clientes-tab-recompra');
+  if(bNovo){
+    const ativo=_clientesTipoOrcamento==='novo';
+    bNovo.style.background=ativo?'#A18B6C':'#fff';
+    bNovo.style.color=ativo?'#fff':'#7a6550';
+    bNovo.style.borderColor=ativo?'#A18B6C':'#d4c9bc';
+  }
+  if(bRec){
+    const ativo=_clientesTipoOrcamento==='recompra';
+    bRec.style.background=ativo?'#A18B6C':'#fff';
+    bRec.style.color=ativo?'#fff':'#7a6550';
+    bRec.style.borderColor=ativo?'#A18B6C':'#d4c9bc';
+  }
+
+  _clientesPage=1;
+  const lblTotal=document.getElementById('cc-total-clientes-label');
+  const lblAbertos=document.getElementById('cc-total-abertos-label');
+  if(lblTotal)lblTotal.textContent=_clientesTipoOrcamento==='recompra'?'orçamentos de recompra':'orçamentos de novos pacientes';
+  if(lblAbertos)lblAbertos.textContent=_clientesTipoOrcamento==='recompra'?'recompras em aberto':'novos pacientes em aberto';
+
+  filterClientesTable();
+}
+
 function filterClientesTable(){
   const q=(document.getElementById('clientes-search')||{}).value||'';
   const ql=q.toLowerCase();
   const fromV=(document.getElementById('clientes-from')||{}).value||'';
   const toV=(document.getElementById('clientes-to')||{}).value||'';
   const fase=(document.getElementById('clientes-fase-filter')||{}).value||'';
-  const tipoOrc=(document.getElementById('clientes-tipo-orc-filter')||{}).value||'';
+  const tipoOrc=_clientesTipoOrcamento;
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
   const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
@@ -5733,11 +5761,9 @@ function filterClientesTable(){
     if(orcsPeriodoTodos.length===0)return false;
 
     // Novo paciente x Recompra.
-    const orcsPeriodo=orcsPeriodoTodos.filter(o=>{
-      if(tipoOrc==='recompra')return o.pacienteAntigo===true;
-      if(tipoOrc==='novo')return o.pacienteAntigo!==true;
-      return true;
-    });
+    const orcsPeriodo=orcsPeriodoTodos.filter(o=>
+      tipoOrc==='recompra' ? o.pacienteAntigo===true : o.pacienteAntigo!==true
+    );
     if(orcsPeriodo.length===0)return false;
 
     const phoneClean=String(e.phone||'').replace(/\D/g,'');
@@ -5766,8 +5792,8 @@ function filterClientesTable(){
     return match&&faseMatch&&sitMatch&&tratMatch&&avalMatch;
   });
 
-  const tipoLabel=tipoOrc==='novo'?' novos pacientes':(tipoOrc==='recompra'?' recompras':' clientes');
-  document.getElementById('clientes-count').textContent=filtered.length+tipoLabel;
+  document.getElementById('clientes-count').textContent=
+    filtered.length+(tipoOrc==='recompra'?' recompras':' novos pacientes');
   _clientesFiltrados=filtered;
   _clientesPage=1;
   renderClientesPage();
@@ -5867,8 +5893,8 @@ function renderClientesPage(){
       <td style="font-size:12px;">${orc0&&orc0.avaliador?orc0.avaliador:'—'}</td>
       <td style="font-size:12px;${proxStyle}">${proxContato}</td>
       <td class="tm">${(()=>{const ph_ts=String(r.phone||'').replace(/\D/g,'');const imp=_ccData[ph_ts]&&_ccData[ph_ts].leadImportado;if(r.timestamp&&r.timestamp!==r.created_at)return fmtDate(r.timestamp);if(imp&&r.timestamp)return fmtDate(r.timestamp);return'—';})()}</td>
-      <td style="text-align:right" class="tm">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcVal=orcs?orcs.reduce((s,o)=>s+Number(o.valor||0),0):0;return orcVal>0?fmt(orcVal):val>0?fmt(val):'—';})()}</td>
-      <td style="text-align:right" class="tg">${(()=>{const orcs=d.orcamentos&&d.orcamentos.length>0?d.orcamentos:null;const orcAprov=orcs?orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.valor||0),0):0;return orcAprov>0?fmt(orcAprov):fechou&&val>0?fmt(val):'—';})()}</td>
+      <td style="text-align:right" class="tm">${(()=>{const orcVal=orcsPeriodo.reduce((s,o)=>s+Number(o.valor||0),0);return orcVal>0?fmt(orcVal):'—';})()}</td>
+      <td style="text-align:right" class="tg">${(()=>{const orcAprov=orcsPeriodo.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);return orcAprov>0?fmt(orcAprov):'—';})()}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="10" style="text-align:center;padding:24px;color:#8a7a6a;">Nenhum cliente encontrado</td></tr>';
 
