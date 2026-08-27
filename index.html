@@ -3588,6 +3588,18 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   });
   const cloudiaLeadsCount=leadsPhones.size;
 
+  // Telefones elegíveis ao Funil por Anúncio no período: precisam ser lead pago
+  // (Instagram ADS ou Formulário/Facebook) no período. Isso impede que um paciente
+  // Orgânico com algum ad_id histórico seja atribuído a anúncio por engano.
+  const adEligiblePhones=new Set();
+  getLeadsUnicosComOrigem(filtered).forEach(e=>{
+    const ph=normalizePhone(e.phone);
+    const org=String(e._origemFinal||e.origin||'').toLowerCase();
+    const grupo=origemGrupoCanonico(org);
+    if(ph&&(org.includes('instagram ads')||grupo==='formulario'))adEligiblePhones.add(ph);
+  });
+  window._lastAdEligiblePhones=adEligiblePhones;
+
   // STEP 4: Casa telefones com anúncios — usa TODOS os rows (não só os filtrados)
   // Monta mapa phone → adKey para usar nos eventos de agendamento/comparecimento
   const phoneAdKeyMap={};
@@ -3621,7 +3633,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     if(isComp(r.stage)&&!seenAdPhone.comp[key].has(ph)){seenAdPhone.comp[key].add(ph);d.comp++;d.compPhones.add(ph);}
     if(isFechou(r.stage)&&!seenAdPhone.fechou[key].has(ph)){seenAdPhone.fechou[key].add(ph);d.fechou++;d.fechouPhones.add(ph);d.vendas+=parseFloat(r.value||0);}
   });
-  Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>leadsPhones.has(p))).size;});
+  Object.keys(adMap).forEach(k=>{if(k!=='__sem_rastreio__')adMap[k].leads=new Set([...adMap[k].phones].filter(p=>adEligiblePhones.has(p))).size;});
 
   // Origens: usa getLeadsUnicosComOrigem — a MESMA função/fonte usada pela lupa de
   // Leads (lupaLeads), garantindo que o gráfico e a lupa NUNCA divirjam entre si,
@@ -3691,13 +3703,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const ticket=contratos>0?totalVendas/contratos:0;
 
   // CPL: só leads pagos (#Instagram ADS)
-  const leadsInstagram=new Set();
-  filtered.forEach(r=>{
-    if((r.origin||'').toLowerCase().includes('instagram ads')||
-       (r.ad_name&&String(r.ad_name).trim()!=='')){
-      const ph=normalizePhone(r.phone);if(ph)leadsInstagram.add(ph);
-    }
-  });
+  const leadsInstagram=new Set([...adEligiblePhones]);
   const leadsBase=cloudiaLeadsCount;
   const leadsBasePago=leadsInstagram.size||leadsBase;
   // CPL — Meta ADS: só o investimento das campanhas de captação (conversa por mensagem)
@@ -4165,6 +4171,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   Object.values(adMap).forEach(d=>{d.agend=0;d.agendPhones=new Set();});
   const _reconAgendPhones=window._lastAgendPhones||new Set();
   _reconAgendPhones.forEach(ph=>{
+    if(!adEligiblePhones.has(ph))return;
     let key=phoneAdKeyMap[ph]||null;
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
     if(!key)key='__sem_rastreio__';
@@ -4178,6 +4185,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   Object.values(adMap).forEach(d=>{d.comp=0;d.compPhones=new Set();});
   const _reconCompPhones=window._lastCompPhones||new Set();
   _reconCompPhones.forEach(ph=>{
+    if(!adEligiblePhones.has(ph))return;
     let key=phoneAdKeyMap[ph]||null;
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
     if(!key)key='__sem_rastreio__';
@@ -4190,18 +4198,13 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Zera fechou/fechouPhones/vendas antes de reconciliar
   Object.values(adMap).forEach(d=>{d.fechou=0;d.fechouPhones=new Set();d.vendas=0;});
   fechadosPhones.forEach(ph=>{
+    if(!adEligiblePhones.has(ph))return;
     let key=phoneAdKeyMap[ph]||null;
     if(!key){for(const [k,d] of Object.entries(adMap)){if(k!=='__sem_rastreio__'&&d.phones&&d.phones.has(ph)){key=k;break;}}}
     if(!key){
-      // Tenta casar pela origem do lead (ex: #Instagram ADS → anúncio com mais leads no período)
-      const rowCloudia=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
-      const origLead=(rowCloudia&&rowCloudia.origin||'').toLowerCase();
-      if(origLead.includes('instagram')){
-        // Atribui ao anúncio com mais leads de Instagram no período
-        let bestKey=null,bestLeads=0;
-        Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__'&&d.leads>bestLeads){bestLeads=d.leads;bestKey=k;}});
-        if(bestKey)key=bestKey;
-      }
+      // Sem ad_id/ad_name rastreável = NÃO inventa atribuição.
+      // Antes o código jogava a venda no anúncio com mais leads, o que contaminava
+      // ROAS/CAC e podia levar a decisões erradas. Mantém em "Sem rastreamento".
     }
     if(!key)key='__sem_rastreio__';
     if(!adMap[key])adMap[key]={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
@@ -4218,7 +4221,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Leads sem rastreamento
   const trackeadosPhones=new Set();
   Object.entries(adMap).forEach(([k,d])=>{if(k!=='__sem_rastreio__')(d.phones||new Set()).forEach(p=>trackeadosPhones.add(p));});
-  const semRastreioPhones=new Set([...leadsPhones].filter(p=>p&&!trackeadosPhones.has(p)));
+  const semRastreioPhones=new Set([...adEligiblePhones].filter(p=>p&&!trackeadosPhones.has(p)));
   if(!adMap['__sem_rastreio__'])adMap['__sem_rastreio__']={spend:0,leads:0,agend:0,comp:0,fechou:0,vendas:0,adset:'',campaign:'',label:'⚠ Sem rastreamento',phones:new Set(),compPhones:new Set(),fechouPhones:new Set(),agendPhones:new Set()};
   semRastreioPhones.forEach(p=>adMap['__sem_rastreio__'].phones.add(p));
   adMap['__sem_rastreio__'].leads=semRastreioPhones.size;
@@ -4243,7 +4246,7 @@ function filterAdTable(){
   const adMap=window._lastAdMap;if(!adMap)return;
   const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
   const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
-  let adRows=Object.entries(adMap).sort((a,b)=>b[1].spend-a[1].spend);
+  let adRows=Object.entries(adMap).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0)||(b[1].spend||0)-(a[1].spend||0));
   if(campFilt)adRows=adRows.filter(([,d])=>d.campaign===campFilt);
   if(adsetFilt)adRows=adRows.filter(([,d])=>d.adset===adsetFilt);
   const totSpend=adRows.reduce((s,[,d])=>s+(d.spend||0),0);
