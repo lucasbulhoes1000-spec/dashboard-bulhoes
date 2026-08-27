@@ -3416,15 +3416,26 @@ function _metaFinalRowGet(r,...keys){
 function aplicarFunilMetaFinal(metaAds, pacote){
   const base=Array.isArray(pacote&&pacote.base)?pacote.base:[];
 
-  // FUNIL POR ANÚNCIO = somente #Instagram ADS.
-  // #Formulário continua existindo nas métricas gerais, mas não entra aqui.
-  // Assim o total de vendas desta tabela precisa reconciliar exatamente
-  // com o valor de Instagram ADS (R$ 73.467,50 no período auditado).
-  const origemInstagram=(v)=>{
-    const n=String(v||'').toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-      .replace(/\s+/g,' ').trim();
-    return n==='#instagram ads' || n==='instagram ads';
+  // FUNIL POR ANÚNCIO — fonte final, respeitando o filtro de origem.
+  // Todas as origens: usa todo o universo Meta auditado (#Instagram ADS + #Formulário).
+  // Instagram ADS: usa somente #Instagram ADS.
+  // Formulário: usa somente #Formulário / #Formulário Facebook.
+  const normalizaOrigemFinal=(v)=>String(v||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+
+  const origemEscopoFinal=(v)=>{
+    const n=normalizaOrigemFinal(v);
+    const filtro=normalizaOrigemFinal(window._origemFilter||'');
+    const ehInstagram=n==='#instagram ads'||n==='instagram ads';
+    const ehFormulario=n.includes('formulario');
+
+    if(!filtro) return ehInstagram||ehFormulario;
+    if(filtro.includes('instagram')&&filtro.includes('ads')) return ehInstagram;
+    if(filtro.includes('formulario')) return ehFormulario;
+
+    // Se o usuário escolher uma origem não-Meta, não há Funil por Anúncio.
+    return false;
   };
 
   // Spend da Meta por AD_ID.
@@ -3438,7 +3449,7 @@ function aplicarFunilMetaFinal(metaAds, pacote){
   // A fonte real agora é a BASE FINAL, filtrada por origem.
   // O resumo não é usado para distribuir valores, evitando misturar
   // #Instagram ADS com #Formulário quando compartilham o mesmo AD_ID.
-  const rows=base.filter(r=>origemInstagram(_metaFinalRowGet(r,'ORIGEM','origem')));
+  const rows=base.filter(r=>origemEscopoFinal(_metaFinalRowGet(r,'ORIGEM','origem')));
   const adMap={};
 
   const bucket=(id,r)=>({
@@ -3484,7 +3495,8 @@ function aplicarFunilMetaFinal(metaAds, pacote){
 
   window._funilMetaFinalPacote={
     ...pacote,
-    baseInstagramAds:rows
+    base:base,
+    baseEscopoAtual:rows
   };
   window._funilMetaFonteFinalAtiva=true;
   window._lastAdMap=adMap;
@@ -3522,15 +3534,15 @@ function aplicarFunilMetaFinal(metaAds, pacote){
 
   filterAdTable();
 
-  console.log('[FUNIL POR ANÚNCIO — INSTAGRAM ADS]',{
+  console.log('[FUNIL POR ANÚNCIO — FONTE FINAL]',{
     pessoas:rows.length,
     leads:totalLeads,
     agendados:totalAg,
     comparecimentos:totalComp,
     fechamentos:totalFechou,
     vendas:totalVendas,
-    esperadoAuditoria:73467.50,
-    diferenca:totalVendas-73467.50
+    origemFiltro:window._origemFilter||'todas',
+    totalVendas:totalVendas
   });
 }
 
@@ -3557,8 +3569,11 @@ async function loadTrafego(){
     _lastCloudiaFilteredEvents=filteredEvents;
     _lastCloudiaFilteredAgend=filteredAgend;
     updateOrigemCount(filtered);
+    // Registra o pacote final ANTES do render. O próprio renderTrafego
+    // reaplica essa fonte ao terminar e em todos os re-renders futuros.
+    window._funilMetaFinalPacote=funilMetaFinal;
+    window._funilMetaFonteFinalAtiva=true;
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
-    aplicarFunilMetaFinal(metaAds,funilMetaFinal); // SOBRESCREVE somente o Funil por Anúncio com a fonte aprovada
     carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
     carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
@@ -4473,6 +4488,14 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   if(adsetSel){const prev=adsetSel.value;adsetSel.innerHTML='<option value="">Todos os conjuntos</option>'+allAdsets.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');}
   // Renderiza respeitando filtros ativos
   filterAdTable();
+
+  // CRÍTICO: renderTrafego é chamado novamente ao trocar origem, editar datas,
+  // carregar Clinicorp e por outras rotinas assíncronas. Essas chamadas antigas
+  // reconstruíam _lastAdMap e apagavam o Funil Meta auditado.
+  // Sempre reaplica a fonte final após qualquer render legado.
+  if(window._funilMetaFinalPacote && window._funilMetaFonteFinalAtiva){
+    aplicarFunilMetaFinal(window._lastMetaAds||[], window._funilMetaFinalPacote);
+  }
 }
 
 // ===== FILTER AD TABLE =====
@@ -6100,7 +6123,7 @@ function lupaContratos(){
 
 function _linhasFunilMetaFinal(adKey, campo){
   const pacote=window._funilMetaFinalPacote||{};
-  const base=pacote.baseInstagramAds||[];
+  const base=pacote.baseEscopoAtual||[];
   const alvo=(adKey==='__sem_rastreio__')?'':_metaFinalId(adKey);
   return base.filter(r=>{
     const rid=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
