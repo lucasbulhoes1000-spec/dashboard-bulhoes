@@ -2833,6 +2833,7 @@ function lupaNovoRecompra(tipo,classe){
 }
 
 function reconciliarAgendCompClinicorpPorAnuncio(){
+  if(window._funilMetaFonteFinalAtiva)return; // fonte final aprovada: não recalcular distribuição por anúncio
   const adMap=window._lastAdMap;
   const dados=getAgendaClinicorpFiltrada();
   if(!adMap||!dados)return;
@@ -3382,12 +3383,139 @@ function rebuildStageIndex(cloudiaRows){
     arr.sort((a,b)=>(parseCloudiaDate(b.timestamp||b.created_at)||new Date(0))-(parseCloudiaDate(a.timestamp||a.created_at)||new Date(0)));
   });
 }
+
+// ===== FUNIL META — FONTE ÚNICA APROVADA NO GS (27/08/2026) =====
+// A tabela "Funil por Anúncio" e TODAS as suas lupas passam a usar
+// FUNIL_META_BASE_FINAL + FUNIL_META_RESUMO_FINAL como fonte da verdade.
+// A Meta continua sendo usada somente para investimento/spend.
+async function fetchFunilMetaFinal(){
+  const range=getRange('trafego');
+  const url=CLOUDIA_URL+'?action=funilMetaFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
+  const res=await fetch(url);
+  const data=await res.json();
+  if(!data||data.status!=='ok'||!Array.isArray(data.base)||!Array.isArray(data.resumo)){
+    throw new Error((data&&data.mensagem)||'Fonte final do Funil Meta não disponível no GS.');
+  }
+  return data;
+}
+
+function _metaFinalSim(v){
+  return String(v||'').trim().toUpperCase()==='SIM';
+}
+function _metaFinalNum(v){
+  const n=Number(v||0); return Number.isFinite(n)?n:0;
+}
+function _metaFinalId(v){
+  return String(v||'').replace(/^ag:/i,'').replace(/\D/g,'').trim();
+}
+function _metaFinalRowGet(r,...keys){
+  for(const k of keys){ if(r && r[k]!==undefined && r[k]!==null) return r[k]; }
+  return '';
+}
+
+function aplicarFunilMetaFinal(metaAds, pacote){
+  const base=pacote.base||[];
+  const resumo=pacote.resumo||[];
+
+  // Spend da Meta por AD_ID. Nenhuma métrica clínica é recalculada aqui.
+  const spendById={};
+  (metaAds||[]).forEach(ad=>{
+    const id=_metaFinalId(ad.ad_id);
+    if(!id)return;
+    spendById[id]=(spendById[id]||0)+_metaFinalNum(ad.spend);
+  });
+
+  const adMap={};
+  resumo.forEach(r=>{
+    const id=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
+    const key=id||'__sem_rastreio__';
+    const anuncio=String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'').trim() || (id?id:'⚠ Sem rastreamento histórico');
+    adMap[key]={
+      spend:id?(spendById[id]||0):0,
+      leads:_metaFinalNum(_metaFinalRowGet(r,'LEADS','leads')),
+      agend:_metaFinalNum(_metaFinalRowGet(r,'AGENDADOS','agendados')),
+      comp:_metaFinalNum(_metaFinalRowGet(r,'COMPARECIMENTOS','comparecimentos')),
+      fechou:_metaFinalNum(_metaFinalRowGet(r,'FECHAMENTOS','fechamentos')),
+      contratos:_metaFinalNum(_metaFinalRowGet(r,'CONTRATOS','contratos')),
+      lancamentos:_metaFinalNum(_metaFinalRowGet(r,'LANÇAMENTOS','LANCAMENTOS','lancamentos')),
+      vendas:_metaFinalNum(_metaFinalRowGet(r,'VENDAS','vendas')),
+      adset:String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||''),
+      campaign:String(_metaFinalRowGet(r,'CAMPANHA','campanha')||''),
+      label:anuncio,
+      phones:new Set(),
+      agendPhones:new Set(),
+      compPhones:new Set(),
+      fechouPhones:new Set(),
+      _fonteFinal:true
+    };
+  });
+
+  // As lupas são construídas da MESMA base que gerou o resumo.
+  base.forEach(r=>{
+    const id=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
+    const key=id||'__sem_rastreio__';
+    if(!adMap[key]){
+      adMap[key]={
+        spend:id?(spendById[id]||0):0,leads:0,agend:0,comp:0,fechou:0,contratos:0,lancamentos:0,vendas:0,
+        adset:String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||''),
+        campaign:String(_metaFinalRowGet(r,'CAMPANHA','campanha')||''),
+        label:String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'⚠ Sem rastreamento histórico'),
+        phones:new Set(),agendPhones:new Set(),compPhones:new Set(),fechouPhones:new Set(),_fonteFinal:true
+      };
+    }
+    const ph=normalizePhone(_metaFinalRowGet(r,'TELEFONE','telefone'));
+    if(!ph)return;
+    if(_metaFinalSim(_metaFinalRowGet(r,'LEAD NO PERÍODO?','LEAD NO PERIODO?')))adMap[key].phones.add(ph);
+    if(_metaFinalSim(_metaFinalRowGet(r,'AGENDOU NO PERÍODO?','AGENDOU NO PERIODO?')))adMap[key].agendPhones.add(ph);
+    if(_metaFinalSim(_metaFinalRowGet(r,'COMPARECEU NO PERÍODO?','COMPARECEU NO PERIODO?')))adMap[key].compPhones.add(ph);
+    if(_metaFinalSim(_metaFinalRowGet(r,'FECHOU NO PERÍODO?','FECHOU NO PERIODO?')))adMap[key].fechouPhones.add(ph);
+  });
+
+  window._funilMetaFinalPacote=pacote;
+  window._funilMetaFonteFinalAtiva=true;
+  window._lastAdMap=adMap;
+
+  // Filtros da tabela, derivados da fonte final.
+  const allCampaigns=[...new Set(Object.values(adMap).map(d=>d.campaign||'').filter(Boolean))].sort();
+  const allAdsets=[...new Set(Object.values(adMap).map(d=>d.adset||'').filter(Boolean))].sort();
+  const campSel=document.getElementById('ad-filter-campaign');
+  const adsetSel=document.getElementById('ad-filter-adset');
+  if(campSel){
+    const prev=campSel.value;
+    campSel.innerHTML='<option value="">Todas as campanhas</option>'+allCampaigns.map(c=>`<option value="${c}"${c===prev?' selected':''}>${c}</option>`).join('');
+  }
+  if(adsetSel){
+    const prev=adsetSel.value;
+    adsetSel.innerHTML='<option value="">Todos os conjuntos</option>'+allAdsets.map(a=>`<option value="${a}"${a===prev?' selected':''}>${a}</option>`).join('');
+  }
+
+  // Auditoria visual baseada na própria base final.
+  const totalLeads=Object.values(adMap).reduce((s,d)=>s+(d.leads||0),0);
+  const sem=adMap.__sem_rastreio__||{};
+  window._auditoriaFunilAnuncio={
+    coberturaLeads:totalLeads>0?(totalLeads-(sem.leads||0))/totalLeads:1,
+    leadsSemRastreio:sem.leads||0,
+    fechamentosSemRastreio:sem.fechou||0,
+    vendasSemRastreio:sem.vendas||0
+  };
+
+  filterAdTable(); // já ordena DESC por leads
+  console.log('[FUNIL META FINAL] Fonte única aplicada:', {
+    base:base.length,resumo:resumo.length,
+    leads:Object.values(adMap).reduce((s,d)=>s+(d.leads||0),0),
+    agendados:Object.values(adMap).reduce((s,d)=>s+(d.agend||0),0),
+    comparecimentos:Object.values(adMap).reduce((s,d)=>s+(d.comp||0),0),
+    fechamentos:Object.values(adMap).reduce((s,d)=>s+(d.fechou||0),0),
+    vendas:Object.values(adMap).reduce((s,d)=>s+(d.vendas||0),0)
+  });
+}
+
 async function loadTrafego(){
   document.getElementById('loading-trafego').style.display='flex';
   document.getElementById('content-trafego').style.display='none';
   document.getElementById('error-trafego').style.display='none';
   try{
-    const[metaAds,cloudiaRows]=await Promise.all([fetchMeta(),fetchCloudia()]);
+    const[metaAds,cloudiaRows,funilMetaFinal]=await Promise.all([fetchMeta(),fetchCloudia(),fetchFunilMetaFinal()]);
     _lastMetaAds=metaAds;
     _lastCloudiaRows=cloudiaRows;
     // Índice por telefone dos CUSTOMER_STAGE_UPDATED com stage não-vazio, já ordenados por timestamp desc.
@@ -3406,6 +3534,7 @@ async function loadTrafego(){
     _lastCloudiaFilteredAgend=filteredAgend;
     updateOrigemCount(filtered);
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
+    aplicarFunilMetaFinal(metaAds,funilMetaFinal); // SOBRESCREVE somente o Funil por Anúncio com a fonte aprovada
     carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
     carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
@@ -5944,100 +6073,73 @@ function lupaContratos(){
   );
 }
 
-function lupaAdLeads(adKey){
-  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
-  const label=adInfo?(adInfo.label||adKey):adKey;
-  const elegiveis=window._lastAdEligiblePhones||new Set();
-  const phones=adInfo&&adInfo.phones
-    ? [...adInfo.phones].filter(ph=>elegiveis.has(normalizePhone(ph)))
-    : [];
 
-  const rows=phones.map(ph=>{
-    ph=normalizePhone(ph);
-    const candidates=(_lastCloudiaFiltered||[]).filter(r=>normalizePhone(r.phone)===ph)
-      .sort((a,b)=>(parseCloudiaDate(a.created_at)||new Date(0))-(parseCloudiaDate(b.created_at)||new Date(0)));
-    const row=candidates[0]||allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
-    const e=applyEdits({...row,phone:row.phone||ph});
-    return [fmtDate(e.created_at),e.name||((ccDataLookup(ph)||{}).nomeAtual)||'—',ph,e.stage||'—'];
-  }).sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
-
-  openModal('Leads — '+label.substring(0,30)+' — '+rows.length+' registros',
-    ['Data cadastro','Nome','Telefone','Etapa'],rows);
+function _linhasFunilMetaFinal(adKey, campo){
+  const pacote=window._funilMetaFinalPacote||{};
+  const base=pacote.base||[];
+  const alvo=(adKey==='__sem_rastreio__')?'':_metaFinalId(adKey);
+  return base.filter(r=>{
+    const rid=_metaFinalId(_metaFinalRowGet(r,'AD_ID','ad_id'));
+    if((alvo&&rid!==alvo)||(!alvo&&rid))return false;
+    return _metaFinalSim(_metaFinalRowGet(r,campo,campo.replace('Í','I').replace('É','E')));
+  });
 }
-
+function _labelAdFinal(adKey){
+  const d=window._lastAdMap&&window._lastAdMap[adKey];
+  return d?(d.label||adKey):adKey;
+}
+function _linhaPessoaFinal(r){
+  return [
+    String(_metaFinalRowGet(r,'NOME','nome')||'—'),
+    String(_metaFinalRowGet(r,'TELEFONE','telefone')||'—'),
+    String(_metaFinalRowGet(r,'ORIGEM','origem')||'—'),
+    String(_metaFinalRowGet(r,'CAMPANHA','campanha')||'—'),
+    String(_metaFinalRowGet(r,'CONJUNTO','conjunto')||'—')
+  ];
+}
+function lupaAdLeads(adKey){
+  const rows=_linhasFunilMetaFinal(adKey,'LEAD NO PERÍODO?');
+  openModal('Leads — '+_labelAdFinal(adKey).substring(0,35)+' — '+rows.length+' registros',
+    ['Nome','Telefone','Origem','Campanha','Conjunto'],rows.map(_linhaPessoaFinal));
+}
 function lupaAdAgend(adKey){
-  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
-  const label=adInfo?(adInfo.label||adKey):adKey;
-  const adPhones=adInfo&&adInfo.agendPhones?adInfo.agendPhones:new Set();
-  const rows=[...adPhones].map(ph=>{
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
-    const e=applyEdits({...row,phone:row.phone||ph});
-    const info=getEffectiveAgendInfo(ph,row);
-    const ccD=ccDataLookup(ph);
-    const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
-    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,stage:info.stage,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(dataCadastroVal)||new Date(0)};
-  }).sort((a,b)=>b.sortKey-a.sortKey)
-    .map(r=>[r.dataCadastro,r.nome,r.telefone,getStatusAgend(r.stage),fmtDate(r.consultaTs)]);
-  openModal('Agendamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Status','Data consulta'],rows);
+  const rows=_linhasFunilMetaFinal(adKey,'AGENDOU NO PERÍODO?');
+  openModal('Agendamentos — '+_labelAdFinal(adKey).substring(0,35)+' — '+rows.length+' registros',
+    ['Nome','Telefone','Origem','Campanha','Conjunto'],rows.map(_linhaPessoaFinal));
 }
 function lupaAdComp(adKey){
-  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
-  const label=adInfo?(adInfo.label||adKey):adKey;
-  const adPhones=adInfo&&adInfo.compPhones?adInfo.compPhones:new Set();
-  // Constrói a tabela a partir de adPhones (fonte reconciliada — inclui CSV importados),
-  // não apenas de quem tem evento explícito de Comparecimento no Cloudia.
-  const rows=[...adPhones].map(ph=>{
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
-    const e=applyEdits({...row,phone:row.phone||ph});
-    const info=getEffectiveAgendInfo(ph,row);
-    const ccD=ccDataLookup(ph);
-    const nome=(ccD&&ccD.nomeAtual)||e.name||'—';
-    const origem=(ccD&&ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
-    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
-    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,origem,consultaTs:info.consultaTs,sortKey:parseCloudiaDate(info.consultaTs)||parseCloudiaDate(dataCadastroVal)||new Date(0)};
-  }).sort((a,b)=>b.sortKey-a.sortKey)
-    .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,fmtDate(r.consultaTs)]);
-  openModal('Comparecimentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Data consulta'],rows);
+  const rows=_linhasFunilMetaFinal(adKey,'COMPARECEU NO PERÍODO?');
+  openModal('Comparecimentos — '+_labelAdFinal(adKey).substring(0,35)+' — '+rows.length+' registros',
+    ['Nome','Telefone','Origem','Campanha','Conjunto'],rows.map(_linhaPessoaFinal));
 }
 function lupaAdFechou(adKey){
-  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
-  const label=adInfo?(adInfo.label||adKey):adKey;
-  const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
-  const rows=[...adPhones].map(ph=>{
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
-    const e=applyEdits({...row,phone:row.phone||ph});
-    const ccD=ccDataLookup(ph)||{};
-    const nome=(ccD.nomeAtual)||e.name||'—';
-    const origem=(ccD.origemAtual)||getOrigemReal(ph)||e.origin||'—';
-    const orc=ccD.orcamentos&&ccD.orcamentos.find(o=>o.status==='Aprovado');
-    const valFech=orc?fmt(Number(orc.valor||0)):'—';
-    const dataCadastroVal=e.created_at||getDataCadastroReal(ph);
-    const dataCadastro=dataCadastroVal?fmtDate(dataCadastroVal):'—';
-    return{dataCadastro,nome,telefone:e.phone||ph,origem,valFech,sortKey:parseCloudiaDate(dataCadastroVal)||new Date(0)};
-  }).sort((a,b)=>b.sortKey-a.sortKey)
-    .map(r=>[r.dataCadastro,r.nome,r.telefone,r.origem,r.valFech]);
-  openModal('Fechamentos — '+label.substring(0,30),['Data cadastro','Nome','Telefone','Origem','Valor fechado'],rows);
+  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?');
+  openModal('Fechamentos — '+_labelAdFinal(adKey).substring(0,35)+' — '+rows.length+' registros',
+    ['Nome','Telefone','Origem','Valor vendas','Detalhes'],rows.map(r=>[
+      String(_metaFinalRowGet(r,'NOME','nome')||'—'),
+      String(_metaFinalRowGet(r,'TELEFONE','telefone')||'—'),
+      String(_metaFinalRowGet(r,'ORIGEM','origem')||'—'),
+      fmt(_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'))),
+      String(_metaFinalRowGet(r,'DETALHES VENDAS','detalhes vendas')||'—')
+    ]));
 }
 function lupaAdVendas(adKey){
-  const adInfo=window._lastAdMap&&window._lastAdMap[adKey];
-  const label=adInfo?(adInfo.label||adKey):adKey;
-  const adPhones=adInfo&&adInfo.fechouPhones?adInfo.fechouPhones:new Set();
-  const rows=[];let total=0;
-  adPhones.forEach(ph=>{
-    const d=ccDataLookup(ph)||{};
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
-    const nome=(d.nomeAtual)||(row&&row.name)||'—';
-    const orcsAprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado');
-    const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
-    if(val>0){total+=val;rows.push([nome,ph,fmt(val)]);}
+  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?').filter(r=>_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'))>0);
+  let total=0;
+  const out=rows.map(r=>{
+    const v=_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas')); total+=v;
+    return [
+      String(_metaFinalRowGet(r,'NOME','nome')||'—'),
+      String(_metaFinalRowGet(r,'TELEFONE','telefone')||'—'),
+      String(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio')||'—'),
+      fmt(v)
+    ];
   });
-  rows.sort((a,b)=>parseFloat(b[2].replace(/\D/g,''))-parseFloat(a[2].replace(/\D/g,'')));
-  rows.push(['TOTAL','',fmt(total)]);
-  openModal('Vendas — '+label.substring(0,30),['Nome','Telefone','Valor Fechado'],rows);
+  out.push(['TOTAL','','',fmt(total)]);
+  openModal('Vendas — '+_labelAdFinal(adKey).substring(0,35),
+    ['Nome','Telefone','Anúncio','Valor Fechado'],out);
 }
+
 // Retorna {stage, consultaTs} mais corretos para um telefone, priorizando:
 // 1) statusAtual manual do _ccData (se setado)
 // 2) último CUSTOMER_STAGE_UPDATED real do Cloudia em _lastCloudiaRows
