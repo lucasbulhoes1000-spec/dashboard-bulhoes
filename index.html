@@ -4625,7 +4625,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // reconstruíam _lastAdMap e apagavam o Funil Meta auditado.
   // Sempre reaplica a fonte final após qualquer render legado.
   if(window._funilMetaFinalPacote && window._funilMetaFonteFinalAtiva){
-    aplicarFunilMetaFinal(window._lastMetaAds||[], window._funilMetaFinalPacote);
+    aplicarFunilMetaFinal(_lastMetaAds||[], window._funilMetaFinalPacote);
   }
 }
 
