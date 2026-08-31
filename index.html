@@ -678,9 +678,12 @@ tbody tr:hover td{background:#faf7f3;}
             <option value="fechado">Fechou tratamento</option>
             <option value="aberto">Não fechou</option>
           </select>
-          <select class="filter-select" id="clientes-trat-filter" onchange="filterClientesTable()">
-            <option value="">Todos os tratamentos</option>
-          </select>
+          <details id="clientes-trat-multi" style="position:relative;min-width:210px;">
+            <summary id="clientes-trat-summary" class="filter-select" style="list-style:none;cursor:pointer;user-select:none;min-width:210px;">Todos os tratamentos</summary>
+            <div id="clientes-trat-options" style="position:absolute;z-index:1000;top:100%;left:0;margin-top:4px;min-width:280px;max-height:300px;overflow:auto;background:#fff;border:0.5px solid #d4c9bc;border-radius:7px;box-shadow:0 8px 24px rgba(60,45,30,.12);padding:8px;">
+              <div style="padding:5px 7px;color:#9a8c7e;font-size:11px;">Selecione um ou mais tratamentos</div>
+            </div>
+          </details>
           <select class="filter-select" id="clientes-aval-filter" onchange="filterClientesTable()">
             <option value="">Todos os avaliadores</option>
             
@@ -5870,6 +5873,41 @@ function setTipoOrcamentoClientes(tipo){
   filterClientesTable();
 }
 
+let _clientesTratSelecionados=new Set();
+function getClientesTratSelecionados(){return [..._clientesTratSelecionados];}
+function atualizarResumoTratClientes(){
+  const el=document.getElementById('clientes-trat-summary');if(!el)return;
+  const arr=getClientesTratSelecionados();
+  el.textContent=arr.length===0?'Todos os tratamentos':arr.length===1?arr[0]:arr.length+' tratamentos selecionados';
+  el.title=arr.join(', ');
+}
+function toggleTratClienteFiltro(valor,checked){
+  const v=canonTratamentoCliente(valor);
+  if(!v)return;
+  if(checked)_clientesTratSelecionados.add(v);else _clientesTratSelecionados.delete(v);
+  atualizarResumoTratClientes();
+  _clientesPage=1;
+  filterClientesTable();
+}
+function limparTratClientes(){
+  _clientesTratSelecionados.clear();
+  document.querySelectorAll('#clientes-trat-options input[type="checkbox"]').forEach(c=>c.checked=false);
+  atualizarResumoTratClientes();
+  _clientesPage=1;
+  filterClientesTable();
+}
+function popularTratamentosClientesMulti(tratsTodos){
+  const box=document.getElementById('clientes-trat-options');if(!box)return;
+  const agrupados=[...new Set((tratsTodos||[]).map(canonTratamentoCliente).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  // descarta seleções que deixaram de existir na lista disponível
+  const validos=new Set(agrupados);
+  [..._clientesTratSelecionados].forEach(v=>{if(!validos.has(v))_clientesTratSelecionados.delete(v);});
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 7px 7px;border-bottom:1px solid #eee7df;margin-bottom:4px;"><span style="color:#9a8c7e;font-size:11px;">Selecione um ou mais</span><button type="button" onclick="limparTratClientes();event.preventDefault();" style="border:0;background:none;color:#7a6550;cursor:pointer;font-size:11px;text-decoration:underline;">Limpar</button></div>'+
+    agrupados.map(t=>'<label style="display:flex;align-items:center;gap:7px;padding:6px 7px;cursor:pointer;font-size:11px;color:#5f5144;border-radius:4px;" onmouseover="this.style.background=\'#f7f3ee\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" '+(_clientesTratSelecionados.has(t)?'checked ':'')+'onchange="toggleTratClienteFiltro(this.dataset.trat,this.checked)" data-trat="'+esc(t)+'"> <span>'+esc(t)+'</span></label>').join('');
+  atualizarResumoTratClientes();
+}
+
 function filterClientesTable(){
   const q=(document.getElementById('clientes-search')||{}).value||'';
   const ql=q.toLowerCase();
@@ -5878,7 +5916,7 @@ function filterClientesTable(){
   const fase=(document.getElementById('clientes-fase-filter')||{}).value||'';
   const tipoOrc=_clientesTipoOrcamento;
   const sit=(document.getElementById('clientes-sit-filter')||{}).value||'';
-  const trat=(document.getElementById('clientes-trat-filter')||{}).value||'';
+  const tratamentosSelecionados=getClientesTratSelecionados();
   const aval=(document.getElementById('clientes-aval-filter')||{}).value||'';
   const qDigits=(q||'').replace(/\D/g,'');
 
@@ -5911,7 +5949,11 @@ function filterClientesTable(){
     const origemEfetiva=origemAtualPaciente(ph,e.name||'');
 
     const sitMatch=!sit||(sit==='fechado'&&fechou)||(sit==='aberto'&&!fechou);
-    const tratMatch=!trat||orcsPeriodo.some(o=>tratamentoBate(o.tratamento,trat));
+    // Multi-seleção: mostra o cliente se QUALQUER um dos tratamentos selecionados
+    // estiver em algum orçamento dele no período atual.
+    const tratMatch=tratamentosSelecionados.length===0||tratamentosSelecionados.some(trat=>
+      orcsPeriodo.some(o=>tratamentoBate(o.tratamento,trat))
+    );
     const avalMatch=!aval||orcsPeriodo.some(o=>normStr(o.avaliador)===normStr(aval));
 
     // Guarda o recorte para render/cards; não recalcula histórico inteiro.
@@ -11753,7 +11795,7 @@ function populateDynamicSelects(){
   const tratsDoOrc=[...new Set(Object.values(_ccData||{}).flatMap(d=>(d.orcamentos||[]).flatMap(o=>(o.tratamento||'').split(',').map(s=>s.trim()).filter(Boolean))))];
   const tratsTodos=[...new Set([...trats,...tratsDoOrc])].sort();
   _todosTratamentosCache=tratsTodos;
-  ['orc-tratamento','clientes-trat-filter','ro-trat','rof-trat','pacientes-trat-filter'].forEach(id=>{
+  ['orc-tratamento','ro-trat','rof-trat','pacientes-trat-filter'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const cur=el.value;
     const isFilter=id.includes('filter')||id.startsWith('ro')||id.startsWith('rof');
@@ -11761,15 +11803,9 @@ function populateDynamicSelects(){
       +tratsTodos.map(t=>`<option${t===cur?' selected':''}>${t}</option>`).join('');
   });
 
-  // Na aba Clientes, agrupa procedimentos iguais que só variam pelo dente.
-  const cliTrat=document.getElementById('clientes-trat-filter');
-  if(cliTrat){
-    const curCanon=canonTratamentoCliente(cliTrat.value);
-    const agrupados=[...new Set(tratsTodos.map(canonTratamentoCliente).filter(Boolean))]
-      .sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    cliTrat.innerHTML='<option value="">Todos os tratamentos</option>'
-      +agrupados.map(t=>`<option value="${t}"${t===curCanon?' selected':''}>${t}</option>`).join('');
-  }
+  // Na aba Clientes, o filtro aceita múltiplos tratamentos ao mesmo tempo
+  // e continua agrupando procedimentos iguais que só variam pelo dente.
+  popularTratamentosClientesMulti(tratsTodos);
 
   // Origens nos modais criar lead/cliente e card de lead
   ['cl-origem','cc2-origem','lc-origem'].forEach(id=>{
