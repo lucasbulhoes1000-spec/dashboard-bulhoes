@@ -1794,7 +1794,6 @@ tbody tr:hover td{background:#faf7f3;}
 </div>
 
 <script>
-const META_TOKEN='EAASruBtHjI0BSdFo6t7ylsbjH1MieP2BGazhsO0TGONLyxjEVuBpIsODXQZBu8ZBWJi3Cme4hhNvSqFnlg3t80E5It7sSXpaVcOqZBZA4o1Vdr5wCQLCiS2aX6ZC3GVmjE31IvOZCQjzS2ncZCpV2GzjZC26s3snUZAS8Qptzd9l2LEN5itGnb4klleKdUsFnmQZDZD';
 const META_ACCOUNT='act_830126674734657';
 const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
 const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
@@ -3610,6 +3609,13 @@ function aplicarFunilMetaFinal(metaAds, pacote){
     console.warn('[META SPEND] anúncios do funil sem spend casado:',_spendNaoCasado);
   }
 
+  // Defesa final: o funil nunca deve perder spend se a Meta devolveu investimento.
+  // Faz uma segunda passagem EXCLUSIVAMENTE por AD_ID exato, sem alterar leads/eventos/vendas.
+  metaEntries.forEach(m=>{
+    if(!m.id || !(m.spend>0)) return;
+    if(adMap[m.id]) adMap[m.id].spend=m.spend;
+  });
+
   window._funilMetaFinalPacote={
     ...pacote,
     base:base,
@@ -3709,23 +3715,23 @@ async function loadTrafego(){
 async function fetchMeta(){
   try{
     const range=getRange('trafego');
-    const tr=encodeURIComponent(JSON.stringify(range));
-    let url=`https://graph.facebook.com/v18.0/${META_ACCOUNT}/insights?fields=ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,actions&time_range=${tr}&level=ad&limit=500&access_token=${META_TOKEN}`;
-    const all=[];
-    let pages=0;
-    while(url&&pages<20){
-      const res=await fetch(url);
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message);
-      if(Array.isArray(data.data))all.push(...data.data);
-      url=data&&data.paging&&data.paging.next?data.paging.next:'';
-      pages++;
+    const url=CLOUDIA_URL+'?action=metaInsightsFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
+    const res=await fetch(url);
+    const payload=await res.json();
+    if(!payload||payload.status!=='ok'||!Array.isArray(payload.data)){
+      throw new Error((payload&&payload.mensagem)||'Insights da Meta não disponíveis.');
     }
-    console.log('[META DEBUG] anúncios:',all.length,'| páginas:',pages,'| range:',range);
+    const all=payload.data.map(ad=>({
+      ...ad,
+      ad_id:String(ad.ad_id||''),
+      spend:Number(ad.spend||0)
+    }));
+    console.log('[META DEBUG SERVER] anúncios:',all.length,'| range:',range,'| exemplo:',all[0]);
     document.getElementById('badge-meta').textContent='⬤ Meta Ads — conectado';
     return all;
   }catch(e){
-    document.getElementById('badge-meta').textContent='⬤ Meta Ads — '+e.message.substring(0,30);
+    document.getElementById('badge-meta').textContent='⬤ Meta Ads — '+String(e.message||e).substring(0,30);
+    console.error('[META DEBUG SERVER] erro:',e);
     return[];
   }
 }
