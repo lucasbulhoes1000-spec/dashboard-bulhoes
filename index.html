@@ -3480,57 +3480,12 @@ function aplicarFunilMetaFinal(metaAds, pacote){
   });
 
   function resolveMetaSpend(id,r){
-    // 1) ID oficial exato — sempre autoridade máxima.
+    // REGRA FINANCEIRA ESTRITA: investimento só pode ser atribuído por AD_ID exato.
+    // Nomes de anúncio/conjunto/campanha podem se repetir e nunca devem mover dinheiro
+    // entre anúncios. Se o ID histórico não existir no retorno da Meta do período,
+    // o bucket fica com spend 0; o anúncio Meta real entra separadamente abaixo.
     if(id&&Object.prototype.hasOwnProperty.call(spendById,id)){
       return {spend:spendById[id],match:'id'};
-    }
-
-    const c=normMedia(_metaFinalRowGet(r,'CAMPANHA','campanha'));
-    const s=normMedia(_metaFinalRowGet(r,'CONJUNTO','conjunto'));
-    const a=normMedia(_metaFinalRowGet(r,'ANÚNCIO','ANUNCIO','anuncio'));
-    if(!a&&!s&&!c)return {spend:0,match:'none'};
-
-    // 2) Mesmo anúncio + mesmo conjunto. É a combinação mais segura quando
-    // o mesmo criativo foi duplicado em vários conjuntos.
-    let cand=metaEntries.filter(x=>x.na===a && x.ns===s);
-    if(cand.length===1)return {spend:cand[0].spend,match:'ad+adset'};
-    if(cand.length>1){
-      const sameCampaign=cand.filter(x=>x.nc===c);
-      if(sameCampaign.length===1)return {spend:sameCampaign[0].spend,match:'camp+adset+ad'};
-      // Se forem múltiplas linhas do MESMO AD_ID por paginação/quebra da Meta,
-      // soma somente esses registros, nunca anúncios diferentes.
-      const ids=[...new Set(cand.map(x=>x.id).filter(Boolean))];
-      if(ids.length===1)return {spend:cand.reduce((t,x)=>t+x.spend,0),match:'same-id-group'};
-    }
-
-    // 3) Campanha + anúncio, quando o conjunto sofreu pequena mudança de texto.
-    cand=metaEntries.filter(x=>x.na===a && x.nc===c);
-    if(cand.length===1)return {spend:cand[0].spend,match:'campaign+ad'};
-
-    // 4) Nome do anúncio sozinho SOMENTE se for inequívoco no período.
-    cand=metaEntries.filter(x=>x.na===a);
-    if(cand.length===1)return {spend:cand[0].spend,match:'ad-unique'};
-
-    // 5) Fallback tolerante para pequenas diferenças de sufixos/pontuação.
-    // Ex.: "[ABERTO] [2]" x "[ABERTO] | 2". Exige anúncio compatível e
-    // escolhe apenas quando existe um vencedor claramente melhor.
-    const scored=metaEntries.map(x=>{
-      let score=0;
-      if(a&&x.na===a)score+=100;
-      else if(a&&x.na&&(x.na.startsWith(a)||a.startsWith(x.na)))score+=55;
-      if(s&&x.ns===s)score+=45;
-      else if(s&&x.ns&&(x.ns.startsWith(s)||s.startsWith(x.ns)))score+=20;
-      if(c&&x.nc===c)score+=25;
-      else if(c&&x.nc&&(x.nc.startsWith(c)||c.startsWith(x.nc)))score+=10;
-      return {x,score};
-    }).filter(z=>z.score>=100).sort((p,q)=>q.score-p.score);
-
-    if(scored.length){
-      const best=scored[0];
-      const second=scored[1];
-      if(!second || best.score>second.score){
-        return {spend:best.x.spend,match:'fuzzy'};
-      }
     }
     return {spend:0,match:'unmatched'};
   }
