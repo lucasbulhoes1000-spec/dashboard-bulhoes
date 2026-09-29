@@ -3419,14 +3419,30 @@ function rebuildStageIndex(cloudiaRows){
 // FUNIL_META_BASE_FINAL + FUNIL_META_RESUMO_FINAL como fonte da verdade.
 // A Meta continua sendo usada somente para investimento/spend.
 async function fetchFunilMetaFinal(){
-  const range=getRange('trafego');
-  const url=CLOUDIA_URL+'?action=funilMetaFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
-  const res=await fetch(url);
-  const data=await res.json();
-  if(!data||data.status!=='ok'||!Array.isArray(data.base)||!Array.isArray(data.resumo)){
-    throw new Error((data&&data.mensagem)||'Fonte final do Funil Meta não disponível no GS.');
+  // ⚠️ CORRIGIDO (28/09/2026 — URGENTE, "quebrou o backoffice inteiro"):
+  // essa função rodava dentro do MESMO Promise.all que carrega o dashboard
+  // inteiro (fetchMeta + fetchCloudia) — quando o backend (.gs) não tinha
+  // (ou perdeu) o endpoint 'funilMetaFinal', o throw() aqui derrubava a
+  // promise INTEIRA, e o dashboard inteiro ficava em branco com erro,
+  // mesmo fetchMeta/fetchCloudia tendo funcionado normalmente. Agora, se
+  // essa fonte específica falhar, avisa no console e devolve null — o resto
+  // do dashboard carrega normal, só a tabela "Funil por Anúncio" fica sem
+  // essa fonte específica (ver os "if(window._funilMetaFinalPacote..." mais
+  // abaixo, que já tratam esse valor como opcional).
+  try{
+    const range=getRange('trafego');
+    const url=CLOUDIA_URL+'?action=funilMetaFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
+    const res=await fetch(url);
+    const data=await res.json();
+    if(!data||data.status!=='ok'||!Array.isArray(data.base)||!Array.isArray(data.resumo)){
+      console.warn('[FUNIL META FINAL] Fonte indisponível no GS — dashboard segue carregando sem essa parte específica.',data&&data.mensagem);
+      return null;
+    }
+    return data;
+  }catch(e){
+    console.warn('[FUNIL META FINAL] Erro ao buscar — dashboard segue carregando sem essa parte específica.',e);
+    return null;
   }
-  return data;
 }
 
 function _metaFinalSim(v){
@@ -3667,7 +3683,12 @@ async function loadTrafego(){
     // Registra o pacote final ANTES do render. O próprio renderTrafego
     // reaplica essa fonte ao terminar e em todos os re-renders futuros.
     window._funilMetaFinalPacote=funilMetaFinal;
-    window._funilMetaFonteFinalAtiva=true;
+    // ⚠️ CORRIGIDO (28/09/2026, junto com o fix acima): só marca como "fonte
+    // final ativa" quando o dado realmente veio — outro trecho do código
+    // (linha ~2866) confia só nessa flag pra decidir se recalcula o funil
+    // por conta própria; se marcássemos true mesmo com funilMetaFinal nulo,
+    // aquele trecho pularia o recálculo de fallback à toa.
+    window._funilMetaFonteFinalAtiva=!!funilMetaFinal;
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
     carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
     carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
