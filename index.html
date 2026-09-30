@@ -3149,139 +3149,84 @@ async function carregarVendasReaisClinicorp(){
     if(meuRequestId!==_vendasReaisRequestId)return;
 
     if(r.status!=='ok'){
-      // ⚠️ NOVO (30/09/2026, URGENTE — rate limit do Clinicorp persistente):
-      // antes, qualquer falha aqui derrubava direto pro cálculo antigo por
-      // orçamento (pior, sabidamente incompleto). Agora, primeiro tenta usar
-      // o ÚLTIMO resultado que funcionou de verdade pra esse MESMO período
-      // (guardado no localStorage) — mostra um aviso de que é um valor em
-      // cache, mas evita mostrar um número pior só porque a API do Clinicorp
-      // está temporariamente limitada.
-      console.warn('[VENDAS REAIS] Erro:',r.mensagem);
-      if(usarCacheVendasReais(range))return;
-      console.warn('[VENDAS REAIS] Sem cache disponível — volta a mostrar o valor baseado em orçamento:',r.mensagem);
+      console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',r.mensagem);
       if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
       return;
     }
 
-    // Guarda no cache — pra usar como reserva na próxima vez que a API do
-    // Clinicorp estiver temporariamente indisponível/limitada.
-    try{
-      localStorage.setItem('vendasReaisCache_'+range.since+'_'+range.until,JSON.stringify({r,salvoEm:new Date().toISOString()}));
-    }catch(eCache){console.warn('[VENDAS REAIS] Não conseguiu salvar cache (não bloqueia nada):',eCache);}
+    // Normaliza TODAS as linhas oficiais uma única vez e já associa a origem
+    // FINAL do paciente. Essa origem é a mesma usada no CRM: edição manual >
+    // origem reconciliada > histórico Cloudia. A origem do lançamento financeiro
+    // em si nunca decide a classificação.
+    const todasLinhas=(r.registros||[]).map(reg=>{
+      const ph=normalizePhone(reg.telefone);
+      const name=reg.nome||'—';
+      const origemFinal=getOrigemFinalLancamento(ph,name);
+      return{
+        name,
+        ph,
+        value:Number(reg.valor||0),
+        classe:reg.classe||'Novo',
+        descricao:reg.descricao||'',
+        data:reg.data||'',
+        origemFinal
+      };
+    });
 
-    processarResultadoVendasReais(r,range,false);
+    // Guarda a fonte-mestra COMPLETA para Métricas de Origem/Funil por Anúncio.
+    // Ela nunca depende do filtro atualmente selecionado no Dashboard.
+    window._dashVendasFonteMestraRows=todasLinhas.map(v=>({...v}));
+    window._dashVendasFonteMestraTotal=todasLinhas.reduce((s,v)=>s+v.value,0);
+    window._dashVendasFonteMestraPeriodo={from:range.since,to:range.until};
+    window._dashVendasFonteMestraOficial=true;
+
+    // Para o Dashboard/lupas, aplica o filtro de origem CLIENT-SIDE sobre as
+    // linhas oficiais. Assim o total geral continua R$177k, mas #Orgânico mostra
+    // somente vendas realmente atribuídas a #Orgânico.
+    const bateFiltroOrigem=v=>origemBateFiltro(v.origemFinal||'',_origemFilter);
+
+    const linhas=todasLinhas.filter(bateFiltroOrigem);
+    const total=linhas.reduce((s,v)=>s+v.value,0);
+    const totalNovo=linhas.filter(v=>v.classe==='Novo').reduce((s,v)=>s+v.value,0);
+    const totalRecompra=linhas.filter(v=>v.classe==='Recompra').reduce((s,v)=>s+v.value,0);
+
+    window._vendasReaisPeriodo={from:range.since,to:range.until};
+    window._lastVendasReais={...r,total,totalNovo,totalRecompra,registros:linhas};
+    window._lastVendaRows=linhas.map(v=>({...v}));
+    window._lastValorVendasNovas=totalNovo;
+    window._lastValorVendasRecompra=totalRecompra;
+    window._lastValorFechado=total;
+
+    // Ticket das vendas do filtro atual. Mantém a mesma lógica visual do CRM:
+    // total de vendas / quantidade de lançamentos financeiros exibidos na lupa.
+    const ticketAtual=linhas.length>0?total/linhas.length:0;
+    window._lastTicketCRM=ticketAtual;
+    const novosLinhas=linhas.filter(v=>v.classe==='Novo');
+    const recomprasLinhas=linhas.filter(v=>v.classe==='Recompra');
+    window._lastTicketCRMNovos=novosLinhas.length?totalNovo/novosLinhas.length:0;
+    window._lastTicketCRMRecompra=recomprasLinhas.length?totalRecompra/recomprasLinhas.length:0;
+
+    const elVendas=document.getElementById('t-vendas');
+    const elVendasSub=document.getElementById('t-vendas-sub');
+    const elFunilValor=document.getElementById('t-funil-card-valor');
+    const elTicket=document.getElementById('t-ticket');
+    const elTicketSub=document.getElementById('t-ticket-sub');
+
+    if(elVendas)elVendas.innerHTML=(total>0?fmt(total):'—')+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
+    if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(totalNovo,totalRecompra,fmt,'vendas');
+    if(elFunilValor)elFunilValor.textContent=totalNovo>0?fmt(totalNovo):'—';
+    if(elTicket)elTicket.textContent=ticketAtual>0?fmt(ticketAtual):'—';
+    if(elTicketSub)elTicketSub.innerHTML=splitNovoRecompraHTML(window._lastTicketCRMNovos,window._lastTicketCRMRecompra,fmt,'ticket');
+
+    // Os 59 lançamentos completos continuam disponíveis para relatórios gerais;
+    // Dashboard e suas lupas enxergam somente as linhas do filtro ativo.
+    if(typeof reconciliarAgendCompClinicorpPorAnuncio==='function')reconciliarAgendCompClinicorpPorAnuncio();
+    if(currentPage==='rel-origem'&&typeof renderRelOrigem==='function')renderRelOrigem();
   }catch(e){
-    console.warn('[VENDAS REAIS] Erro:',e);
+    console.warn('[VENDAS REAIS] Erro — volta a mostrar o valor baseado em orçamento:',e);
     if(meuRequestId!==_vendasReaisRequestId)return;
-    if(usarCacheVendasReais(range))return;
-    console.warn('[VENDAS REAIS] Sem cache disponível — volta a mostrar o valor baseado em orçamento.');
     if(_lastCloudiaFiltered)renderTrafego(_lastMetaAds,_lastCloudiaFiltered,_lastCloudiaFilteredEvents,_lastCloudiaFilteredAgend);
   }
-}
-
-// ⚠️ NOVO (30/09/2026, URGENTE — rate limit do Clinicorp persistente): tenta
-// usar o último resultado de Vendas Reais que funcionou de verdade pra esse
-// MESMO período (from/to exatos), guardado no localStorage. Só usa se tiver
-// no máximo 24h — mais velho que isso, melhor cair pro aviso de "sem dado"
-// do que mostrar algo desatualizado demais sem dizer nada.
-function usarCacheVendasReais(range){
-  try{
-    const bruto=localStorage.getItem('vendasReaisCache_'+range.since+'_'+range.until);
-    if(!bruto)return false;
-    const {r,salvoEm}=JSON.parse(bruto);
-    const idadeHoras=(new Date()-new Date(salvoEm))/(1000*60*60);
-    if(idadeHoras>24){
-      console.warn('[VENDAS REAIS] Tinha cache, mas passou de 24h ('+idadeHoras.toFixed(1)+'h) — não vou usar.');
-      return false;
-    }
-    console.warn('[VENDAS REAIS] Usando cache salvo em '+salvoEm+' ('+idadeHoras.toFixed(1)+'h atrás) — API do Clinicorp indisponível agora.');
-    processarResultadoVendasReais(r,range,true,salvoEm);
-    return true;
-  }catch(e){
-    console.warn('[VENDAS REAIS] Erro ao ler cache:',e);
-    return false;
-  }
-}
-
-// Extraído de dentro de carregarVendasReaisClinicorp (30/09/2026) pra poder
-// ser chamado tanto com um resultado FRESCO (da API agora) quanto com um
-// resultado em CACHE (quando a API está indisponível) — a lógica de
-// processar/exibir é idêntica nos dois casos, só muda se mostra o aviso de
-// "dado em cache" ou não.
-function processarResultadoVendasReais(r,range,doCache,salvoEm){
-  // Normaliza TODAS as linhas oficiais uma única vez e já associa a origem
-  // FINAL do paciente. Essa origem é a mesma usada no CRM: edição manual >
-  // origem reconciliada > histórico Cloudia. A origem do lançamento financeiro
-  // em si nunca decide a classificação.
-  const todasLinhas=(r.registros||[]).map(reg=>{
-    const ph=normalizePhone(reg.telefone);
-    const name=reg.nome||'—';
-    const origemFinal=getOrigemFinalLancamento(ph,name);
-    return{
-      name,
-      ph,
-      value:Number(reg.valor||0),
-      classe:reg.classe||'Novo',
-      descricao:reg.descricao||'',
-      data:reg.data||'',
-      origemFinal
-    };
-  });
-
-  // Guarda a fonte-mestra COMPLETA para Métricas de Origem/Funil por Anúncio.
-  // Ela nunca depende do filtro atualmente selecionado no Dashboard.
-  window._dashVendasFonteMestraRows=todasLinhas.map(v=>({...v}));
-  window._dashVendasFonteMestraTotal=todasLinhas.reduce((s,v)=>s+v.value,0);
-  window._dashVendasFonteMestraPeriodo={from:range.since,to:range.until};
-  window._dashVendasFonteMestraOficial=true;
-
-  // Para o Dashboard/lupas, aplica o filtro de origem CLIENT-SIDE sobre as
-  // linhas oficiais. Assim o total geral continua R$177k, mas #Orgânico mostra
-  // somente vendas realmente atribuídas a #Orgânico.
-  const bateFiltroOrigem=v=>origemBateFiltro(v.origemFinal||'',_origemFilter);
-
-  const linhas=todasLinhas.filter(bateFiltroOrigem);
-  const total=linhas.reduce((s,v)=>s+v.value,0);
-  const totalNovo=linhas.filter(v=>v.classe==='Novo').reduce((s,v)=>s+v.value,0);
-  const totalRecompra=linhas.filter(v=>v.classe==='Recompra').reduce((s,v)=>s+v.value,0);
-
-  window._vendasReaisPeriodo={from:range.since,to:range.until};
-  window._lastVendasReais={...r,total,totalNovo,totalRecompra,registros:linhas};
-  window._lastVendaRows=linhas.map(v=>({...v}));
-  window._lastValorVendasNovas=totalNovo;
-  window._lastValorVendasRecompra=totalRecompra;
-  window._lastValorFechado=total;
-
-  // Ticket das vendas do filtro atual. Mantém a mesma lógica visual do CRM:
-  // total de vendas / quantidade de lançamentos financeiros exibidos na lupa.
-  const ticketAtual=linhas.length>0?total/linhas.length:0;
-  window._lastTicketCRM=ticketAtual;
-  const novosLinhas=linhas.filter(v=>v.classe==='Novo');
-  const recomprasLinhas=linhas.filter(v=>v.classe==='Recompra');
-  window._lastTicketCRMNovos=novosLinhas.length?totalNovo/novosLinhas.length:0;
-  window._lastTicketCRMRecompra=recomprasLinhas.length?totalRecompra/recomprasLinhas.length:0;
-
-  const elVendas=document.getElementById('t-vendas');
-  const elVendasSub=document.getElementById('t-vendas-sub');
-  const elFunilValor=document.getElementById('t-funil-card-valor');
-  const elTicket=document.getElementById('t-ticket');
-  const elTicketSub=document.getElementById('t-ticket-sub');
-
-  // ⚠️ NOVO — quando o valor vem do cache (API indisponível agora), avisa
-  // claramente na tela, com a hora em que esse dado foi salvo de verdade —
-  // pra nunca passar a impressão de que é um dado ao vivo quando não é.
-  const avisoCache=doCache?' <span style="color:#b8860b;font-size:11px;" title="API do Clinicorp indisponível agora — mostrando o último valor real que conseguimos buscar">⚠️ salvo às '+new Date(salvoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span>':'';
-
-  if(elVendas)elVendas.innerHTML=(total>0?fmt(total):'—')+avisoCache+' <button class="lupa" onclick="lupaVendas()" title="Ver detalhes">🔍</button>';
-  if(elVendasSub)elVendasSub.innerHTML=splitNovoRecompraHTML(totalNovo,totalRecompra,fmt,'vendas');
-  if(elFunilValor)elFunilValor.innerHTML=(totalNovo>0?fmt(totalNovo):'—')+avisoCache;
-  if(elTicket)elTicket.textContent=ticketAtual>0?fmt(ticketAtual):'—';
-  if(elTicketSub)elTicketSub.innerHTML=splitNovoRecompraHTML(window._lastTicketCRMNovos,window._lastTicketCRMRecompra,fmt,'ticket');
-
-  // Os 59 lançamentos completos continuam disponíveis para relatórios gerais;
-  // Dashboard e suas lupas enxergam somente as linhas do filtro ativo.
-  if(typeof reconciliarAgendCompClinicorpPorAnuncio==='function')reconciliarAgendCompClinicorpPorAnuncio();
-  if(currentPage==='rel-origem'&&typeof renderRelOrigem==='function')renderRelOrigem();
 }
 async function carregarComparecimentoClinicorp(){
   const elAgendados=document.getElementById('t-leads-agendados');
@@ -3474,30 +3419,14 @@ function rebuildStageIndex(cloudiaRows){
 // FUNIL_META_BASE_FINAL + FUNIL_META_RESUMO_FINAL como fonte da verdade.
 // A Meta continua sendo usada somente para investimento/spend.
 async function fetchFunilMetaFinal(){
-  // ⚠️ CORRIGIDO (28/09/2026 — URGENTE, "quebrou o backoffice inteiro"):
-  // essa função rodava dentro do MESMO Promise.all que carrega o dashboard
-  // inteiro (fetchMeta + fetchCloudia) — quando o backend (.gs) não tinha
-  // (ou perdeu) o endpoint 'funilMetaFinal', o throw() aqui derrubava a
-  // promise INTEIRA, e o dashboard inteiro ficava em branco com erro,
-  // mesmo fetchMeta/fetchCloudia tendo funcionado normalmente. Agora, se
-  // essa fonte específica falhar, avisa no console e devolve null — o resto
-  // do dashboard carrega normal, só a tabela "Funil por Anúncio" fica sem
-  // essa fonte específica (ver os "if(window._funilMetaFinalPacote..." mais
-  // abaixo, que já tratam esse valor como opcional).
-  try{
-    const range=getRange('trafego');
-    const url=CLOUDIA_URL+'?action=funilMetaFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
-    const res=await fetch(url);
-    const data=await res.json();
-    if(!data||data.status!=='ok'||!Array.isArray(data.base)||!Array.isArray(data.resumo)){
-      console.warn('[FUNIL META FINAL] Fonte indisponível no GS — dashboard segue carregando sem essa parte específica.',data&&data.mensagem);
-      return null;
-    }
-    return data;
-  }catch(e){
-    console.warn('[FUNIL META FINAL] Erro ao buscar — dashboard segue carregando sem essa parte específica.',e);
-    return null;
+  const range=getRange('trafego');
+  const url=CLOUDIA_URL+'?action=funilMetaFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
+  const res=await fetch(url);
+  const data=await res.json();
+  if(!data||data.status!=='ok'||!Array.isArray(data.base)||!Array.isArray(data.resumo)){
+    throw new Error((data&&data.mensagem)||'Fonte final do Funil Meta não disponível no GS.');
   }
+  return data;
 }
 
 function _metaFinalSim(v){
@@ -3738,12 +3667,7 @@ async function loadTrafego(){
     // Registra o pacote final ANTES do render. O próprio renderTrafego
     // reaplica essa fonte ao terminar e em todos os re-renders futuros.
     window._funilMetaFinalPacote=funilMetaFinal;
-    // ⚠️ CORRIGIDO (28/09/2026, junto com o fix acima): só marca como "fonte
-    // final ativa" quando o dado realmente veio — outro trecho do código
-    // (linha ~2866) confia só nessa flag pra decidir se recalcula o funil
-    // por conta própria; se marcássemos true mesmo com funilMetaFinal nulo,
-    // aquele trecho pularia o recálculo de fallback à toa.
-    window._funilMetaFonteFinalAtiva=!!funilMetaFinal;
+    window._funilMetaFonteFinalAtiva=true;
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
     carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
     carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
