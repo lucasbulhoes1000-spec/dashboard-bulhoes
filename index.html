@@ -416,6 +416,9 @@ tbody tr:hover td{background:#faf7f3;}
             <button class="fb" onclick="setFilter('trafego','hoje',this)">Hoje</button>
             <button class="fb" onclick="setFilter('trafego','ontem',this)">Ontem</button>
             <button class="fb" onclick="setFilter('trafego','7dias',this)">7 dias</button>
+            <button class="fb" onclick="setFilter('trafego','60dias',this)">60 dias</button>
+            <button class="fb" onclick="setFilter('trafego','90dias',this)">90 dias</button>
+            <button class="fb" onclick="setFilter('trafego','120dias',this)">120 dias</button>
             <button class="fb" onclick="setFilter('trafego','mespassado',this)">Mês passado</button>
             <button class="fb" onclick="setFilter('trafego','personalizado',this)">Personalizado</button>
             <div class="date-wrap" id="trafego-dates">
@@ -2337,6 +2340,9 @@ function getRange(tab){
   if(f==='hoje'){const t=localDateStr(now);return{since:t,until:t};}
   if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=localDateStr(y);return{since:t,until:t};}
   if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:localDateStr(s),until:localDateStr(now)};}
+  if(f==='60dias'){const s=new Date(now);s.setDate(s.getDate()-59);return{since:localDateStr(s),until:localDateStr(now)};}
+  if(f==='120dias'){const s=new Date(now);s.setDate(s.getDate()-119);return{since:localDateStr(s),until:localDateStr(now)};}
+  if(f==='90dias'){const s=new Date(now);s.setDate(s.getDate()-89);return{since:localDateStr(s),until:localDateStr(now)};}
   if(f==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(new Date(now.getFullYear(),now.getMonth()+1,0))};
   if(f==='ateHoje')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
   if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:localDateStr(fm),until:localDateStr(lm)};}
@@ -4770,12 +4776,12 @@ function garantirCardRoasGeral(){
   }
   if(c.parentElement!==host)host.insertBefore(c,funilCard);
 }
-function atualizarCardRoasGeral(roas,vendas,spend){
+function atualizarCardRoasGeral(roas,vendas,spend,semAnuncio){
   garantirCardRoasGeral();
   const el=document.getElementById('t-roas-geral');
   const sub=document.getElementById('t-roas-geral-sub');
   if(el)el.textContent=spend>0?roas.toFixed(2).replace('.',',')+'x':'—';
-  if(sub)sub.textContent=spend>0?`${fmt(vendas)} em vendas atribuídas ÷ ${fmt(spend)} investidos`:'sem investimento no período';
+  if(sub)sub.textContent=spend>0?`${fmt(vendas)} em vendas de novos pacientes de tráfego pago`+(semAnuncio>0?` (${fmt(vendas-semAnuncio)} com anúncio identificado + ${fmt(semAnuncio)} sem anúncio)`:'')+` ÷ ${fmt(spend)} investidos`:'sem investimento no período';
 }
 
 // ===== FILTER AD TABLE =====
@@ -4810,7 +4816,7 @@ function filterAdTable(){
   const totTicket=totFechou>0?totVendas/totFechou:0;
   const totRoas=totSpend>0?totVendas/totSpend:0;
   const totConv=totLeads>0?totFechou/totLeads*100:0;
-  atualizarCardRoasGeral(totRoas,totVendas,totSpend);
+  atualizarCardRoasGeral(totRoas,totVendas,totSpend,((adRows.find(([k])=>k==='__sem_rastreio__')||[])[1]||{}).vendas||0);
 
   // Cards de topo
   const _setTxt=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
