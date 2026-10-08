@@ -416,9 +416,6 @@ tbody tr:hover td{background:#faf7f3;}
             <button class="fb" onclick="setFilter('trafego','hoje',this)">Hoje</button>
             <button class="fb" onclick="setFilter('trafego','ontem',this)">Ontem</button>
             <button class="fb" onclick="setFilter('trafego','7dias',this)">7 dias</button>
-            <button class="fb" onclick="setFilter('trafego','60dias',this)">60 dias</button>
-            <button class="fb" onclick="setFilter('trafego','90dias',this)">90 dias</button>
-            <button class="fb" onclick="setFilter('trafego','120dias',this)">120 dias</button>
             <button class="fb" onclick="setFilter('trafego','mespassado',this)">Mês passado</button>
             <button class="fb" onclick="setFilter('trafego','personalizado',this)">Personalizado</button>
             <div class="date-wrap" id="trafego-dates">
@@ -591,6 +588,12 @@ tbody tr:hover td{background:#faf7f3;}
   <div style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div><div style="font-size:18px;font-weight:700;color:#2a2520;">Tráfego Pago</div><div style="font-size:12px;color:#9a8c7e;margin-top:3px;">Performance por campanha, conjunto e anúncio</div></div>
+    </div>
+    <div id="tp-filtros" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;background:#fff;border:1px solid #e8dfd2;border-radius:10px;padding:12px 14px;">
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">Data inicial</div><input type="date" id="tp-from" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;"></div>
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">Data final</div><input type="date" id="tp-to" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;"></div>
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Anúncio</div><input type="text" id="tp-ad" oninput="filterAdTable()" placeholder="ID ou nome do anúncio" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Campanha</div><input type="text" id="tp-camp" oninput="filterAdTable()" placeholder="Nome da campanha" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
     </div>
     <div id="trafego-pago-host"></div>
   </div>
@@ -2340,9 +2343,6 @@ function getRange(tab){
   if(f==='hoje'){const t=localDateStr(now);return{since:t,until:t};}
   if(f==='ontem'){const y=new Date(now);y.setDate(y.getDate()-1);const t=localDateStr(y);return{since:t,until:t};}
   if(f==='7dias'){const s=new Date(now);s.setDate(s.getDate()-6);return{since:localDateStr(s),until:localDateStr(now)};}
-  if(f==='60dias'){const s=new Date(now);s.setDate(s.getDate()-59);return{since:localDateStr(s),until:localDateStr(now)};}
-  if(f==='120dias'){const s=new Date(now);s.setDate(s.getDate()-119);return{since:localDateStr(s),until:localDateStr(now)};}
-  if(f==='90dias'){const s=new Date(now);s.setDate(s.getDate()-89);return{since:localDateStr(s),until:localDateStr(now)};}
   if(f==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(new Date(now.getFullYear(),now.getMonth()+1,0))};
   if(f==='ateHoje')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:localDateStr(now)};
   if(f==='mespassado'){const fm=new Date(now.getFullYear(),now.getMonth()-1,1),lm=new Date(now.getFullYear(),now.getMonth(),0);return{since:localDateStr(fm),until:localDateStr(lm)};}
@@ -3761,6 +3761,7 @@ function aplicarFunilMetaFinal(metaAds, pacote){
 }
 
 async function loadTrafego(){
+  window._trafegoPronto=false;
   document.getElementById('loading-trafego').style.display='flex';
   document.getElementById('content-trafego').style.display='none';
   document.getElementById('error-trafego').style.display='none';
@@ -3793,8 +3794,15 @@ async function loadTrafego(){
     // aquele trecho pularia o recálculo de fallback à toa.
     window._funilMetaFonteFinalAtiva=!!funilMetaFinal;
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
-    carregarComparecimentoClinicorp(); // não-bloqueante — enriquece o card com dado oficial do Clinicorp
-    carregarVendasReaisClinicorp(); // não-bloqueante — corrige "Total de vendas" com faturamento real do Clinicorp
+    // Espera Clinicorp (agenda + vendas reais) ANTES de mostrar qualquer número,
+    // com limite de 60s pra nunca travar a tela.
+    await Promise.race([
+      Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]),
+      new Promise(r=>setTimeout(r,60000))
+    ]);
+    window._trafegoPronto=true;
+    try{sincronizarFiltroTrafegoPago();}catch(e){}
+    if(window._lastAdMap)filterAdTable();
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
     console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
@@ -3803,6 +3811,7 @@ async function loadTrafego(){
   }catch(e){
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
+    window._trafegoPronto=true;
     document.getElementById('error-trafego').textContent='Erro: '+e.message;
     document.getElementById('error-trafego').style.display='block';
   }
@@ -4749,8 +4758,36 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   }
 }
 
+function aplicarFiltroTrafegoPago(){
+  const fv=(document.getElementById('tp-from')||{}).value;
+  const tv=(document.getElementById('tp-to')||{}).value;
+  if(!fv||!tv)return;
+  if(fv>tv){showToast&&showToast('error','Datas inválidas','A data inicial é maior que a final.');return;}
+  customDates.trafego.from=new Date(fv+'T00:00:00');
+  customDates.trafego.to=new Date(tv+'T23:59:59');
+  filters.trafego='personalizado';
+  // mantém o filtro do Dashboard em sincronia (mesmo período)
+  try{
+    const bar=document.getElementById('filters-trafego');
+    if(bar){
+      bar.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+      const bp=[...bar.querySelectorAll('.fb')].find(b=>/personalizado/.test(b.getAttribute('onclick')||''));
+      if(bp)bp.classList.add('active');
+    }
+    const df=document.getElementById('trafego-from'),dt=document.getElementById('trafego-to'),dw=document.getElementById('trafego-dates');
+    if(df)df.value=fv;if(dt)dt.value=tv;if(dw)dw.style.display='flex';
+  }catch(e){}
+  loadTrafego();
+}
+function sincronizarFiltroTrafegoPago(){
+  const r=getRange('trafego');
+  const a=document.getElementById('tp-from'),b=document.getElementById('tp-to');
+  if(a&&a.value!==r.since)a.value=r.since;
+  if(b&&b.value!==r.until)b.value=r.until;
+}
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
+  try{sincronizarFiltroTrafegoPago();}catch(e){}
   const host=document.getElementById('trafego-pago-host');
   const tbody=document.getElementById('t-ads-tbody');
   if(!host||!tbody)return;
@@ -4787,11 +4824,24 @@ function atualizarCardRoasGeral(roas,vendas,spend,semAnuncio){
 // ===== FILTER AD TABLE =====
 function filterAdTable(){
   const adMap=window._lastAdMap;if(!adMap)return;
+  // Enquanto o Clinicorp (agenda + vendas reais) não respondeu, NÃO mostra número
+  // provisório — evita o valor "pular" de um número para outro.
+  if(window._trafegoPronto===false){
+    ['ad-kpi-cac','ad-kpi-semperf','t-roas-geral'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='…';});
+    const sub=document.getElementById('t-roas-geral-sub');if(sub)sub.textContent='carregando dados finais do Clinicorp…';
+    const tb=document.getElementById('t-ads-tbody');
+    if(tb)tb.innerHTML='<tr><td colspan="16" class="empty-state">⏳ Carregando dados finais do Clinicorp… (os números aparecem só quando estiverem completos)</td></tr>';
+    return;
+  }
   const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
   const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
   let adRows=Object.entries(adMap).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0)||(b[1].spend||0)-(a[1].spend||0));
   if(campFilt)adRows=adRows.filter(([,d])=>d.campaign===campFilt);
   if(adsetFilt)adRows=adRows.filter(([,d])=>d.adset===adsetFilt);
+  const _qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
+  const _qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
+  if(_qAd)adRows=adRows.filter(([k,d])=>String(k).toLowerCase().includes(_qAd)||String(d.label||'').toLowerCase().includes(_qAd));
+  if(_qCamp)adRows=adRows.filter(([,d])=>String(d.campaign||'').toLowerCase().includes(_qCamp));
   const totSpend=adRows.reduce((s,[,d])=>s+(d.spend||0),0);
   const totLeads=adRows.reduce((s,[,d])=>s+(d.leads||0),0);
   const totAgend=adRows.reduce((s,[,d])=>s+(d.agend||0),0);
