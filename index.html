@@ -497,6 +497,7 @@ tbody tr:hover td{background:#faf7f3;}
                   <div class="mc" style="margin:0;"><div class="ml">CAC</div><div class="mv cost" id="ad-kpi-cac">—</div><div class="ms" id="ad-kpi-cac-sub">gasto ÷ contratos novos</div></div>
                   <div class="mc" style="margin:0;"><div class="ml">Anúncios sem performance</div><div class="mv" style="color:#b5483a;" id="ad-kpi-semperf">—</div><div class="ms" id="ad-kpi-semperf-sub">gasto sem contrato</div></div>
                 </div>
+                <div id="ad-tracking-audit" style="font-size:11px;color:#8a7a6a;background:#faf7f2;border:1px solid #e8dfd2;border-radius:8px;padding:6px 10px;margin-bottom:10px;"></div>
                 <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
                   <select id="ad-filter-campaign" onchange="filterAdTable()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:160px;">
                     <option value="">Todas as campanhas</option>
@@ -2114,6 +2115,7 @@ async function verificarAtualizacoesDados(){
   // Performance: não faz consultas pesadas quando a aba do navegador está
   // em segundo plano e nunca deixa dois refreshes rodarem ao mesmo tempo.
   if(document.hidden||_autoRefreshDadosExecutando)return;
+  if(currentPage!=='leads'&&currentPage!=='clientes')return; // nas outras telas não precisa rebaixar a planilha inteira
   _autoRefreshDadosExecutando=true;
   try{
     const [rows]=await Promise.all([fetchCloudia(),carregarCRMRemoto({silencioso:true})]);
@@ -2130,12 +2132,12 @@ async function verificarAtualizacoesDados(){
 function iniciarAutoRefreshDados(){
   if(_autoRefreshDadosIniciado)return;
   _autoRefreshDadosIniciado=true;
-  setInterval(verificarAtualizacoesDados,2*60*1000);
+  setInterval(verificarAtualizacoesDados,5*60*1000);
 
   // Se a pessoa ficou um tempo em outra aba do navegador, atualiza uma vez
   // ao voltar, em vez de ter gasto processamento durante todo esse período.
   document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden && Date.now()-_autoRefreshUltimaExecucao>2*60*1000){
+    if(!document.hidden && Date.now()-_autoRefreshUltimaExecucao>5*60*1000){
       verificarAtualizacoesDados();
     }
   });
@@ -2496,16 +2498,31 @@ function tratamentoBate(tratamentoStr,filtro){
   const alvo=norm(filtro);
   return (tratamentoStr||'').split(',').some(p=>norm(p)===alvo);
 }
+var _normPhoneCache=new Map();
 function normalizePhone(phone){
-  let d=String(phone||'').replace(/\D/g,'');
-  if(!d)return'';
-  if(d.startsWith('55')&&(d.length===12||d.length===13)){
-    d=d.slice(2);
+  if(phone===null||phone===undefined||phone==='')return'';
+  const chave=typeof phone==='string'?phone:String(phone);
+  const hit=_normPhoneCache.get(chave);
+  if(hit!==undefined)return hit;
+  let d=chave.replace(/\D/g,'');
+  if(d){
+    if(d.startsWith('55')&&(d.length===12||d.length===13))d=d.slice(2);
+    if(d.length===10)d=d.slice(0,2)+'9'+d.slice(2);
   }
-  if(d.length===10){
-    d=d.slice(0,2)+'9'+d.slice(2);
-  }
+  if(_normPhoneCache.size>200000)_normPhoneCache.clear();
+  _normPhoneCache.set(chave,d);
   return d;
+}
+// Índice telefone(normalizado) → primeira linha do Cloudia. Reconstruído só
+// quando allCloudiaRows muda (nova referência ou novo tamanho).
+var _cloudiaRowIdx=null,_cloudiaRowIdxRef=null,_cloudiaRowIdxLen=-1;
+function cloudiaRowPorTel(ph){
+  if(!_cloudiaRowIdx||_cloudiaRowIdxRef!==allCloudiaRows||_cloudiaRowIdxLen!==allCloudiaRows.length){
+    _cloudiaRowIdx=new Map();
+    for(const r of allCloudiaRows){const k=normalizePhone(r.phone);if(k&&!_cloudiaRowIdx.has(k))_cloudiaRowIdx.set(k,r);}
+    _cloudiaRowIdxRef=allCloudiaRows;_cloudiaRowIdxLen=allCloudiaRows.length;
+  }
+  return _cloudiaRowIdx.get(normalizePhone(ph));
 }
 // Monta link wa.me a partir de qualquer formato de telefone (com ou sem 55, com ou sem 9º dígito)
 function linkWhatsapp(phone){
@@ -4184,7 +4201,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const leadsBase=cloudiaLeadsCount;
   const leadsBasePago=leadsInstagram.size||leadsBase;
   // CPL — Meta ADS: só o investimento das campanhas de captação (conversa por mensagem)
-  const cplReal=leadsBasePago>0&&spendCaptacao>0?spendCaptacao/leadsBasePago:0;
+  const cplReal=leadsBasePago>0?((spendCaptacao>0?spendCaptacao:spend)/leadsBasePago):0;
   // CPL Geral: investimento TOTAL (todas as campanhas), dividido por
   // TODOS os leads do período, qualquer canal — mostra o custo médio "diluído".
   const cplGeral=leadsBase>0&&spend>0?spend/leadsBase:0;
@@ -4387,7 +4404,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   let valorVendasNovas=0, valorVendasRecompra=0;
   fechadosPhones.forEach(ph=>{
     const d=ccDataLookup(ph);
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
+    const row=cloudiaRowPorTel(ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     if(d&&d.orcamentos&&d.orcamentos.length>0){
       // Filtra por data de FECHAMENTO (fechData), não por data do orçamento
@@ -4451,7 +4468,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   let oportNovas=0, oportRecompra=0;
   compPhonesSet.forEach(ph=>{
     const d=ccDataLookup(ph);
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
+    const row=cloudiaRowPorTel(ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
     const classe=classificarNovoOuRecompra(ph,_range);
     if(d&&d.orcamentos&&d.orcamentos.length>0){
@@ -4582,7 +4599,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       if(entVal>0){
         totalEntradas+=entVal;
         if(o.pacienteAntigo)entradasRecompra+=entVal;else entradasNovas+=entVal;
-        const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
+        const row=cloudiaRowPorTel(ph);
         const nome=(d.nomeAtual)||(row&&row.name)||'—';
         _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||'',classe:o.pacienteAntigo?'Recompra':'Novo'});
       }
@@ -4689,7 +4706,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     adMap[key].fechouPhones.add(ph);
     // Valor real do orçamento aprovado
     const ccD=ccDataLookup(ph);
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)=== ph);
+    const row=cloudiaRowPorTel(ph);
     const orcsAprov=(ccD&&ccD.orcamentos||[]).filter(o=>o.status==='Aprovado'&&(()=>{const dr=o.fechData||o.data||'';return!dr||(dr>=_range.since&&dr<=_range.until);})());
     const val=orcsAprov.reduce((s,o)=>s+Number(o.valor||0),0)||parseFloat((row&&row.value)||0);
     adMap[key].vendas+=val;
@@ -4799,10 +4816,10 @@ function filterAdTable(){
   const _setTxt=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   _setTxt('ad-kpi-leads',totLeads?fmtN(totLeads):'—');
   _setTxt('ad-kpi-cac',totFechou>0?fmt(totCpc):'—');
-  const semPerf=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&(d.spend||0)>0&&!(d.fechou>0)&&!(d.vendas>0));
+  const semPerf=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&(d.spend||0)>0&&(d.leads||0)>0&&!(d.fechou>0)&&!(d.vendas>0));
   const gastoSemPerf=semPerf.reduce((s,[,d])=>s+(d.spend||0),0);
   _setTxt('ad-kpi-semperf',semPerf.length?fmt(gastoSemPerf):'R$ 0');
-  _setTxt('ad-kpi-semperf-sub',semPerf.length+' anúncio(s) com gasto e 0 contratos'+(totSpend>0?' · '+(gastoSemPerf/totSpend*100).toFixed(0)+'% do gasto':''));
+  _setTxt('ad-kpi-semperf-sub',semPerf.length+' anúncio(s) com leads e 0 contratos (contrato pode demorar a fechar)'+(totSpend>0?' · '+(gastoSemPerf/totSpend*100).toFixed(0)+'% do gasto':''));
 
   // Ordena: maior gasto primeiro, "sem rastreamento" por último
   adRows.sort((a,b)=>{
@@ -6302,7 +6319,7 @@ function lupaComp(){
   // não apenas quem tem evento explícito de Comparecimento no Cloudia.
   const compPhonesSrc=window._lastCompPhones||new Set();
   const rows=[...compPhonesSrc].map(ph=>{
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const row=cloudiaRowPorTel(ph)||{};
     const e=applyEdits({...row,phone:row.phone||ph});
     const info=getEffectiveAgendInfo(ph,row);
     const ccD=ccDataLookup(ph);
@@ -6447,7 +6464,7 @@ function lupaContratos(){
   const phones=[...(window._dashFechadosPhones||new Set())];
   const rows=phones.map(ph=>{
     const d=ccDataLookup(ph)||{};
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph)||{};
+    const row=cloudiaRowPorTel(ph)||{};
     const nome=d.nomeAtual||row.name||'—';
     const origem=origemAtualPaciente(ph,nome);
     const classe=(window._dashFechadosRecompraPhones&&window._dashFechadosRecompraPhones.has(ph))?'Recompra':'Novo';
@@ -6713,7 +6730,7 @@ function abrirCardPorTelefone(phone){
   }
 
   // Fallback: busca em allCloudiaRows e popula as listas
-  const rowInCloudia=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+  const rowInCloudia=cloudiaRowPorTel(ph);
   if(rowInCloudia){
     const isCliente=isComp(rowInCloudia.stage)||isFechou(rowInCloudia.stage);
     if(isCliente){
@@ -6762,7 +6779,7 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
 
 // CRM STATE
-function ccKey(r){var ph=String(r.phone||'').replace(/\D/g,'');return ph.length>6?ph:(r.name||'unknown');}
+function ccKey(r){var ph=normalizePhone(r.phone);return ph.length>6?ph:(r.name||'unknown');}
 function normStr(s){
   if(s===null || s===undefined) return '';
   if(typeof s==='object'){
@@ -8485,7 +8502,7 @@ function calcularFechamentosComoDashboard(range, avalFilt, tratFilt){
 
   fechadosPhones.forEach(ph=>{
     const d=ccDataLookup(ph);
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    const row=cloudiaRowPorTel(ph);
     const nome=(d&&d.nomeAtual)||(row&&row.name)||'—';
 
     let valor=0;
@@ -8549,7 +8566,7 @@ function getOrigemFinalLancamento(ph,nome){
     if(d&&d.origemAtual)return d.origemAtual;
     const real=getOrigemReal(ph);
     if(real)return real;
-    const row=allCloudiaRows.find(r=>normalizePhone(r.phone)===ph);
+    const row=cloudiaRowPorTel(ph);
     if(row){
       const e=applyEdits(row);
       if(e&&e.origin)return e.origin;
@@ -9217,7 +9234,7 @@ async function salvarCRMRemoto(){
     if(r.status==='ok'){
       // O servidor devolve a versão final já mesclada. Isso é importante:
       // a aba passa a trabalhar exatamente sobre a mesma versão que ficou salva.
-      if(r.crm&&typeof r.crm==='object')_ccData=r.crm;
+      if(r.crm&&typeof r.crm==='object')_ccData=consolidarChavesTelefoneCRM(r.crm);
       if(Array.isArray(r.comissoes))_comissoes=r.comissoes;
       _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData||{}));
       _comissoesBaseSnapshot=JSON.parse(JSON.stringify(_comissoes||[]));
@@ -9247,6 +9264,33 @@ function salvarCRMDebounced(){
 }
 
 // Carrega o CRM do Supabase
+
+// Unifica chaves duplicadas do CRM (mesmo telefone com/sem 55 ou sem 9º dígito).
+// Mantém a chave canônica (11 dígitos, sem 55) e junta os dados SEM duplicar
+// orçamentos — evita contar a mesma venda/entrada duas vezes.
+function consolidarChavesTelefoneCRM(obj){
+  try{
+    if(!obj||typeof obj!=='object')return obj;
+    const idOrc=o=>o&&o._clinicorpId?('c'+o._clinicorpId):JSON.stringify(o);
+    const uniao=(a,b,idf)=>{const seen=new Set(),out=[];(a||[]).concat(b||[]).forEach(x=>{const k=idf(x);if(seen.has(k))return;seen.add(k);out.push(x);});return out;};
+    const chaves=Object.keys(obj).filter(k=>/^\d+$/.test(k));
+    let fundidos=0;
+    chaves.forEach(k=>{
+      const can=normalizePhone(k);
+      if(!can||can===k)return;
+      const v=obj[k];
+      if(!obj[can]){obj[can]=v;delete obj[k];fundidos++;return;}
+      const a=obj[can];
+      a.orcamentos=uniao(a.orcamentos,v.orcamentos,idOrc);
+      a.atividades=uniao(a.atividades,v.atividades,x=>JSON.stringify(x));
+      a.anotacoes=uniao(a.anotacoes,v.anotacoes,x=>JSON.stringify(x));
+      Object.keys(v).forEach(f=>{if(['orcamentos','atividades','anotacoes'].includes(f))return;if(a[f]===undefined||a[f]===''||a[f]===null)a[f]=v[f];});
+      delete obj[k];fundidos++;
+    });
+    if(fundidos)console.log('[CRM] Chaves de telefone duplicadas unificadas:',fundidos);
+  }catch(e){console.warn('[CRM] consolidarChavesTelefoneCRM falhou:',e);}
+  return obj;
+}
 async function carregarCRMRemoto(opcoes){
   const silencioso=!!(opcoes&&opcoes.silencioso);
   try{
@@ -9260,7 +9304,7 @@ async function carregarCRMRemoto(opcoes){
       if(rows[0].crm_json){
         const parsed=JSON.parse(rows[0].crm_json);
         if(parsed&&typeof parsed==='object'&&Object.keys(parsed).length>0){
-          _ccData=parsed;_ccDataNormIndex=null;
+          _ccData=consolidarChavesTelefoneCRM(parsed);_ccDataNormIndex=null;
           _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));
           localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
           console.log('[CRM] Carregado do Supabase ✅',Object.keys(_ccData).length,'clientes');
@@ -9296,7 +9340,7 @@ async function carregarCRMRemoto(opcoes){
     if(local){
       const parsed=JSON.parse(local);
       if(parsed&&Object.keys(parsed).length>0){
-        _ccData=parsed;_ccDataNormIndex=null;
+        _ccData=consolidarChavesTelefoneCRM(parsed);_ccDataNormIndex=null;
         _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));
         console.log('[CRM] Carregado do localStorage:',Object.keys(_ccData).length,'clientes');
       }
@@ -9304,7 +9348,7 @@ async function carregarCRMRemoto(opcoes){
   }catch(e){
     console.warn('[CRM] Erro ao carregar:',e);
     const local=localStorage.getItem('bulhoes_crm');
-    if(local)try{_ccData=JSON.parse(local);_ccDataNormIndex=null;_crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));}catch(e2){}
+    if(local)try{_ccData=consolidarChavesTelefoneCRM(JSON.parse(local));_ccDataNormIndex=null;_crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));}catch(e2){}
   }
 }
 
