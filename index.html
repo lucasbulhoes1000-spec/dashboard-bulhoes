@@ -4840,10 +4840,14 @@ function exportarFunilParaIA(){
   });
 
   // 3) Linhas por pessoa
-  const cabP=['periodo_inicio','periodo_fim','pessoa','data_entrada_lead','ad_id','anuncio','campanha','conjunto','origem','agendou','data_agendamento','compareceu','data_consulta','fechou','data_fechamento','valor_venda_clinicorp_novo','valor_venda_clinicorp_recompra','valor_orcamento_aprovado_crm','valor_venda_final','procedimento'];
+  const cabP=['periodo_inicio','periodo_fim','pessoa','data_entrada_lead','ad_id','anuncio','campanha','conjunto','origem','agendou','data_agendamento','compareceu','data_consulta','fechou','data_fechamento','valor_venda_clinicorp_novo','valor_venda_clinicorp_recompra','valor_orcamento_aprovado_crm','valor_venda_final','procedimento','ligado_a_anuncio'];
   const linP=[];
   pessoas.forEach(o=>{
-    if(!o.adId&&!o.adName)return; // só gente ligada a anúncio
+    // Entra quem tem anúncio identificado OU veio de origem paga (Instagram ADS / Formulário).
+    const _org=origemAtualPaciente(o.ph,'')||'';
+    const _orgL=String(_org).toLowerCase();
+    const _pago=_orgL.includes('instagram ads')||origemGrupoCanonico(_orgL)==='formulario';
+    if(!o.adId&&!o.adName&&!_pago)return;
     const cc=ccDataLookup(o.ph)||{};
     const v=vendasPorTel[o.ph]||{novo:0,recompra:0,datas:[],desc:[]};
     // orçamentos aprovados no período (CRM)
@@ -4860,13 +4864,13 @@ function exportarFunilParaIA(){
     const temVendaNoPeriodo=v.novo>0||v.recompra>0||orc>0;
     if(!noPeriodo(o.entrada)&&!temVendaNoPeriodo)return; // fora do recorte
     const meta=o.adId?metaPorId[o.adId]:null;
-    const nomeAd=(meta&&meta.ad_name)||o.adName||'';
+    const nomeAd=(meta&&meta.ad_name)||o.adName||((o.adId||o.adName)?'':'SEM ANÚNCIO IDENTIFICADO');
     const fechou=(v.novo>0||orc>0||noPeriodo(o.fech));
     const valorFinal=v.novo>0?v.novo:orc;
-    linP.push([r.since,r.until,hash(o.ph),o.entrada,o.adId,nomeAd,(meta&&meta.campaign)||'',(meta&&meta.adset)||'',origemAtualPaciente(o.ph,'')||'',
+    linP.push([r.since,r.until,hash(o.ph),o.entrada,o.adId,nomeAd,(meta&&meta.campaign)||'',(meta&&meta.adset)||'',_org,
       agendD?'sim':'nao',agendD,compD?'sim':'nao',compD,fechou?'sim':'nao',noPeriodo(fechD)?fechD:(fechD||''),
       v.novo>0?num(v.novo):'',v.recompra>0?num(v.recompra):'',orc>0?num(orc):'',valorFinal>0?num(valorFinal):'',
-      (v.desc.length?v.desc:proc).join(' | ').substring(0,200)]);
+      (v.desc.length?v.desc:proc).join(' | ').substring(0,200),(o.adId||o.adName)?'sim':'nao']);
   });
 
   // 4) Resumo por anúncio (a partir das MESMAS linhas, para os dois arquivos baterem)
@@ -4889,7 +4893,7 @@ function exportarFunilParaIA(){
   setTimeout(()=>baixar('funil_anuncios_pessoas_'+sufixo+'.csv',csv(cabP,linP)),600);
   const somaV=linP.reduce((t,l)=>t+(Number(l[18])||0),0);
   console.log('[EXPORTAR IA] pessoas:',linP.length,'| anúncios:',linR.length,'| vendas R$',somaV.toFixed(2),'| vendas Clinicorp carregadas:',vendasOk);
-  showToast(vendasOk?'success':'error','Exportação — '+r.since.split('-').reverse().join('/')+' a '+r.until.split('-').reverse().join('/'),linP.length+' pessoas, '+linR.length+' anúncios, vendas R$ '+somaV.toLocaleString('pt-BR',{minimumFractionDigits:2})+(vendasOk?'':' — ATENÇÃO: vendas do Clinicorp não carregaram para este período (usei só orçamentos aprovados do CRM).')+' Sem nome nem telefone.');
+  showToast(vendasOk?'success':'error','Exportação — '+r.since.split('-').reverse().join('/')+' a '+r.until.split('-').reverse().join('/'),linP.length+' pessoas ('+linP.filter(l=>l[20]==='sim').length+' com anúncio identificado, '+linP.filter(l=>l[20]==='nao').length+' de origem paga sem anúncio), '+linR.length+' anúncios, vendas R$ '+somaV.toLocaleString('pt-BR',{minimumFractionDigits:2})+(vendasOk?'':' — ATENÇÃO: vendas do Clinicorp não carregaram para este período (usei só orçamentos aprovados do CRM).')+' Sem nome nem telefone.');
 }
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
