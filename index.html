@@ -4898,7 +4898,8 @@ async function exportarFunilParaIA(){
   {
     const hojeD=new Date();const maisFuturo=new Date(hojeD.getFullYear(),hojeD.getMonth(),hojeD.getDate()+45);
     const fimAg=(r.until>localDateStr(maisFuturo))?r.until:localDateStr(maisFuturo);
-    const fat=gerarFatias(r.since,fimAg);
+    const _d0=new Date(r.since+'T12:00:00');_d0.setDate(_d0.getDate()-60);const iniAg=localDateStr(_d0);
+    const fat=gerarFatias(iniAg,fimAg);
     for(let i=0;i<fat.length;i++){
       showToast('success','Exportando…','Buscando agenda do Clinicorp ('+(i+1)+'/'+fat.length+')');
       const j=await buscarComRetry(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+fat[i][0]+'&to='+fat[i][1]);
