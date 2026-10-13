@@ -4792,78 +4792,104 @@ function sincronizarFiltroTrafegoPago(){
 // Gera 2 CSVs do período selecionado: resumo por anúncio e base por pessoa.
 // Nome e telefone NÃO vão no arquivo (LGPD): cada pessoa vira um código anônimo.
 function exportarFunilParaIA(){
-  const m=window._lastAdMap;
-  if(!m||window._trafegoPronto===false){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
+  // Exporta direto das FONTES (Cloudia + CRM + Clinicorp), sem depender da tabela do funil.
+  // Entram todas as pessoas ligadas a algum anúncio (ad_id/ad_name) que entraram no período
+  // OU que tiveram venda/orçamento aprovado no período.
+  if(window._trafegoPronto===false){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
   const r=getRange('trafego');
   const esc=v=>{const t=String(v===null||v===undefined?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
-  const num=v=>(Math.round(Number(v||0)*100)/100).toFixed(2); // ponto decimal (padrão que qualquer IA lê)
+  const num=v=>(Math.round(Number(v||0)*100)/100).toFixed(2);
   const hash=ph=>{let h=5381;const t='bulhoes|'+ph;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))>>>0;return 'P'+h.toString(16).toUpperCase();};
   const csv=(cab,linhas)=>'﻿'+[cab.join(',')].concat(linhas.map(l=>l.map(esc).join(','))).join('\n');
-  // Valor vendido por pessoa: 1) lançamentos reais do Clinicorp (vendaRows);
-  // 2) se não houver, soma dos orçamentos APROVADOS no período no CRM.
-  const valorCRM=ph=>{
-    const d=ccDataLookup(ph);let t=0;
-    ((d&&d.orcamentos)||[]).forEach(o=>{
-      if(o.status!=='Aprovado')return;
-      const dr=o.fechData||o.data||'';
-      if(dr&&(dr<r.since||dr>r.until))return;
-      t+=Number(o.fechValor||o.valor||0);
-    });
-    return t;
-  };
-  // Data de entrada do lead = primeira linha do Cloudia desse telefone (qualquer data).
-  const entradaPorTel=new Map();
-  (allCloudiaRows||[]).forEach(row=>{
-    const ph=normalizePhone(row.phone);if(!ph)return;
-    const dt=parseCloudiaDate(row.created_at);if(!dt)return;
-    const ds=localDateStr(dt);
-    const at=entradaPorTel.get(ph);
-    if(!at||ds<at)entradaPorTel.set(ph,ds);
-  });
   const dia=v=>{if(!v)return '';const t=parseCloudiaDate(v);return t?localDateStr(t):String(v).substring(0,10);};
-  const datasPessoa=ph=>{const d=ccDataLookup(ph)||{};return [entradaPorTel.get(ph)||'',dia(d.agendTimestamp),dia(d.consultaTimestamp)];};
-  // 1) Resumo por anúncio
-  const cabR=['periodo_inicio','periodo_fim','ad_id','anuncio','conjunto','campanha','gasto','leads','cpl','agendamentos','comparecimentos','contratos_novos','valor_venda_total','ticket_medio','roas','conversao_lead_contrato_pct'];
-  const linR=[];
-  let totVenda=0;
-  Object.entries(m).forEach(([k,d])=>{
-    const leads=d.leads||0,fe=d.fechou||0,sp=d.spend||0,v=d.vendas||0;
-    totVenda+=v;
-    linR.push([r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.adset||'',d.campaign||'',num(sp),leads,leads>0&&sp>0?num(sp/leads):'',d.agend||0,d.comp||0,fe,num(v),fe>0?num(v/fe):'',sp>0?num(v/sp):'',leads>0?num(fe/leads*100):'']);
+  const noPeriodo=d=>!!d&&d>=r.since&&d<=r.until;
+
+  // Metadados dos anúncios (Meta) do período
+  const metaPorId={};
+  (_lastMetaAds||[]).forEach(a=>{const id=String(a.ad_id||'');if(!id)return;const o=metaPorId[id]||(metaPorId[id]={ad_name:a.ad_name||'',campaign:a.campaign_name||'',adset:a.adset_name||'',spend:0});o.spend+=Number(a.spend||0);});
+
+  // 1) Pessoas a partir do Cloudia (todas as linhas, qualquer data)
+  const pessoas=new Map();
+  (excluirSocialSelling(allCloudiaRows)||[]).forEach(row=>{
+    const ph=normalizePhone(row.phone);if(!ph)return;
+    let o=pessoas.get(ph);
+    if(!o){o={ph,entrada:'',adId:'',adName:'',adDia:'9999',agend:'',comp:'',fech:''};pessoas.set(ph,o);}
+    const cd=parseCloudiaDate(row.created_at);const ds=cd?localDateStr(cd):'';
+    if(ds&&(!o.entrada||ds<o.entrada))o.entrada=ds;
+    const rawId=String(row.ad_id||'').trim();
+    const temId=rawId&&rawId!=='undefined'&&rawId!=='null';
+    const nome=String(row.ad_name||'').trim();
+    if((temId||nome)&&(ds||'9999')<=o.adDia){o.adDia=ds||'9999';if(temId)o.adId=rawId;if(nome)o.adName=nome;}
+    if(row.type==='CUSTOMER_STAGE_UPDATED'||row.type==='CUSTOMER_CREATED'){
+      const td=parseCloudiaDate(row.timestamp||row.created_at);const tds=td?localDateStr(td):ds;
+      if(isAgend(row.stage)&&tds&&(!o.agend||tds<o.agend))o.agend=tds;
+      if(isComp(row.stage)&&tds&&(!o.comp||tds<o.comp))o.comp=tds;
+      if(isFechou(row.stage)&&tds&&(!o.fech||tds<o.fech))o.fech=tds;
+    }
   });
-  // 2) Base por pessoa (anônima), com valor de venda
-  const cabP=['periodo_inicio','periodo_fim','ad_id','anuncio','campanha','pessoa','data_entrada_lead','data_agendamento','data_consulta','lead_no_periodo','agendou','compareceu','fechou','valor_venda','classe_venda','data_venda','procedimento'];
+
+  // 2) Vendas reais do Clinicorp (se carregadas para ESTE período)
+  const vp=window._dashVendasFonteMestraPeriodo;
+  const vendasOk=!!(window._dashVendasFonteMestraOficial&&vp&&vp.from===r.since&&vp.to===r.until);
+  const vendasPorTel={};
+  if(vendasOk)(window._dashVendasFonteMestraRows||[]).forEach(v=>{
+    const ph=normalizePhone(v.ph||v.telefone);if(!ph)return;
+    const o=vendasPorTel[ph]||(vendasPorTel[ph]={novo:0,recompra:0,datas:[],desc:[]});
+    if(v.classe==='Novo')o.novo+=Number(v.value||0);else o.recompra+=Number(v.value||0);
+    if(v.data)o.datas.push(v.data);if(v.descricao)o.desc.push(v.descricao);
+  });
+
+  // 3) Linhas por pessoa
+  const cabP=['periodo_inicio','periodo_fim','pessoa','data_entrada_lead','ad_id','anuncio','campanha','conjunto','origem','agendou','data_agendamento','compareceu','data_consulta','fechou','data_fechamento','valor_venda_clinicorp_novo','valor_venda_clinicorp_recompra','valor_orcamento_aprovado_crm','valor_venda_final','procedimento'];
   const linP=[];
-  let totPessoas=0;
-  Object.entries(m).forEach(([k,d])=>{
-    const L=d.phones||new Set(),A=d.agendPhones||new Set(),C=d.compPhones||new Set(),F=d.fechouPhones||new Set();
-    const vendas={};
-    (d.vendaRows||[]).forEach(v=>{const ph=normalizePhone(v.ph||v.telefone)||('nome:'+(v.name||v.nome||''));(vendas[ph]=vendas[ph]||[]).push(v);});
-    const todos=new Set([...L,...A,...C,...F,...Object.keys(vendas).filter(x=>!x.startsWith('nome:'))]);
-    const adId=k==='__sem_rastreio__'?'':k;
-    todos.forEach(ph=>{
-      const vs=vendas[ph]||[];
-      const fechou=F.has(ph)||vs.length>0;
-      const base=[r.since,r.until,adId,d.label||k,d.campaign||'',hash(ph),...datasPessoa(ph),L.has(ph)?'sim':'nao',A.has(ph)?'sim':'nao',C.has(ph)?'sim':'nao',fechou?'sim':'nao'];
-      if(vs.length){
-        vs.forEach(v=>linP.push(base.concat([num(v.value),v.classe||'',v.data||'',v.descricao||''])));
-      }else if(fechou){
-        const vc=valorCRM(ph);
-        linP.push(base.concat([vc>0?num(vc):'', 'Novo (orçamento aprovado no CRM)','','']));
-      }else{
-        linP.push(base.concat(['','','','']));
-      }
-      totPessoas++;
+  pessoas.forEach(o=>{
+    if(!o.adId&&!o.adName)return; // só gente ligada a anúncio
+    const cc=ccDataLookup(o.ph)||{};
+    const v=vendasPorTel[o.ph]||{novo:0,recompra:0,datas:[],desc:[]};
+    // orçamentos aprovados no período (CRM)
+    let orc=0,orcData='',proc=[];
+    (cc.orcamentos||[]).forEach(q=>{
+      if(q.status!=='Aprovado')return;
+      const dr=q.fechData||q.data||'';
+      if(!noPeriodo(dr))return;
+      orc+=Number(q.fechValor||q.valor||0);if(!orcData||dr<orcData)orcData=dr;if(q.tratamento)proc.push(q.tratamento);
     });
-    Object.keys(vendas).filter(x=>x.startsWith('nome:')).forEach(x=>vendas[x].forEach(v=>linP.push([r.since,r.until,adId,d.label||k,d.campaign||'',hash(x),'','','','nao','nao','nao','sim',num(v.value),v.classe||'',v.data||'',v.descricao||''])));
+    const agendD=o.agend||dia(cc.agendTimestamp);
+    const compD=o.comp||dia(cc.consultaTimestamp);
+    const fechD=v.datas.length?v.datas.slice().sort()[0]:(orcData||o.fech);
+    const temVendaNoPeriodo=v.novo>0||v.recompra>0||orc>0;
+    if(!noPeriodo(o.entrada)&&!temVendaNoPeriodo)return; // fora do recorte
+    const meta=o.adId?metaPorId[o.adId]:null;
+    const nomeAd=(meta&&meta.ad_name)||o.adName||'';
+    const fechou=(v.novo>0||orc>0||noPeriodo(o.fech));
+    const valorFinal=v.novo>0?v.novo:orc;
+    linP.push([r.since,r.until,hash(o.ph),o.entrada,o.adId,nomeAd,(meta&&meta.campaign)||'',(meta&&meta.adset)||'',origemAtualPaciente(o.ph,'')||'',
+      agendD?'sim':'nao',agendD,compD?'sim':'nao',compD,fechou?'sim':'nao',noPeriodo(fechD)?fechD:(fechD||''),
+      v.novo>0?num(v.novo):'',v.recompra>0?num(v.recompra):'',orc>0?num(orc):'',valorFinal>0?num(valorFinal):'',
+      (v.desc.length?v.desc:proc).join(' | ').substring(0,200)]);
   });
-  const somaP=linP.reduce((s,l)=>s+(Number(l[13])||0),0);
+
+  // 4) Resumo por anúncio (a partir das MESMAS linhas, para os dois arquivos baterem)
+  const grp={};
+  linP.forEach(l=>{
+    const id=l[4]||('nome:'+l[5]);
+    const g=grp[id]||(grp[id]={adId:l[4],nome:l[5],camp:l[6],adset:l[7],leads:0,ag:0,co:0,fe:0,val:0});
+    if(noPeriodo(l[3]))g.leads++;
+    if(l[9]==='sim')g.ag++;if(l[11]==='sim')g.co++;if(l[13]==='sim')g.fe++;g.val+=Number(l[18]||0);
+  });
+  Object.entries(metaPorId).forEach(([id,m])=>{if(!grp[id])grp[id]={adId:id,nome:m.ad_name,camp:m.campaign,adset:m.adset,leads:0,ag:0,co:0,fe:0,val:0};});
+  const cabR=['periodo_inicio','periodo_fim','ad_id','anuncio','campanha','conjunto','gasto','leads','cpl','agendamentos','comparecimentos','contratos','valor_venda_total','ticket_medio','roas'];
+  const linR=Object.values(grp).map(g=>{const sp=(metaPorId[g.adId]||{}).spend||0;
+    return [r.since,r.until,g.adId,g.nome,g.camp,g.adset,num(sp),g.leads,g.leads>0&&sp>0?num(sp/g.leads):'',g.ag,g.co,g.fe,num(g.val),g.fe>0?num(g.val/g.fe):'',sp>0?num(g.val/sp):''];
+  }).sort((x,y)=>Number(y[6])-Number(x[6]));
+
   const baixar=(nome,texto)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([texto],{type:'text/csv;charset=utf-8'}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);};
   const sufixo=r.since+'_a_'+r.until;
   baixar('funil_anuncios_resumo_'+sufixo+'.csv',csv(cabR,linR));
   setTimeout(()=>baixar('funil_anuncios_pessoas_'+sufixo+'.csv',csv(cabP,linP)),600);
-  console.log('[EXPORTAR IA] resumo: vendas R$',totVenda.toFixed(2),'| pessoas: vendas R$',somaP.toFixed(2),'| linhas pessoas:',linP.length);
-  showToast('success','Exportação pronta','2 CSVs baixados: '+linR.length+' anúncios, vendas R$ '+totVenda.toLocaleString('pt-BR',{minimumFractionDigits:2})+' (pessoas somam R$ '+somaP.toLocaleString('pt-BR',{minimumFractionDigits:2})+'). Sem nome nem telefone.');
+  const somaV=linP.reduce((t,l)=>t+(Number(l[18])||0),0);
+  console.log('[EXPORTAR IA] pessoas:',linP.length,'| anúncios:',linR.length,'| vendas R$',somaV.toFixed(2),'| vendas Clinicorp carregadas:',vendasOk);
+  showToast(vendasOk?'success':'error','Exportação — '+r.since.split('-').reverse().join('/')+' a '+r.until.split('-').reverse().join('/'),linP.length+' pessoas, '+linR.length+' anúncios, vendas R$ '+somaV.toLocaleString('pt-BR',{minimumFractionDigits:2})+(vendasOk?'':' — ATENÇÃO: vendas do Clinicorp não carregaram para este período (usei só orçamentos aprovados do CRM).')+' Sem nome nem telefone.');
 }
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
