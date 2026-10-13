@@ -4795,38 +4795,64 @@ function exportarFunilParaIA(){
   const m=window._lastAdMap;
   if(!m||window._trafegoPronto===false){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
   const r=getRange('trafego');
-  const esc=v=>{const t=String(v===null||v===undefined?'':v);return /[",\n;]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
-  const num=v=>(Math.round(Number(v||0)*100)/100).toString().replace('.',',');
+  const esc=v=>{const t=String(v===null||v===undefined?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  const num=v=>(Math.round(Number(v||0)*100)/100).toFixed(2); // ponto decimal (padrão que qualquer IA lê)
   const hash=ph=>{let h=5381;const t='bulhoes|'+ph;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))>>>0;return 'P'+h.toString(16).toUpperCase();};
-  const csv=(cab,linhas)=>'﻿'+[cab.join(';')].concat(linhas.map(l=>l.map(esc).join(';'))).join('\n');
+  const csv=(cab,linhas)=>'﻿'+[cab.join(',')].concat(linhas.map(l=>l.map(esc).join(','))).join('\n');
+  // Valor vendido por pessoa: 1) lançamentos reais do Clinicorp (vendaRows);
+  // 2) se não houver, soma dos orçamentos APROVADOS no período no CRM.
+  const valorCRM=ph=>{
+    const d=ccDataLookup(ph);let t=0;
+    ((d&&d.orcamentos)||[]).forEach(o=>{
+      if(o.status!=='Aprovado')return;
+      const dr=o.fechData||o.data||'';
+      if(dr&&(dr<r.since||dr>r.until))return;
+      t+=Number(o.fechValor||o.valor||0);
+    });
+    return t;
+  };
   // 1) Resumo por anúncio
-  const cabR=['periodo_inicio','periodo_fim','ad_id','anuncio','conjunto','campanha','gasto','leads','cpl','agendamentos','comparecimentos','contratos_novos','valor_vendas_novos_trafego_pago','ticket_medio','roas','conversao_lead_contrato_pct'];
+  const cabR=['periodo_inicio','periodo_fim','ad_id','anuncio','conjunto','campanha','gasto','leads','cpl','agendamentos','comparecimentos','contratos_novos','valor_venda_total','ticket_medio','roas','conversao_lead_contrato_pct'];
   const linR=[];
+  let totVenda=0;
   Object.entries(m).forEach(([k,d])=>{
     const leads=d.leads||0,fe=d.fechou||0,sp=d.spend||0,v=d.vendas||0;
+    totVenda+=v;
     linR.push([r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.adset||'',d.campaign||'',num(sp),leads,leads>0&&sp>0?num(sp/leads):'',d.agend||0,d.comp||0,fe,num(v),fe>0?num(v/fe):'',sp>0?num(v/sp):'',leads>0?num(fe/leads*100):'']);
   });
-  // 2) Base por pessoa (anônima)
+  // 2) Base por pessoa (anônima), com valor de venda
   const cabP=['periodo_inicio','periodo_fim','ad_id','anuncio','campanha','pessoa','lead_no_periodo','agendou','compareceu','fechou','valor_venda','classe_venda','data_venda','procedimento'];
   const linP=[];
+  let totPessoas=0;
   Object.entries(m).forEach(([k,d])=>{
     const L=d.phones||new Set(),A=d.agendPhones||new Set(),C=d.compPhones||new Set(),F=d.fechouPhones||new Set();
     const vendas={};
     (d.vendaRows||[]).forEach(v=>{const ph=normalizePhone(v.ph||v.telefone)||('nome:'+(v.name||v.nome||''));(vendas[ph]=vendas[ph]||[]).push(v);});
     const todos=new Set([...L,...A,...C,...F,...Object.keys(vendas).filter(x=>!x.startsWith('nome:'))]);
+    const adId=k==='__sem_rastreio__'?'':k;
     todos.forEach(ph=>{
       const vs=vendas[ph]||[];
-      const base=[r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.campaign||'',hash(ph),L.has(ph)?'sim':'nao',A.has(ph)?'sim':'nao',C.has(ph)?'sim':'nao',(F.has(ph)||vs.length)?'sim':'nao'];
-      if(vs.length)vs.forEach(v=>linP.push(base.concat([num(v.value),v.classe||'',v.data||'',v.descricao||''])));
-      else linP.push(base.concat(['','','','']));
+      const fechou=F.has(ph)||vs.length>0;
+      const base=[r.since,r.until,adId,d.label||k,d.campaign||'',hash(ph),L.has(ph)?'sim':'nao',A.has(ph)?'sim':'nao',C.has(ph)?'sim':'nao',fechou?'sim':'nao'];
+      if(vs.length){
+        vs.forEach(v=>linP.push(base.concat([num(v.value),v.classe||'',v.data||'',v.descricao||''])));
+      }else if(fechou){
+        const vc=valorCRM(ph);
+        linP.push(base.concat([vc>0?num(vc):'', 'Novo (orçamento aprovado no CRM)','','']));
+      }else{
+        linP.push(base.concat(['','','','']));
+      }
+      totPessoas++;
     });
-    Object.keys(vendas).filter(x=>x.startsWith('nome:')).forEach(x=>vendas[x].forEach(v=>linP.push([r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.campaign||'',hash(x),'nao','nao','nao','sim',num(v.value),v.classe||'',v.data||'',v.descricao||''])));
+    Object.keys(vendas).filter(x=>x.startsWith('nome:')).forEach(x=>vendas[x].forEach(v=>linP.push([r.since,r.until,adId,d.label||k,d.campaign||'',hash(x),'nao','nao','nao','sim',num(v.value),v.classe||'',v.data||'',v.descricao||''])));
   });
+  const somaP=linP.reduce((s,l)=>s+(Number(l[10])||0),0);
   const baixar=(nome,texto)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([texto],{type:'text/csv;charset=utf-8'}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);};
   const sufixo=r.since+'_a_'+r.until;
   baixar('funil_anuncios_resumo_'+sufixo+'.csv',csv(cabR,linR));
   setTimeout(()=>baixar('funil_anuncios_pessoas_'+sufixo+'.csv',csv(cabP,linP)),600);
-  showToast('success','Exportação pronta','2 arquivos CSV baixados ('+linR.length+' anúncios, '+linP.length+' linhas de pessoas). Sem nome nem telefone.');
+  console.log('[EXPORTAR IA] resumo: vendas R$',totVenda.toFixed(2),'| pessoas: vendas R$',somaP.toFixed(2),'| linhas pessoas:',linP.length);
+  showToast('success','Exportação pronta','2 CSVs baixados: '+linR.length+' anúncios, vendas R$ '+totVenda.toLocaleString('pt-BR',{minimumFractionDigits:2})+' (pessoas somam R$ '+somaP.toLocaleString('pt-BR',{minimumFractionDigits:2})+'). Sem nome nem telefone.');
 }
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
