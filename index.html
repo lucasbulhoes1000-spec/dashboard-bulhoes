@@ -4838,6 +4838,24 @@ async function exportarFunilParaIA(){
     if(classe==='Novo')o.novo+=Number(valor||0);else o.recompra+=Number(valor||0);
     if(data)o.datas.push(data);if(desc)o.desc.push(desc);
   };
+  const gerarFatias=(ini0,fim0)=>{
+    const pad=n=>String(n).padStart(2,'0');const out=[];
+    let cur=new Date(ini0+'T00:00:00');const fim=new Date(fim0+'T00:00:00');
+    while(cur<=fim){
+      const ultimo=new Date(cur.getFullYear(),cur.getMonth()+1,0);
+      const fx=ultimo<fim?ultimo:fim;
+      out.push([cur.getFullYear()+'-'+pad(cur.getMonth()+1)+'-'+pad(cur.getDate()),fx.getFullYear()+'-'+pad(fx.getMonth()+1)+'-'+pad(fx.getDate())]);
+      cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+    }
+    return out;
+  };
+  const buscarComRetry=async(url)=>{
+    for(let t=0;t<3;t++){
+      try{const res=await fetch(url);const j=await res.json();if(j&&j.status==='ok')return j;}catch(e){}
+      await new Promise(rs=>setTimeout(rs,4000));
+    }
+    return null;
+  };
   let vendasCarregadas=false,vendasFalhas=0;
   if(vendasOk){
     (window._dashVendasFonteMestraRows||[]).forEach(v=>addVenda(v.ph||v.telefone,v.value,v.classe,v.data,v.descricao));
@@ -4873,8 +4891,35 @@ async function exportarFunilParaIA(){
     vendasCarregadas=ok>0&&vendasFalhas===0;
   }
 
+  // 2b) AGENDA do Clinicorp (mês a mês) — mesma base oficial do Dashboard:
+  // agendamento = avaliação marcada (consulta no período); comparecimento = Em atendimento/Atendido.
+  const agendaPorTel={};
+  let agendaFalhas=0;
+  {
+    const hojeD=new Date();const maisFuturo=new Date(hojeD.getFullYear(),hojeD.getMonth(),hojeD.getDate()+45);
+    const fimAg=(r.until>localDateStr(maisFuturo))?r.until:localDateStr(maisFuturo);
+    const fat=gerarFatias(r.since,fimAg);
+    for(let i=0;i<fat.length;i++){
+      showToast('success','Exportando…','Buscando agenda do Clinicorp ('+(i+1)+'/'+fat.length+')');
+      const j=await buscarComRetry(CLOUDIA_URL+'?action=analyticsAgendaClinicorp&from='+fat[i][0]+'&to='+fat[i][1]);
+      if(!j){agendaFalhas++;continue;}
+      (j.detalheAtos||[]).forEach(a=>{
+        const ph=normalizePhone(a.tel);if(!ph||a.deletado)return;
+        (agendaPorTel[ph]=agendaPorTel[ph]||[]).push({data:String(a.data||'').substring(0,10),criacao:String(a.dataCriacao||'').substring(0,10),status:a.statusLabel||'',statusId:a.statusId});
+      });
+      (j.detalheComparecimentos||[]).forEach(d=>{
+        const ph=normalizePhone(d.tel);if(!ph)return;
+        (agendaPorTel[ph]=agendaPorTel[ph]||[]);
+        agendaPorTel[ph]._comp=true;
+        const m=String(d.statusResumo||'').match(/(Atendido|Em atendimento)[^()]*\((\d{4}-\d{2}-\d{2})\)/i);
+        if(m&&(!agendaPorTel[ph]._compData||m[2]<agendaPorTel[ph]._compData))agendaPorTel[ph]._compData=m[2];
+      });
+    }
+  }
+  const agendaOk=agendaFalhas===0;
+
   // 3) Linhas por pessoa
-  const cabP=['periodo_inicio','periodo_fim','pessoa','data_entrada_lead','ad_id','anuncio','campanha','conjunto','origem','agendou','data_agendamento','compareceu','data_consulta','fechou','data_fechamento','valor_venda_clinicorp_novo','valor_venda_clinicorp_recompra','valor_orcamento_aprovado_crm','valor_venda_final','procedimento','ligado_a_anuncio'];
+  const cabP=['periodo_inicio','periodo_fim','pessoa','data_entrada_lead','ad_id','anuncio','campanha','conjunto','origem','agendou','data_agendamento','compareceu','data_consulta','fechou','data_fechamento','valor_venda_clinicorp_novo','valor_venda_clinicorp_recompra','valor_orcamento_aprovado_crm','valor_venda_final','procedimento','ligado_a_anuncio','qtd_agendamentos_clinicorp','status_ultimo_agendamento','fonte_agenda','agenda_cloudia_crm'];
   const linP=[];
   pessoas.forEach(o=>{
     // Entra quem tem anúncio identificado OU veio de origem paga (Instagram ADS / Formulário).
@@ -4892,8 +4937,20 @@ async function exportarFunilParaIA(){
       if(!noPeriodo(dr))return;
       orc+=Number(q.fechValor||q.valor||0);if(!orcData||dr<orcData)orcData=dr;if(q.tratamento)proc.push(q.tratamento);
     });
-    const agendD=o.agend||dia(cc.agendTimestamp);
-    const compD=o.comp||dia(cc.consultaTimestamp);
+    const agCloud=o.agend||dia(cc.agendTimestamp);
+    const coCloud=o.comp||dia(cc.consultaTimestamp);
+    let agendD=agCloud,compD=coCloud,qtdAg='',stAg='',fonteAg='cloudia_crm';
+    if(agendaOk){
+      const at=agendaPorTel[o.ph]||[];
+      fonteAg='clinicorp';
+      qtdAg=at.length;
+      const criacoes=at.map(x=>x.criacao).filter(Boolean).sort();
+      agendD=at.length?(criacoes[0]||at.map(x=>x.data).filter(Boolean).sort()[0]||''):'';
+      if(at.length&&!agendD)agendD='sem data';
+      compD=at._comp?(at._compData||at.map(x=>x.data).filter(Boolean).sort()[0]||'sem data'):'';
+      const ord=at.slice().sort((x,y)=>(x.data<y.data?-1:1));
+      stAg=ord.length?ord[ord.length-1].status+' ('+ord[ord.length-1].data+')':'';
+    }
     const fechD=v.datas.length?v.datas.slice().sort()[0]:(orcData||o.fech);
     const temVendaNoPeriodo=v.novo>0||v.recompra>0||orc>0;
     if(!noPeriodo(o.entrada)&&!temVendaNoPeriodo)return; // fora do recorte
@@ -4904,7 +4961,7 @@ async function exportarFunilParaIA(){
     linP.push([r.since,r.until,hash(o.ph),o.entrada,o.adId,nomeAd,(meta&&meta.campaign)||'',(meta&&meta.adset)||'',_org,
       agendD?'sim':'nao',agendD,compD?'sim':'nao',compD,fechou?'sim':'nao',noPeriodo(fechD)?fechD:(fechD||''),
       v.novo>0?num(v.novo):'',v.recompra>0?num(v.recompra):'',orc>0?num(orc):'',valorFinal>0?num(valorFinal):'',
-      (v.desc.length?v.desc:proc).join(' | ').substring(0,200),(o.adId||o.adName)?'sim':'nao']);
+      (v.desc.length?v.desc:proc).join(' | ').substring(0,200),(o.adId||o.adName)?'sim':'nao',qtdAg,stAg,fonteAg,(agCloud||coCloud)?'sim':'nao']);
   });
 
   // 4) Resumo por anúncio (a partir das MESMAS linhas, para os dois arquivos baterem)
@@ -4927,7 +4984,7 @@ async function exportarFunilParaIA(){
   setTimeout(()=>baixar('funil_anuncios_pessoas_'+sufixo+'.csv',csv(cabP,linP)),600);
   const somaV=linP.reduce((t,l)=>t+(Number(l[18])||0),0);
   console.log('[EXPORTAR IA] pessoas:',linP.length,'| anúncios:',linR.length,'| vendas R$',somaV.toFixed(2),'| vendas Clinicorp carregadas:',vendasCarregadas,'| meses com falha:',vendasFalhas);
-  showToast(vendasCarregadas?'success':'error','Exportação — '+r.since.split('-').reverse().join('/')+' a '+r.until.split('-').reverse().join('/'),linP.length+' pessoas ('+linP.filter(l=>l[20]==='sim').length+' com anúncio identificado, '+linP.filter(l=>l[20]==='nao').length+' de origem paga sem anúncio), '+linR.length+' anúncios, vendas R$ '+somaV.toLocaleString('pt-BR',{minimumFractionDigits:2})+(vendasCarregadas?'':' — ATENÇÃO: '+vendasFalhas+' mês(es) de vendas do Clinicorp não carregaram; nesses casos usei só orçamentos aprovados do CRM.')+' Sem nome nem telefone.');
+  showToast(vendasCarregadas?'success':'error','Exportação — '+r.since.split('-').reverse().join('/')+' a '+r.until.split('-').reverse().join('/'),linP.length+' pessoas ('+linP.filter(l=>l[20]==='sim').length+' com anúncio identificado, '+linP.filter(l=>l[20]==='nao').length+' de origem paga sem anúncio), '+linR.length+' anúncios, vendas R$ '+somaV.toLocaleString('pt-BR',{minimumFractionDigits:2})+(agendaOk?'':' — ATENÇÃO: '+agendaFalhas+' mês(es) da AGENDA do Clinicorp falharam; agendamentos/comparecimentos vieram do Cloudia/CRM (subcontados).')+(vendasCarregadas?'':' — ATENÇÃO: '+vendasFalhas+' mês(es) de vendas do Clinicorp não carregaram; nesses casos usei só orçamentos aprovados do CRM.')+' Sem nome nem telefone.');
 }
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
