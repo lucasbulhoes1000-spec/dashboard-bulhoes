@@ -594,6 +594,7 @@ tbody tr:hover td{background:#faf7f3;}
       <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">Data final</div><input type="date" id="tp-to" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;"></div>
       <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Anúncio</div><input type="text" id="tp-ad" oninput="filterAdTable()" placeholder="ID ou nome do anúncio" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
       <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Campanha</div><input type="text" id="tp-camp" oninput="filterAdTable()" placeholder="Nome da campanha" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
+      <button class="fb" style="margin-left:auto;background:#5a7a9a;color:#fff;border-color:#5a7a9a;" onclick="exportarFunilParaIA()" title="Baixa 2 planilhas CSV (resumo por anúncio + pessoas anonimizadas) para enviar a outra IA">⬇ Exportar p/ IA</button>
     </div>
     <div id="trafego-pago-host"></div>
   </div>
@@ -3794,15 +3795,16 @@ async function loadTrafego(){
     // aquele trecho pularia o recálculo de fallback à toa.
     window._funilMetaFonteFinalAtiva=!!funilMetaFinal;
     renderTrafego(metaAds,filtered,filteredEvents,filteredAgend);
-    // Espera Clinicorp (agenda + vendas reais) ANTES de mostrar qualquer número,
-    // com limite de 60s pra nunca travar a tela.
-    await Promise.race([
-      Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]),
-      new Promise(r=>setTimeout(r,60000))
-    ]);
-    window._trafegoPronto=true;
-    try{sincronizarFiltroTrafegoPago();}catch(e){}
-    if(window._lastAdMap)filterAdTable();
+    // NÃO bloqueia a tela: o Dashboard aparece na hora (como antes). Só a TABELA do
+    // Funil por Anúncio espera o Clinicorp (máx. 25s) para não mostrar número provisório.
+    const _fimClinicorp=()=>{
+      if(window._trafegoPronto===true)return;
+      window._trafegoPronto=true;
+      try{sincronizarFiltroTrafegoPago();}catch(e){}
+      try{if(window._lastAdMap)filterAdTable();}catch(e){}
+    };
+    Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]).then(_fimClinicorp);
+    setTimeout(_fimClinicorp,25000);
     console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
     console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
@@ -4784,6 +4786,47 @@ function sincronizarFiltroTrafegoPago(){
   const a=document.getElementById('tp-from'),b=document.getElementById('tp-to');
   if(a&&a.value!==r.since)a.value=r.since;
   if(b&&b.value!==r.until)b.value=r.until;
+}
+
+// ===== EXPORTAR FUNIL POR ANÚNCIO (para análise em outra IA) =====
+// Gera 2 CSVs do período selecionado: resumo por anúncio e base por pessoa.
+// Nome e telefone NÃO vão no arquivo (LGPD): cada pessoa vira um código anônimo.
+function exportarFunilParaIA(){
+  const m=window._lastAdMap;
+  if(!m||window._trafegoPronto===false){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
+  const r=getRange('trafego');
+  const esc=v=>{const t=String(v===null||v===undefined?'':v);return /[",\n;]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  const num=v=>(Math.round(Number(v||0)*100)/100).toString().replace('.',',');
+  const hash=ph=>{let h=5381;const t='bulhoes|'+ph;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))>>>0;return 'P'+h.toString(16).toUpperCase();};
+  const csv=(cab,linhas)=>'﻿'+[cab.join(';')].concat(linhas.map(l=>l.map(esc).join(';'))).join('\n');
+  // 1) Resumo por anúncio
+  const cabR=['periodo_inicio','periodo_fim','ad_id','anuncio','conjunto','campanha','gasto','leads','cpl','agendamentos','comparecimentos','contratos_novos','valor_vendas_novos_trafego_pago','ticket_medio','roas','conversao_lead_contrato_pct'];
+  const linR=[];
+  Object.entries(m).forEach(([k,d])=>{
+    const leads=d.leads||0,fe=d.fechou||0,sp=d.spend||0,v=d.vendas||0;
+    linR.push([r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.adset||'',d.campaign||'',num(sp),leads,leads>0&&sp>0?num(sp/leads):'',d.agend||0,d.comp||0,fe,num(v),fe>0?num(v/fe):'',sp>0?num(v/sp):'',leads>0?num(fe/leads*100):'']);
+  });
+  // 2) Base por pessoa (anônima)
+  const cabP=['periodo_inicio','periodo_fim','ad_id','anuncio','campanha','pessoa','lead_no_periodo','agendou','compareceu','fechou','valor_venda','classe_venda','data_venda','procedimento'];
+  const linP=[];
+  Object.entries(m).forEach(([k,d])=>{
+    const L=d.phones||new Set(),A=d.agendPhones||new Set(),C=d.compPhones||new Set(),F=d.fechouPhones||new Set();
+    const vendas={};
+    (d.vendaRows||[]).forEach(v=>{const ph=normalizePhone(v.ph||v.telefone)||('nome:'+(v.name||v.nome||''));(vendas[ph]=vendas[ph]||[]).push(v);});
+    const todos=new Set([...L,...A,...C,...F,...Object.keys(vendas).filter(x=>!x.startsWith('nome:'))]);
+    todos.forEach(ph=>{
+      const vs=vendas[ph]||[];
+      const base=[r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.campaign||'',hash(ph),L.has(ph)?'sim':'nao',A.has(ph)?'sim':'nao',C.has(ph)?'sim':'nao',(F.has(ph)||vs.length)?'sim':'nao'];
+      if(vs.length)vs.forEach(v=>linP.push(base.concat([num(v.value),v.classe||'',v.data||'',v.descricao||''])));
+      else linP.push(base.concat(['','','','']));
+    });
+    Object.keys(vendas).filter(x=>x.startsWith('nome:')).forEach(x=>vendas[x].forEach(v=>linP.push([r.since,r.until,k==='__sem_rastreio__'?'':k,d.label||k,d.campaign||'',hash(x),'nao','nao','nao','sim',num(v.value),v.classe||'',v.data||'',v.descricao||''])));
+  });
+  const baixar=(nome,texto)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([texto],{type:'text/csv;charset=utf-8'}));a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);};
+  const sufixo=r.since+'_a_'+r.until;
+  baixar('funil_anuncios_resumo_'+sufixo+'.csv',csv(cabR,linR));
+  setTimeout(()=>baixar('funil_anuncios_pessoas_'+sufixo+'.csv',csv(cabP,linP)),600);
+  showToast('success','Exportação pronta','2 arquivos CSV baixados ('+linR.length+' anúncios, '+linP.length+' linhas de pessoas). Sem nome nem telefone.');
 }
 // ===== PÁGINA TRÁFEGO PAGO =====
 function abrirTrafegoPago(){
