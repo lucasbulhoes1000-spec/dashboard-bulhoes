@@ -271,10 +271,6 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="nav-icon">💵</span>
       <span class="nav-label">Comissões</span>
     </div>
-    <div class="nav-item" onclick="window.open('https://estoque-bulhoes.vercel.app','_blank')" title="Abre o app de Estoque">
-      <span class="nav-icon">📦</span>
-      <span class="nav-label">Estoque</span>
-    </div>
     <div class="nav-item" onclick="switchPage('calendario',this);initCalendarioSazonal();">
       <span class="nav-icon">📅</span>
       <span class="nav-label">Calendário Sazonal</span>
@@ -368,11 +364,6 @@ tbody tr:hover td{background:#faf7f3;}
             <div style="font-size:26px;margin-bottom:10px;">💵</div>
             <div style="font-weight:700;color:#2a2520;font-size:14px;margin-bottom:3px;">Comissões</div>
             <div style="font-size:12px;color:#8a7a6a;">Relatório por vendedor</div>
-          </div>
-          <div onclick="window.open('https://estoque-bulhoes.vercel.app','_blank')" class="inicio-card" style="background:#fff;border:1px solid #e8e2da;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">📦</div>
-            <div style="font-weight:700;color:#2a2520;font-size:14px;margin-bottom:3px;">Estoque</div>
-            <div style="font-size:12px;color:#8a7a6a;">Entrada/saída e alertas de mínimo</div>
           </div>
           <div onclick="irParaPagina('calendario')" class="inicio-card" style="background:#fff;border:1px solid #e8e2da;border-radius:14px;padding:20px;cursor:pointer;">
             <div style="font-size:26px;margin-bottom:10px;">📅</div>
@@ -2069,15 +2060,6 @@ function verificarAcessoPagina(page){
     const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Gerenciar:');
     if(senha===null)return false;
     if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado.gerenciar=true;return true;}
-    alert('Senha incorreta.');
-    return false;
-  }
-  if(page==='estoque'){
-    if(ACESSO_TOTAL_LOGINS.includes(email))return true;
-    if(_acessoDesbloqueado.estoque)return true;
-    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Estoque:');
-    if(senha===null)return false;
-    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado.estoque=true;return true;}
     alert('Senha incorreta.');
     return false;
   }
