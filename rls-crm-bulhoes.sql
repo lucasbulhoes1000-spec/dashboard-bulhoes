@@ -16,7 +16,8 @@ as $$
     'larissa@bulhoesodontologia.com.br',
     'livia@bulhoesodontologia.com.br',
     'raffaella@bulhoesodontologia.com.br',
-    'victoria@bulhoesodontologia.com.br'
+    'victoria@bulhoesodontologia.com.br',
+    'gabi@bulhoesodontologia.com.br'
   ]);
 $$;
 
