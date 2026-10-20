@@ -1875,6 +1875,9 @@ const DASHBOARD_TOKEN='4b88a3c50b1d5152112db15bc4a35c0f774f5ddcb9e50bf0';
     if(typeof input==='string'&&input.indexOf(CLOUDIA_URL)===0){
       const sep=input.indexOf('?')===-1?'?':'&';
       input=input+sep+'token='+encodeURIComponent(DASHBOARD_TOKEN);
+      // (20/10/2026) Login da Supabase: o Apps Script só atende o dashboard
+      // com o token de uma conta da equipe (ver _usuarioDoDashboard no .gs).
+      if(typeof _sbAccessToken!=='undefined'&&_sbAccessToken)input+='&sb='+encodeURIComponent(_sbAccessToken);
     }
     return _fetchOriginal.call(this,input,init);
   };
@@ -9706,16 +9709,39 @@ function consolidarChavesTelefoneCRM(obj){
   }catch(e){console.warn('[CRM] consolidarChavesTelefoneCRM falhou:',e);}
   return obj;
 }
+// ⚠️ TRÁFEGO (20/10/2026): o plano gratuito da Supabase tem 5 GB/mês de saída
+// e o CRM inteiro tem ~4,3 MB. Antes, cada atualização automática (5 em 5 min),
+// cada "Atualizar" e cada aba aberta baixavam tudo de novo, mesmo sem mudança,
+// e o limite ia estourar no começo de novembro. Agora as atualizações
+// silenciosas perguntam primeiro só o atualizado_em (poucos bytes) e só baixam
+// o CRM quando ele mudou. Toda gravação (navegador e Apps Script) atualiza
+// essa coluna, então nenhuma mudança real deixa de aparecer.
+let _crmAtualizadoEmCarregado=null;
+async function _crmMudouNoServidor(){
+  try{
+    const r=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(CRM_SHARED_KEY)+'&select=atualizado_em',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    });
+    const rows=await r.json();
+    const atual=rows&&rows[0]?rows[0].atualizado_em:null;
+    if(!atual)return true; // sem como comparar: baixa por segurança
+    return atual!==_crmAtualizadoEmCarregado;
+  }catch(e){return true;}
+}
 async function carregarCRMRemoto(opcoes){
   const silencioso=!!(opcoes&&opcoes.silencioso);
+  if(silencioso&&_crmAtualizadoEmCarregado&&!(await _crmMudouNoServidor())){
+    return; // nada mudou desde o último download
+  }
   try{
     const email=CRM_SHARED_KEY;
     // Busca do Supabase primeiro
-    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(email)+'&select=crm_json,comissoes_json,listas_json',{
+    const res=await fetch(SUPABASE_URL+'/rest/v1/crm_sessions?email_clinica=eq.'+encodeURIComponent(email)+'&select=crm_json,comissoes_json,listas_json,atualizado_em',{
       headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
     });
     const rows=await res.json();
     if(rows&&rows[0]){
+      if(rows[0].atualizado_em)_crmAtualizadoEmCarregado=rows[0].atualizado_em;
       if(rows[0].crm_json){
         const parsed=JSON.parse(rows[0].crm_json);
         if(parsed&&typeof parsed==='object'&&Object.keys(parsed).length>0){
