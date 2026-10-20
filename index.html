@@ -1824,7 +1824,11 @@ const META_ACCOUNT='act_830126674734657';
 const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
 const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
 const CLINICA_ID=null; // será preenchido após login
-const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbykaZnJfZBI5M7PQWdU3KSno5lf4OyjU8IaERmjh2kMXA5npUNz_5WXMwdfcix9Nw17/exec';
+// (20/10/2026) Dashboard aponta para a implantação nova do Apps Script (versão
+// com saveCRMPatch). A implantação antiga (…cix9Nw17/exec) segue no ar SÓ para
+// os webhooks da Cloudia e do Clinicorp, que estão configurados nela.
+// Ao publicar mudanças no Apps Script, atualize as DUAS implantações.
+const CLOUDIA_URL='https://script.google.com/macros/s/AKfycbzx-jZf3jiiULmkMjhQy38iTHde7NfQvlzhPdMPz0oE2YqG8_9y6I_CULgJXk5IW8JT/exec';
 // ⚠️ SEGURANÇA (24/07/2026): antes, quem descobrisse essa URL (ela fica
 // visível no código-fonte da página, não tem como esconder de verdade num
 // app que roda no navegador) conseguia chamar qualquer ação do backend —
