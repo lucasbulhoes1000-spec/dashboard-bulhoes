@@ -1702,6 +1702,12 @@ const DASHBOARD_TOKEN='4b88a3c50b1d5152112db15bc4a35c0f774f5ddcb9e50bf0';
       // (20/10/2026) Login da Supabase: o Apps Script só atende o dashboard
       // com o token de uma conta da equipe (ver _usuarioDoDashboard no .gs).
       if(typeof _sbAccessToken!=='undefined'&&_sbAccessToken)input+='&sb='+encodeURIComponent(_sbAccessToken);
+      // Se o Apps Script recusar o login (sessão encerrada ou expirada), trata
+      // aqui em vez de deixar a tela vazia sem aviso.
+      return _fetchOriginal.call(this,input,init).then(resp=>{
+        try{resp.clone().json().then(j=>{if(j&&j.codigo==='sem_login')_sessaoRecusadaPeloServidor();}).catch(()=>{});}catch(e){}
+        return resp;
+      });
     }
     return _fetchOriginal.call(this,input,init);
   };
@@ -10918,8 +10924,31 @@ async function trocarMinhaSenha(){
   else{registrarAuditoria('Senha','trocou a própria senha');alert('Senha trocada com sucesso.');}
 }
 
+// (20/10/2026) O Apps Script confere a sessão na Supabase. Se ela foi encerrada
+// (ex.: "Sair" em outro aparelho, senha trocada), tenta renovar; se não der,
+// volta para o login com um aviso. Roda uma vez por vez.
+let _tratandoSessaoRecusada=false;
+async function _sessaoRecusadaPeloServidor(){
+  if(_tratandoSessaoRecusada||!_sb)return;
+  _tratandoSessaoRecusada=true;
+  try{
+    const {data,error}=await _sb.auth.refreshSession();
+    if(!error&&data&&data.session){
+      _sbAccessToken=data.session.access_token;
+      _tratandoSessaoRecusada=false;
+      if(typeof reloadCurrent==='function')reloadCurrent();
+      return;
+    }
+  }catch(e){}
+  try{await _sb.auth.signOut({scope:'local'});}catch(e){}
+  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
+  alert('Sua sessão expirou. Entre de novo para continuar.');
+  location.reload();
+}
+
 async function fazerLogout(){
-  try{if(_sb)await _sb.auth.signOut();}catch(e){}
+  // scope local: sair aqui não derruba o login da pessoa nos outros aparelhos/abas.
+  try{if(_sb)await _sb.auth.signOut({scope:'local'});}catch(e){}
   ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
   location.reload();
 }
