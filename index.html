@@ -6,6 +6,7 @@
 <!-- VERSÃO FINAL DEFINITIVA — performance conservadora — 26/08/2026 -->
 <title>Backoffice — Bulhões Odontologia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -299,6 +300,7 @@ tbody tr:hover td{background:#faf7f3;}
       <span class="last-update" id="last-update"></span>
       <button class="btn-top" onclick="pedirPermissaoNotificacao()" title="Ativar notificações de novo lead do Formulário Facebook">🔔</button>
       <button class="btn-top" onclick="reloadCurrent()">↻ Atualizar</button>
+      <button class="btn-top" onclick="trocarMinhaSenha()" style="background:#e8e2da;color:#8a7a6a;margin-left:4px;" title="Trocar minha senha">🔑 Senha</button>
       <button class="btn-top" onclick="fazerLogout()" style="background:#e8e2da;color:#8a7a6a;margin-left:4px;" title="Sair">⎋ Sair</button>
     </div>
   </div>
@@ -1823,6 +1825,34 @@ tbody tr:hover td{background:#faf7f3;}
 const META_ACCOUNT='act_830126674734657';
 const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
 const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
+// ⚠️ SEGURANÇA (20/10/2026): login real pela Supabase Auth. Toda chamada REST
+// ao Supabase passa a levar o token da pessoa logada (Authorization: Bearer
+// <access_token>) em vez da chave pública. Com o RLS ligado, quem não tem
+// sessão válida não lê nem grava nada, mesmo conhecendo a chave pública.
+const _sb=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'bulhoes_auth'}}):null;
+let _sbAccessToken=null;
+if(_sb){
+  _sb.auth.onAuthStateChange((evento,sessao)=>{
+    _sbAccessToken=sessao?sessao.access_token:null;
+    if(evento==='SIGNED_OUT'&&localStorage.getItem('bulhoes_logado')==='true'){
+      ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
+      location.reload();
+    }
+  });
+}
+(function(){
+  const _fetchAnterior=window.fetch;
+  window.fetch=function(input,init){
+    if(typeof input==='string'&&input.indexOf(SUPABASE_URL+'/rest/v1/')===0&&_sbAccessToken){
+      init=Object.assign({},init||{});
+      const h=new Headers(init.headers||{});
+      h.set('apikey',SUPABASE_KEY);
+      h.set('Authorization','Bearer '+_sbAccessToken);
+      init.headers=h;
+    }
+    return _fetchAnterior.call(this,input,init);
+  };
+})();
 const CLINICA_ID=null; // será preenchido após login
 // (20/10/2026) Dashboard aponta para a implantação nova do Apps Script (versão
 // com saveCRMPatch). A implantação antiga (…cix9Nw17/exec) segue no ar SÓ para
@@ -11434,15 +11464,22 @@ function removerSubModelo(tipo, idx) {
 // de ninguém, só uma sequência sem sentido. Não é uma segurança perfeita
 // (ainda dá pra tentar quebrar o hash com muito esforço/tempo), mas fecha o
 // problema de "ver o código = ver a senha de todo mundo na hora".
+// ⚠️ SEGURANÇA (20/10/2026): o login agora é feito pela Supabase Auth (senha
+// conferida no servidor, não mais no navegador). Esta lista serve só para
+// mostrar o nome de cada pessoa; quem pode entrar é definido pelas contas
+// criadas em Supabase → Authentication → Users e pela política de acesso
+// (função is_equipe_crm no banco).
 const USUARIOS_VALIDOS=[
-  {email:'lucasbulhoes1000@gmail.com',senhaHash:'25a432b3aafa00d463cced2a84877b76f47465b2b61cf8541d9011faf12f1afa',nome:'Lucas'},
-  {email:'victoria@bulhoes',senhaHash:'0afe5597e9452291e4acada4e4770f65f88503c36c0f3d8b466839d69cd3e6bb',nome:'Victoria'},
-  {email:'livia@bulhoes',senhaHash:'9451cc002d11584a6174fb5bd2497fd24e81474fcd3b938a7bb719fe6e4ebd6f',nome:'Lívia'},
-  {email:'larissa@bulhoes',senhaHash:'58c929968b93cb3c60c8271d4efd05df579ae338efa1dec585c02f7829645fb3',nome:'Larissa'},
-  {email:'gabi@bulhoes',senhaHash:'4b8608f57eb9ce57dd442d474c9a85a3a9f990663707e8bbdfc7f994e98b3aeb',nome:'Gabi'},
-  {email:'raffaella@bulhoes',senhaHash:'bd18f73b410cc43bbd060e3f468ec59f9d5d7d07d51b09266695cf520cb14d3e',nome:'Raffaella'},
-  {email:'luiza@bulhoes',senhaHash:'faf28381657e264d0a770bed2adaf4c760b3dee8bf92749cbc209905075b1377',nome:'Luiza'},
-  {email:'madu@bulhoes',senhaHash:'2456296fdb42f3868f512f062625a9503b79ae1c4d9787d6bda204e885fb58c2',nome:'Madu'}
+  {email:'lucasbulhoes1000@gmail.com',nome:'Lucas'},
+  {email:'larissa@bulhoesodontologia.com.br',nome:'Larissa'},
+  {email:'livia@bulhoesodontologia.com.br',nome:'Lívia'},
+  {email:'raffaella@bulhoesodontologia.com.br',nome:'Raffaella'},
+  {email:'victoria@bulhoesodontologia.com.br',nome:'Victoria'},
+  // Sem conta de login hoje; mantidas só para os nomes continuarem nas listas de
+  // responsáveis/tarefas. Para dar acesso, criar a conta na Supabase.
+  {email:'gabi@bulhoesodontologia.com.br',nome:'Gabi'},
+  {email:'luiza@bulhoesodontologia.com.br',nome:'Luiza'},
+  {email:'madu@bulhoesodontologia.com.br',nome:'Madu'}
 ];
 async function sha256Hex(texto){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(texto));
@@ -11522,7 +11559,7 @@ function fecharHistoricoAuditoria(){
 // esse número — quem tiver uma versão de sessão menor (ou nenhuma, sessão
 // antiga) é automaticamente deslogado na próxima vez que abrir/recarregar o
 // dashboard, e precisa entrar de novo com login e senha válidos.
-const VERSAO_SESSAO_MINIMA=2;
+const VERSAO_SESSAO_MINIMA=3; // 3 = login pela Supabase Auth (20/10/2026)
 
 function verificarLogin(){
   const email=localStorage.getItem('bulhoes_email');
@@ -11544,43 +11581,51 @@ function verificarLogin(){
 
 async function fazerLogin(){
   const email=document.getElementById('login-email').value.trim().toLowerCase();
-  const senha=document.getElementById('login-senha').value.trim();
+  const senha=document.getElementById('login-senha').value;
   const btn=document.getElementById('login-btn');
   const errEl=document.getElementById('login-error');
-  
   btn.textContent='Entrando...';
   btn.disabled=true;
   errEl.style.display='none';
-  
-  // Verifica na lista local — lista local tem prioridade absoluta
-  const senhaHashDigitada=await sha256Hex(senha);
-  const user=USUARIOS_VALIDOS.find(u=>u.email.toLowerCase()===email&&u.senhaHash===senhaHashDigitada);
-  
-  // Se achou na lista local, entra direto sem checar Supabase
-  if(user){
+  const falhar=msg=>{errEl.textContent=msg;errEl.style.display='block';btn.textContent='Entrar';btn.disabled=false;};
+  if(!_sb)return falhar('Não foi possível carregar o login. Verifique a internet e recarregue a página.');
+  try{
+    const {data,error}=await _sb.auth.signInWithPassword({email,password:senha});
+    if(error||!data||!data.session)return falhar('Email ou senha incorretos.');
+    _sbAccessToken=data.session.access_token;
+    const user=USUARIOS_VALIDOS.find(u=>u.email.toLowerCase()===email);
+    const nome=user?user.nome:email.split('@')[0];
     localStorage.setItem('bulhoes_email',email);
     localStorage.setItem('bulhoes_logado','true');
-    localStorage.setItem('bulhoes_nome',user?user.nome:email.split('@')[0]);
+    localStorage.setItem('bulhoes_nome',nome);
     localStorage.setItem('bulhoes_versao_sessao',String(VERSAO_SESSAO_MINIMA));
-    registrarAuditoria('Login',user.nome+' entrou no sistema');
+    registrarAuditoria('Login',nome+' entrou no sistema');
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-wrapper').style.display='flex';
     iniciarApp();
-    // Vai para tela de início após login
     setTimeout(()=>{
       const inicioNav=document.querySelector('[onclick*="inicio"]');
       if(inicioNav)switchPage('inicio',inicioNav);
     },500);
-  } else {
-    errEl.textContent='Email ou senha incorretos.';
-    errEl.style.display='block';
-    btn.textContent='Entrar';
-    btn.disabled=false;
+  }catch(e){
+    falhar('Falha ao conectar com o servidor de login. Tente novamente.');
   }
 }
 
-function fazerLogout(){
-  localStorage.removeItem('bulhoes_logado');
+// Troca de senha da própria pessoa (fica no menu do usuário / pode ser chamada pelo console).
+async function trocarMinhaSenha(){
+  if(!_sb)return;
+  const nova=prompt('Digite a nova senha (mínimo 8 caracteres):');
+  if(nova===null)return;
+  if(nova.length<8){alert('A senha precisa ter pelo menos 8 caracteres.');return;}
+  const {error}=await _sb.auth.updateUser({password:nova});
+  if(error)alert('Não foi possível trocar a senha: '+error.message);
+  else{registrarAuditoria('Senha','trocou a própria senha');alert('Senha trocada com sucesso.');}
+}
+
+async function fazerLogout(){
+  try{if(_sb)await _sb.auth.signOut();}catch(e){}
+  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
   location.reload();
 }
 
@@ -12470,9 +12515,16 @@ function getManualOverride(campo){
 }
 
 // INIT
-window.addEventListener('load',()=>{
+window.addEventListener('load',async()=>{
+  // ⚠️ SEGURANÇA (20/10/2026): além da marca local, exige sessão válida na
+  // Supabase Auth. Sem sessão (expirada, outro navegador, login antigo),
+  // volta para a tela de login.
+  let sessao=null;
+  try{if(_sb){const r=await _sb.auth.getSession();sessao=r&&r.data?r.data.session:null;}}catch(e){}
+  if(!sessao){['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));}
+  else{_sbAccessToken=sessao.access_token;}
   verificarLogin();
-  if(localStorage.getItem('bulhoes_logado')==='true'){
+  if(sessao&&localStorage.getItem('bulhoes_logado')==='true'){
     document.getElementById('app-wrapper').style.display='flex';
     iniciarApp();
   }
