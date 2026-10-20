@@ -2050,8 +2050,7 @@ async function verificarNovosLeadsFacebook(){
     try{ await fetch(CLOUDIA_URL+'?action=importarLeadsFormularioFacebook'); }
     catch(eImport){ console.warn('[NOTIF LEADS FACEBOOK] Falha ao forçar importação:',eImport); }
 
-    var res=await fetch(CLOUDIA_URL);
-    var raw=await res.json();
+    var raw=await baixarPlanilhaCloudiaRaw();
     if(!Array.isArray(raw)||raw.length<2)return;
     var h=raw[0];
     var idxType=h.indexOf('type');
@@ -3761,7 +3760,23 @@ function aplicarFunilMetaFinal(metaAds, pacote){
   });
 }
 
-async function loadTrafego(){
+// ⚠️ PERFORMANCE (20/10/2026): loadTrafego() é chamado na abertura do app e de
+// novo ao abrir Dashboard/Tráfego Pago. Como o Apps Script leva 40-90s, a
+// segunda chamada começava antes da primeira terminar e TODAS as consultas
+// (metaInsightsFinal, funil, planilha do Cloudia) iam em dobro ou triplo,
+// competindo entre si no Apps Script. Agora, se já há um carregamento em curso
+// para o MESMO período, reaproveita a mesma promessa em vez de disparar outro.
+let _loadTrafegoEmCurso=null,_loadTrafegoChave='';
+function loadTrafego(){
+  let chave='';
+  try{const r=getRange('trafego');chave=r.since+'|'+r.until;}catch(e){}
+  if(_loadTrafegoEmCurso&&_loadTrafegoChave===chave)return _loadTrafegoEmCurso;
+  _loadTrafegoChave=chave;
+  const p=_loadTrafegoImpl().finally(()=>{if(_loadTrafegoEmCurso===p)_loadTrafegoEmCurso=null;});
+  _loadTrafegoEmCurso=p;
+  return p;
+}
+async function _loadTrafegoImpl(){
   window._trafegoPronto=false;
   document.getElementById('loading-trafego').style.display='flex';
   document.getElementById('content-trafego').style.display='none';
@@ -3805,8 +3820,6 @@ async function loadTrafego(){
     };
     Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]).then(_fimClinicorp);
     setTimeout(_fimClinicorp,25000);
-    console.log('[META DEBUG] Anúncios retornados:', metaAds.length, '| Exemplo:', metaAds[0]);
-    console.log('[AD DEBUG] Chaves adMap após render:', Object.keys(window._lastAdMap||{}).filter(k=>k!=='__sem_rastreio__'));
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
     document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -3843,9 +3856,27 @@ async function fetchMeta(){
   }
 }
 
-async function fetchCloudia(){
+// ⚠️ PERFORMANCE (20/10/2026): a planilha inteira do Cloudia era baixada várias
+// vezes ao mesmo tempo (abertura do app, Dashboard, checagem de leads de 2 em
+// 2 min, auto-refresh de 5 em 5 min), cada download levando ~40s no Apps
+// Script. Agora downloads simultâneos compartilham a mesma requisição.
+let _cloudiaRawEmCurso=null;
+function baixarPlanilhaCloudiaRaw(){
+  if(_cloudiaRawEmCurso)return _cloudiaRawEmCurso;
+  const p=fetch(CLOUDIA_URL).then(res=>res.json()).finally(()=>{if(_cloudiaRawEmCurso===p)_cloudiaRawEmCurso=null;});
+  _cloudiaRawEmCurso=p;
+  return p;
+}
+let _fetchCloudiaEmCurso=null;
+function fetchCloudia(){
+  if(_fetchCloudiaEmCurso)return _fetchCloudiaEmCurso;
+  const p=_fetchCloudiaImpl().finally(()=>{if(_fetchCloudiaEmCurso===p)_fetchCloudiaEmCurso=null;});
+  _fetchCloudiaEmCurso=p;
+  return p;
+}
+async function _fetchCloudiaImpl(){
   try{
-    const res=await fetch(CLOUDIA_URL);const raw=await res.json();
+    const raw=await baixarPlanilhaCloudiaRaw();
     if(!Array.isArray(raw)||raw.length<2){
       document.getElementById('badge-cloudia').textContent='⬤ Cloudia — aguardando dados';
       return[];
@@ -3898,6 +3929,20 @@ async function fetchCloudia(){
         if(r.ad_id&&!lead.ad_id)lead.ad_id=r.ad_id;
       }
     });
+    // ⚠️ PERFORMANCE (20/10/2026, "CRM travando"): os dois laços abaixo faziam,
+    // para CADA cliente do CRM (~6.700), uma varredura completa em
+    // allCloudiaRows com regex no telefone de cada linha. Isso dava centenas de
+    // milhões de operações e congelava a aba por 30s+ ao abrir o Dashboard.
+    // Agora o índice telefone → linhas é montado UMA vez e cada consulta é O(1).
+    // Mesma regra de comparação de antes (só dígitos, igualdade exata).
+    const _linhasPorTelefone=new Map();
+    const _indexarLinha=row=>{
+      const k=String(row.phone||'').replace(/\D/g,'');
+      let arr=_linhasPorTelefone.get(k);
+      if(!arr){arr=[];_linhasPorTelefone.set(k,arr);}
+      arr.push(row);
+    };
+    allCloudiaRows.forEach(_indexarLinha);
     // Reconstrói leads importados que não estão no Cloudia
     Object.entries(_ccData).forEach(([ph,d])=>{
       // ⚠️ CORRIGIDO (14/07/2026): antes só reconstruía quem tinha leadImportado
@@ -3905,13 +3950,15 @@ async function fetchCloudia(){
       // Clinicorp (comparecimento real sem passar pelo fluxo padrão) ficaram sem
       // essa flag e nunca apareciam em lugar nenhum. Amplia pra cobrir isso.
       if(!d.leadImportado && !d.consultaTimestampViaClinicorp)return;
-      const jaExiste=allCloudiaRows.some(r=>String(r.phone||'').replace(/\D/g,'')=== ph);
+      const jaExiste=_linhasPorTelefone.has(ph);
       if(!jaExiste){
-        allCloudiaRows.push({
+        const novaLinha={
           name:d.nomeAtual||'—',phone:ph,origin:d.origemAtual||'#Clinicorp Direto',
           stage:d.statusAtual||'Lead',created_at:d.created_at||'',
           timestamp:d.timestamp||d.created_at||'',type:'CUSTOMER_CREATED',ad_id:'',ad_name:''
-        });
+        };
+        allCloudiaRows.push(novaLinha);
+        _indexarLinha(novaLinha);
       }
     });
     // Aplica consultaTimestamp e agendTimestamp do CRM em allCloudiaRows
@@ -3928,34 +3975,26 @@ async function fetchCloudia(){
         }
         return d.consultaTimestamp||d.timestamp||null;
       })();
+      const linhasDoTelefone=_linhasPorTelefone.get(ph);
+      if(!linhasDoTelefone)return;
       if(dataManualComparecimento){
-        allCloudiaRows.forEach(row=>{
-          if(String(row.phone||'').replace(/\D/g,'')=== ph&&(isComp(row.stage)||isFechou(row.stage))){
+        linhasDoTelefone.forEach(row=>{
+          if(isComp(row.stage)||isFechou(row.stage)){
             row.timestamp=dataManualComparecimento;
           }
         });
       }
       if(d.agendTimestamp){
-        allCloudiaRows.forEach(row=>{
-          if(String(row.phone||'').replace(/\D/g,'')=== ph&&row.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(row.stage)){
+        linhasDoTelefone.forEach(row=>{
+          if(row.type==='CUSTOMER_STAGE_UPDATED'&&isAgend(row.stage)){
             row.timestamp=d.agendTimestamp;
           }
         });
       }
     });
     sincronizarNomesCRM(rows);
-    console.log('[CLOUDIA HEADERS]', h);
-    console.log('[CLOUDIA SAMPLE com ad_id]', rows.filter(r=>r.ad_id).slice(0,3).map(r=>({name:r.name,ad_id:r.ad_id,ad_name:r.ad_name})));
-    // DEBUG: loga ad_name/ad_id de todos os leads de hoje
-    if(rows.length>0){
-      const hoje=rows.filter(r=>{
-        const d=parseCloudiaDate(r.created_at);
-        if(!d)return false;
-        const now=new Date();
-        return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
-      });
-    console.log('[AD DEBUG] Leads de hoje:', hoje.map(r=>({name:r.name,ad_name:r.ad_name,ad_id:r.ad_id,ad_id_normalizado:String(r.ad_id||'').replace(/^(\d+\.?\d*)[eE]\+?(\d+)$/,(_,b,exp)=>String(Math.round(parseFloat(b+'e+'+exp)))),origin:r.origin})));
-    }
+    // (20/10/2026) Logs de depuração removidos: varriam a planilha inteira de
+    // novo a cada carregamento e expunham nome de lead no console.
     document.getElementById('badge-cloudia').textContent='⬤ Cloudia — '+rows.length+' registros';
     return rows;
   }catch(e){
