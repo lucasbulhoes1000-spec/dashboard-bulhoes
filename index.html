@@ -9510,7 +9510,91 @@ let _comissoesBaseSnapshot=[];
 // acima. Antes, salvar qualquer coisa do CRM (nota, atividade etc.) também
 // sobrescrevia listas_json com o que estivesse na memória daquela aba,
 // mesmo desatualizado, apagando fases/listas criadas em outra aba/sessão.
-async function salvarCRMRemoto(){
+// ⚠️ PERFORMANCE (20/10/2026, "CRM travando"): antes, CADA edição (nota,
+// status, nome...) mandava o CRM inteiro DUAS vezes ao Apps Script (base +
+// local, vários MB) e recebia o CRM inteiro de volta, segurando o lock do
+// servidor por muito tempo e enfileirando o resto do Dashboard. Agora manda
+// só os clientes que mudaram desde a última versão confirmada (saveCRMPatch).
+// O servidor aplica as MESMAS regras de merge de 3 vias, só nessas chaves.
+// Se o Apps Script ainda não tiver a ação nova, cai no salvamento completo
+// antigo (salvarCRMRemotoCompleto) automaticamente.
+// Salvamentos ficam em fila: nunca dois ao mesmo tempo pela mesma aba.
+let _crmSaveFila=Promise.resolve();
+function salvarCRMRemoto(){
+  _crmSaveFila=_crmSaveFila.then(_salvarCRMPorPatch,_salvarCRMPorPatch);
+  return _crmSaveFila;
+}
+function _diffCRM(base,local){
+  const mudancas={};
+  const tem=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  const chaves=new Set([...Object.keys(base),...Object.keys(local)]);
+  chaves.forEach(k=>{
+    const tb=tem(base,k),tl=tem(local,k);
+    if(!tb&&!tl)return;
+    if(tb&&tl&&JSON.stringify(base[k])===JSON.stringify(local[k]))return;
+    mudancas[k]={temBase:tb,temLocal:tl,base:tb?base[k]:null,local:tl?local[k]:null};
+  });
+  return mudancas;
+}
+async function _salvarCRMPorPatch(){
+  const base=_crmBaseSnapshot||{}, local=_ccData||{};
+  const mudancas=_diffCRM(base,local);
+  const chavesMudadas=Object.keys(mudancas);
+  const temComissoes=JSON.stringify(_comissoesBaseSnapshot||[])!==JSON.stringify(_comissoes||[]);
+  if(!chavesMudadas.length&&!temComissoes)return; // nada mudou desde a última gravação confirmada
+  // Guarda o que foi enviado, pra não sobrescrever uma edição feita
+  // durante a gravação quando a resposta chegar.
+  const enviado={};chavesMudadas.forEach(k=>{enviado[k]=JSON.stringify(mudancas[k].local);});
+  const comissoesEnviadas=temComissoes?JSON.parse(JSON.stringify(_comissoes||[])):null;
+  try{
+    const res=await fetch(CRM_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({
+        action:'saveCRMPatch',
+        mudancas,
+        temComissoes,
+        baseComissoes:temComissoes?(_comissoesBaseSnapshot||[]):[],
+        localComissoes:temComissoes?comissoesEnviadas:[]
+      })
+    });
+    const r=await res.json();
+    if(r&&r.status==='ok'&&r.modo==='patch'&&r.crm&&typeof r.crm==='object'){
+      Object.keys(r.crm).forEach(k=>{
+        const fin=r.crm[k];
+        const editadoDuranteGravacao=JSON.stringify(Object.prototype.hasOwnProperty.call(_ccData,k)?_ccData[k]:null)!==(enviado[k]===undefined?'null':enviado[k]);
+        if(fin===null){
+          delete _crmBaseSnapshot[k];
+          if(!editadoDuranteGravacao)delete _ccData[k];
+        }else{
+          _crmBaseSnapshot[k]=JSON.parse(JSON.stringify(fin));
+          if(!editadoDuranteGravacao)_ccData[k]=fin;
+        }
+      });
+      if(temComissoes&&Array.isArray(r.comissoes)){
+        if(JSON.stringify(_comissoes||[])===JSON.stringify(comissoesEnviadas))_comissoes=r.comissoes;
+        _comissoesBaseSnapshot=JSON.parse(JSON.stringify(r.comissoes));
+      }
+      _ccDataNormIndex=null;
+      try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
+      console.log('[CRM] Salvo ✅',chavesMudadas.length,'cliente(s) alterado(s)'+(temComissoes?' + comissões':''));
+      return;
+    }
+    if(r&&r.status==='ok'){
+      // Apps Script ainda sem a ação saveCRMPatch: usa o salvamento completo antigo.
+      console.warn('[CRM] saveCRMPatch indisponível no Apps Script; usando salvamento completo.');
+      return salvarCRMRemotoCompleto();
+    }
+    console.warn('[CRM] Backend recusou salvamento:',(r&&r.mensagem)||r);
+    try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
+    if(typeof showToast==='function')showToast('error','CRM não foi salvo',(r&&r.mensagem)||'Tente atualizar a página e salvar novamente.');
+  }catch(e){
+    console.warn('[CRM] Erro ao salvar:',e);
+    try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
+    if(typeof showToast==='function')showToast('error','CRM não foi salvo','Falha ao comunicar com o servidor. Os dados ficaram preservados neste navegador; tente novamente antes de fechar a página.');
+  }
+}
+async function salvarCRMRemotoCompleto(){
   try{
     // Salva pelo Apps Script (não direto no Supabase). O backend usa LockService
     // + merge de 3 vias: base que esta aba carregou, estado local editado e
