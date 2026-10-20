@@ -1990,7 +1990,7 @@ function usuarioAtualEmail(){
   return (localStorage.getItem('bulhoes_email')||'').toLowerCase();
 }
 function ehSDRUrgente(){
-  return usuarioAtualEmail()==='raffaella@bulhoes';
+  return ['raffaella@bulhoesodontologia.com.br','raffaella@bulhoes'].includes(usuarioAtualEmail());
 }
 // Chave por pessoa, sanitizada (Supabase key não aceita @ nem . de forma
 // ambígua com outras chaves — troca por caracteres seguros).
@@ -2221,8 +2221,9 @@ function toggleMobileSidebar(){
 // manuais). O desbloqueio por senha vale só pra sessão atual (some se
 // recarregar a página) — não é salvo em lugar nenhum.
 // ============================================================
-const ACESSO_TOTAL_LOGINS=['lucasbulhoes1000@gmail.com','larissa@bulhoes','gabi@bulhoes'];
-const ACESSO_ORCAMENTOS_FECHADOS=[...ACESSO_TOTAL_LOGINS,'victoria@bulhoes'];
+// (20/10/2026) E-mails atualizados para os logins da Supabase Auth.
+const ACESSO_TOTAL_LOGINS=['lucasbulhoes1000@gmail.com','larissa@bulhoesodontologia.com.br','gabi@bulhoesodontologia.com.br'];
+const ACESSO_ORCAMENTOS_FECHADOS=[...ACESSO_TOTAL_LOGINS,'victoria@bulhoesodontologia.com.br'];
 const SENHA_ACESSO_RESTRITO='14891';
 let _acessoDesbloqueado={estoque:false,'rel-orcamentos':false,gerenciar:false};
 
