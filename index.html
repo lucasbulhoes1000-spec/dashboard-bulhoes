@@ -10930,6 +10930,8 @@ async function trocarMinhaSenha(){
 let _tratandoSessaoRecusada=false;
 async function _sessaoRecusadaPeloServidor(){
   if(_tratandoSessaoRecusada||!_sb)return;
+  // Na tela de login (ninguém logado) não há o que renovar: ignora.
+  if(!_sbAccessToken||localStorage.getItem('bulhoes_logado')!=='true')return;
   _tratandoSessaoRecusada=true;
   try{
     const {data,error}=await _sb.auth.refreshSession();
@@ -10942,7 +10944,7 @@ async function _sessaoRecusadaPeloServidor(){
   }catch(e){}
   try{await _sb.auth.signOut({scope:'local'});}catch(e){}
   ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
-  alert('Sua sessão expirou. Entre de novo para continuar.');
+  try{sessionStorage.setItem('bulhoes_aviso_login','Sua sessão expirou. Entre de novo para continuar.');}catch(e){}
   location.reload();
 }
 
@@ -11848,13 +11850,14 @@ window.addEventListener('load',async()=>{
   if(!sessao){['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));}
   else{_sbAccessToken=sessao.access_token;}
   verificarLogin();
+  try{const aviso=sessionStorage.getItem('bulhoes_aviso_login');if(aviso){sessionStorage.removeItem('bulhoes_aviso_login');const el=document.getElementById('login-error');if(el){el.textContent=aviso;el.style.display='block';}}}catch(e){}
   if(sessao&&localStorage.getItem('bulhoes_logado')==='true'){
     document.getElementById('app-wrapper').style.display='flex';
     iniciarApp();
   }
 });
 
-setTimeout(()=>{try{abrirTrafegoPago();}catch(e){console.warn('Tráfego pago:',e);}},0);
+setTimeout(()=>{if(localStorage.getItem('bulhoes_logado')!=='true')return;try{abrirTrafegoPago();}catch(e){console.warn('Tráfego pago:',e);}},0);
 </script>
 </div>
 
