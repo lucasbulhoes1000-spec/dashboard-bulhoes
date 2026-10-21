@@ -3744,7 +3744,13 @@ async function _baixarCloudiaDaBaseNova(){
   const sel='select=linha,'+COLUNAS_PLANILHA_CLOUDIA.join(',')+',ativo,recebido_em';
   const valores=r=>COLUNAS_PLANILHA_CLOUDIA.map(c=>r[c]==null?'':r[c]);
   if(!_cloudiaBase||_cloudiaBase.renumerado!==renumerado){
-    const rows=await _lerTabelaBaseNova('importacao_cloudia?'+sel+'&ativo=is.true&order=linha');
+    // Carga completa em paralelo, por faixas de 1.000 linhas (antes: 11 pedidos
+    // em sequência, cada um mais lento que o anterior, ~12 s no total).
+    const ultimaLinha=(await _lerTabelaBaseNova('importacao_cloudia?select=linha&order=linha.desc&limit=1'))[0];
+    const maxLinha=ultimaLinha?ultimaLinha.linha:0;
+    const faixas=[];for(let a=0;a<=maxLinha;a+=1000)faixas.push(a);
+    const partes=await Promise.all(faixas.map(a=>_lerTabelaBaseNova('importacao_cloudia?'+sel+'&ativo=is.true&linha=gte.'+a+'&linha=lt.'+(a+1000)+'&order=linha')));
+    const rows=[].concat(...partes);
     if(!rows.length)throw new Error('cópia da planilha vazia');
     const m=new Map();let ult='';
     rows.forEach(r=>{m.set(r.linha,valores(r));if(r.recebido_em>ult)ult=r.recebido_em;});
