@@ -3718,10 +3718,57 @@ async function fetchMeta(){
 // vezes ao mesmo tempo (abertura do app, Dashboard, checagem de leads de 2 em
 // 2 min, auto-refresh de 5 em 5 min), cada download levando ~40s no Apps
 // Script. Agora downloads simultâneos compartilham a mesma requisição.
+// ⚠️ BASE NOVA (21/10/2026): a aba Leads tem uma cópia viva na Supabase
+// (tabela importacao_cloudia, atualizada pelo Apps Script logo depois de cada
+// alteração). Ler de lá leva ~1 s em vez de 40–90 s no Apps Script. Ao abrir
+// baixa tudo uma vez; depois só as linhas que mudaram (com folga de 5 min).
+// Chave no banco (configuracoes.crm_ler_cloudia_da_base_nova = true) liga;
+// sem a chave, ou se a Supabase falhar, volta sozinho para o Apps Script.
+const COLUNAS_PLANILHA_CLOUDIA=['timestamp','type','customer_id','name','phone','stage','value','ad_id','ad_name','adset_name','campaign_name','origin','created_at'];
+let _cloudiaBase=null; // {linhas: Map(linha → valores), ultimo: recebido_em mais recente, renumerado}
+async function _lerTabelaBaseNova(caminho){
+  let out=[],de=0;
+  for(;;){
+    const r=await fetch(SUPABASE_URL+'/rest/v1/'+caminho,{headers:{Range:de+'-'+(de+999),'Range-Unit':'items'}});
+    if(!r.ok)throw new Error('Supabase '+r.status);
+    const j=await r.json(); out=out.concat(j);
+    if(j.length<1000)break; de+=1000;
+  }
+  return out;
+}
+async function _baixarCloudiaDaBaseNova(){
+  const cfg=await _lerTabelaBaseNova('configuracoes?chave=in.(crm_ler_cloudia_da_base_nova,cloudia_renumerado_em)&select=chave,valor');
+  const valor=k=>{const c=cfg.find(x=>x.chave===k);return c?c.valor:null;};
+  if(valor('crm_ler_cloudia_da_base_nova')!==true)throw new Error('leitura pela base nova desligada');
+  const renumerado=JSON.stringify(valor('cloudia_renumerado_em')||'');
+  const sel='select=linha,'+COLUNAS_PLANILHA_CLOUDIA.join(',')+',ativo,recebido_em';
+  const valores=r=>COLUNAS_PLANILHA_CLOUDIA.map(c=>r[c]==null?'':r[c]);
+  if(!_cloudiaBase||_cloudiaBase.renumerado!==renumerado){
+    const rows=await _lerTabelaBaseNova('importacao_cloudia?'+sel+'&ativo=is.true&order=linha');
+    if(!rows.length)throw new Error('cópia da planilha vazia');
+    const m=new Map();let ult='';
+    rows.forEach(r=>{m.set(r.linha,valores(r));if(r.recebido_em>ult)ult=r.recebido_em;});
+    _cloudiaBase={linhas:m,ultimo:ult,renumerado};
+  }else{
+    const desde=new Date(new Date(_cloudiaBase.ultimo).getTime()-5*60000).toISOString();
+    const rows=await _lerTabelaBaseNova('importacao_cloudia?'+sel+'&recebido_em=gt.'+encodeURIComponent(desde)+'&order=recebido_em');
+    rows.forEach(r=>{
+      if(r.ativo)_cloudiaBase.linhas.set(r.linha,valores(r));else _cloudiaBase.linhas.delete(r.linha);
+      if(r.recebido_em>_cloudiaBase.ultimo)_cloudiaBase.ultimo=r.recebido_em;
+    });
+  }
+  const ordem=[..._cloudiaBase.linhas.keys()].sort((a,b)=>a-b);
+  return [COLUNAS_PLANILHA_CLOUDIA.slice()].concat(ordem.map(k=>_cloudiaBase.linhas.get(k)));
+}
 let _cloudiaRawEmCurso=null;
 function baixarPlanilhaCloudiaRaw(){
   if(_cloudiaRawEmCurso)return _cloudiaRawEmCurso;
-  const p=fetch(CLOUDIA_URL).then(res=>res.json()).finally(()=>{if(_cloudiaRawEmCurso===p)_cloudiaRawEmCurso=null;});
+  const p=_baixarCloudiaDaBaseNova()
+    .catch(e=>{
+      if(!/desligada/.test(String(e&&e.message)))console.warn('[CLOUDIA] Base nova indisponível, usando o Apps Script:',e);
+      return fetch(CLOUDIA_URL).then(res=>res.json());
+    })
+    .finally(()=>{if(_cloudiaRawEmCurso===p)_cloudiaRawEmCurso=null;});
   _cloudiaRawEmCurso=p;
   return p;
 }
