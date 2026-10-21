@@ -1049,6 +1049,10 @@ tbody tr:hover td{background:#faf7f3;}
         <div class="wa-lista">
           <div class="wa-lista-topo">
             <input class="wa-busca" id="wa-busca" placeholder="Buscar por nome ou telefone" oninput="_wa.busca=this.value;waRenderLista()">
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="wa-sel" id="wa-filtro-numero" style="flex:1;display:none" onchange="_wa.numeroFiltro=this.value;waRenderLista()" title="Número da clínica"></select>
+              <button class="wa-btn" id="wa-btn-numeros" style="display:none" onclick="waAbrirNumeros()" title="Números de WhatsApp ligados ao CRM">📱 Números</button>
+            </div>
             <div class="wa-filtros">
               <button class="wa-filtro ativo" onclick="waFiltrar('todas',this)">Abertas</button>
               <button class="wa-filtro" onclick="waFiltrar('nao_lidas',this)">Não lidas</button>
@@ -12031,7 +12035,7 @@ setTimeout(()=>{if(localStorage.getItem('bulhoes_logado')!=='true')return;try{ab
 // ============================================================
 const WA_FUNCAO=SUPABASE_URL+'/functions/v1/whatsapp-acoes';
 const WA_JANELA_MS=24*60*60*1000;
-const _wa={conversas:[],atual:null,msgs:[],filtro:'todas',busca:'',canal:null,tempoReal:false,urls:{},modelos:null,equipe:{},iniciado:false,poll:null,enviando:false,carregandoMsgs:false};
+const _wa={numeros:[],numeroFiltro:'',conversas:[],atual:null,msgs:[],filtro:'todas',busca:'',canal:null,tempoReal:false,urls:{},modelos:null,equipe:{},iniciado:false,poll:null,enviando:false,carregandoMsgs:false};
 
 function _waEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function _waFormatarTexto(t){
@@ -12050,7 +12054,7 @@ function _waTelFormatado(t){
 }
 function _waNome(c){
   const p=c&&c.pacientes;
-  return (p&&p.nome)||(c&&c.nome_perfil)||_waTelFormatado(c&&c.telefone)||'Contato';
+  return (p&&p.nome)||(c&&c.nome_contato)||(c&&c.nome_perfil)||_waTelFormatado(c&&c.telefone)||'Contato';
 }
 function _waIniciais(n){
   const partes=String(n||'').replace(/[()0-9-]/g,'').trim().split(/\s+/).filter(Boolean);
@@ -12104,6 +12108,15 @@ async function _waAcao(dados){
   return j;
 }
 
+// colunas das mensagens (canal só existe depois do SQL 012; sem ela, segue sem)
+let _waTemCanal=true;
+function _waMsgs(resto){
+  const cols='id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,'+(_waTemCanal?'canal,':'')+'enviada_em';
+  return _waRest('mensagens?select='+cols+'&conversa_id=eq.'+resto).catch(e=>{
+    if(_waTemCanal&&/canal/.test(e.message)){_waTemCanal=false;return _waMsgs(resto);}
+    throw e;
+  });
+}
 // ---------- carregar ----------
 async function waCarregarConversas(silencioso){
   try{
@@ -12141,6 +12154,7 @@ function waRenderLista(){
   const busca=_wa.busca.trim().toLowerCase();
   const buscaNum=busca.replace(/\D/g,'');
   let lista=_wa.conversas.filter(c=>{
+    if(_wa.numeroFiltro&&c.numero_clinica_id!==_wa.numeroFiltro)return false;
     if(_wa.filtro==='nao_lidas'&&!(c.nao_lidas>0))return false;
     if(_wa.filtro==='minhas'&&c.atribuida_a!==eu)return false;
     if(_wa.filtro==='todas'&&c.status==='encerrada'&&!busca)return false;
@@ -12159,6 +12173,7 @@ function waRenderLista(){
     const j=_waJanela(c);
     const tags=[];
     tags.push(j.aberta?'<span class="wa-tag aberta">'+(j.gratis?'anúncio · ':'')+'janela '+_waDuracao(j.fim-Date.now())+'</span>':'<span class="wa-tag fechada">24 h encerradas</span>');
+    if(_wa.numeros.length>1&&!_wa.numeroFiltro)tags.push('<span class="wa-tag" style="background:#efe6da">📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</span>');
     if(c.atribuida_a)tags.push('<span class="wa-tag">'+_waEsc(_waNomeEquipe(c.atribuida_a))+'</span>');
     if(c.status!=='aberta')tags.push('<span class="wa-tag">'+_waEsc(c.status)+'</span>');
     return '<div class="wa-item'+(c.nao_lidas>0?' nao-lida':'')+(_wa.atual&&_wa.atual.id===c.id?' ativo':'')+'" onclick="waAbrir(\''+c.id+'\')">'+
@@ -12167,6 +12182,132 @@ function waRenderLista(){
       '<div class="wa-item-linha"><span class="wa-item-prev">'+_waEsc(c.ultima_mensagem_texto||'')+'</span>'+(c.nao_lidas>0?'<span class="wa-badge">'+c.nao_lidas+'</span>':'')+'</div>'+
       '<div class="wa-tags">'+tags.join('')+'</div></div></div>';
   }).join('');
+}
+
+// ---------- números da clínica (vários números + coexistência) ----------
+const WA_APP_ID='2152669228663129';
+function _waEhGestao(){return ACESSO_TOTAL_LOGINS.includes(usuarioAtualEmail());}
+function _waApelidoNumero(id){
+  const n=_wa.numeros.find(x=>x.phone_number_id===id);
+  return n?(n.apelido||n.numero_exibicao||id):'outro número';
+}
+async function waCarregarNumeros(){
+  try{_wa.numeros=(await _waRest('whatsapp_numeros?select=phone_number_id,waba_id,numero_exibicao,apelido,coexistencia,conectado_em,historico_progresso,historico_erro,ativo&ativo=is.true&order=conectado_em'))||[];}
+  catch(e){_wa.numeros=[];} // tabela ainda não criada
+  const sel=document.getElementById('wa-filtro-numero');
+  if(sel){
+    sel.style.display=_wa.numeros.length>1?'block':'none';
+    sel.innerHTML='<option value="">Todos os números</option>'+_wa.numeros.map(n=>'<option value="'+_waEsc(n.phone_number_id)+'"'+(_wa.numeroFiltro===n.phone_number_id?' selected':'')+'>📱 '+_waEsc(n.apelido||n.numero_exibicao)+'</option>').join('');
+  }
+  const b=document.getElementById('wa-btn-numeros');if(b)b.style.display=_waEhGestao()?'inline-block':'none';
+  if(document.getElementById('wa-numeros-lista'))waRenderNumeros();
+}
+function waAbrirNumeros(){
+  waFecharModal();
+  const fundo=document.createElement('div');
+  fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal"><div class="wa-modal-cab">Números de WhatsApp no CRM<button class="wa-btn" onclick="waFecharModal()">✕</button></div>'+
+    '<div class="wa-modal-corpo"><div id="wa-numeros-lista"></div>'+
+    '<div style="border-top:0.5px solid #e0d8ce;padding-top:12px"><div style="font-size:13px;font-weight:600;color:#2a2520">Conectar número que está no celular</div>'+
+    '<div style="font-size:12px;color:#7a6550;margin-top:6px;line-height:1.5">O número continua funcionando no app WhatsApp Business do celular e passa a aparecer aqui também. O que for enviado pelo celular aparece no CRM, e o CRM importa o histórico e os contatos.<br><br>'+
+    '<b>Antes de conectar:</b> tenha o celular com o número em mãos e o app WhatsApp Business atualizado. Grupos e listas de transmissão não passam para o CRM; o WhatsApp Web do celular será desconectado e precisa ser conectado de novo depois.</div>'+
+    '<input class="wa-var" id="wa-apelido-novo" placeholder="Apelido do número (ex.: Celular Dra. Larissa)" style="margin-top:10px">'+
+    '<div id="wa-conectar-status" style="font-size:12px;margin-top:8px"></div>'+
+    '<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="wa-btn primario" id="wa-btn-conectar" onclick="waConectarNumero()">Conectar número do celular</button></div></div>'+
+    '</div></div>';
+  document.body.appendChild(fundo);
+  waRenderNumeros();
+}
+function waRenderNumeros(){
+  const el=document.getElementById('wa-numeros-lista');if(!el)return;
+  if(!_wa.numeros.length){el.innerHTML='<div style="font-size:12px;color:#9a8c7e">Nenhum número cadastrado ainda.</div>';return;}
+  el.innerHTML=_wa.numeros.map(n=>{
+    let hist='';
+    if(n.coexistencia){
+      hist=n.historico_erro?'<div class="wa-erro">Histórico: '+_waEsc(n.historico_erro)+'</div>'
+        :n.historico_progresso!=null&&n.historico_progresso<100?'<div style="font-size:11px;color:#9a8c7e">Importando histórico do celular… '+n.historico_progresso+'%</div>'
+        :n.historico_progresso===100?'<div style="font-size:11px;color:#5a8a6a">Histórico importado</div>':'';
+    }
+    return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;border:0.5px solid #e0d8ce;border-radius:8px;padding:9px 11px;margin-bottom:6px">'+
+      '<div><div style="font-size:13px;font-weight:600;color:#2a2520">📱 '+_waEsc(n.apelido||'Sem apelido')+'</div>'+
+      '<div style="font-size:11px;color:#9a8c7e">'+_waEsc(n.numero_exibicao||n.phone_number_id)+' · '+(n.coexistencia?'API + app do celular':'API oficial')+'</div>'+hist+'</div>'+
+      '<button class="wa-btn" onclick="waRenomearNumero(\''+_waEsc(n.phone_number_id)+'\')">Renomear</button></div>';
+  }).join('');
+}
+async function waRenomearNumero(id){
+  const n=_wa.numeros.find(x=>x.phone_number_id===id);if(!n)return;
+  const novo=window.prompt('Novo apelido para '+(n.numero_exibicao||id)+':',n.apelido||'');
+  if(novo==null||!novo.trim())return;
+  try{
+    await _waRest('whatsapp_numeros?phone_number_id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({apelido:novo.trim()})});
+    n.apelido=novo.trim();waCarregarNumeros();waRenderLista();
+  }catch(e){showToast('error','Não foi possível renomear',e.message);}
+}
+function _waStatusConexao(txt,erro){
+  const el=document.getElementById('wa-conectar-status');
+  if(el){el.style.color=erro?'#b04a3e':'#7a6550';el.textContent=txt;}
+}
+async function _waConfigCadastro(){
+  try{
+    const r=await _waRest('configuracoes?chave=eq.wa_cadastro_incorporado&select=valor');
+    return r&&r[0]&&r[0].valor&&r[0].valor.config_id?r[0].valor:null;
+  }catch(e){return null;}
+}
+function _waCarregarSdkFacebook(){
+  return new Promise((ok,falha)=>{
+    if(window.FB){ok(window.FB);return;}
+    window.fbAsyncInit=function(){
+      window.FB.init({appId:WA_APP_ID,autoLogAppEvents:true,xfbml:false,version:'v23.0'});
+      ok(window.FB);
+    };
+    const s=document.createElement('script');
+    s.src='https://connect.facebook.net/pt_BR/sdk.js';s.async=true;s.defer=true;s.crossOrigin='anonymous';
+    s.onerror=()=>falha(new Error('Não foi possível carregar o login do Facebook.'));
+    document.head.appendChild(s);
+  });
+}
+async function waConectarNumero(){
+  const b=document.getElementById('wa-btn-conectar');
+  const cfg=await _waConfigCadastro();
+  if(!cfg){
+    _waStatusConexao('Ainda não disponível: a Meta está analisando o app Bulhões CRM (pedido enviado em 21/10/2026). Assim que aprovar, este botão passa a funcionar.',true);
+    return;
+  }
+  let FB;
+  try{FB=await _waCarregarSdkFacebook();}catch(e){_waStatusConexao(e.message,true);return;}
+  const sessao={};
+  const ouvir=ev=>{
+    if(!/(^|\.)facebook\.com$/.test(new URL(ev.origin).hostname))return;
+    try{
+      const d=typeof ev.data==='string'?JSON.parse(ev.data):ev.data;
+      if(d&&d.type==='WA_EMBEDDED_SIGNUP'){
+        sessao.evento=d.event;
+        if(d.data){sessao.waba_id=d.data.waba_id||sessao.waba_id;sessao.phone_number_id=d.data.phone_number_id||sessao.phone_number_id;}
+        if(d.event==='CANCEL')_waStatusConexao('Conexão cancelada'+(d.data&&d.data.current_step?' na etapa '+d.data.current_step:'')+'.',true);
+        if(d.event==='ERROR')_waStatusConexao('A Meta informou um erro: '+((d.data&&d.data.error_message)||'sem detalhes'),true);
+      }
+    }catch(e){}
+  };
+  window.addEventListener('message',ouvir);
+  if(b){b.disabled=true;b.textContent='Conectando…';}
+  _waStatusConexao('Siga as etapas na janela do Facebook. No celular, abra o WhatsApp Business e leia o QR Code quando pedir.');
+  FB.login(async resp=>{
+    try{
+      const code=resp&&resp.authResponse&&resp.authResponse.code;
+      if(!code){_waStatusConexao('A janela foi fechada antes de terminar.',true);return;}
+      for(let i=0;i<20&&!sessao.waba_id;i++)await new Promise(r=>setTimeout(r,250));
+      if(!sessao.waba_id){_waStatusConexao('A Meta não informou a conta do WhatsApp. Tente de novo.',true);return;}
+      _waStatusConexao('Ligando o número ao CRM e pedindo o histórico…');
+      const apelido=(document.getElementById('wa-apelido-novo')||{}).value||'';
+      const r=await _waAcao({acao:'conectar_numero',code,waba_id:sessao.waba_id,phone_number_id:sessao.phone_number_id||'',apelido,coexistencia:true});
+      const p=r.passos||{};
+      _waStatusConexao('Pronto! '+(p.numero||'Número')+' conectado.'+(p.historico==='pedido'?' O histórico está sendo importado e aparece aos poucos.':' Histórico: '+(p.historico||'não pedido')));
+      waCarregarNumeros();
+    }catch(e){_waStatusConexao('Não foi possível concluir: '+e.message,true);}
+    finally{window.removeEventListener('message',ouvir);if(b){b.disabled=false;b.textContent='Conectar número do celular';}}
+  },{config_id:cfg.config_id,response_type:'code',override_default_response_type:true,
+     extras:{setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'}});
 }
 
 // ---------- conversa aberta ----------
@@ -12178,7 +12319,7 @@ async function waAbrir(id){
   waRenderChatBase();
   _wa.carregandoMsgs=true;
   try{
-    const m=await _waRest('mensagens?select=id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,enviada_em&conversa_id=eq.'+id+'&order=enviada_em.desc&limit=300');
+    const m=await _waMsgs(id+'&order=enviada_em.desc&limit=300');
     if(!_wa.atual||_wa.atual.id!==id)return;
     _wa.msgs=(m||[]).reverse();
   }catch(e){
@@ -12213,7 +12354,7 @@ function waRenderCabecalho(){
   const c=_wa.atual;const cab=document.getElementById('wa-cab');if(!c||!cab)return;
   const nome=_waNome(c);
   const eu=usuarioAtualEmail();
-  const etapa=c.pacientes&&c.pacientes.etapa?' · '+_waEsc(c.pacientes.etapa):'';
+  const etapa=(c.pacientes&&c.pacientes.etapa?' · '+_waEsc(c.pacientes.etapa):'')+(_wa.numeros.length>1?' · 📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id)):'');
   const perfil=c.nome_perfil&&c.pacientes&&c.pacientes.nome&&c.nome_perfil!==c.pacientes.nome?' · WhatsApp: '+_waEsc(c.nome_perfil):'';
   const resp=c.atribuida_a
     ?(c.atribuida_a===eu?'<button class="wa-btn" onclick="waAtribuir(null)" title="Deixar a conversa sem responsável">Você está atendendo · liberar</button>':'<button class="wa-btn" onclick="waAtribuir(\'eu\')" title="Passar a conversa para você">'+_waEsc(_waNomeEquipe(c.atribuida_a))+' atendendo · assumir</button>')
@@ -12287,7 +12428,10 @@ function _waBolha(m){
   const textoMidia=!!m.midia_caminho&&(['📷 Foto','🎥 Vídeo','🎤 Áudio','Figurinha'].includes(tx)||(m.tipo==='document'&&tx.indexOf('📄 ')===0));
   const texto=m.texto&&!textoMidia?'<div>'+_waFormatarTexto(m.texto)+'</div>':'';
   const anuncio=m.origem_anuncio?'<div class="wa-anuncio">📣 Veio de anúncio'+(m.origem_anuncio.headline?': '+_waEsc(m.origem_anuncio.headline):'')+'</div>':'';
-  const autor=m.direcao==='enviada'&&m.autor_email?'<span class="wa-autor">'+_waEsc(_waNomeEquipe(m.autor_email))+'</span>':'';
+  const autor=m.direcao!=='enviada'?(m.canal==='historico'?'<span class="wa-autor" title="Importada do celular">histórico</span>':'')
+    :m.canal==='celular'?'<span class="wa-autor" title="Enviada pelo app do celular">📱 Celular</span>'
+    :m.canal==='historico'?'<span class="wa-autor" title="Importada do celular">📱 histórico</span>'
+    :m.autor_email?'<span class="wa-autor">'+_waEsc(_waNomeEquipe(m.autor_email))+'</span>':'';
   const hora=new Date(m.enviada_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   const erro=m.erro?'<div class="wa-erro">'+_waEsc(m.erro)+'</div>':'';
   const corpo=_waMidiaHtml(m)+texto||(!erro?'<div style="color:#9a8c7e;font-style:italic">['+_waEsc(m.tipo)+']</div>':'');
@@ -12467,6 +12611,7 @@ function waLigarTempoReal(){
     _wa.canal=_sb.channel('crm-whatsapp')
       .on('postgres_changes',{event:'*',schema:'public',table:'mensagens'},_waAoMudarMensagem)
       .on('postgres_changes',{event:'*',schema:'public',table:'conversas'},_waAoMudarConversa)
+      .on('postgres_changes',{event:'*',schema:'public',table:'whatsapp_numeros'},()=>waCarregarNumeros())
       .subscribe(st=>{
         const antes=_wa.tempoReal;
         _wa.tempoReal=st==='SUBSCRIBED';
@@ -12484,7 +12629,7 @@ function iniciarWhatsApp(){
   // espera o login da Supabase ficar pronto
   const tentar=()=>{if(!_sbAccessToken){setTimeout(tentar,1500);return;}
     _sb.realtime.setAuth(_sbAccessToken);
-    waCarregarEquipe();waCarregarConversas(true);waLigarTempoReal();};
+    waCarregarEquipe();waCarregarNumeros();waCarregarConversas(true);waLigarTempoReal();};
   tentar();
   // checagem de segurança: se o tempo real cair, atualiza a lista a cada 30 s
   _wa.poll=setInterval(()=>{
@@ -12498,7 +12643,7 @@ function iniciarWhatsApp(){
 async function waRecarregarMsgsAtual(){
   const c=_wa.atual;if(!c)return;
   try{
-    const m=await _waRest('mensagens?select=id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,enviada_em&conversa_id=eq.'+c.id+'&order=enviada_em.desc&limit=300');
+    const m=await _waMsgs(c.id+'&order=enviada_em.desc&limit=300');
     if(_wa.atual&&_wa.atual.id===c.id){_wa.msgs=(m||[]).reverse();waRenderMsgs(false);}
   }catch(e){}
 }

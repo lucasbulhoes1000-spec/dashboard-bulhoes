@@ -59,12 +59,30 @@ const EXTENSOES: Record<string, string> = {
 
 type Midia = { mensagem_id: string; conversa_id: string; midia_id: string; mime?: string; nome?: string };
 
+// Números conectados pelo celular têm chave própria
+const _tokens = new Map<string, string>();
+async function tokenDaConversa(conversaId: string): Promise<string> {
+  if (_tokens.has(conversaId)) return _tokens.get(conversaId)!;
+  let t = WA_TOKEN;
+  try {
+    const c = await (await banco(`/rest/v1/conversas?id=eq.${conversaId}&select=numero_clinica_id`)).json();
+    const n = c?.[0]?.numero_clinica_id;
+    if (n) {
+      const r = await (await banco(`/rest/v1/whatsapp_numeros?phone_number_id=eq.${encodeURIComponent(n)}&select=token`)).json();
+      if (Array.isArray(r) && r[0]?.token) t = r[0].token;
+    }
+  } catch (_) { /* usa a chave padrão */ }
+  _tokens.set(conversaId, t);
+  return t;
+}
+
 export async function baixarMidia(m: Midia): Promise<void> {
   try {
-    const info = await fetch(`${GRAPH}/${m.midia_id}`, { headers: { Authorization: "Bearer " + WA_TOKEN } });
+    const tk = await tokenDaConversa(m.conversa_id);
+    const info = await fetch(`${GRAPH}/${m.midia_id}`, { headers: { Authorization: "Bearer " + tk } });
     if (!info.ok) throw new Error("Meta (dados da mídia) " + info.status + " " + (await info.text()).slice(0, 200));
     const dados = await info.json();
-    const arquivo = await fetch(dados.url, { headers: { Authorization: "Bearer " + WA_TOKEN } });
+    const arquivo = await fetch(dados.url, { headers: { Authorization: "Bearer " + tk } });
     if (!arquivo.ok) throw new Error("Meta (download) " + arquivo.status);
     const mime = (dados.mime_type || m.mime || "application/octet-stream").split(";")[0].trim();
     const ext = EXTENSOES[mime] ?? (m.nome?.split(".").pop() || "bin");

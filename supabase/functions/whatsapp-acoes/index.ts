@@ -8,6 +8,8 @@
 //   enviar_modelo  { conversa_id | telefone, nome, idioma, variaveis: [] }
 //   modelos        {}  → modelos aprovados da conta
 //   marcar_lida    { conversa_id } → avisa a Meta (dois tiques azuis) e zera não lidas
+//   configurar     {}  → (gestão) liga o app à conta e lista os números
+//   conectar_numero { code, waba_id, phone_number_id?, apelido? } → (gestão) coexistência
 //
 // Regra da Meta: texto livre só até 24 h depois da última mensagem do paciente
 // (ou na janela grátis de anúncio). Fora disso, só modelo aprovado.
@@ -21,6 +23,8 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const WA_TOKEN = Deno.env.get("WA_TOKEN") ?? "";
 const WA_PHONE_NUMBER_ID = Deno.env.get("WA_PHONE_NUMBER_ID") ?? "";
 const WA_WABA_ID = Deno.env.get("WA_WABA_ID") ?? "";
+const WA_APP_ID = Deno.env.get("WA_APP_ID") ?? "2152669228663129";
+const WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 const ORIGENS = (Deno.env.get("CRM_ORIGENS") ?? "https://dashboard-bulhoes.vercel.app").split(",").map((s) => s.trim());
 
@@ -56,14 +60,27 @@ async function bancoJson(caminho: string, init: RequestInit = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-async function meta(caminho: string, corpo?: unknown) {
+async function meta(caminho: string, corpo?: unknown, token = WA_TOKEN) {
   const r = await fetch(GRAPH + caminho, {
     method: corpo === undefined ? "GET" : "POST",
-    headers: { Authorization: "Bearer " + WA_TOKEN, "Content-Type": "application/json" },
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
   });
   const j = await r.json().catch(() => ({}));
   return { ok: r.ok, status: r.status, j };
+}
+
+// Chave do número: números conectados pelo celular têm chave própria; os demais usam a do crmmaluco
+const _tokens = new Map<string, string>();
+async function tokenDoNumero(phoneNumberId: string): Promise<string> {
+  if (_tokens.has(phoneNumberId)) return _tokens.get(phoneNumberId)!;
+  let t = WA_TOKEN;
+  try {
+    const r = await bancoJson(`/rest/v1/whatsapp_numeros?phone_number_id=eq.${encodeURIComponent(phoneNumberId)}&select=token`);
+    if (r?.[0]?.token) t = r[0].token;
+  } catch (_) { /* tabela ainda não criada: usa a chave padrão */ }
+  _tokens.set(phoneNumberId, t);
+  return t;
 }
 
 function erroMeta(j: any): string {
@@ -90,7 +107,7 @@ async function conversa(dados: any) {
     const tel = String(dados.telefone).replace(/\D/g, "");
     id = await bancoJson("/rest/v1/rpc/wa_conversa", {
       method: "POST",
-      body: JSON.stringify({ p_numero: WA_PHONE_NUMBER_ID, p_wa_id: tel.startsWith("55") ? tel : "55" + tel }),
+      body: JSON.stringify({ p_numero: String(dados.numero || WA_PHONE_NUMBER_ID), p_wa_id: tel.startsWith("55") ? tel : "55" + tel }),
     });
   }
   if (!id) throw new Error("informe conversa_id ou telefone");
@@ -116,7 +133,7 @@ async function registrar(c: any, waId: string | null, tipo: string, texto: strin
 }
 
 async function enviar(req: Request, quem: { email: string }, c: any, corpoMeta: any, tipo: string, textoRegistro: string) {
-  const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, ...corpoMeta });
+  const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, ...corpoMeta }, await tokenDoNumero(c.numero_clinica_id));
   if (!r.ok) {
     const erro = erroMeta(r.j);
     await registrar(c, null, tipo, textoRegistro, quem.email, "falhou", erro, r.j);
@@ -199,7 +216,7 @@ export async function handler(req: Request): Promise<Response> {
         const c = await conversa(dados);
         const ult = await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.recebida&select=wa_message_id&order=enviada_em.desc&limit=1`);
         const wamid = ult?.[0]?.wa_message_id;
-        if (wamid) await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", status: "read", message_id: wamid });
+        if (wamid) await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", status: "read", message_id: wamid }, await tokenDoNumero(c.numero_clinica_id));
         await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nao_lidas: 0 }) });
         return resposta(req, { ok: true });
       }
@@ -217,6 +234,61 @@ export async function handler(req: Request): Promise<Response> {
           apps_assinados: apps.ok ? (apps.j?.data ?? []).map((a: any) => a?.whatsapp_business_api_data?.name ?? a?.whatsapp_business_api_data?.id) : erroMeta(apps.j),
           numero_configurado: WA_PHONE_NUMBER_ID || null,
         });
+      }
+      case "conectar_numero": {
+        // Só gestão. Recebe o código do cadastro incorporado da Meta (botão "Conectar número do
+        // celular"), troca por uma chave, liga o app à conta, pede a cópia dos contatos e do
+        // histórico (a Meta só deixa pedir uma vez e dentro de 24 h) e cadastra o número.
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão conecta números" }, 403);
+        const code = String(dados.code ?? "").trim();
+        const wabaId = String(dados.waba_id ?? "").trim();
+        if (!code || !wabaId) return resposta(req, { ok: false, erro: "faltou o código ou a conta do WhatsApp" }, 400);
+        if (!WA_APP_SECRET) return resposta(req, { ok: false, erro: "falta o segredo WA_APP_SECRET" }, 500);
+        const passos: Record<string, unknown> = {};
+
+        const tk = await fetch(`${GRAPH}/oauth/access_token?client_id=${WA_APP_ID}&client_secret=${encodeURIComponent(WA_APP_SECRET)}&code=${encodeURIComponent(code)}`);
+        const tj = await tk.json().catch(() => ({}));
+        if (!tk.ok || !tj.access_token) return resposta(req, { ok: false, erro: "A Meta recusou o código: " + erroMeta(tj) }, 502);
+        const token = String(tj.access_token);
+
+        let phoneId = String(dados.phone_number_id ?? "").trim();
+        const nums = await meta(`/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,platform_type,status`, undefined, token);
+        const lista: any[] = nums.ok ? nums.j?.data ?? [] : [];
+        const num = lista.find((n) => n.id === phoneId) ?? lista[0];
+        if (!num) return resposta(req, { ok: false, erro: "não encontrei o número nessa conta: " + erroMeta(nums.j) }, 502);
+        phoneId = num.id;
+        passos.numero = num.display_phone_number;
+
+        const assinar = await meta(`/${wabaId}/subscribed_apps`, {}, token);
+        passos.app_ligado = assinar.ok ? true : erroMeta(assinar.j);
+
+        const coexistencia = dados.coexistencia !== false;
+        let pedidoContatos: string | null = null, pedidoHistorico: string | null = null;
+        if (coexistencia) {
+          const c1 = await meta(`/${phoneId}/smb_app_data`, { messaging_product: "whatsapp", sync_type: "smb_app_state_sync" }, token);
+          pedidoContatos = c1.ok ? c1.j?.request_id ?? "ok" : null;
+          passos.contatos = c1.ok ? "pedido" : erroMeta(c1.j);
+          const c2 = await meta(`/${phoneId}/smb_app_data`, { messaging_product: "whatsapp", sync_type: "history" }, token);
+          pedidoHistorico = c2.ok ? c2.j?.request_id ?? "ok" : null;
+          passos.historico = c2.ok ? "pedido" : erroMeta(c2.j);
+        }
+
+        await bancoJson("/rest/v1/rpc/wa_salvar_numero", {
+          method: "POST",
+          body: JSON.stringify({
+            p_phone_number_id: phoneId, p_waba_id: wabaId, p_exibicao: num.display_phone_number ?? null,
+            p_apelido: String(dados.apelido ?? "").trim() || num.verified_name || null, p_token: token,
+            p_coexistencia: coexistencia, p_por: quem.email,
+          }),
+        });
+        if (pedidoContatos || pedidoHistorico) {
+          await banco(`/rest/v1/whatsapp_numeros?phone_number_id=eq.${phoneId}`, {
+            method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ sync_contatos_pedido: pedidoContatos, sync_historico_pedido: pedidoHistorico, historico_progresso: 0 }),
+          });
+        }
+        _tokens.delete(phoneId);
+        return resposta(req, { ok: true, phone_number_id: phoneId, passos });
       }
       default:
         return resposta(req, { ok: false, erro: "ação desconhecida" }, 400);
