@@ -6,17 +6,19 @@
 -- ============================================================
 create or replace function public.conferir_espelho()
 returns jsonb
-language plpgsql stable security definer set search_path = public, migracao, pg_temp as $$
-declare crm jsonb; r jsonb;
+language plpgsql stable security definer set search_path = public, migracao, pg_temp
+-- o banco estima 1 linha para o bloco do CRM e escolheria comparar todos com todos
+set enable_nestloop = off as $$
+declare r jsonb;
 begin
   if not (public.tem_papel('gestao') or session_user = 'postgres') then
     raise exception 'Só a gestão pode conferir o espelho.';
   end if;
-  select crm_json::jsonb into crm from public.crm_sessions where email_clinica = 'bulhoes-clinica-crm';
 
   with src as (
     select k, v, migracao.tel(k) as tel, (k = migracao.tel(k)) as canonica
-    from jsonb_each(crm) e(k, v) where k ~ '^\d+$' and jsonb_typeof(v) = 'object'
+    from public.crm_sessions s0, jsonb_each(s0.crm_json::jsonb) e(k, v)
+    where s0.email_clinica = 'bulhoes-clinica-crm' and k ~ '^\d+$' and jsonb_typeof(v) = 'object'
   ), ord as (
     select *, row_number() over (partition by tel order by canonica desc, k) as prio
     from src where tel ~ '^[0-9]{10,13}$'
