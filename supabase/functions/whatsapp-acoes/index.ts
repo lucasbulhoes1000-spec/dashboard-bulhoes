@@ -154,19 +154,44 @@ export async function handler(req: Request): Promise<Response> {
         const nome = String(dados.nome ?? "").trim();
         if (!nome) return resposta(req, { ok: false, erro: "escolha um modelo" }, 400);
         const variaveis: string[] = Array.isArray(dados.variaveis) ? dados.variaveis.map(String) : [];
+        const campos: string[] = Array.isArray(dados.campos) ? dados.campos.map(String) : [];
+        const nomeado = dados.formato === "NAMED";
         const c = await conversa(dados);
         const template: any = { name: nome, language: { code: String(dados.idioma ?? "pt_BR") } };
-        if (variaveis.length) template.components = [{ type: "body", parameters: variaveis.map((t) => ({ type: "text", text: t })) }];
+        const components: any[] = [];
+        // cabeçalho com foto, vídeo ou documento: a Meta exige mandar a mídia junto
+        const cab = dados.cabecalho;
+        if (cab && ["IMAGE", "VIDEO", "DOCUMENT"].includes(cab.formato) && cab.link) {
+          const tipo = String(cab.formato).toLowerCase();
+          components.push({ type: "header", parameters: [{ type: tipo, [tipo]: { link: String(cab.link) } }] });
+        }
+        if (variaveis.length) {
+          components.push({
+            type: "body",
+            parameters: variaveis.map((t, i) => nomeado ? { type: "text", parameter_name: campos[i], text: t } : { type: "text", text: t }),
+          });
+        }
+        if (components.length) template.components = components;
         const registro = String(dados.texto_preview ?? `[modelo ${nome}]`);
         return await enviar(req, quem, c, { type: "template", template }, "template", registro);
       }
       case "modelos": {
         if (!WA_WABA_ID) return resposta(req, { ok: false, erro: "WA_WABA_ID não configurado" }, 500);
-        const r = await meta(`/${WA_WABA_ID}/message_templates?status=APPROVED&limit=200&fields=name,language,category,components`);
+        const r = await meta(`/${WA_WABA_ID}/message_templates?status=APPROVED&limit=200&fields=name,language,category,components,parameter_format`);
         if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
         const modelos = (r.j?.data ?? []).map((t: any) => {
-          const corpo = (t.components ?? []).find((x: any) => x.type === "BODY")?.text ?? "";
-          return { nome: t.name, idioma: t.language, categoria: t.category, texto: corpo, variaveis: (corpo.match(/\{\{\d+\}\}/g) ?? []).length };
+          const comps = t.components ?? [];
+          const corpo = comps.find((x: any) => x.type === "BODY")?.text ?? "";
+          const cab = comps.find((x: any) => x.type === "HEADER");
+          const nomes = [...new Set((corpo.match(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi) ?? []).map((v: string) => v.replace(/[{}\s]/g, "")))];
+          return {
+            nome: t.name, idioma: t.language, categoria: t.category, texto: corpo,
+            formato: t.parameter_format ?? "POSITIONAL",
+            campos: nomes, variaveis: nomes.length,
+            cabecalho: cab ? { formato: cab.format, texto: cab.text ?? null, exemplo: cab.example?.header_handle?.[0] ?? null } : null,
+            rodape: comps.find((x: any) => x.type === "FOOTER")?.text ?? null,
+            botoes: (comps.find((x: any) => x.type === "BUTTONS")?.buttons ?? []).map((b: any) => ({ tipo: b.type, texto: b.text, url: b.url ?? null })),
+          };
         });
         return resposta(req, { ok: true, modelos });
       }
