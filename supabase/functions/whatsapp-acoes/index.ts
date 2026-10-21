@@ -178,6 +178,21 @@ export async function handler(req: Request): Promise<Response> {
         await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nao_lidas: 0 }) });
         return resposta(req, { ok: true });
       }
+      case "configurar": {
+        // Só gestão: liga o app à conta do WhatsApp e mostra os números (com o ID de cada um).
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão configura o WhatsApp" }, 403);
+        if (!WA_WABA_ID || !WA_TOKEN) return resposta(req, { ok: false, erro: "faltam os segredos WA_WABA_ID ou WA_TOKEN" }, 500);
+        const assinar = await meta(`/${WA_WABA_ID}/subscribed_apps`, {});
+        const nums = await meta(`/${WA_WABA_ID}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,platform_type,status`);
+        const apps = await meta(`/${WA_WABA_ID}/subscribed_apps`);
+        return resposta(req, {
+          ok: assinar.ok && nums.ok,
+          app_assinado: assinar.ok ? true : erroMeta(assinar.j),
+          numeros: nums.ok ? nums.j?.data ?? [] : erroMeta(nums.j),
+          apps_assinados: apps.ok ? (apps.j?.data ?? []).map((a: any) => a?.whatsapp_business_api_data?.name ?? a?.whatsapp_business_api_data?.id) : erroMeta(apps.j),
+          numero_configurado: WA_PHONE_NUMBER_ID || null,
+        });
+      }
       default:
         return resposta(req, { ok: false, erro: "ação desconhecida" }, 400);
     }
