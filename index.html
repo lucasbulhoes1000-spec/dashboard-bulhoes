@@ -12369,13 +12369,23 @@ function waRenderModelos(sel){
   const lista=_wa.modelos||[];
   if(!lista.length){corpo.innerHTML='<div class="wa-vazio">Nenhum modelo aprovado nesta conta ainda.<br><span style="font-size:11px">Os modelos são criados e aprovados no Gerenciador do WhatsApp da Meta.</span></div>';return;}
   const m=sel!=null?lista[sel]:null;
-  let html=lista.map((x,i)=>'<div class="wa-modelo'+(i===sel?' ativo':'')+'" onclick="waRenderModelos('+i+')"><div class="wa-modelo-nome">'+_waEsc(x.nome)+' <span style="font-weight:400;color:#b5a898">· '+_waEsc(x.idioma)+' · '+_waEsc(String(x.categoria||'').toLowerCase())+'</span></div><div class="wa-modelo-texto">'+_waEsc(x.texto)+'</div></div>').join('');
+  let html=lista.map((x,i)=>'<div class="wa-modelo'+(i===sel?' ativo':'')+'" onclick="waRenderModelos('+i+')"><div class="wa-modelo-nome">'+_waEsc(x.nome)+' <span style="font-weight:400;color:#b5a898">· '+(x.categoria==='MARKETING'?'marketing':'utilidade')+(x.cabecalho&&x.cabecalho.formato==='IMAGE'?' · 🖼️ com imagem':'')+'</span></div><div class="wa-modelo-texto">'+_waEsc(String(x.texto||'').slice(0,160))+(String(x.texto||'').length>160?'…':'')+'</div></div>').join('');
   if(m){
     const primeiroNome=(_waNome(_wa.atual).split(' ')[0]||'').replace(/[()0-9-]/g,'');
     let campos='';
-    for(let k=1;k<=m.variaveis;k++)campos+='<label style="font-size:11px;color:#9a8c7e">Campo {{'+k+'}}</label><input class="wa-var" id="wa-var-'+k+'" oninput="waPreviaModelo('+sel+')" value="'+(k===1?_waEsc(primeiroNome):'')+'">';
+    const lista_campos=m.campos&&m.campos.length?m.campos:Array.from({length:m.variaveis||0},(x,k)=>String(k+1));
+    lista_campos.forEach((nomeCampo,k)=>{
+      const sugestao=(k===0||/nome/i.test(nomeCampo))?primeiroNome:'';
+      campos+='<label style="font-size:11px;color:#9a8c7e">Campo {{'+_waEsc(nomeCampo)+'}}</label><input class="wa-var" id="wa-var-'+(k+1)+'" oninput="waPreviaModelo('+sel+')" value="'+_waEsc(sugestao)+'">';
+    });
+    const cab=m.cabecalho;
+    let cabHtml='';
+    if(cab&&cab.formato==='IMAGE')cabHtml=cab.exemplo?'<img src="'+_waEsc(cab.exemplo)+'" alt="Imagem do modelo" style="max-width:100%;max-height:220px;border-radius:8px;display:block;margin-bottom:6px" onerror="this.outerHTML=\'<div class=&quot;wa-erro&quot;>A imagem deste modelo expirou na Meta. O envio pode falhar.</div>\'">':'<div class="wa-erro">Modelo com imagem sem imagem de exemplo: o envio pode falhar.</div>';
+    else if(cab&&(cab.formato==='VIDEO'||cab.formato==='DOCUMENT'))cabHtml='<div style="font-size:11px;color:#9a8c7e">'+(cab.formato==='VIDEO'?'🎥 Vídeo':'📄 Documento')+' do modelo vai junto.</div>';
+    else if(cab&&cab.texto)cabHtml='<div style="font-weight:600;margin-bottom:4px">'+_waEsc(cab.texto)+'</div>';
+    const botoes=(m.botoes||[]).map(b=>'<span class="wa-tag" style="font-size:11px;padding:3px 9px">'+_waEsc(b.texto)+'</span>').join(' ');
     html='<div style="font-size:12px;color:#7a6550;font-weight:600">'+_waEsc(m.nome)+'</div>'+campos+
-      '<div style="font-size:11px;color:#9a8c7e">Prévia</div><div class="wa-previa" id="wa-previa"></div>'+
+      '<div style="font-size:11px;color:#9a8c7e">Prévia</div><div class="wa-previa">'+cabHtml+'<div id="wa-previa"></div>'+(m.rodape?'<div style="font-size:11px;color:#9a8c7e;margin-top:6px">'+_waEsc(m.rodape)+'</div>':'')+'</div>'+(botoes?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+botoes+'</div>':'')+
       '<div style="font-size:11px;color:#9a8c7e">A Meta cobra por modelo enviado (marketing custa mais que utilidade).</div>'+
       '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="wa-btn" onclick="waRenderModelos()">Voltar</button><button class="wa-btn primario" id="wa-enviar-modelo" onclick="waEnviarModelo('+sel+')">Enviar modelo</button></div>';
   }
@@ -12383,9 +12393,13 @@ function waRenderModelos(sel){
   if(m)waPreviaModelo(sel);
 }
 function _waValoresModelo(m){
-  const v=[];for(let k=1;k<=m.variaveis;k++){const e=document.getElementById('wa-var-'+k);v.push(e?e.value.trim():'');}return v;
+  const n=m.campos&&m.campos.length?m.campos.length:(m.variaveis||0);
+  const v=[];for(let k=1;k<=n;k++){const e=document.getElementById('wa-var-'+k);v.push(e?e.value.trim():'');}return v;
 }
-function _waTextoModelo(m,v){return String(m.texto||'').replace(/\{\{(\d+)\}\}/g,(x,n)=>v[n-1]||x);}
+function _waTextoModelo(m,v){
+  const campos=m.campos&&m.campos.length?m.campos:[];
+  return String(m.texto||'').replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi,(x,nome)=>{const i=campos.length?campos.indexOf(nome):Number(nome)-1;return (i>=0&&v[i])||x;});
+}
 function waPreviaModelo(i){
   const m=_wa.modelos[i];const el=document.getElementById('wa-previa');if(!m||!el)return;
   el.textContent=_waTextoModelo(m,_waValoresModelo(m));
@@ -12396,7 +12410,8 @@ async function waEnviarModelo(i){
   if(v.some(x=>!x)){showToast('error','Preencha todos os campos do modelo');return;}
   const b=document.getElementById('wa-enviar-modelo');if(b){b.disabled=true;b.textContent='Enviando…';}
   try{
-    await _waAcao({acao:'enviar_modelo',conversa_id:c.id,nome:m.nome,idioma:m.idioma,variaveis:v,texto_preview:_waTextoModelo(m,v)});
+    const cab=m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo}:null;
+    await _waAcao({acao:'enviar_modelo',conversa_id:c.id,nome:m.nome,idioma:m.idioma,formato:m.formato,campos:m.campos||[],variaveis:v,cabecalho:cab,texto_preview:(cab&&cab.formato==='IMAGE'?'🖼️ ':'')+_waTextoModelo(m,v)});
     waFecharModal();showToast('success','Modelo enviado');
     if(!_wa.tempoReal)waAbrir(c.id);
   }catch(e){
