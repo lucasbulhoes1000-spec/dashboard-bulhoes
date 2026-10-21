@@ -4,7 +4,7 @@
 -- Rodar no Supabase: SQL Editor → New query → colar tudo → Run.
 -- ============================================================
 alter table public.listas add column if not exists fixo boolean not null default false;
-delete from public.listas;
+delete from public.listas where true;
 insert into public.listas (tipo, valor, ordem, ativo, fixo)
 select distinct on (l.tipo, l.valor) l.tipo, l.valor, l.ordem, l.ativo, l.fixo
 from (

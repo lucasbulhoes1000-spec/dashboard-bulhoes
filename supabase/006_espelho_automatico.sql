@@ -160,7 +160,7 @@ returns void
 language plpgsql security definer set search_path = public, migracao, pg_temp as $$
 begin
   if linha.email_clinica = 'bulhoes-clinica-crm' then
-    delete from public.comissoes;
+    delete from public.comissoes where true;  -- a Supabase recusa DELETE sem filtro vindo do site
     insert into public.comissoes
       (data, paciente_nome, telefone, avaliador, crc, valor_tratamento, entrada, pagamento,
        comissao_avaliador, comissao_crc, status, obs, origem, criado_em)
@@ -173,7 +173,7 @@ begin
     where jsonb_typeof(c) = 'object';
 
     if linha.listas_json is not null and jsonb_typeof(linha.listas_json::jsonb) = 'object' then
-      delete from public.listas;
+      delete from public.listas where true;
       insert into public.listas (tipo, valor, ordem, ativo, fixo)
       select distinct on (l.tipo, l.valor) l.tipo, l.valor, l.ordem, l.ativo, l.fixo
       from (
@@ -218,6 +218,7 @@ declare
   novo jsonb; velho jsonb; mudados text[];
 begin
   if not public.espelho_ligado() then return new; end if;
+  -- pacientes e extras em blocos separados: um erro num não impede o outro
   begin
     if new.email_clinica = 'bulhoes-clinica-crm' then
       if tg_op = 'INSERT' or new.crm_json is distinct from old.crm_json then
@@ -234,6 +235,13 @@ begin
           perform public.espelhar_pacientes_do_crm(mudados, novo);
         end if;
       end if;
+    end if;
+  exception when others then
+    insert into public.espelho_erros (origem, erro, detalhe)
+    values ('pacientes:' || new.email_clinica, sqlerrm, sqlstate);
+  end;
+  begin
+    if new.email_clinica = 'bulhoes-clinica-crm' then
       if tg_op = 'INSERT' or new.crm_json is distinct from old.crm_json
          or new.comissoes_json is distinct from old.comissoes_json
          or new.listas_json is distinct from old.listas_json then
@@ -244,7 +252,7 @@ begin
     end if;
   exception when others then
     insert into public.espelho_erros (origem, erro, detalhe)
-    values ('crm_sessions:' || new.email_clinica, sqlerrm, sqlstate);
+    values ('extras:' || new.email_clinica, sqlerrm, sqlstate);
   end;
   return new;
 end $$;
