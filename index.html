@@ -12589,7 +12589,7 @@ function _waMsgs(resto){
 async function waCarregarConversas(silencioso){
   try{
     const lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');
-    _wa.conversas=lista||[];
+    _wa.conversas=lista||[];_wa.carregou=true;
     if(_wa.atual){const n=_wa.conversas.find(c=>c.id===_wa.atual.id);if(n)_wa.atual=n;}
     waAtualizarBadge();
     if(currentPage==='conversas'){waRenderLista();if(_wa.atual){waRenderCabecalho();waRenderPainel();}}
@@ -14333,7 +14333,7 @@ function waRenderLista(){
   });
   const lista=base.filter(c=>_waPassaAba(c,_wa.filtro,eu));
   if(!lista.length){
-    const msg=_wa.conversas.length?'Nenhuma conversa neste filtro.':'Nenhuma conversa ainda.<br><span style="font-size:11px">As mensagens novas dos pacientes aparecem aqui assim que chegam.</span>';
+    const msg=!_wa.carregou?'Carregando conversas…':_wa.conversas.length?'Nenhuma conversa neste filtro.':'Nenhuma conversa ainda.<br><span style="font-size:11px">As mensagens novas dos pacientes aparecem aqui assim que chegam.</span>';
     el.innerHTML='<div class="wa-vazio">'+msg+'</div>';return;
   }
   el.innerHTML=lista.map(c=>{
