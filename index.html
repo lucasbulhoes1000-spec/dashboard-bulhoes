@@ -442,6 +442,13 @@ tbody tr:hover td{background:#faf7f3;}
 .sq-var{display:flex;align-items:center;gap:8px;font-size:11px;color:#5a4e44;}
 .sq-cinza{filter:grayscale(1);}
 @media (max-width:700px){.sq-tab .sq-desc,.sq-tab th:nth-child(3){display:none;}.sq-gat-linha{grid-template-columns:1fr 1fr 22px 22px;}.sq-horas{grid-template-columns:1fr;}}
+.cl-comp-rodape{position:relative;}
+.cl-comp-rodape.gravando>*:not(.cl-grav){visibility:hidden;}
+.cl-grav{position:absolute;inset:0 10px 6px;display:flex;align-items:center;gap:8px;background:#fff;}
+.cl-grav-dot{width:9px;height:9px;border-radius:50%;background:#c0392b;animation:clPisca 1s infinite;}
+.cl-grav-txt{font-size:12px;color:#7a6550;}
+.cl-grav .cl-enviar{margin-left:auto;}
+@keyframes clPisca{50%{opacity:.25}}
 .wa-modal-fundo{position:fixed;inset:0;background:rgba(42,37,32,.35);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;}
 .wa-modal{background:#fff;border-radius:12px;width:min(520px,100%);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);}
 .wa-modal-cab{padding:14px 16px;border-bottom:0.5px solid #e0d8ce;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:#2a2520;}
@@ -14366,11 +14373,14 @@ function waRenderChatBase(){
         '<button class="cl-ib" title="Respostas rápidas (ou digite /)" onclick="waMostrarRapidas(\'\',true)">'+_clIc('lista')+'</button>'+
         '<button class="cl-ib" id="wa-btn-anexo" title="Enviar foto, vídeo, áudio ou documento" onclick="document.getElementById(\'wa-arquivo\').click()">'+_clIc('clip')+'</button>'+
         '<button class="cl-ib" title="Gerenciar respostas rápidas" onclick="waGerenciarRapidas()">'+_clIc('msgs')+'</button>'+
-        '<div class="dir"><button class="cl-chip-seq" title="Sequências ativas" onclick="waSeqAbrir()">'+_clIc('play')+'<b id="wa-seq-n">0</b> | SEQUÊNCIAS ATIVAS '+_clIc('up')+'</button></div>'+
+        '<button class="cl-ib" title="Agendar mensagem" onclick="waAgendarAbrir()">'+_clIc('clock')+'</button>'+
+        '<div class="dir"><button class="cl-chip-seq" title="Sequências ativas" onclick="waSeqAbrir()">'+_clIc('play')+'<b id="wa-seq-n">0</b> | SEQUÊNCIAS ATIVAS '+_clIc('up')+'</button>'+
+        '<button class="cl-chip-seq" title="Mensagens agendadas" onclick="waAgAbrir()">'+_clIc('clock')+'<b id="wa-ag-n">0</b> | MENSAGENS AGENDADAS '+_clIc('up')+'</button></div>'+
       '</div>'+
       '<textarea id="wa-texto" class="cl-texto" rows="1" placeholder="Digite uma mensagem..." oninput="waAjustarTexto(this);waDigitando(this);waContar(this)" onkeydown="waTeclaTexto(event)"></textarea>'+
       '<div class="cl-comp-rodape">'+
         '<button class="cl-ib" title="Emoji" onclick="waEmojis(event)">'+_clIc('smile')+'</button>'+
+        '<button class="cl-ib" id="wa-btn-mic" title="Gravar áudio" onclick="waGravarAudio()">'+_clIc('mic')+'</button>'+
         '<span class="cl-janela" id="wa-janela"></span>'+
         '<span class="cl-cont" id="wa-cont">0 caracteres</span>'+
         '<button class="cl-enviar" id="wa-enviar" title="Enviar (Enter)" onclick="waEnviarTexto()">'+_clIc('send')+'</button>'+
@@ -14380,6 +14390,7 @@ function waRenderChatBase(){
   waRenderCabecalho();
   waRenderPainel();
   waSeqContar();
+  waAgContar();
 }
 function waContar(t){const el=document.getElementById('wa-cont');if(el)el.textContent=t.value.length+' caracteres';}
 function waRenderCabecalho(){
@@ -14445,6 +14456,7 @@ function waRenderJanela(){
   if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado';}
   if(b)b.disabled=!j.aberta||_wa.enviando;
   if(a)a.disabled=!j.aberta;
+  const mic=document.getElementById('wa-btn-mic');if(mic)mic.disabled=!j.aberta;
 }
 const _CL_EMOJIS='😀 😃 😄 😁 😊 🙂 😉 😍 🥰 😘 😅 😂 🤗 🤩 😌 🙏 👏 👍 👌 💪 ✨ 💙 💛 🤍 ❤️ 🦷 😁 🗓️ 📍 ⏰ ✅ ☺️ 😇 🥹 😬 🤔 🙌 💫 🌟 💎'.split(' ');
 function waEmojis(ev){
@@ -14512,6 +14524,7 @@ async function waSeqAbrir(){
   const chat=document.getElementById('wa-chat');
   let p=document.getElementById('cl-seq');
   if(p){p.remove();return;}
+  const ag=document.getElementById('cl-ag');if(ag)ag.remove();
   p=document.createElement('div');p.className='cl-seq';p.id='cl-seq';
   p.innerHTML='<div class="cl-seq-cab">Sequências ativas<button class="cl-ib sem-borda" onclick="document.getElementById(\'cl-seq\').remove()">'+_clIc('x')+'</button></div><div class="wa-vazio" style="padding:14px">Carregando…</div>';
   chat.appendChild(p);
@@ -14640,6 +14653,171 @@ function waNovaConversa(){
   if(ja){waAbrir(ja.id);return;}
   _wa.atual={id:null,telefone:ph,numero_clinica_id:_wa.numeroFiltro||'',nome_contato:'',status:'aberta'};
   waAbrirModelos();
+}
+
+// ---------- mensagens agendadas (como no Cloudia) ----------
+function _waDtLocal(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes());}
+async function waAgContar(){
+  const c=_wa.atual;const el=document.getElementById('wa-ag-n');if(!c||!c.id||!el)return;
+  try{const r=await _waRest('mensagens_agendadas?select=id&status=eq.agendada&conversa_id=eq.'+c.id);if(_wa.atual&&_wa.atual.id===c.id)el.textContent=(r||[]).length;}
+  catch(e){el.textContent='0';}
+}
+async function waAgendarAbrir(){
+  const c=_wa.atual;if(!c||!c.id)return;
+  if(!_wa.modelos){try{const r=await _waAcao({acao:'modelos'});_wa.modelos=r.modelos||[];}catch(e){_wa.modelos=[];}}
+  const d=new Date(Date.now()+60*60000);d.setMinutes(d.getMinutes()<30?30:0);if(d.getMinutes()===0)d.setHours(d.getHours()+1);
+  _wa.ag={tipo:_waJanela(c).aberta?'texto':'modelo',texto:'',modelo:null,quando:_waDtLocal(d)};
+  waAgendarRender();
+}
+function waAgendarRender(){
+  const c=_wa.atual;const g=_wa.ag;if(!c||!g)return;
+  waFecharModal();
+  const ms=_wa.modelos||[];const m=g.modelo&&ms.find(x=>x.nome===g.modelo.nome);
+  let corpo;
+  if(g.tipo==='texto'){
+    corpo='<textarea class="wa-textarea" id="wa-ag-txt" maxlength="4096" placeholder="Mensagem (pode usar {primeiro_nome})" oninput="_wa.ag.texto=this.value" style="min-height:90px">'+_waEsc(g.texto)+'</textarea>'+
+      '<div style="font-size:11px;color:#9a6a3a">Texto livre só sai se a janela de 24 h estiver aberta na hora do envio. Se não estiver, a mensagem não sai e aparece como falha aqui. Para garantir, use um modelo.</div>';
+  }else{
+    corpo='<select class="wa-sel" style="width:100%;height:34px" onchange="waAgModelo(this.value)"><option value="">Escolha o modelo aprovado…</option>'+ms.map(x=>'<option value="'+_waEsc(x.nome)+'"'+(g.modelo&&g.modelo.nome===x.nome?' selected':'')+'>'+_waEsc(x.nome)+' ('+String(x.categoria||'').toLowerCase()+')</option>').join('')+'</select>';
+    if(m){
+      corpo+='<div class="au-preview">'+_waEsc(m.texto)+'</div>';
+      if(g.modelo.cabecalho)corpo+='<div style="font-size:11px;color:#7a6550">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[g.modelo.cabecalho.formato]||'mídia')+' (link público):</div><input class="wa-var" value="'+_waEsc(g.modelo.cabecalho.link||'')+'" oninput="_wa.ag.modelo.cabecalho.link=this.value.trim()">';
+      g.modelo.variaveis.forEach((v,k)=>{corpo+='<div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#7a6550">'+_waEsc(m.formato==='NAMED'?'{{'+(m.campos[k]||k+1)+'}}':'{{'+(k+1)+'}}')+'<input class="wa-var" style="flex:1" value="'+_waEsc(v)+'" placeholder="ex.: {primeiro_nome}" oninput="_wa.ag.modelo.variaveis['+k+']=this.value"></div>';});
+    }
+  }
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal"><div class="wa-modal-cab">Agendar mensagem para '+_waEsc(_waNome(c))+'<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo">'+
+    '<div style="display:flex;gap:14px;font-size:12.5px;color:#2a2520"><label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="wa-ag-tipo" '+(g.tipo==='texto'?'checked':'')+' onchange="_wa.ag.tipo=\'texto\';waAgendarRender()"> Texto livre</label>'+
+      '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="radio" name="wa-ag-tipo" '+(g.tipo==='modelo'?'checked':'')+' onchange="_wa.ag.tipo=\'modelo\';waAgendarRender()"> Modelo aprovado (Template)</label></div>'+
+    corpo+
+    '<div style="font-size:12px;font-weight:600;color:#2a2520">Data e hora do envio</div><input class="wa-var" type="datetime-local" id="wa-ag-quando" value="'+_waEsc(g.quando)+'" min="'+_waDtLocal(new Date())+'" onchange="_wa.ag.quando=this.value">'+
+    '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="wa-btn" onclick="waFecharModal()">Cancelar</button><button class="wa-btn primario" id="wa-ag-salvar" onclick="waAgendarSalvar()">Agendar</button></div>'+
+  '</div></div>';
+  document.body.appendChild(fundo);
+}
+function waAgModelo(nome){
+  const m=(_wa.modelos||[]).find(x=>x.nome===nome);const g=_wa.ag;
+  g.modelo=m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,
+    variaveis:Array.from({length:m.variaveis||0},(_,k)=>k===0?'{primeiro_nome}':''),
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null}:null;
+  waAgendarRender();
+}
+async function waAgendarSalvar(){
+  const c=_wa.atual;const g=_wa.ag;if(!c||!g)return;
+  const quando=new Date(g.quando);
+  if(!g.quando||isNaN(quando)){showToast('error','Escolha a data e a hora','');return;}
+  if(quando<Date.now()+30000){showToast('error','Escolha um horário no futuro','');return;}
+  const corpo={conversa_id:c.id,tipo:g.tipo,enviar_em:quando.toISOString()};
+  if(g.tipo==='texto'){const t=String(g.texto||'').trim();if(!t){showToast('error','Escreva a mensagem','');return;}corpo.texto=t;}
+  else{
+    if(!g.modelo){showToast('error','Escolha o modelo','');return;}
+    if(g.modelo.cabecalho&&!/^https:\/\//.test(g.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho','O modelo tem imagem/vídeo: coloque o link https://');return;}
+    corpo.modelo=g.modelo;
+  }
+  const b=document.getElementById('wa-ag-salvar');if(b){b.disabled=true;b.textContent='Agendando…';}
+  try{
+    await _waRest('mensagens_agendadas',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(corpo)});
+    waFecharModal();_wa.ag=null;
+    showToast('success','Mensagem agendada',quando.toLocaleString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
+    waAgContar();const p=document.getElementById('cl-ag');if(p){p.remove();waAgAbrir();}
+  }catch(e){if(b){b.disabled=false;b.textContent='Agendar';}showToast('error','Não foi possível agendar',e.message);}
+}
+async function waAgAbrir(){
+  const c=_wa.atual;if(!c||!c.id)return;
+  const chat=document.getElementById('wa-chat');
+  let p=document.getElementById('cl-ag');if(p){p.remove();return;}
+  const s=document.getElementById('cl-seq');if(s)s.remove();
+  p=document.createElement('div');p.className='cl-seq';p.id='cl-ag';
+  const cab='<div class="cl-seq-cab">Mensagens agendadas<button class="cl-ib sem-borda" onclick="document.getElementById(\'cl-ag\').remove()">'+_clIc('x')+'</button></div>';
+  p.innerHTML=cab+'<div class="wa-vazio" style="padding:14px">Carregando…</div>';
+  chat.appendChild(p);
+  let ls=[];
+  try{ls=await _waRest('mensagens_agendadas?select=id,tipo,texto,modelo,enviar_em,status,erro,criada_por,enviada_em&conversa_id=eq.'+c.id+'&order=enviar_em.desc&limit=30');}
+  catch(e){p.innerHTML=cab+'<div class="wa-vazio">'+_waEsc(e.message)+'</div>';return;}
+  const st={agendada:'Agendada',enviando:'Enviando',enviada:'Enviada',falhou:'Falhou',cancelada:'Cancelada'};
+  const fd=x=>new Date(x).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const ord=ls.slice().sort((a,b)=>(a.status==='agendada'?0:1)-(b.status==='agendada'?0:1)||(a.status==='agendada'?Date.parse(a.enviar_em)-Date.parse(b.enviar_em):Date.parse(b.enviar_em)-Date.parse(a.enviar_em)));
+  p.innerHTML=cab+
+    '<div class="cl-seq-acoes"><button class="cl-primario" style="height:28px;font-size:11.5px" onclick="waAgendarAbrir()">'+_clIc('plus')+' Agendar mensagem</button></div>'+
+    '<div class="corpo">'+(ord.length?'<table><thead><tr><th>Status</th><th>Mensagem</th><th>Data do envio</th><th>Agendada por</th><th>Ações</th></tr></thead><tbody>'+
+      ord.map(x=>'<tr><td class="'+(x.status==='agendada'?'cl-st-ativo':'')+'">'+st[x.status]+(x.erro?'<div style="font-size:10px;color:#c0392b;max-width:180px">'+_waEsc(x.erro)+'</div>':'')+'</td>'+
+        '<td>'+(x.tipo==='modelo'?'📋 <b>'+_waEsc(x.modelo&&x.modelo.nome||'')+'</b>':_waEsc(String(x.texto||'').slice(0,90)))+'</td>'+
+        '<td>'+fd(x.enviar_em)+'</td><td>'+_waEsc(_waNomeEquipe(x.criada_por)||x.criada_por||'')+'</td>'+
+        '<td>'+(x.status==='agendada'?'<button class="cl-lixo" title="Cancelar envio" onclick="waAgCancelar('+x.id+')">'+_clIc('trash')+'</button>':'')+'</td></tr>').join('')+
+      '</tbody></table>':'<div class="wa-vazio" style="padding:16px">Nenhuma mensagem agendada para este contato.</div>')+'</div>';
+  const n=document.getElementById('wa-ag-n');if(n)n.textContent=ls.filter(x=>x.status==='agendada').length;
+}
+async function waAgCancelar(id){
+  if(!confirm('Cancelar esta mensagem agendada? Ela não será enviada.'))return;
+  try{
+    await _waRest('mensagens_agendadas?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:'cancelada'})});
+    const p=document.getElementById('cl-ag');if(p)p.remove();waAgAbrir();
+  }catch(e){showToast('error','Não foi possível cancelar',e.message);}
+}
+
+// ---------- gravar áudio (grava no navegador e converte para MP3, que o WhatsApp aceita) ----------
+_CL_IC.mic='<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>';
+const _waGrav={rec:null,stream:null,partes:[],ini:0,timer:null,cancelado:false};
+async function waGravarAudio(){
+  const c=_wa.atual;if(!c||_waGrav.rec)return;
+  if(!_waJanela(c).aberta){showToast('error','Janela de 24 h fechada','Áudio só pode ser enviado com a janela aberta. Use um modelo.');return;}
+  if(!navigator.mediaDevices||!window.MediaRecorder){showToast('error','Este navegador não grava áudio','Use o Chrome ou o Edge atualizados.');return;}
+  try{_waGrav.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
+  catch(e){showToast('error','Sem acesso ao microfone','Permita o microfone para o CRM (cadeado ao lado do endereço do site).');return;}
+  const tipo=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+  _waGrav.partes=[];_waGrav.cancelado=false;
+  try{_waGrav.rec=new MediaRecorder(_waGrav.stream,tipo?{mimeType:tipo}:undefined);}
+  catch(e){_waGrav.stream.getTracks().forEach(t=>t.stop());showToast('error','Não foi possível gravar',e.message);return;}
+  _waGrav.rec.ondataavailable=e=>{if(e.data&&e.data.size)_waGrav.partes.push(e.data);};
+  _waGrav.rec.onstop=()=>waAudioParou();
+  _waGrav.rec.start(250);_waGrav.ini=Date.now();
+  const rod=document.querySelector('.cl-comp-rodape');
+  if(rod){rod.classList.add('gravando');const g=document.createElement('div');g.className='cl-grav';g.id='wa-grav';
+    g.innerHTML='<button class="cl-ib" title="Cancelar" onclick="waAudioParar(true)">'+_clIc('trash')+'</button><span class="cl-grav-dot"></span><b id="wa-grav-t">0:00</b><span class="cl-grav-txt">Gravando áudio…</span>'+
+      '<button class="cl-enviar" title="Enviar áudio" onclick="waAudioParar(false)">'+_clIc('send')+'</button>';
+    rod.appendChild(g);}
+  _waGrav.timer=setInterval(()=>{const s=Math.floor((Date.now()-_waGrav.ini)/1000);const el=document.getElementById('wa-grav-t');if(el)el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s>=300)waAudioParar(false);},250);
+}
+function waAudioParar(cancelar){
+  _waGrav.cancelado=!!cancelar;clearInterval(_waGrav.timer);
+  try{if(_waGrav.rec&&_waGrav.rec.state!=='inactive')_waGrav.rec.stop();}catch(e){}
+  try{_waGrav.stream&&_waGrav.stream.getTracks().forEach(t=>t.stop());}catch(e){}
+  const g=document.getElementById('wa-grav');if(g)g.remove();
+  const rod=document.querySelector('.cl-comp-rodape');if(rod)rod.classList.remove('gravando');
+}
+async function waAudioParou(){
+  const rec=_waGrav.rec;_waGrav.rec=null;
+  const dur=Date.now()-_waGrav.ini;
+  if(_waGrav.cancelado||!_waGrav.partes.length)return;
+  if(dur<800){showToast('info','Áudio muito curto','Grave por pelo menos 1 segundo.');return;}
+  const blob=new Blob(_waGrav.partes,{type:(rec&&rec.mimeType)||'audio/webm'});
+  const c=_wa.atual;if(!c)return;
+  const mic=document.getElementById('wa-btn-mic');if(mic)mic.disabled=true;
+  try{
+    showToast('info','Enviando áudio…','');
+    const mp3=await _waParaMp3(blob);
+    const f=new File([mp3],'audio-'+new Date().toISOString().slice(0,19).replace(/\D/g,'')+'.mp3',{type:'audio/mpeg'});
+    await waEnviarArquivo(f,'áudio');
+  }catch(e){showToast('error','Não foi possível enviar o áudio',e.message||String(e));}
+  finally{if(mic)mic.disabled=false;waRenderJanela();}
+}
+function _waCarregarLame(){
+  if(window.lamejs)return Promise.resolve();
+  return new Promise((ok,err)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';s.onload=()=>ok();s.onerror=()=>err(new Error('não consegui carregar o conversor de áudio'));document.head.appendChild(s);});
+}
+async function _waParaMp3(blob){
+  await _waCarregarLame();
+  const Ctx=window.AudioContext||window.webkitAudioContext;const ctx=new Ctx();
+  let buf;try{buf=await ctx.decodeAudioData(await blob.arrayBuffer());}finally{try{ctx.close();}catch(e){}}
+  const n=buf.length,ch=buf.numberOfChannels,mono=new Float32Array(n);
+  for(let c=0;c<ch;c++){const d=buf.getChannelData(c);for(let i=0;i<n;i++)mono[i]+=d[i]/ch;}
+  const pcm=new Int16Array(n);for(let i=0;i<n;i++){const v=Math.max(-1,Math.min(1,mono[i]));pcm[i]=v<0?v*0x8000:v*0x7FFF;}
+  const taxa=[48000,44100,32000,24000,22050,16000].includes(buf.sampleRate)?buf.sampleRate:44100;
+  const enc=new lamejs.Mp3Encoder(1,taxa,64);const out=[];
+  for(let i=0;i<n;i+=1152){const b=enc.encodeBuffer(pcm.subarray(i,i+1152));if(b.length)out.push(new Int8Array(b));}
+  const fim=enc.flush();if(fim.length)out.push(new Int8Array(fim));
+  return new Blob(out,{type:'audio/mpeg'});
 }
 
 function abrirConversas(){

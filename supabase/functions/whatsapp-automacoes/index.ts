@@ -6,7 +6,8 @@
 // chave do motor (cabeçalho x-motor-chave). Ela pega quem tem passo vencido
 // (automacao_pegar) e executa os passos em ordem até chegar numa espera:
 //   esperar · texto · midia · modelo · acao · por_tag · tirar_tag · atribuir · se · fim
-// Também envia os disparos em massa (tabela disparos), no ritmo de cada um.
+// Também envia os disparos em massa (tabela disparos), no ritmo de cada um, e as
+// mensagens agendadas pela equipe na Central (tabela mensagens_agendadas).
 //
 // Regras de cada automação (campo regras):
 //   inicio/fim (horário de Brasília) e pular_fim_de_semana → mensagens fora do
@@ -377,6 +378,56 @@ async function rodarDisparos(inicio: number, cont: Record<string, number>) {
   }
 }
 
+// ---------- mensagens agendadas (Central de Mensagens) ----------
+type Agendada = { id: number; conversa_id: string; tipo: string; texto: string | null; modelo: any; criada_por: string | null };
+export async function enviarAgendada(a: Agendada, agora = () => Date.now()) {
+  const marcar = (status: string, erro: string | null, wa: string | null) => rpc("agendadas_marcar", { p_id: a.id, p_status: status, p_erro: erro, p_wa: wa });
+  try {
+    const c = (await bancoJson(`/rest/v1/conversas?id=eq.${a.conversa_id}&select=*`))?.[0];
+    if (!c) { await marcar("falhou", "conversa não encontrada", null); return "falhou"; }
+    const p = (await bancoJson(`/rest/v1/pacientes?telefone=eq.${c.telefone}&select=nome`))?.[0];
+    const dados = { nome: p?.nome || c.nome_contato || c.nome_perfil || "", telefone: c.telefone };
+    let corpo: any, registro: string, tipo: string;
+    if (a.tipo === "texto") {
+      if (!janelaAberta(c, agora())) { await marcar("falhou", "janela de 24 h fechada na hora do envio: use um modelo", null); return "falhou"; }
+      registro = preencher(String(a.texto ?? ""), dados).trim();
+      corpo = { type: "text", text: { body: registro.slice(0, 4096), preview_url: true } };
+      tipo = "text";
+    } else {
+      corpo = corpoModelo(a.modelo, dados);
+      registro = a.modelo?.texto_preview ? preencher(String(a.modelo.texto_preview), dados) : `[modelo ${a.modelo?.nome}]`;
+      tipo = "template";
+    }
+    const autor = a.criada_por || "mensagem agendada";
+    const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, ...corpo }, await tokenDoNumero(c.numero_clinica_id));
+    if (!r.ok) {
+      const erro = erroMeta(r.j);
+      await registrar(c, null, tipo, registro, autor, "falhou", erro, r.j);
+      await marcar("falhou", erro.slice(0, 300), null);
+      return "falhou";
+    }
+    const waId = r.j?.messages?.[0]?.id ?? null;
+    await registrar(c, waId, tipo, registro, autor, "enviada", null, r.j);
+    await marcar("enviada", null, waId);
+    return "enviada";
+  } catch (e) {
+    await marcar("falhou", String((e as Error)?.message ?? e).slice(0, 300), null).catch(() => {});
+    return "falhou";
+  }
+}
+async function rodarAgendadas(inicio: number, cont: Record<string, number>) {
+  const lote: Agendada[] = await rpc("agendadas_pegar", {}).catch(() => []);
+  for (const a of lote ?? []) {
+    if (Date.now() - inicio > TEMPO_MAX_MS) {
+      // sem tempo: devolve para a fila (ainda não tentou enviar)
+      await bancoJson(`/rest/v1/mensagens_agendadas?id=eq.${a.id}&status=eq.enviando`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "agendada" }) }).catch(() => {});
+      continue;
+    }
+    const r = await enviarAgendada(a);
+    cont["agendada_" + r] = (cont["agendada_" + r] ?? 0) + 1;
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const json = (c: unknown, s = 200) => new Response(JSON.stringify(c), { status: s, headers: { "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
@@ -388,6 +439,8 @@ export async function handler(req: Request): Promise<Response> {
   const inicio = Date.now();
   const cont: Record<string, number> = {};
   // disparos em massa primeiro (não dependem da chave geral: cada um é decisão da equipe)
+  // mensagens agendadas pela equipe primeiro (hora marcada), depois disparos em massa
+  await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
   await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
   const autos = new Map<number, any>();
   while (Date.now() - inicio < TEMPO_MAX_MS) {
