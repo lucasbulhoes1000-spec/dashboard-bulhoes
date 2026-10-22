@@ -219,7 +219,8 @@ const telefoneBonito = (t: string) => { const d = String(t).replace(/\D/g, "").r
 async function pacienteClinicorp(nome: string, telefone: string): Promise<number | null> {
   try {
     const r = await clinicorp("/patient/get", { subscriber_id: assinante(), Phone: telefone });
-    const p = Array.isArray(r) ? r[0] : r;
+    // cadastro excluído ou inativo no Clinicorp não serve: cria de novo
+    const p = (Array.isArray(r) ? r : [r]).find((x: any) => x?.PatientId && !/DELETED|INACTIVE/i.test(String(x?.Status ?? "")));
     if (p?.PatientId) return Number(p.PatientId);
   } catch (_) { /* não achou: cria */ }
   const novo = await clinicorp("/patient/create", {}, "POST", { subscriber_id: assinante(), Name: nome, MobilePhone: Number(String(telefone).replace(/\D/g, "")), IgnoreSameName: "X" });
