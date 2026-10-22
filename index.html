@@ -12173,6 +12173,15 @@ async function _waAcao(dados){
   const r=await fetch(WA_FUNCAO,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+_sbAccessToken},body:JSON.stringify(dados)});
   let j={};try{j=await r.json();}catch(e){}
   if(!r.ok||j.ok===false){const e=new Error(j.detalhe||j.erro||('Erro '+r.status));e.codigo=j.erro;e.status=r.status;throw e;}
+  // quem responde uma conversa sem atendente vira o responsável (o banco faz o mesmo)
+  if(/^enviar_/.test(dados.acao||'')&&dados.conversa_id){
+    const c=_wa.conversas.find(x=>x.id===dados.conversa_id);
+    const eu=usuarioAtualEmail();
+    if(c&&!c.atribuida_a&&eu&&_wa.equipeLista.some(p=>p.email===eu)){
+      c.atribuida_a=eu;
+      try{waRenderLista();if(_wa.atual&&_wa.atual.id===c.id){waRenderCabecalho();waRenderPainel();}}catch(e){}
+    }
+  }
   return j;
 }
 
