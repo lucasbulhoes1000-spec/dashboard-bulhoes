@@ -33,6 +33,10 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const ANTHROPIC_URL = Deno.env.get("ANTHROPIC_URL") ?? "https://api.anthropic.com/v1/messages";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 const ORIGENS = (Deno.env.get("CRM_ORIGENS") ?? "https://dashboard-bulhoes.vercel.app").split(",").map((s) => s.trim());
+const CLINICORP_USUARIO = Deno.env.get("CLINICORP_USUARIO") ?? "";
+const CLINICORP_TOKEN = Deno.env.get("CLINICORP_TOKEN") ?? "";
+const CLINICORP_SUBSCRIBER_ID = Deno.env.get("CLINICORP_SUBSCRIBER_ID") ?? "";
+const CLINICORP_URL = Deno.env.get("CLINICORP_URL") ?? "https://api.clinicorp.com/rest/v1";
 const TEMPO_MAX_MS = 100_000;
 const JANELA_MS = 24 * 60 * 60 * 1000;
 const FUSO_MIN = -180;
@@ -102,6 +106,149 @@ export function janelaAberta(c: { ultima_recebida_em?: string | null; janela_gra
   return agora - ultima < JANELA_MS || gratis > agora;
 }
 
+// ---------- agenda do Clinicorp (marcar avaliação) ----------
+async function clinicorp(caminho: string, params: Record<string, string | number> = {}, metodo = "GET", corpo?: unknown) {
+  if (!CLINICORP_USUARIO || !CLINICORP_TOKEN) throw new Error("faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN");
+  const u = new URL(CLINICORP_URL + caminho);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
+  const r = await fetch(u, {
+    method: metodo,
+    headers: { Authorization: "Basic " + btoa(CLINICORP_USUARIO + ":" + CLINICORP_TOKEN), Accept: "application/json", ...(corpo ? { "Content-Type": "application/json" } : {}) },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`Clinicorp ${r.status}: ${t.slice(0, 200)}`);
+  try { return t ? JSON.parse(t) : null; } catch { return t; }
+}
+const assinante = () => CLINICORP_SUBSCRIBER_ID || CLINICORP_USUARIO;
+const minutos = (hhmm: string) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm ?? "")); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+const diaLocal = (agora: number, n = 0) => {
+  const d = new Date(agora + FUSO_MIN * 60_000);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n)).toISOString().slice(0, 10);
+};
+const dataDoItem = (a: any) => {
+  const at = String(a?.AtomicDate ?? "");
+  if (/^\d{8}$/.test(at)) return `${at.slice(0, 4)}-${at.slice(4, 6)}-${at.slice(6, 8)}`;
+  const d = Date.parse(String(a?.date ?? ""));
+  return isNaN(d) ? "" : new Date(d + FUSO_MIN * 60_000).toISOString().slice(0, 10);
+};
+
+export type Horario = { data: string; hora: string; fim: string };
+/** Horários livres da profissional, respeitando expediente, sábado, almoço e antecedência. */
+export function horariosLivres(cfg: any, agenda: any[], agora: number): Horario[] {
+  const prof = String(cfg.profissional_id ?? "");
+  const dur = Number(cfg.duracao_min ?? 60), passo = Math.max(5, Number(cfg.passo_min ?? 30));
+  const limite = agora + Number(cfg.antecedencia_horas ?? 2) * 3_600_000;
+  const ocupado = new Map<string, [number, number][]>();
+  const diaInteiro = new Set<string>();
+  for (const a of Array.isArray(agenda) ? agenda : []) {
+    if (String(a?.Canceled ?? "").toUpperCase() === "X" || String(a?.Deleted ?? "").toUpperCase() === "X") continue;
+    const dono = a?.Dentist_PersonId != null ? String(a.Dentist_PersonId) : "";
+    const tipo = String(a?.ItemType ?? "APPOINTMENT");
+    // compromisso/agendamento de outra profissional não conta; evento sem profissional é da clínica toda
+    if (dono && dono !== prof) continue;
+    if (!dono && tipo === "APPOINTMENT") continue;
+    const d = dataDoItem(a);
+    if (!d) continue;
+    if (String(a?.AllDay ?? "").toUpperCase() === "X") { diaInteiro.add(d); continue; }
+    const i = minutos(a?.fromTime), f = minutos(a?.toTime);
+    if (isNaN(i) || isNaN(f)) continue;
+    if (!ocupado.has(d)) ocupado.set(d, []);
+    ocupado.get(d)!.push([i, Math.max(f, i + 1)]);
+  }
+  const livreEm = (ints: [number, number][], ini: number, fim: number) => ints.every(([a, b]) => b <= ini || a >= fim);
+  const sobraAlmoco = (ints: [number, number][]) => {
+    const ai = minutos(cfg.almoco_inicio), af = minutos(cfg.almoco_fim), am = Number(cfg.almoco_min ?? 60);
+    if (isNaN(ai) || isNaN(af) || af - ai < am) return true;
+    for (let t = ai; t + am <= af; t += 5) if (livreEm(ints, t, t + am)) return true;
+    return false;
+  };
+  const out: Horario[] = [];
+  for (let n = 0; n <= Number(cfg.dias_busca ?? 14); n++) {
+    const d = diaLocal(agora, n);
+    const sem = new Date(d + "T12:00:00Z").getUTCDay();
+    if (sem === 0 || diaInteiro.has(d)) continue;
+    const ini = minutos(sem === 6 ? cfg.sabado_inicio : cfg.semana_inicio), ult = minutos(sem === 6 ? cfg.sabado_ultimo : cfg.semana_ultimo);
+    if (isNaN(ini) || isNaN(ult)) continue;
+    const ints = ocupado.get(d) ?? [];
+    for (let t = ini; t <= ult; t += passo) {
+      const inicioMs = Date.parse(`${d}T${hhmm(t)}:00-03:00`);
+      if (inicioMs < limite) continue;
+      if (!livreEm(ints, t, t + dur)) continue;
+      if (sem !== 6 && !sobraAlmoco([...ints, [t, t + dur]])) continue;
+      out.push({ data: d, hora: hhmm(t), fim: hhmm(t + dur) });
+    }
+  }
+  return out;
+}
+
+/** As duas opções mais próximas no período pedido (a segunda não encosta na primeira). */
+export function duasOpcoes(livres: Horario[], periodo: string, data?: string): Horario[] {
+  const ok = livres.filter((h) => {
+    if (data && h.data !== data) return false;
+    const m = minutos(h.hora);
+    if (periodo === "manha") return m < 12 * 60;
+    if (periodo === "tarde") return m >= 12 * 60;
+    return true;
+  });
+  if (!ok.length) return [];
+  const a = ok[0];
+  const b = ok.find((h) => h.data !== a.data || minutos(h.hora) >= minutos(a.fim));
+  return b ? [a, b] : [a];
+}
+
+export function descreverHorario(h: Horario, agora: number): string {
+  const [y, m, d] = h.data.split("-").map(Number);
+  const sem = DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const rel = h.data === diaLocal(agora) ? "hoje" : h.data === diaLocal(agora, 1) ? "amanhã" : sem;
+  return `${rel} (${sem}, ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}) às ${h.hora}`;
+}
+
+async function agendaDaProfissional(cfg: any, agora: number) {
+  const de = diaLocal(agora), ate = diaLocal(agora, Number(cfg.dias_busca ?? 14));
+  const p: Record<string, string> = { from: de, to: ate, includeAssigns: "X" };
+  if (CLINICORP_SUBSCRIBER_ID) p.subscriber_id = CLINICORP_SUBSCRIBER_ID;
+  const j = await clinicorp("/appointment/list", p);
+  return Array.isArray(j) ? j : (j?.appointments ?? j?.data ?? []);
+}
+
+const telefoneBonito = (t: string) => { const d = String(t).replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
+
+async function pacienteClinicorp(nome: string, telefone: string): Promise<number | null> {
+  try {
+    const r = await clinicorp("/patient/get", { subscriber_id: assinante(), Phone: telefone });
+    const p = Array.isArray(r) ? r[0] : r;
+    if (p?.PatientId) return Number(p.PatientId);
+  } catch (_) { /* não achou: cria */ }
+  const novo = await clinicorp("/patient/create", {}, "POST", { subscriber_id: assinante(), Name: nome, MobilePhone: Number(String(telefone).replace(/\D/g, "")), IgnoreSameName: "X" });
+  const id = novo?.PatientId ?? novo?.id ?? (Array.isArray(novo) ? novo[0]?.PatientId ?? novo[0]?.id : null);
+  return id ? Number(id) : null;
+}
+
+/** Marca de verdade no Clinicorp (confere de novo se o horário ainda está livre). */
+export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: string }, nome: string, telefone: string, observacoes: string, agora = Date.now()) {
+  const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
+  const escolhido = livres.find((x) => x.data === h.data && x.hora === h.hora);
+  if (!escolhido) return { ok: false, motivo: "esse horário não está mais livre" };
+  const pacienteId = await pacienteClinicorp(nome, telefone);
+  const corpo: any = {
+    PatientName: nome, MobilePhone: telefoneBonito(telefone),
+    fromTime: escolhido.hora, toTime: escolhido.fim, date: `${escolhido.data}T03:00:00.000Z`,
+    Dentist_PersonId: Number(cfg.profissional_id),
+    Procedures: cfg.procedimento || "Avaliação",
+    Notes: observacoes || "",
+  };
+  if (pacienteId) corpo.Patient_PersonId = pacienteId;
+  if (cfg.clinica_id) corpo.Clinic_BusinessId = Number(cfg.clinica_id);
+  if (cfg.categoria_id) corpo.CategoryId = Number(cfg.categoria_id);
+  else if (cfg.categoria_nome) corpo.CategoryDescription = cfg.categoria_nome;
+  const r = await clinicorp("/appointment/create_appointment_by_api", CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {}, "POST", corpo);
+  const item = Array.isArray(r) ? r[0] : r;
+  if (!item?.id) return { ok: false, motivo: "o Clinicorp não confirmou: " + JSON.stringify(r).slice(0, 150) };
+  return { ok: true, id: String(item.id), horario: escolhido, pacienteId };
+}
+
 // ---------- montagem do pedido ao Claude ----------
 const DIAS = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 export function agoraBrasilia(agora = Date.now()): string {
@@ -120,6 +267,12 @@ export function montarSistema(a: any, imagens: any[], ctx: { nome?: string; etap
     partes.push("# Imagens que você pode enviar (ferramenta enviar_imagem)\n" +
       imagens.map((i) => `- "${i.nome}"${i.quando_usar ? ": " + i.quando_usar : ""}`).join("\n"));
   }
+  if (a.agendamento?.ligado) {
+    partes.push("# Agendamento da avaliação\n" +
+      `Você pode marcar a ${a.agendamento.procedimento || "avaliação"} direto na agenda${a.agendamento.profissional_nome ? " da " + a.agendamento.profissional_nome : ""}. ` +
+      "Para saber os horários, use a ferramenta ver_horarios (nunca invente horário). Ofereça exatamente as opções que ela devolver. " +
+      "Antes de marcar, confirme o horário escolhido e o nome completo do paciente. Para marcar, use agendar_avaliacao e só diga que está marcado se ela confirmar.");
+  }
   const info = [`Agora: ${agoraBrasilia(agora)} (horário de Brasília).`];
   if (ctx.nome) info.push(`Nome do contato no WhatsApp/CRM: ${ctx.nome}.`);
   if (ctx.etapa) info.push(`Etapa no CRM: ${ctx.etapa}.`);
@@ -137,12 +290,32 @@ export function montarSistema(a: any, imagens: any[], ctx: { nome?: string; etap
   return partes.join("\n\n");
 }
 
-export function ferramentas(imagens: any[]) {
+export function ferramentas(imagens: any[], agendamento = false) {
   const t: any[] = [{
     name: "transferir_para_humano",
     description: "Passa a conversa para a equipe da clínica e para de responder automaticamente. Use quando as instruções pedirem ou quando não souber responder com segurança.",
     input_schema: { type: "object", properties: { motivo: { type: "string", description: "Por que está passando (ex.: pediu horários, dor forte, reclamação)" } }, required: ["motivo"] },
   }];
+  if (agendamento) {
+    t.push({
+      name: "ver_horarios",
+      description: "Consulta a agenda e devolve as duas opções livres mais próximas para a avaliação.",
+      input_schema: { type: "object", properties: {
+        periodo: { type: "string", enum: ["manha", "tarde", "qualquer"], description: "Período que o paciente prefere" },
+        data: { type: "string", description: "Opcional: um dia específico pedido pelo paciente (AAAA-MM-DD)" },
+      }, required: ["periodo"] },
+    });
+    t.push({
+      name: "agendar_avaliacao",
+      description: "Marca a avaliação no horário escolhido pelo paciente (um dos devolvidos por ver_horarios).",
+      input_schema: { type: "object", properties: {
+        data: { type: "string", description: "AAAA-MM-DD" },
+        hora: { type: "string", description: "HH:MM" },
+        nome_completo: { type: "string", description: "Nome completo do paciente" },
+        observacoes: { type: "string", description: "Resumo para a agenda: queixa, o que procura, procedimentos de interesse, como conheceu a clínica" },
+      }, required: ["data", "hora", "nome_completo", "observacoes"] },
+    });
+  }
   if (imagens.length) {
     t.push({
       name: "enviar_imagem",
@@ -212,18 +385,19 @@ async function chamarClaude(modelo: string, sistema: string, mensagens: any[], t
 }
 
 export type Acao = { tipo: "texto"; texto: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string };
+export type Agenda = { ver: (periodo: string, data?: string) => Promise<string>; marcar: (x: any) => Promise<string> };
 
 /**
  * Conversa com o Claude até ele terminar (no máximo 4 voltas), devolvendo as ações em ordem.
  * "executar" é chamado a cada ação (enviar de verdade ou só anotar, no teste); se devolver false, para.
  */
-export async function gerarResposta(a: any, imagens: any[], sistema: string, historico: any[], executar: (x: Acao) => Promise<boolean>) {
-  const tools = ferramentas(imagens);
+export async function gerarResposta(a: any, imagens: any[], sistema: string, historico: any[], executar: (x: Acao) => Promise<boolean>, agenda?: Agenda) {
+  const tools = ferramentas(imagens, !!(agenda && a.agendamento?.ligado));
   const msgs: any[] = historico.map((h) => ({ role: h.role, content: h.content }));
   const uso: Uso = { entrada: 0, saida: 0 };
   let blocos = 0, transferiu = false;
   const max = Number(a.max_blocos ?? 4);
-  for (let volta = 0; volta < 4; volta++) {
+  for (let volta = 0; volta < 6; volta++) {
     const j = await chamarClaude(a.modelo, sistema, msgs, tools, a.criatividade);
     uso.entrada += Number(j?.usage?.input_tokens ?? 0);
     uso.saida += Number(j?.usage?.output_tokens ?? 0);
@@ -247,6 +421,12 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
           } else {
             resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Não foi possível enviar essa imagem.", is_error: true });
           }
+        } else if (agenda && b.name === "ver_horarios") {
+          const txt = await agenda.ver(String(b.input?.periodo ?? "qualquer"), b.input?.data ? String(b.input.data) : undefined).catch((e) => "Não consegui consultar a agenda agora (" + String(e?.message ?? e).slice(0, 120) + "). Passe para a equipe.");
+          resultados.push({ type: "tool_result", tool_use_id: b.id, content: txt });
+        } else if (agenda && b.name === "agendar_avaliacao") {
+          const txt = await agenda.marcar(b.input ?? {}).catch((e) => "Não consegui marcar (" + String(e?.message ?? e).slice(0, 160) + "). Não diga que está marcado; passe para a equipe.");
+          resultados.push({ type: "tool_result", tool_use_id: b.id, content: txt });
         } else {
           resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Ferramenta desconhecida.", is_error: true });
         }
@@ -257,6 +437,38 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
     msgs.push({ role: "user", content: resultados });
   }
   return { uso, transferiu, parou: false };
+}
+
+// ---------- ferramentas de agenda ----------
+export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | null, simular = false): Agenda {
+  const cfg = a.agendamento ?? {};
+  return {
+    ver: async (periodo, data) => {
+      const agora = Date.now();
+      const op = duasOpcoes(horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora), periodo, data);
+      if (!op.length) return data ? `Sem horário livre em ${data} nesse período. Ofereça procurar outro dia ou período.` : `Sem horário livre nos próximos ${cfg.dias_busca ?? 14} dias nesse período. Ofereça o outro período ou passe para a equipe.`;
+      return "Opções (ofereça estas duas): " + op.map((h) => `${descreverHorario(h, agora)} [data=${h.data} hora=${h.hora}]`).join(" ou ");
+    },
+    marcar: async (x) => {
+      const nome = String(x.nome_completo ?? "").trim();
+      if (nome.split(/\s+/).length < 2) return "Falta o nome completo (nome e sobrenome). Peça ao paciente antes de marcar.";
+      if (simular) return `Simulação: marcaria ${x.data} às ${x.hora} para ${nome}. Nada foi marcado de verdade (teste).`;
+      if (conversaId) {
+        const ja = await bancoJson(`/rest/v1/agente_registros?conversa_id=eq.${conversaId}&tipo=eq.agendamento&criado_em=gte.${new Date(Date.now() - 30 * 86_400_000).toISOString()}&select=id&limit=1`).catch(() => []);
+        if (ja?.length) return "Esta conversa já tem uma avaliação marcada pelo agente. Para remarcar ou marcar outra, passe para a equipe.";
+      }
+      const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", String(x.observacoes ?? ""));
+      if (!r.ok) return `Não foi possível marcar: ${r.motivo}. Consulte ver_horarios de novo e ofereça outras opções.`;
+      // CRM: etapa "Agendou"
+      const agoraIso = new Date().toISOString();
+      if (conv?.telefone) {
+        await banco(`/rest/v1/pacientes?on_conflict=telefone`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ telefone: conv.telefone, nome: nome, etapa: "Agendou", etapa_alterada_em: agoraIso }) }).catch(() => {});
+      }
+      await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${cfg.procedimento || "Avaliação"} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}.`, autor: "agente" });
+      return `Marcado no Clinicorp: ${descreverHorario(r.horario!, Date.now())}, até ${r.horario!.fim}. Confirme ao paciente.`;
+    },
+  };
 }
 
 // ---------- dados da conversa ----------
@@ -317,7 +529,7 @@ export async function responder(conversaId: string, versao: number, pausa = espe
       await rpc("agente_transferir", { p_conversa: conversaId, p_motivo: x.motivo });
       return true;
     };
-    const res = await gerarResposta(a, imagens, montarSistema(a, imagens, ctx), hist, executar);
+    const res = await gerarResposta(a, imagens, montarSistema(a, imagens, ctx), hist, executar, a.agendamento?.ligado ? agendaReal(a, c, ctx, conversaId) : undefined);
     if (res.parou && !enviados.length) { await concluir(); return "refazer"; }
     await registro({ conversa_id: conversaId, tipo: "resposta", detalhe: enviados.join("\n\n").slice(0, 4000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: "agente" });
     await concluir();
@@ -376,7 +588,8 @@ async function testar(dados: any) {
   const hist = montarHistorico((dados?.historico ?? []).map((h: any) => ({ direcao: h.de === "paciente" ? "recebida" : "enviada", tipo: "text", texto: String(h.texto ?? "") })));
   if (!hist.length) throw new Error("escreva uma mensagem como se fosse o paciente");
   const acoes: Acao[] = [];
-  const res = await gerarResposta(a, imagens, montarSistema(a, imagens, { nome: dados?.nome || "" }), hist, async (x) => { acoes.push(x); return true; });
+  const res = await gerarResposta(a, imagens, montarSistema(a, imagens, { nome: dados?.nome || "" }), hist, async (x) => { acoes.push(x); return true; },
+    a.agendamento?.ligado ? agendaReal(a, { telefone: "" }, {}, null, true) : undefined);
   await registro({ tipo: "teste", detalhe: acoes.map((x) => x.tipo === "texto" ? x.texto : x.tipo === "imagem" ? "[imagem: " + x.nome + "]" : "[transferiu: " + x.motivo + "]").join("\n\n").slice(0, 2000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: dados?._autor });
   return { acoes, uso: res.uso };
 }
@@ -445,6 +658,32 @@ export async function handler(req: Request): Promise<Response> {
       case "testar":
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão testa o agente" }, 403);
         return json({ ok: true, ...(await testar({ ...dados, _autor: u.email })) });
+      case "clinicorp_opcoes": {
+        if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
+        const sub = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
+        const [profs, cats, ag] = await Promise.all([
+          clinicorp("/professional/list_all_professionals", { subscriber_id: assinante() }).catch((e) => ({ erro: String(e.message) })),
+          clinicorp("/appointment/list_categories", { subscriber_id: assinante() }).catch((e) => ({ erro: String(e.message) })),
+          clinicorp("/appointment/list", { ...sub, from: diaLocal(Date.now()), to: diaLocal(Date.now(), 7) }).catch(() => []),
+        ]);
+        const lista = (x: any) => Array.isArray(x) ? x : (x?.data ?? x?.professionals ?? x?.categories ?? []);
+        const clinicas = [...new Set(lista(ag).map((i: any) => i?.Clinic_BusinessId).filter(Boolean).map(String))];
+        return json({
+          ok: true, assinante: assinante(), clinicas,
+          profissionais: Array.isArray(lista(profs)) ? lista(profs).map((p: any) => ({ id: String(p.id ?? p.PersonId ?? p.Dentist_PersonId ?? ""), nome: p.Name ?? p.name ?? p.Nome ?? "" })) : [],
+          categorias: Array.isArray(lista(cats)) ? lista(cats).map((c: any) => ({ id: String(c.id ?? c.CategoryId ?? ""), nome: c.Description ?? c.description ?? c.Name ?? "" })) : [],
+          erro_profissionais: (profs as any)?.erro ?? null, erro_categorias: (cats as any)?.erro ?? null,
+          amostra_profissional: JSON.stringify(lista(profs)?.[0] ?? null).slice(0, 300), amostra_categoria: JSON.stringify(lista(cats)?.[0] ?? null).slice(0, 300),
+        });
+      }
+      case "horarios": {
+        const { a } = await carregarAgente();
+        const cfg = { ...(a?.agendamento ?? {}), ...(dados.rascunho ?? {}) };
+        if (!cfg.profissional_id) return json({ ok: false, erro: "escolha a profissional" });
+        const agora = Date.now();
+        const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
+        return json({ ok: true, livres: livres.slice(0, 40), manha: duasOpcoes(livres, "manha").map((h) => descreverHorario(h, agora)), tarde: duasOpcoes(livres, "tarde").map((h) => descreverHorario(h, agora)) });
+      }
       case "sugerir":
         return json({ ok: true, ...(await sugerir(String(dados.conversa_id), u.email)) });
       case "resumir":

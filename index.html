@@ -13385,7 +13385,7 @@ function agRender(){
   const E=_ag.ed,pode=_waEhGestao(),dis=pode?'':' disabled';
   const st=_ag.status;
   const chave=!st?'<span class="ag-chip">Conferindo a chave…</span>':st.erro?'<span class="ag-chip erro">'+_auEsc(st.erro)+'</span>':st.chave?'<span class="ag-chip ok">● Chave da Anthropic configurada</span>':'<span class="ag-chip erro">● Falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)</span>';
-  const abas=[['config','Configurações'],['instrucoes','Instruções'],['base','Base de conhecimento'],['imagens','Imagens ('+_ag.imagens.length+')'],['testar','Testar agente'],['atividade','Atividade']].concat(pode?[['versoes','Versões']]:[]);
+  const abas=[['config','Configurações'],['instrucoes','Instruções'],['base','Base de conhecimento'],['imagens','Imagens ('+_ag.imagens.length+')'],['agenda','Agendamento'],['testar','Testar agente'],['atividade','Atividade']].concat(pode?[['versoes','Versões']]:[]);
   let corpo='';
   if(_ag.aba==='config'){
     corpo='<div class="ag-grid">'+
@@ -13412,6 +13412,29 @@ function agRender(){
     corpo='<div class="ag-dica">Fotos que o agente pode mandar (ex.: antes e depois por queixa). Em “quando usar”, explique em que situação mandar. Nas instruções, você pode citar a imagem pelo nome.</div>'+
       (_ag.imagens.length?'<div class="ag-imgs">'+_ag.imagens.map(i=>'<div class="ag-img"><img src="'+_auEsc(i.link)+'" alt=""><div style="flex:1;min-width:0"><b>'+_auEsc(i.nome)+'</b><div class="ag-dica">'+_auEsc(i.quando_usar||'')+'</div></div>'+(pode?'<button class="cl-lixo" title="Apagar" onclick="agImagemApagar('+i.id+')">'+_clIc('trash')+'</button>':'')+'</div>').join('')+'</div>':'<div class="au-vazio" style="padding:18px">Nenhuma imagem ainda.</div>')+
       (pode?'<div class="ag-nova"><input class="wa-var" id="ag-img-nome" placeholder="Nome (ex.: Diastemas)" maxlength="80"><input class="wa-var" id="ag-img-quando" placeholder="Quando usar (ex.: paciente com espaço entre os dentes)" style="flex:2"><input type="file" id="ag-img-arq" accept="image/jpeg,image/png" style="display:none" onchange="agImagemEnviar(this.files[0])"><button class="wa-btn primario" onclick="document.getElementById(\'ag-img-arq\').click()">＋ Escolher imagem</button></div>':'');
+  }else if(_ag.aba==='agenda'){
+    const G=E.agendamento||(E.agendamento={});const op=_ag.clin||{};
+    const inp=(k,tipo,extra)=>'<input class="wa-var" type="'+(tipo||'text')+'" value="'+_auEsc(G[k]==null?'':G[k])+'"'+dis+(extra||'')+' oninput="_ag.ed.agendamento.'+k+'='+(tipo==='number'?'Number(this.value)':'this.value')+';_agMarcar()">';
+    const profs=(op.profissionais||[]),cats=(op.categorias||[]);
+    corpo='<div class="ag-sw"><label class="sq-switch"><input type="checkbox" '+(G.ligado?'checked':'')+dis+' onchange="_ag.ed.agendamento.ligado=this.checked;_agMarcar()"><span></span></label><div><b>O agente marca a avaliação direto no Clinicorp</b><div>Ele consulta os horários livres da profissional, oferece as duas opções mais próximas no período que o paciente preferir e marca. O contato vai para a etapa “Agendou”.</div></div></div>'+
+      (pode?'<div class="ag-nova"><button class="wa-btn" onclick="agClinicorpOpcoes()">'+(_ag.carregandoClin?'Carregando…':'Carregar profissionais e categorias do Clinicorp')+'</button>'+(op.erro?'<span class="ag-chip erro">'+_auEsc(op.erro)+'</span>':'')+'</div>':'')+
+      '<div class="ag-grid">'+
+        '<label>Profissional<select class="wa-sel"'+dis+' onchange="const o=this.options[this.selectedIndex];_ag.ed.agendamento.profissional_id=this.value||null;_ag.ed.agendamento.profissional_nome=this.value?o.text:null;_agMarcar()"><option value="">'+(profs.length?'Escolha…':(G.profissional_nome||'Carregue do Clinicorp'))+'</option>'+(G.profissional_id&&!profs.some(x=>x.id===String(G.profissional_id))?'<option selected value="'+_auEsc(G.profissional_id)+'">'+_auEsc(G.profissional_nome||G.profissional_id)+'</option>':'')+profs.map(x=>'<option value="'+_auEsc(x.id)+'"'+(String(G.profissional_id)===x.id?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+'</select></label>'+
+        '<label>Categoria<select class="wa-sel"'+dis+' onchange="const o=this.options[this.selectedIndex];_ag.ed.agendamento.categoria_id=this.value||null;_ag.ed.agendamento.categoria_nome=this.value?o.text:_ag.ed.agendamento.categoria_nome;_agMarcar()"><option value="">'+(cats.length?'Escolha…':(G.categoria_nome||'Carregue do Clinicorp'))+'</option>'+(G.categoria_id&&!cats.some(x=>x.id===String(G.categoria_id))?'<option selected value="'+_auEsc(G.categoria_id)+'">'+_auEsc(G.categoria_nome||G.categoria_id)+'</option>':'')+cats.map(x=>'<option value="'+_auEsc(x.id)+'"'+(String(G.categoria_id)===x.id?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+'</select></label>'+
+        '<label>Procedimento'+inp('procedimento')+'</label>'+
+        '<label>Duração (minutos)'+inp('duracao_min','number',' min="15" max="240" step="15"')+'</label>'+
+        '<label>Dias de semana: primeiro horário'+inp('semana_inicio','time')+'</label>'+
+        '<label>Dias de semana: último horário'+inp('semana_ultimo','time')+'</label>'+
+        '<label>Sábado: primeiro horário'+inp('sabado_inicio','time')+'</label>'+
+        '<label>Sábado: último horário'+inp('sabado_ultimo','time')+'</label>'+
+        '<label>Almoço entre'+inp('almoco_inicio','time')+'</label>'+
+        '<label>e'+inp('almoco_fim','time')+'<span class="ag-dica">Sempre sobra 1 hora livre nessa faixa para o almoço.</span></label>'+
+        '<label>Antecedência mínima (horas)'+inp('antecedencia_horas','number',' min="0" max="72"')+'</label>'+
+        '<label>Procurar nos próximos (dias)'+inp('dias_busca','number',' min="1" max="60"')+'</label>'+
+      '</div>'+
+      '<div class="ag-nova"><button class="wa-btn" onclick="agVerHorarios()">'+(_ag.carregandoHor?'Consultando…':'Ver próximos horários livres')+'</button><span class="ag-dica">Confere a regra com a agenda de verdade (só leitura).</span></div>'+
+      (_ag.hor?(_ag.hor.erro?'<div class="ag-chip erro">'+_auEsc(_ag.hor.erro)+'</div>':'<div class="ag-dica" style="color:#3a322b">Manhã: <b>'+_auEsc((_ag.hor.manha||[]).join(' ou ')||'sem horário')+'</b><br>Tarde: <b>'+_auEsc((_ag.hor.tarde||[]).join(' ou ')||'sem horário')+'</b><br><span style="color:#9a8c7e">Livres: '+(_ag.hor.livres||[]).slice(0,24).map(h=>h.data.slice(8,10)+'/'+h.data.slice(5,7)+' '+h.hora).join(' · ')+'</span></div>'):'')+
+      '<div class="ag-dica">Nas instruções, diga quando o agente deve oferecer horários (ex.: depois de perguntar manhã ou tarde). Ele só oferece o que a agenda devolver e confirma o nome completo antes de marcar.</div>';
   }else if(_ag.aba==='testar'){
     const bal=_ag.teste.map(x=>x.de==='paciente'?'<div class="ag-b pac">'+_auEsc(x.texto)+'</div>':x.tipo==='imagem'?'<div class="ag-b ag"><img src="'+_auEsc(x.link)+'" style="max-width:160px;border-radius:6px;display:block"><small>'+_auEsc(x.nome)+'</small></div>':x.tipo==='transferir'?'<div class="ag-b sis">↪ Passaria para a equipe: '+_auEsc(x.motivo||'')+'</div>':x.tipo==='erro'?'<div class="ag-b sis erro">'+_auEsc(x.texto)+'</div>':'<div class="ag-b ag">'+_auEsc(x.texto)+'</div>').join('');
     corpo='<div class="ag-dica">Converse como se fosse o paciente. Nada é enviado no WhatsApp. Usa o que está na tela, mesmo antes de salvar.</div>'+
@@ -13450,7 +13473,9 @@ async function agSalvar(){
   if(E.habilitar_ia&&!String(E.instrucoes||'').trim()){showToast('error','Escreva as instruções','Sem instruções o agente não sabe como atender.');return;}
   if(E.habilitar_ia&&E.modo_teste&&!(E.telefones_teste||[]).length){showToast('error','Coloque um telefone de teste','No modo teste só esses telefones recebem resposta.');return;}
   if(E.habilitar_ia&&!E.modo_teste&&!(_ag.a.habilitar_ia&&!_ag.a.modo_teste)&&!confirm('Ligar o Agente de IA para todos os contatos?\n\nConversas novas passam a ser respondidas pela IA. Se o robô do Cloudia ainda estiver ligado, o paciente recebe em dobro.'))return;
-  const campos=['nome','habilitar_ia','assistente_virtual','resumos','modelo','criatividade','personalidade','instrucoes','base_conhecimento','espera_segundos','max_blocos','ligar_em_novas','modo_teste','telefones_teste'];
+  const G=E.agendamento||{};
+  if(G.ligado&&(!G.profissional_id||(!G.categoria_id&&!G.categoria_nome))){showToast('error','Agendamento incompleto','Escolha a profissional e a categoria (aba Agendamento).');return;}
+  const campos=['nome','habilitar_ia','assistente_virtual','resumos','modelo','criatividade','personalidade','instrucoes','base_conhecimento','espera_segundos','max_blocos','ligar_em_novas','modo_teste','telefones_teste','agendamento'];
   const corpo={};campos.forEach(k=>corpo[k]=E[k]);
   const b=document.getElementById('ag-salvar');if(b){b.disabled=true;b.textContent='Salvando…';}
   try{
@@ -13486,6 +13511,22 @@ async function agImagemApagar(id){
   if(!confirm('Tirar a imagem “'+i.nome+'” do agente?'))return;
   try{await _waRest('agente_imagens?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}});agCarregar();}
   catch(e){showToast('error','Não foi possível apagar',e.message);}
+}
+async function agClinicorpOpcoes(){
+  _ag.carregandoClin=true;agRender();
+  try{const r=await _agAcao({acao:'clinicorp_opcoes'});_ag.clin=r;
+    const G=_ag.ed.agendamento||(_ag.ed.agendamento={});
+    if(!G.clinica_id&&r.clinicas&&r.clinicas.length===1){G.clinica_id=r.clinicas[0];}
+    if(!G.profissional_id){const v=(r.profissionais||[]).find(p=>/vict[oó]ria/i.test(p.nome));if(v){G.profissional_id=v.id;G.profissional_nome=v.nome;}}
+    if(!G.categoria_id){const c=(r.categorias||[]).find(c=>/^avalia[cç][aã]o$/i.test(String(c.nome).trim()));if(c){G.categoria_id=c.id;G.categoria_nome=c.nome;}}
+    if(r.erro_profissionais||r.erro_categorias)_ag.clin.erro=[r.erro_profissionais,r.erro_categorias].filter(Boolean).join(' · ');
+  }catch(e){_ag.clin={erro:e.message};}
+  _ag.carregandoClin=false;agRender();
+}
+async function agVerHorarios(){
+  _ag.carregandoHor=true;agRender();
+  try{_ag.hor=await _agAcao({acao:'horarios',rascunho:_ag.ed.agendamento||{}});}catch(e){_ag.hor={erro:e.message};}
+  _ag.carregandoHor=false;agRender();
 }
 function agUsarVersao(id){
   const v=_ag.versoes.find(x=>x.id===id);if(!v)return;
