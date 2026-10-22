@@ -7,6 +7,7 @@
 --     segunda (e as de domingo, se houver). Domingo não manda véspera.
 --   • No dia, às 8h30: consultas do próprio dia que ainda não começaram.
 -- Um lembrete por telefone, por dia de consulta e por tipo (nunca repete).
+-- Só consultas cuja categoria no Clinicorp contém "avaliação" (editável na tela).
 -- Desmarcados e excluídos no Clinicorp ficam de fora.
 -- A gestão liga, escolhe os modelos e os telefones de teste na tela
 -- Automações. Credenciais do Clinicorp: segredos CLINICORP_USUARIO e
@@ -16,7 +17,7 @@
 
 insert into public.configuracoes (chave, valor, atualizado_por)
 values ('lembretes_consulta', jsonb_build_object(
-  'ligado', false, 'modo_teste', true, 'telefones_teste', '[]'::jsonb,
+  'ligado', false, 'modo_teste', true, 'telefones_teste', '[]'::jsonb, 'categorias', 'avaliação',
   'vespera', jsonb_build_object('hora', '10:30', 'modelo', null),
   'dia', jsonb_build_object('hora', '08:30', 'modelo', null)), 'migracao')
 on conflict (chave) do nothing;

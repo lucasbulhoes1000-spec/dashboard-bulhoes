@@ -13573,7 +13573,7 @@ function _auLembHtml(){
     (r.erro?' · <span style="color:#c0392b">'+_auEsc(r.erro)+'</span>':'')+'</div>').join('');
   const cab='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
     '<div><div style="font-weight:600;font-size:13px">⏰ Lembretes de consulta (agenda do Clinicorp) '+(L.ligado?(L.modo_teste!==false?'<span class="sq-teste">🧪 teste</span>':'<span style="color:#3f6b4c">● ligados</span>'):'<span style="color:#9a8a78">● desligados</span>')+'</div>'+
-    '<div style="font-size:12px;margin-top:3px;color:#7a6550">Um modelo aprovado do WhatsApp por consulta: na véspera e no dia. Desmarcados e excluídos no Clinicorp ficam de fora. Não depende da chave geral.</div></div>'+
+    '<div style="font-size:12px;margin-top:3px;color:#7a6550">Um modelo aprovado do WhatsApp na véspera e no dia, só para consultas de categoria <b>'+_auEsc(L.categorias||'avaliação')+'</b> no Clinicorp. Desmarcados e excluídos ficam de fora. Não depende da chave geral.</div></div>'+
     '<div style="display:flex;gap:6px">'+(L.ligado||(_au.lembRodadas||[]).length?'<button class="wa-btn" onclick="auLembVer()">Ver enviados</button>':'')+
     (g?'<button class="wa-btn" onclick="_au.lembAberto=!_au.lembAberto;auRenderExtras()">'+(_au.lembAberto?'Fechar':'Configurar')+'</button>':'')+'</div></div>';
   let corpo='';
@@ -13597,6 +13597,8 @@ function _auLembHtml(){
     };
     corpo='<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">'+
       '<div style="font-size:11.5px;color:#7a6550">Nas variáveis do modelo: <b>{primeiro_nome}</b>, <b>{nome}</b>, <b>{data}</b> (26/10), <b>{hora}</b> (09:30), <b>{dia_semana}</b> (segunda-feira), <b>{quando}</b> (hoje / amanhã / segunda-feira).</div>'+
+      '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Categorias do Clinicorp que recebem (contém): <input class="wa-var" style="flex:1;min-width:200px" value="'+_auEsc(E.categorias==null?'avaliação':E.categorias)+'" placeholder="avaliação" oninput="_au.lembEd.categorias=this.value"></label>'+
+      '<div style="font-size:11px;color:#7a6550;margin-top:-6px">Separe por vírgula. “avaliação” pega Avaliação e Avaliação Paciente/Parceria.</div>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('dia')+'</div>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px">'+
         '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" '+(E.ligado?'checked':'')+' onchange="_au.lembEd.ligado=this.checked"> Ligados</label>'+
@@ -13624,6 +13626,7 @@ async function auLembSalvar(){
     if(c.modelo&&c.modelo.cabecalho&&!/^https:\/\//.test(c.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho',AU_LEMB_TIPOS[t].nome+': o modelo tem mídia, coloque o link https://');return;}
   }
   if(E.ligado&&!E.vespera.modelo&&!E.dia.modelo){showToast('error','Escolha pelo menos um modelo','');return;}
+  if(!String(E.categorias==null?'avaliação':E.categorias).trim()&&!confirm('Sem categoria, TODOS os pacientes agendados recebem lembrete (retornos, manutenção, cirurgia…). Continuar?'))return;
   if(E.ligado&&E.modo_teste!==false&&!(E.telefones_teste||[]).length){showToast('error','Coloque um telefone de teste','No modo teste só esses telefones recebem.');return;}
   if(E.ligado&&E.modo_teste===false&&!(_au.lemb.ligado&&_au.lemb.modo_teste===false)&&!confirm('Ligar os lembretes para todos os pacientes agendados?\n\nSe o Cloudia ainda manda lembretes, o paciente recebe em dobro.'))return;
   try{

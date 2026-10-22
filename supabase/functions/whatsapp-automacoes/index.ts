@@ -454,13 +454,22 @@ export function diasDoLembrete(tipo: "vespera" | "dia", agora: number): string[]
 
 export type Consulta = { id: string; data: string; hora: string; nome: string; telefone: string };
 /** Agendamentos válidos do Clinicorp: paciente, com celular, não desmarcado/excluído, no dia pedido. Um por telefone e dia (o mais cedo). */
-export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vespera" | "dia", agora: number): Consulta[] {
+const semAcento = (t: unknown) => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+/** Só as categorias que contêm algum dos termos (padrão: avaliação). Vazio = todas. */
+export function categoriaValida(desc: unknown, termos: unknown): boolean {
+  const lista = (Array.isArray(termos) ? termos : String(termos ?? "avaliação").split(/[,;\n]+/)).map(semAcento).filter(Boolean);
+  if (!lista.length) return true;
+  const d = semAcento(desc);
+  return lista.some((t) => d.includes(t));
+}
+export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vespera" | "dia", agora: number, categorias: unknown = "avaliação"): Consulta[] {
   const minutosAgora = Math.floor(((agora + FUSO_MIN * 60_000) % 86_400_000) / 60_000);
   const hoje = diasDoLembrete("dia", agora)[0];
   const porChave = new Map<string, Consulta>();
   for (const a of Array.isArray(lista) ? lista : []) {
     if (a?.ItemType && a.ItemType !== "APPOINTMENT") continue;
     if (String(a?.Canceled ?? "").toUpperCase() === "X" || String(a?.Deleted ?? "").toUpperCase() === "X") continue;
+    if (!categoriaValida(a?.CategoryDescription, categorias)) continue;
     const tel = String(a?.MobilePhone ?? "").replace(/\D/g, "");
     if (tel.length < 10) continue;
     const at = String(a?.AtomicDate ?? "");
@@ -552,7 +561,7 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     }
     let lista: Consulta[];
     try {
-      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, tipo, agora);
+      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, tipo, agora, cfg.categorias ?? "avaliação");
     } catch (e) {
       await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: String((e as Error)?.message ?? e).slice(0, 300) });
       continue;
@@ -582,19 +591,13 @@ export async function handler(req: Request): Promise<Response> {
     try {
       const dias = [...diasDoLembrete("dia", Date.now()), ...diasDoLembrete("dia", Date.now() + 86_400_000)];
       const bruto = await agendaClinicorp(dias[0], dias[1]);
-      const validas = consultasDoClinicorp(bruto, dias, "vespera", Date.now());
+      const cfgL = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor;
+      const validas = consultasDoClinicorp(bruto, dias, "vespera", Date.now(), cfgL?.categorias ?? "avaliação");
       const porDia: Record<string, number> = {};
       for (const c of validas) porDia[c.data] = (porDia[c.data] ?? 0) + 1;
-      // campos e categorias (sem dados de paciente) para conferir o filtro de avaliação
-      const campos = [...new Set(bruto.flatMap((a: any) => Object.keys(a ?? {})))];
       const categorias: Record<string, number> = {};
-      for (const a of bruto) for (const [k, v] of Object.entries(a ?? {})) {
-        if (/categ|procedure|tipo|type|description/i.test(k) && !/patient|name|phone|mail|notes/i.test(k)) {
-          const c = k + "=" + (typeof v === "object" ? JSON.stringify(v) : String(v)).slice(0, 60);
-          categorias[c] = (categorias[c] ?? 0) + 1;
-        }
-      }
-      return json({ ok: true, itens_na_agenda: bruto.length, pacientes_com_celular_por_dia: porDia, campos, categorias });
+      for (const a of bruto) { const c = String(a?.CategoryDescription ?? "(sem categoria)"); categorias[c] = (categorias[c] ?? 0) + 1; }
+      return json({ ok: true, itens_na_agenda: bruto.length, lembretes_por_dia: porDia, categorias });
     } catch (e) {
       return json({ ok: false, erro: String((e as Error)?.message ?? e).slice(0, 300) });
     }
