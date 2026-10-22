@@ -201,8 +201,9 @@ export function duasOpcoes(livres: Horario[], periodo: string, data?: string): H
 export function descreverHorario(h: Horario, agora: number): string {
   const [y, m, d] = h.data.split("-").map(Number);
   const sem = DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  const rel = h.data === diaLocal(agora) ? "hoje" : h.data === diaLocal(agora, 1) ? "amanhã" : sem;
-  return `${rel} (${sem}, ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}) às ${h.hora}`;
+  const dm = `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+  const rel = h.data === diaLocal(agora) ? "hoje" : h.data === diaLocal(agora, 1) ? "amanhã" : "";
+  return rel ? `${rel} (${sem}, ${dm}) às ${h.hora}` : `${sem}, ${dm}, às ${h.hora}`;
 }
 
 async function agendaDaProfissional(cfg: any, agora: number) {
