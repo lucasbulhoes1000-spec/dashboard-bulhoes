@@ -14,9 +14,11 @@
 --     passos vencidos sem que dois motores peguem o mesmo contato.
 --
 -- Segurança: tudo nasce DESLIGADO.
---   • chave geral: configuracoes 'automacoes_ligadas' = false
 --   • cada automação nasce com ligada = false e modo_teste = true
 --     (no modo teste, só os telefones da lista de teste entram).
+--   • chave geral: configuracoes 'automacoes_ligadas' = false. Enquanto estiver
+--     false, só funcionam as automações em modo teste (para testar antes de
+--     desligar o Cloudia sem mandar nada em dobro para os pacientes).
 --
 -- Rodar no Supabase: SQL Editor → New query → colar tudo → Run.
 -- Pode rodar mais de uma vez sem problema.
@@ -68,6 +70,11 @@ create table if not exists public.automacoes (
   atualizada_em      timestamptz not null default now(),
   atualizada_por     text default public.email_atual()
 );
+
+create or replace function public.automacoes_alguma_ligada() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.automacoes where ligada);
+$$;
 
 create table if not exists public.automacao_execucoes (
   id             bigint generated always as identity primary key,
@@ -164,7 +171,8 @@ begin
   select * into a from public.automacoes where id = p_auto;
   if not found then return null; end if;
   if not p_forcar then
-    if not a.ligada or not public.automacoes_ligadas() then return null; end if;
+    if not a.ligada then return null; end if;
+    if not a.modo_teste and not public.automacoes_ligadas() then return null; end if;
     if a.modo_teste and not (v_tel = any (array(select migracao.tel(t) from unnest(a.telefones_teste) t))) then return null; end if;
   end if;
   if jsonb_array_length(a.passos) = 0 then return null; end if;
@@ -201,7 +209,6 @@ returns integer
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare a record; n integer := 0; ok boolean;
 begin
-  if not public.automacoes_ligadas() then return 0; end if;
   for a in select * from public.automacoes where ligada and gatilho->>'tipo' = p_tipo loop
     ok := case p_tipo
       when 'etapa' then coalesce(a.gatilho->>'etapa', '') = coalesce(p_dados->>'etapa', '')
@@ -228,7 +235,7 @@ end $$;
 create or replace function public.automacao_t_pacientes() returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $$
 begin
-  if not public.automacoes_ligadas() then return new; end if;
+  if not public.automacoes_alguma_ligada() then return new; end if;
   if tg_op = 'INSERT' then
     perform public.automacao_disparar('lead_criado', new.telefone, jsonb_build_object('origem', new.origem, 'etapa', new.etapa));
     if new.etapa is not null then
@@ -250,7 +257,7 @@ create or replace function public.automacao_t_tags() returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_tel text;
 begin
-  if not public.automacoes_ligadas() then return null; end if;
+  if not public.automacoes_alguma_ligada() then return null; end if;
   if tg_op = 'INSERT' then
     select telefone into v_tel from public.conversas where id = new.conversa_id;
     if v_tel is not null then perform public.automacao_disparar('tag_adicionada', v_tel, jsonb_build_object('tag_id', new.tag_id)); end if;
@@ -287,7 +294,7 @@ begin
   -- marca a resposta para a condição "respondeu"
   update public.automacao_execucoes set contexto = contexto || jsonb_build_object('respondeu_em', new.enviada_em)
    where telefone = v_tel and status = 'ativa';
-  if public.automacoes_ligadas() then
+  if public.automacoes_alguma_ligada() then
     perform public.automacao_disparar('mensagem_recebida', v_tel, jsonb_build_object('texto', new.texto));
   end if;
   return null;

@@ -13,6 +13,9 @@
 //   Texto livre só sai com a janela de 24 h aberta; sem janela, o passo é
 //   pulado (ou a pessoa sai, se o passo tiver "sem_janela":"parar").
 //
+// Chave geral (configuracoes 'automacoes_ligadas'): enquanto false, só andam as
+// automações em modo teste.
+//
 // Segredos usados: WA_TOKEN, WA_PHONE_NUMBER_ID (mesmos da whatsapp-acoes).
 // ============================================================
 
@@ -172,9 +175,9 @@ async function tagIds(conversa: string): Promise<number[]> {
   return (r ?? []).map((t: any) => Number(t.tag_id));
 }
 
-export async function processar(x: Exec, a: any, agora = () => Date.now()) {
-  if (!a || !a.ligada) {
-    // automação desligada: pausa (volta a andar quando religar)
+export async function processar(x: Exec, a: any, agora = () => Date.now(), geral = true) {
+  // automação desligada, ou fora do modo teste com a chave geral pausada: pausa (volta a andar quando religar)
+  if (!a || !a.ligada || (!a.modo_teste && !geral)) {
     await avancar(x, x.passo, null, "ok", null, null, agora() + 60 * 60_000);
     return "pausada";
   }
@@ -303,7 +306,8 @@ export async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
   const chave = req.headers.get("x-motor-chave") ?? "";
   if (!chave || !(await rpc("automacao_conferir_chave", { p_chave: chave }))) return json({ ok: false, erro: "chave do motor inválida" }, 401);
-  if (!(await chaveGeralLigada())) return json({ ok: true, desligado: true });
+  // chave geral pausada: só as automações em modo teste andam
+  const geral = await chaveGeralLigada();
 
   const inicio = Date.now();
   const cont: Record<string, number> = {};
@@ -313,18 +317,18 @@ export async function handler(req: Request): Promise<Response> {
     if (!lote?.length) break;
     const faltam = [...new Set(lote.map((x) => x.automacao_id))].filter((id) => !autos.has(id));
     if (faltam.length) {
-      const rs = await bancoJson(`/rest/v1/automacoes?id=in.(${faltam.join(",")})&select=id,nome,ligada,regras,passos,numero_clinica_id`);
+      const rs = await bancoJson(`/rest/v1/automacoes?id=in.(${faltam.join(",")})&select=id,nome,ligada,modo_teste,regras,passos,numero_clinica_id`);
       for (const a of rs ?? []) autos.set(a.id, a);
     }
     for (const x of lote) {
-      const r = await processar(x, autos.get(x.automacao_id)).catch(async (e) => {
+      const r = await processar(x, autos.get(x.automacao_id), undefined, geral).catch(async (e) => {
         await avancar(x, x.passo, "motor", "erro", String(e?.message ?? e).slice(0, 500), x.passo, null, "erro").catch(() => {});
         return "erro";
       });
       cont[r] = (cont[r] ?? 0) + 1;
     }
   }
-  return json({ ok: true, ...cont, ms: Date.now() - inicio });
+  return json({ ok: true, geral, ...cont, ms: Date.now() - inicio });
 }
 
 if (!Deno.env.get("WA_TESTE")) Deno.serve(handler);
