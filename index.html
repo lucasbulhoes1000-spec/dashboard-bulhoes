@@ -4346,6 +4346,26 @@ async function _baixarCloudiaDaBaseNova(){
   return [COLUNAS_PLANILHA_CLOUDIA.slice()].concat(ordem.map(k=>_cloudiaBase.linhas.get(k)));
 }
 let _cloudiaRawEmCurso=null;
+// ⚠️ FUNIL SEM O CLOUDIA (22/10/2026): o CRM grava os próprios eventos (lead
+// novo pelo WhatsApp, troca de origem por anúncio, mudança de etapa) na tabela
+// eventos_proprios, no mesmo formato da planilha. A partir da data em
+// configuracoes.funil_proprio_desde (a gestão liga em Automações, no dia em que
+// o Cloudia for desligado) eles entram junto com as linhas da planilha, e o
+// Dashboard continua contando leads, agendamentos, comparecimentos e fechamentos
+// do mesmo jeito. Sem a data, nada muda. Se a leitura falhar, segue só com a planilha.
+async function _anexarEventosProprios(raw){
+  try{
+    if(!Array.isArray(raw)||!Array.isArray(raw[0]))return raw;
+    const cfg=await _lerTabelaBaseNova('configuracoes?chave=eq.funil_proprio_desde&select=valor');
+    const desde=cfg&&cfg[0]&&typeof cfg[0].valor==='string'?cfg[0].valor:null;
+    window._funilProprioDesde=desde;
+    if(!desde)return raw;
+    const ev=await _lerTabelaBaseNova('eventos_proprios_planilha?select='+COLUNAS_PLANILHA_CLOUDIA.join(',')+'&ocorrido_em=gte.'+encodeURIComponent(desde)+'&order=id');
+    const h=raw[0];
+    ev.forEach(r=>raw.push(h.map(k=>Object.prototype.hasOwnProperty.call(r,k)&&r[k]!=null?r[k]:'')));
+  }catch(e){console.warn('[FUNIL CRM] eventos do CRM indisponíveis, usando só a planilha:',e);}
+  return raw;
+}
 function baixarPlanilhaCloudiaRaw(){
   if(_cloudiaRawEmCurso)return _cloudiaRawEmCurso;
   const p=_baixarCloudiaDaBaseNova()
@@ -4353,6 +4373,7 @@ function baixarPlanilhaCloudiaRaw(){
       if(!/desligada/.test(String(e&&e.message)))console.warn('[CLOUDIA] Base nova indisponível, usando o Apps Script:',e);
       return fetch(CLOUDIA_URL).then(res=>res.json());
     })
+    .then(_anexarEventosProprios)
     .finally(()=>{if(_cloudiaRawEmCurso===p)_cloudiaRawEmCurso=null;});
   _cloudiaRawEmCurso=p;
   return p;
@@ -13382,6 +13403,7 @@ async function auCarregar(){
     _au.chaveGeral=!!(chave&&chave[0]&&chave[0].valor===true);
     _au.ativos={};(ativos||[]).forEach(x=>{_au.ativos[x.automacao_id]=(_au.ativos[x.automacao_id]||0)+1;});
     _au.erro=null;
+    auCarregarExtras();
   }catch(e){_au.erro=e.message;}
   _au.carregando=false;
   if(currentPage==='automacoes'&&_au.modo==='lista')auRender();
@@ -13472,7 +13494,7 @@ function auRender(){
         (_waEhGestao()?'<button title="Apagar" class="sq-lixo" onclick="auApagar('+a.id+')">🗑</button>':'')+'</td>'+
     '</tr>';
   }).join('');
-  el.innerHTML=geral+
+  el.innerHTML=geral+'<div id="au-extras">'+auExtrasHtml()+'</div>'+
     '<div class="sq-info"><span>ℹ</span><div><b>Limitação da WhatsApp Business API</b><br><b>Importante:</b> Para contatos que utilizam a WhatsApp Business API, <b>somente mensagens de template são enviadas fora da janela de interação de 24 horas com o contato</b>, contabilizadas a partir da última mensagem recebida.</div></div>'+
     '<div class="dp-card">'+
       '<div class="sq-topo"><div class="dp-busca" style="max-width:240px"><input placeholder="Digite para buscar..." value="'+_auEsc(_au.busca||'')+'" oninput="_au.busca=this.value;auRender();this.focus();this.setSelectionRange(this.value.length,this.value.length)" style="border:none;outline:none;flex:1;font-size:12.5px;background:transparent;min-width:0"><span>🔍</span></div>'+
@@ -13482,6 +13504,148 @@ function auRender(){
     '</div>';
 }
 
+
+// ---------- Funil do CRM e lembretes de consulta (cartões no topo de Automações) ----------
+async function auCarregarExtras(){
+  try{
+    const [cfg,rod]=await Promise.all([
+      _waRest('configuracoes?chave=in.(funil_proprio_desde,lembretes_consulta)&select=chave,valor'),
+      _waRest('lembretes_rodadas?select=*&order=dia.desc,tipo&limit=6').catch(()=>[])
+    ]);
+    const v=k=>{const c=(cfg||[]).find(x=>x.chave===k);return c?c.valor:undefined;};
+    _au.funilDesde=typeof v('funil_proprio_desde')==='string'?v('funil_proprio_desde'):null;
+    _au.funilPronto=v('funil_proprio_desde')!==undefined;
+    _au.lemb=v('lembretes_consulta')||null;
+    _au.lembRodadas=rod||[];
+    if(_au.lemb&&!_au.lembEd)_au.lembEd=JSON.parse(JSON.stringify(_au.lemb));
+  }catch(e){_au.funilPronto=false;}
+  if(_au.lemb&&_waEhGestao()&&!_au.modelos)auCarregarModelos().then(()=>auRenderExtras());
+  auRenderExtras();
+}
+function auRenderExtras(){const el=document.getElementById('au-extras');if(el)el.innerHTML=auExtrasHtml();}
+function auExtrasHtml(){return _auFunilHtml()+_auLembHtml();}
+function _auFunilHtml(){
+  if(!_au.funilPronto)return '';
+  const g=_waEhGestao();
+  const desde=_au.funilDesde?new Date(_au.funilDesde):null;
+  return '<div class="au-geral'+(desde?' ligada':'')+'" style="margin-top:10px"><div>'+
+    '<div style="font-weight:600;font-size:13px">'+(desde?'📊 Dashboard usando o funil do CRM':'📊 Dashboard ainda usa o funil do Cloudia')+'</div>'+
+    '<div style="font-size:12px;margin-top:3px">'+(desde
+      ?'Desde '+desde.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+', leads novos do WhatsApp, troca de origem por anúncio e mudanças de etapa feitas no CRM entram nos números do Dashboard.'
+      :'O CRM já registra em paralelo os próprios eventos (lead novo do WhatsApp, origem pelo anúncio, mudança de etapa). Quando o Cloudia for desligado, ligue aqui para o Dashboard passar a contar por eles.')+'</div></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="wa-btn" onclick="auFunilComparar()">Comparar com o Cloudia</button>'+
+    (g?(desde?'<button class="wa-btn" onclick="auFunilLigar(false)">Voltar ao Cloudia</button>':'<button class="wa-btn primario" onclick="auFunilLigar(true)">Usar o funil do CRM</button>'):'')+'</div></div>';
+}
+async function auFunilLigar(ligar){
+  if(ligar&&!confirm('Usar o funil do CRM a partir de agora?\n\nFaça isso no dia em que o Cloudia for desligado. Se o Cloudia continuar mandando eventos para a planilha, leads e agendamentos podem contar em dobro.'))return;
+  if(!ligar&&!confirm('Voltar a contar só pelo Cloudia?\n\nOs eventos do CRM continuam sendo gravados, só saem do Dashboard.'))return;
+  try{
+    const valor=ligar?new Date().toISOString():null;
+    await _waRest('configuracoes?chave=eq.funil_proprio_desde',{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({valor:valor})});
+    _au.funilDesde=valor;auRenderExtras();
+    showToast('success',ligar?'Funil do CRM ligado':'Voltou ao funil do Cloudia','Recarregue o Dashboard para ver os números atualizados.');
+  }catch(e){showToast('error','Não foi possível mudar',e.message);}
+}
+async function auFunilComparar(){
+  let r;
+  try{r=await _waRest('rpc/funil_comparar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_desde:new Date(Date.now()-7*86400000).toISOString()})});}
+  catch(e){showToast('error','Não foi possível comparar',e.message);return;}
+  const rot={'CUSTOMER_CREATED':'Leads novos','CUSTOMER_ACQUISITION_ORIGIN_UPDATED':'Trocas de origem por anúncio'};
+  const nome=k=>{const [t,e]=k.split(':');return rot[t]||(t==='CUSTOMER_STAGE_UPDATED'?'Etapa → '+(WA_ETAPA_ROTULO[e]||e||'?'):t);};
+  const chaves=[...new Set(Object.keys(r.crm||{}).concat(Object.keys(r.cloudia||{})))].sort((a,b)=>(a.startsWith('CUSTOMER_CREATED')?0:1)-(b.startsWith('CUSTOMER_CREATED')?0:1)||a.localeCompare(b));
+  waFecharModal();
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal"><div class="wa-modal-cab">CRM × Cloudia — últimos 7 dias<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo">'+
+    '<div style="font-size:12px;color:#7a6550">Eventos que cada um registrou. No período em paralelo os números devem ficar parecidos; mudanças de etapa feitas direto no Cloudia só aparecem do lado dele.</div>'+
+    '<table class="sq-tab" style="width:100%"><thead><tr><th>Evento</th><th>CRM</th><th>Cloudia</th></tr></thead><tbody>'+
+    (chaves.length?chaves.map(k=>'<tr><td>'+_auEsc(nome(k))+'</td><td>'+((r.crm||{})[k]||0)+'</td><td>'+((r.cloudia||{})[k]||0)+'</td></tr>').join(''):'<tr><td colspan="3">Nenhum evento nos últimos 7 dias.</td></tr>')+
+    '</tbody></table></div></div>';
+  document.body.appendChild(fundo);
+}
+const AU_LEMB_TIPOS={vespera:{nome:'Véspera',dica:'Consultas do dia seguinte. Sábado avisa as de segunda; domingo não manda.'},dia:{nome:'No dia',dica:'Consultas do próprio dia que ainda não começaram.'}};
+function _auLembHtml(){
+  const L=_au.lemb;if(!L)return '';
+  const g=_waEhGestao();const E=_au.lembEd||L;
+  const st={concluida:'concluída',rodando:'enviando…',erro:'erro'};
+  const rod=(_au.lembRodadas||[]).map(r=>'<div style="font-size:11.5px">'+new Date(r.dia+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' · '+AU_LEMB_TIPOS[r.tipo].nome+': '+st[r.status]+
+    (r.status!=='erro'?' · '+r.enviados+' enviado'+(r.enviados===1?'':'s')+(r.falhas?' · <span style="color:#c0392b">'+r.falhas+' falha'+(r.falhas===1?'':'s')+'</span>':''):'')+
+    (r.erro?' · <span style="color:#c0392b">'+_auEsc(r.erro)+'</span>':'')+'</div>').join('');
+  const cab='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
+    '<div><div style="font-weight:600;font-size:13px">⏰ Lembretes de consulta (agenda do Clinicorp) '+(L.ligado?(L.modo_teste!==false?'<span class="sq-teste">🧪 teste</span>':'<span style="color:#3f6b4c">● ligados</span>'):'<span style="color:#9a8a78">● desligados</span>')+'</div>'+
+    '<div style="font-size:12px;margin-top:3px;color:#7a6550">Um modelo aprovado do WhatsApp por consulta: na véspera e no dia. Desmarcados e excluídos no Clinicorp ficam de fora. Não depende da chave geral.</div></div>'+
+    '<div style="display:flex;gap:6px">'+(L.ligado||(_au.lembRodadas||[]).length?'<button class="wa-btn" onclick="auLembVer()">Ver enviados</button>':'')+
+    (g?'<button class="wa-btn" onclick="_au.lembAberto=!_au.lembAberto;auRenderExtras()">'+(_au.lembAberto?'Fechar':'Configurar')+'</button>':'')+'</div></div>';
+  let corpo='';
+  if(g&&_au.lembAberto){
+    const ms=_au.modelos||[];
+    const tipo=t=>{
+      const c=E[t]||{};const p=c.modelo;const m=p&&ms.find(x=>x.nome===p.nome);
+      let h='<div style="border:0.5px solid #e9dccb;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:12.5px">'+AU_LEMB_TIPOS[t].nome+'</b>'+
+        '<label style="font-size:12px;display:flex;gap:6px;align-items:center">às <input class="wa-var" type="time" style="width:96px" value="'+_auEsc(c.hora||'')+'" onchange="_au.lembEd.'+t+'.hora=this.value"></label></div>'+
+        '<div style="font-size:11px;color:#7a6550">'+AU_LEMB_TIPOS[t].dica+'</div>'+
+        '<select class="wa-sel" style="width:100%;height:32px" onchange="auLembModelo(\''+t+'\',this.value)"><option value="">'+(ms.length?'Sem lembrete ('+AU_LEMB_TIPOS[t].nome.toLowerCase()+' desligado)':(_au.carregandoModelos?'Carregando modelos…':'Nenhum modelo carregado'))+'</option>'+
+          ms.map(x=>'<option value="'+_auEsc(x.nome)+'"'+(p&&p.nome===x.nome?' selected':'')+'>'+_auEsc(x.nome)+' ('+String(x.categoria||'').toLowerCase()+')</option>').join('')+
+          (p&&!m?'<option selected value="'+_auEsc(p.nome)+'">'+_auEsc(p.nome)+'</option>':'')+'</select>';
+      if(p){
+        if(p.texto_preview)h+='<div class="au-preview">'+_auEsc(p.texto_preview)+'</div>';
+        if(p.cabecalho)h+='<div style="font-size:11px;color:#7a6550">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[p.cabecalho.formato]||'mídia')+' (link público):</div><input class="wa-var" value="'+_auEsc(p.cabecalho.link||'')+'" oninput="_au.lembEd.'+t+'.modelo.cabecalho.link=this.value.trim()">';
+        (p.variaveis||[]).forEach((v,k)=>{h+='<div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#7a6550">'+_auEsc(p.formato==='NAMED'?'{{'+((p.campos||[])[k]||k+1)+'}}':'{{'+(k+1)+'}}')+'<input class="wa-var" style="flex:1" value="'+_auEsc(v)+'" placeholder="ex.: {hora}" oninput="_au.lembEd.'+t+'.modelo.variaveis['+k+']=this.value"></div>';});
+      }
+      return h+'</div>';
+    };
+    corpo='<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">'+
+      '<div style="font-size:11.5px;color:#7a6550">Nas variáveis do modelo: <b>{primeiro_nome}</b>, <b>{nome}</b>, <b>{data}</b> (26/10), <b>{hora}</b> (09:30), <b>{dia_semana}</b> (segunda-feira), <b>{quando}</b> (hoje / amanhã / segunda-feira).</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('dia')+'</div>'+
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px">'+
+        '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" '+(E.ligado?'checked':'')+' onchange="_au.lembEd.ligado=this.checked"> Ligados</label>'+
+        '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" '+(E.modo_teste!==false?'checked':'')+' onchange="_au.lembEd.modo_teste=this.checked;auRenderExtras()"> Modo teste (só os telefones abaixo)</label>'+
+      '</div>'+
+      (E.modo_teste!==false?'<input class="wa-var" placeholder="Telefones de teste, separados por vírgula (ex.: 13999998888)" value="'+_auEsc((E.telefones_teste||[]).join(', '))+'" oninput="_au.lembEd.telefones_teste=this.value.split(/[\\n,;]+/).map(x=>x.replace(/\\D/g,\'\')).filter(Boolean)">':'')+
+      '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="wa-btn" onclick="_au.lembEd=JSON.parse(JSON.stringify(_au.lemb));_au.lembAberto=false;auRenderExtras()">Cancelar</button><button class="wa-btn primario" onclick="auLembSalvar()">Salvar lembretes</button></div>'+
+    '</div>';
+  }
+  return '<div class="dp-card" style="margin-top:10px;padding:12px 14px">'+cab+(rod?'<div style="margin-top:8px;color:#5a4a3a">'+rod+'</div>':'')+corpo+'</div>';
+}
+function auLembModelo(t,nome){
+  const m=(_au.modelos||[]).find(x=>x.nome===nome);const E=_au.lembEd;
+  const padrao=['{primeiro_nome}',t==='dia'?'{quando}':'{quando}','{hora}'];
+  E[t]=Object.assign({},E[t]||{},{modelo:m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,
+    variaveis:Array.from({length:m.variaveis||0},(_,k)=>padrao[k]||''),
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null}:null});
+  auRenderExtras();
+}
+async function auLembSalvar(){
+  const E=_au.lembEd;if(!E)return;
+  for(const t of ['vespera','dia']){
+    const c=E[t]||{};
+    if(c.modelo&&!/^\d{2}:\d{2}$/.test(c.hora||'')){showToast('error','Falta o horário',AU_LEMB_TIPOS[t].nome+': escolha a hora do envio.');return;}
+    if(c.modelo&&c.modelo.cabecalho&&!/^https:\/\//.test(c.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho',AU_LEMB_TIPOS[t].nome+': o modelo tem mídia, coloque o link https://');return;}
+  }
+  if(E.ligado&&!E.vespera.modelo&&!E.dia.modelo){showToast('error','Escolha pelo menos um modelo','');return;}
+  if(E.ligado&&E.modo_teste!==false&&!(E.telefones_teste||[]).length){showToast('error','Coloque um telefone de teste','No modo teste só esses telefones recebem.');return;}
+  if(E.ligado&&E.modo_teste===false&&!(_au.lemb.ligado&&_au.lemb.modo_teste===false)&&!confirm('Ligar os lembretes para todos os pacientes agendados?\n\nSe o Cloudia ainda manda lembretes, o paciente recebe em dobro.'))return;
+  try{
+    await _waRest('configuracoes?chave=eq.lembretes_consulta',{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({valor:E})});
+    _au.lemb=JSON.parse(JSON.stringify(E));_au.lembAberto=false;auRenderExtras();
+    showToast('success','Lembretes salvos',E.ligado?'O motor confere a agenda nos horários marcados.':'Ficam desligados até marcar “Ligados”.');
+  }catch(e){showToast('error','Não foi possível salvar',e.message);}
+}
+async function auLembVer(){
+  let ls=[];
+  try{ls=await _waRest('lembretes_consulta?select=data,tipo,nome,hora,status,erro,criado_em,conversa_id&order=criado_em.desc&limit=60');}
+  catch(e){showToast('error','Não foi possível carregar',e.message);return;}
+  const st={enviando:'Enviando',enviado:'Enviado',falhou:'Falhou'};
+  waFecharModal();
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal" style="max-width:720px"><div class="wa-modal-cab">Lembretes enviados (últimos 60)<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" style="max-height:70vh;overflow:auto">'+
+    (ls.length?'<table class="sq-tab" style="width:100%"><thead><tr><th>Consulta</th><th>Paciente</th><th>Tipo</th><th>Status</th></tr></thead><tbody>'+
+      ls.map(x=>'<tr><td>'+new Date(x.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+(x.hora?' '+_auEsc(x.hora):'')+'</td><td>'+_auEsc(x.nome||'')+'</td><td>'+AU_LEMB_TIPOS[x.tipo].nome+'</td><td>'+st[x.status]+(x.erro?'<div style="font-size:10.5px;color:#c0392b">'+_auEsc(x.erro)+'</div>':'')+'</td></tr>').join('')+
+      '</tbody></table>':'<div class="wa-vazio">Nenhum lembrete enviado ainda.</div>')+'</div></div>';
+  document.body.appendChild(fundo);
+}
 // ---------- editor (gaveta lateral) ----------
 function _sqAbrir(a){
   a.regras=Object.assign({},AU_REGRAS_PADRAO,a.regras||{});

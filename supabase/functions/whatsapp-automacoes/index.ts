@@ -7,7 +7,8 @@
 // (automacao_pegar) e executa os passos em ordem até chegar numa espera:
 //   esperar · texto · midia · modelo · acao · por_tag · tirar_tag · atribuir · se · fim
 // Também envia os disparos em massa (tabela disparos), no ritmo de cada um, e as
-// mensagens agendadas pela equipe na Central (tabela mensagens_agendadas).
+// mensagens agendadas pela equipe na Central (tabela mensagens_agendadas) e os
+// lembretes de consulta pela agenda do Clinicorp (configuracoes 'lembretes_consulta').
 //
 // Regras de cada automação (campo regras):
 //   inicio/fim (horário de Brasília) e pular_fim_de_semana → mensagens fora do
@@ -18,7 +19,8 @@
 // Chave geral (configuracoes 'automacoes_ligadas'): enquanto false, só andam as
 // automações em modo teste.
 //
-// Segredos usados: WA_TOKEN, WA_PHONE_NUMBER_ID (mesmos da whatsapp-acoes).
+// Segredos usados: WA_TOKEN, WA_PHONE_NUMBER_ID (mesmos da whatsapp-acoes) e, para os
+// lembretes, CLINICORP_USUARIO e CLINICORP_TOKEN (e CLINICORP_SUBSCRIBER_ID em conta de grupo).
 // ============================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -108,11 +110,14 @@ export function janelaAberta(c: { ultima_recebida_em?: string | null; janela_gra
 }
 
 /** Troca {nome}, {primeiro_nome}, {telefone} pelo dado do contato. */
-export function preencher(texto: string, ctx: { nome?: string | null; telefone?: string }): string {
+export function preencher(texto: string, ctx: { nome?: string | null; telefone?: string; extra?: Record<string, string> }): string {
   const nome = String(ctx.nome ?? "").trim();
   const primeiro = nome.split(/\s+/)[0] ?? "";
   const pr = primeiro ? primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase() : "";
-  return String(texto ?? "")
+  let t = String(texto ?? "");
+  // {data}, {hora}, {dia_semana}, {quando} dos lembretes de consulta
+  for (const [k, v] of Object.entries(ctx.extra ?? {})) t = t.replace(new RegExp("\\{\\s*" + k + "\\s*\\}", "gi"), v);
+  return t
     .replace(/\{\s*primeiro_nome\s*\}/gi, pr)
     .replace(/\{\s*nome\s*\}/gi, nome || pr)
     .replace(/\{\s*telefone\s*\}/gi, ctx.telefone ?? "")
@@ -121,7 +126,7 @@ export function preencher(texto: string, ctx: { nome?: string | null; telefone?:
 }
 
 /** Monta o corpo do modelo para a Meta (mesma regra da whatsapp-acoes). */
-export function corpoModelo(p: any, ctx: { nome?: string | null; telefone?: string }) {
+export function corpoModelo(p: any, ctx: { nome?: string | null; telefone?: string; extra?: Record<string, string> }) {
   const template: any = { name: String(p.nome), language: { code: String(p.idioma ?? "pt_BR") } };
   const components: any[] = [];
   const cab = p.cabecalho;
@@ -428,6 +433,143 @@ async function rodarAgendadas(inicio: number, cont: Record<string, number>) {
   }
 }
 
+// ---------- lembretes de consulta (agenda do Clinicorp) ----------
+const CLINICORP_USUARIO = Deno.env.get("CLINICORP_USUARIO") ?? "";
+const CLINICORP_TOKEN = Deno.env.get("CLINICORP_TOKEN") ?? "";
+const CLINICORP_SUBSCRIBER_ID = Deno.env.get("CLINICORP_SUBSCRIBER_ID") ?? "";
+const DIAS_SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+const ymd = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Dias de consulta que a rodada de hoje cobre. Véspera: amanhã; sábado também segunda; domingo nada. */
+export function diasDoLembrete(tipo: "vespera" | "dia", agora: number): string[] {
+  const local = new Date(agora + FUSO_MIN * 60_000);
+  const base = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+  const dia = (n: number) => ymd(new Date(base + n * 86_400_000));
+  if (tipo === "dia") return [dia(0)];
+  const sem = local.getUTCDay();
+  if (sem === 0) return [];
+  if (sem === 6) return [dia(1), dia(2)];
+  return [dia(1)];
+}
+
+export type Consulta = { id: string; data: string; hora: string; nome: string; telefone: string };
+/** Agendamentos válidos do Clinicorp: paciente, com celular, não desmarcado/excluído, no dia pedido. Um por telefone e dia (o mais cedo). */
+export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vespera" | "dia", agora: number): Consulta[] {
+  const minutosAgora = Math.floor(((agora + FUSO_MIN * 60_000) % 86_400_000) / 60_000);
+  const hoje = diasDoLembrete("dia", agora)[0];
+  const porChave = new Map<string, Consulta>();
+  for (const a of Array.isArray(lista) ? lista : []) {
+    if (a?.ItemType && a.ItemType !== "APPOINTMENT") continue;
+    if (String(a?.Canceled ?? "").toUpperCase() === "X" || String(a?.Deleted ?? "").toUpperCase() === "X") continue;
+    const tel = String(a?.MobilePhone ?? "").replace(/\D/g, "");
+    if (tel.length < 10) continue;
+    const at = String(a?.AtomicDate ?? "");
+    const data = /^\d{8}$/.test(at) ? `${at.slice(0, 4)}-${at.slice(4, 6)}-${at.slice(6, 8)}` : String(a?.date ?? "").slice(0, 10);
+    if (!dias.includes(data)) continue;
+    const hora = /^\d{1,2}:\d{2}/.test(String(a?.fromTime ?? "")) ? String(a.fromTime).slice(0, 5).padStart(5, "0") : "";
+    if (tipo === "dia" && data === hoje && hora && hm(hora, 0) <= minutosAgora) continue; // já começou
+    const c: Consulta = { id: String(a?.id ?? ""), data, hora, nome: String(a?.PatientName ?? "").trim(), telefone: tel };
+    const k = data + "|" + tel.slice(-9);
+    const ja = porChave.get(k);
+    if (!ja || (c.hora && (!ja.hora || c.hora < ja.hora))) porChave.set(k, c);
+  }
+  return [...porChave.values()].sort((x, y) => (x.data + x.hora).localeCompare(y.data + y.hora));
+}
+
+export function variaveisDaConsulta(c: Consulta, tipo: "vespera" | "dia", agora: number): Record<string, string> {
+  const [y, m, d] = c.data.split("-").map(Number);
+  const sem = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const amanha = diasDoLembrete("dia", agora + 86_400_000)[0];
+  const quando = tipo === "dia" ? "hoje" : c.data === amanha ? "amanhã" : DIAS_SEMANA[sem];
+  return { data: `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`, hora: c.hora || "-", dia_semana: DIAS_SEMANA[sem], quando };
+}
+
+async function agendaClinicorp(de: string, ate: string): Promise<any[]> {
+  const u = new URL("https://api.clinicorp.com/rest/v1/appointment/list");
+  u.searchParams.set("from", de);
+  u.searchParams.set("to", ate);
+  if (CLINICORP_SUBSCRIBER_ID) u.searchParams.set("subscriber_id", CLINICORP_SUBSCRIBER_ID);
+  const r = await fetch(u, { headers: { Authorization: "Basic " + btoa(CLINICORP_USUARIO + ":" + CLINICORP_TOKEN), Accept: "application/json" } });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`Clinicorp ${r.status}: ${t.slice(0, 200)}`);
+  const j = t ? JSON.parse(t) : [];
+  return Array.isArray(j) ? j : (j?.appointments ?? j?.data ?? []);
+}
+
+async function enviarLembrete(c: Consulta, tipo: "vespera" | "dia", cfg: any, agora: number): Promise<string> {
+  const res = await rpc("lembrete_reservar", { p_data: c.data, p_tipo: tipo, p_tel: c.telefone, p_nome: c.nome, p_hora: c.hora, p_cid: c.id });
+  if (!res) return "ja_enviado";
+  const marcar = (st: string, erro: string | null, wa: string | null, conv: string | null) =>
+    rpc("lembrete_marcar", { p_id: res.id, p_status: st, p_erro: erro, p_wa: wa, p_conversa: conv });
+  try {
+    const numero = String(cfg.numero_clinica_id || WA_PHONE_NUMBER_ID);
+    const convId = await rpc("automacao_conversa", { p_numero: numero, p_telefone: res.telefone });
+    const conv = (await bancoJson(`/rest/v1/conversas?id=eq.${convId}&select=*`))?.[0];
+    const p = (await bancoJson(`/rest/v1/pacientes?telefone=eq.${res.telefone}&select=nome`))?.[0];
+    const dados = { nome: c.nome || p?.nome || conv?.nome_contato || conv?.nome_perfil || "", telefone: res.telefone, extra: variaveisDaConsulta(c, tipo, agora) };
+    const modelo = cfg[tipo].modelo;
+    const corpo = corpoModelo(modelo, dados);
+    const registro = modelo?.texto_preview ? preencher(String(modelo.texto_preview), dados) : `[modelo ${modelo?.nome}]`;
+    const autor = tipo === "dia" ? "Lembrete do dia" : "Lembrete de véspera";
+    const r = await meta(`/${conv.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: conv.wa_id, ...corpo }, await tokenDoNumero(conv.numero_clinica_id));
+    if (!r.ok) {
+      const erro = erroMeta(r.j);
+      await registrar(conv, null, "template", registro, autor, "falhou", erro, r.j);
+      await marcar("falhou", erro.slice(0, 300), null, conv.id);
+      return "falhou";
+    }
+    const waId = r.j?.messages?.[0]?.id ?? null;
+    await registrar(conv, waId, "template", registro, autor, "enviada", null, r.j);
+    await marcar("enviado", null, waId, conv.id);
+    return "enviado";
+  } catch (e) {
+    await marcar("falhou", String((e as Error)?.message ?? e).slice(0, 300), null, null).catch(() => {});
+    return "falhou";
+  }
+}
+
+export async function rodarLembretes(inicio: number, cont: Record<string, number>, agora = Date.now()) {
+  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor;
+  if (!cfg?.ligado) return;
+  await rpc("lembretes_limpar_presos", {}).catch(() => {});
+  const local = new Date(agora + FUSO_MIN * 60_000);
+  const hoje = ymd(local);
+  const minutos = local.getUTCHours() * 60 + local.getUTCMinutes();
+  const teste = cfg.modo_teste !== false;
+  const telsTeste = new Set((Array.isArray(cfg.telefones_teste) ? cfg.telefones_teste : []).map((t: unknown) => String(t).replace(/\D/g, "").slice(-9)).filter(Boolean));
+  for (const tipo of ["dia", "vespera"] as const) {
+    const c = cfg[tipo];
+    if (!c?.modelo?.nome) continue;
+    const h = hm(c.hora, tipo === "dia" ? 8 * 60 + 30 : 10 * 60 + 30);
+    if (minutos < h || minutos > h + 180) continue; // roda nas 3 h depois do horário (se o motor atrasar, ainda manda)
+    const rod = (await bancoJson(`/rest/v1/lembretes_rodadas?dia=eq.${hoje}&tipo=eq.${tipo}&select=status`).catch(() => null))?.[0];
+    if (rod?.status === "concluida") continue;
+    const dias = diasDoLembrete(tipo, agora);
+    if (!dias.length) { await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "concluida", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: null }); continue; }
+    if (!CLINICORP_USUARIO || !CLINICORP_TOKEN) {
+      await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: "faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN na Supabase" });
+      continue;
+    }
+    let lista: Consulta[];
+    try {
+      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, tipo, agora);
+    } catch (e) {
+      await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: String((e as Error)?.message ?? e).slice(0, 300) });
+      continue;
+    }
+    if (teste) lista = lista.filter((x) => telsTeste.has(x.telefone.slice(-9)));
+    let enviados = 0, falhas = 0, completo = true;
+    for (const x of lista) {
+      if (Date.now() - inicio > TEMPO_MAX_MS) { completo = false; break; }
+      const r = await enviarLembrete(x, tipo, cfg, agora);
+      if (r === "enviado") enviados++;
+      if (r === "falhou") falhas++;
+      cont["lembrete_" + r] = (cont["lembrete_" + r] ?? 0) + 1;
+    }
+    await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: completo ? "concluida" : "rodando", p_consultas: lista.length, p_enviados: enviados, p_falhas: falhas, p_erro: null });
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const json = (c: unknown, s = 200) => new Response(JSON.stringify(c), { status: s, headers: { "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
@@ -441,6 +583,7 @@ export async function handler(req: Request): Promise<Response> {
   // disparos em massa primeiro (não dependem da chave geral: cada um é decisão da equipe)
   // mensagens agendadas pela equipe primeiro (hora marcada), depois disparos em massa
   await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
+  await rodarLembretes(inicio, cont).catch((e) => { cont.lembrete_erro_motor = 1; console.error("lembretes", e); });
   await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
   const autos = new Map<number, any>();
   while (Date.now() - inicio < TEMPO_MAX_MS) {
