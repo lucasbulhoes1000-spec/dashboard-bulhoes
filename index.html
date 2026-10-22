@@ -13108,7 +13108,7 @@ async function waEnviarTexto(){
   _wa.enviando=true;
   const temp={id:'tmp-'+Date.now(),conversa_id:c.id,direcao:'enviada',tipo:'text',texto,status:'enviando',autor_email:usuarioAtualEmail(),enviada_em:new Date().toISOString()};
   _wa.msgs.push(temp);waRenderMsgs(true);
-  t.value='';waAjustarTexto(t);waRenderJanela();
+  t.value='';waAjustarTexto(t);try{waContar(t);}catch(e){}waRenderJanela();
   try{
     const r=await _waAcao({acao:'enviar_texto',conversa_id:c.id,texto});
     const ja=_wa.msgs.find(m=>m.id===r.mensagem_id);
