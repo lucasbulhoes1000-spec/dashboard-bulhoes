@@ -585,7 +585,16 @@ export async function handler(req: Request): Promise<Response> {
       const validas = consultasDoClinicorp(bruto, dias, "vespera", Date.now());
       const porDia: Record<string, number> = {};
       for (const c of validas) porDia[c.data] = (porDia[c.data] ?? 0) + 1;
-      return json({ ok: true, itens_na_agenda: bruto.length, pacientes_com_celular_por_dia: porDia });
+      // campos e categorias (sem dados de paciente) para conferir o filtro de avaliação
+      const campos = [...new Set(bruto.flatMap((a: any) => Object.keys(a ?? {})))];
+      const categorias: Record<string, number> = {};
+      for (const a of bruto) for (const [k, v] of Object.entries(a ?? {})) {
+        if (/categ|procedure|tipo|type|description/i.test(k) && !/patient|name|phone|mail|notes/i.test(k)) {
+          const c = k + "=" + (typeof v === "object" ? JSON.stringify(v) : String(v)).slice(0, 60);
+          categorias[c] = (categorias[c] ?? 0) + 1;
+        }
+      }
+      return json({ ok: true, itens_na_agenda: bruto.length, pacientes_com_celular_por_dia: porDia, campos, categorias });
     } catch (e) {
       return json({ ok: false, erro: String((e as Error)?.message ?? e).slice(0, 300) });
     }
