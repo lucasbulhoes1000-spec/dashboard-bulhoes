@@ -16,7 +16,7 @@ alter table public.agente_ia add column if not exists agendamento jsonb not null
   'procedimento', 'Avaliação',
   'duracao_min', 60, 'passo_min', 30,
   'semana_inicio', '09:00', 'semana_ultimo', '18:00',
-  'sabado_inicio', '09:00', 'sabado_ultimo', '12:00',
+  'sabado_inicio', '09:00', 'sabado_ultimo', '13:00',
   'almoco_inicio', '12:00', 'almoco_fim', '14:00', 'almoco_min', 60,
   'antecedencia_horas', 2, 'dias_busca', 14);
 grant update (agendamento) on public.agente_ia to authenticated;

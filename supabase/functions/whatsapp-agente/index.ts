@@ -685,6 +685,20 @@ export async function handler(req: Request): Promise<Response> {
         const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
         return json({ ok: true, livres: livres.slice(0, 40), manha: duasOpcoes(livres, "manha").map((h) => descreverHorario(h, agora)), tarde: duasOpcoes(livres, "tarde").map((h) => descreverHorario(h, agora)) });
       }
+      case "agendar_teste": {
+        // (gestão) marca de verdade, para conferir como fica no Clinicorp
+        if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
+        const { a } = await carregarAgente();
+        const r = await marcarNoClinicorp(a?.agendamento ?? {}, { data: String(dados.data), hora: String(dados.hora) }, String(dados.nome), String(dados.telefone), String(dados.observacoes ?? ""));
+        let conferido = null;
+        if (r.ok) {
+          const ag = await clinicorp("/appointment/list", { from: String(dados.data), to: String(dados.data), ...(CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {}) }).catch(() => []);
+          const it = (Array.isArray(ag) ? ag : []).find((x: any) => String(x.id) === r.id);
+          if (it) conferido = { PatientName: it.PatientName, MobilePhone: it.MobilePhone, fromTime: it.fromTime, toTime: it.toTime, Dentist_PersonId: String(it.Dentist_PersonId), CategoryDescription: it.CategoryDescription, Procedures: it.Procedures, Notes: it.Notes, Patient_PersonId: String(it.Patient_PersonId ?? "") };
+        }
+        await registro({ tipo: "agendamento", detalhe: `Teste da gestão: ${JSON.stringify(r).slice(0, 300)}`, autor: u.email });
+        return json({ ok: r.ok, resultado: r, conferido });
+      }
       case "sugerir":
         return json({ ok: true, ...(await sugerir(String(dados.conversa_id), u.email)) });
       case "resumir":
