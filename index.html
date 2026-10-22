@@ -346,6 +346,102 @@ tbody tr:hover td{background:#faf7f3;}
 .dp-res-linha{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#7a6550;padding:3px 0;}
 .dp-res-linha b{color:#2a2520;white-space:nowrap;}
 .dp-alerta{font-size:11.5px;color:#7a5530;background:#fbf1e6;border:0.5px solid #e9d5bb;border-radius:7px;padding:8px;}
+/* ===== Sequências (layout Cloudia, cores Bulhões) ===== */
+.sq-info{display:flex;gap:10px;background:#f2ebe1;border:0.5px solid #e4d8c8;border-radius:6px;padding:10px 14px;font-size:12px;color:#3d342b;line-height:1.45;}
+.sq-info>span{width:18px;height:18px;border-radius:50%;background:#A18B6C;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.sq-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.sq-nova{height:34px;padding:0 16px;border:none;border-radius:6px;background:#A18B6C;color:#fff;font-size:13px;cursor:pointer;}
+.sq-nova:hover{background:#8f7a5d;}
+.sq-tab{width:100%;border-collapse:collapse;font-size:12.5px;}
+.sq-tab thead th{background:#f7f2ec;color:#5a4e44;font-size:10.5px;font-weight:600;letter-spacing:.4px;text-align:left;padding:13px 14px;border-bottom:0.5px solid #e4d8c8;}
+.sq-tab td{padding:12px 14px;border-bottom:0.5px solid #f2ece4;color:#2a2520;vertical-align:middle;}
+.sq-tab tr:hover td{background:#fcfaf7;}
+.sq-id{color:#5a4e44;width:60px;}
+.sq-nome{cursor:pointer;color:#2a2520;}
+.sq-nome:hover{color:#8f7a5d;text-decoration:underline;}
+.sq-gat{font-size:10.5px;color:#9a8c7e;margin-top:3px;}
+.sq-desc{color:#5a4e44;max-width:420px;}
+.sq-acoes{white-space:nowrap;}
+.sq-acoes button{background:none;border:none;cursor:pointer;font-size:15px;padding:2px 5px;opacity:.85;}
+.sq-acoes button:hover{opacity:1;}
+.sq-cont{min-width:30px;height:24px;border:0.5px solid #ddd2c5;border-radius:12px;background:#fff;color:#5a4e44;font-size:11.5px;cursor:pointer;}
+.sq-teste{display:inline-block;margin-left:6px;font-size:10px;background:#fbf1e6;color:#9a6a3a;border-radius:8px;padding:1px 7px;cursor:pointer;vertical-align:middle;}
+.sq-switch{position:relative;display:inline-block;width:30px;height:17px;vertical-align:middle;flex-shrink:0;}
+.sq-switch input{opacity:0;width:0;height:0;}
+.sq-switch span{position:absolute;inset:0;background:#d8cfc4;border-radius:17px;cursor:pointer;transition:.2s;}
+.sq-switch span:before{content:'';position:absolute;width:13px;height:13px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;}
+.sq-switch input:checked+span{background:#A18B6C;}
+.sq-switch input:checked+span:before{transform:translateX(13px);}
+.sq-switch input:disabled+span{opacity:.5;cursor:default;}
+.sq-gaveta{width:min(600px,100%);}
+.sq-corpo{background:#faf7f3;gap:0;padding:14px 16px 30px;}
+.sq-x{background:none;border:none;font-size:15px;color:#7a6e62;cursor:pointer;padding:2px 6px;}
+.sq-cfg{background:#fff;border:0.5px solid #ece4da;border-radius:6px;margin-top:12px;}
+.sq-cfg-cab{display:flex;justify-content:center;gap:10px;position:relative;padding:11px;font-size:13px;font-weight:600;color:#2a2520;cursor:pointer;border-bottom:0.5px solid #f2ece4;}
+.sq-cfg-cab span{position:absolute;right:14px;color:#7a6e62;}
+.sq-cfg-corpo{padding:12px 14px;display:flex;flex-direction:column;gap:14px;}
+.sq-sub{font-size:11px;color:#5a4e44;}
+.sq-nota{font-size:10.5px;color:#7a6e62;}
+.sq-ta{height:auto;min-height:56px;padding:8px 10px;resize:vertical;font-family:inherit;line-height:1.4;}
+.sq-gats{border:0.5px solid #ece4da;border-radius:5px;margin-top:4px;}
+.sq-gats-cab{background:#f7f2ec;text-align:center;font-size:12px;font-weight:600;color:#2a2520;padding:8px;position:relative;cursor:pointer;}
+.sq-gats-cab span{position:absolute;right:12px;color:#7a6e62;}
+.sq-gats-corpo{padding:10px;display:flex;flex-direction:column;gap:8px;}
+.sq-gat-linha{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 26px 22px;gap:6px;align-items:center;}
+.sq-ou{font-size:11px;color:#2a2520;text-align:center;}
+.sq-gat-linha .sq-x{color:#c0392b;}
+.sq-add-gat{height:30px;border:none;border-radius:4px;background:#A18B6C;color:#fff;font-size:12px;font-weight:600;cursor:pointer;}
+.sq-av-cab{font-size:12px;color:#2a2520;cursor:pointer;user-select:none;}
+.sq-av{display:flex;flex-direction:column;gap:9px;padding:4px 0 2px;}
+.sq-tg{display:flex;align-items:center;gap:9px;font-size:12px;color:#2a2520;cursor:pointer;}
+.sq-horas{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sq-horas label{font-size:11px;color:#5a4e44;display:flex;flex-direction:column;gap:4px;}
+.sq-sep{border-top:0.5px solid #f2ece4;margin:3px 0;}
+.sq-fluxo{display:flex;flex-direction:column;align-items:stretch;margin-top:18px;}
+.sq-comeco{align-self:center;background:#fff;border:0.5px solid #ece4da;border-radius:20px;padding:8px 14px;font-size:12px;color:#2a2520;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.sq-fio{align-self:center;width:1px;height:20px;background:#cfc4b7;}
+.sq-passo{background:#fff;border:0.5px solid #ece4da;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.sq-p-cab{display:flex;align-items:center;gap:6px;padding:12px 14px 4px;}
+.sq-ic{font-size:13px;}
+.sq-num{font-size:11px;color:#9a8c7e;}
+.sq-p-tit{font-size:14px;color:#2a2520;}
+.sq-dots{background:none;border:none;font-size:16px;color:#5a4e44;cursor:pointer;padding:0 4px;}
+.sq-p-corpo{padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;}
+.sq-p-av{border-top:0.5px solid #f2ece4;padding:9px 14px;}
+.sq-lab{font-size:11.5px;font-weight:600;color:#2a2520;}
+.sq-espera{display:flex;align-items:center;gap:12px;}
+.sq-espera input{max-width:150px;}
+.sq-espera span{font-size:16px;color:#2a2520;}
+.sq-espera b{font-size:17px;color:#2a2520;font-weight:500;}
+.sq-cont-car{font-size:10.5px;color:#2a2520;text-align:right;margin-top:-22px;}
+.sq-ta-wrap{position:relative;}
+.sq-ta-wrap textarea{padding-right:64px;}
+.sq-ta-ic{position:absolute;right:8px;bottom:8px;display:flex;gap:4px;}
+.sq-ta-ic button{background:none;border:none;cursor:pointer;font-size:13px;color:#2a2520;padding:0 2px;}
+.sq-menu{position:absolute;right:0;top:22px;background:#fff;border:0.5px solid #e0d8ce;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.12);z-index:1100;min-width:170px;display:flex;flex-direction:column;padding:4px;}
+.sq-menu button{background:none;border:none;text-align:left;padding:7px 10px;font-size:12px;color:#2a2520;cursor:pointer;border-radius:4px;white-space:nowrap;}
+.sq-menu button:hover{background:#f5efe8;}
+.sq-menu code{font-size:10.5px;color:#8f7a5d;}
+.sq-menu-dir{right:0;bottom:24px;top:auto;}
+.sq-emojis{display:grid;grid-template-columns:repeat(5,1fr);min-width:0;}
+.sq-emojis button{font-size:16px;text-align:center;padding:4px;}
+.sq-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:4px 0;}
+.sq-chip{background:#f7f2ec;border:0.5px solid #ece4da;border-radius:5px;padding:5px 10px;font-size:12px;color:#2a2520;cursor:pointer;}
+.sq-chip:hover{background:#efe6da;}
+.sq-mais{align-self:center;width:34px;height:34px;border-radius:50%;border:none;background:#A18B6C;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+.sq-salvar{margin:10px 16px 14px;height:38px;border:none;border-radius:4px;background:#C9A86A;color:#2a2520;font-size:13.5px;cursor:pointer;flex-shrink:0;}
+.sq-salvar:hover{background:#bb9b5d;}
+.sq-salvar:disabled{opacity:.6;}
+.sq-tags-box{display:flex;flex-wrap:wrap;gap:5px;align-items:center;border:0.5px solid #ddd2c5;border-radius:6px;padding:5px 7px;min-height:36px;}
+.sq-tags-box select{border:none;background:none;font-size:12px;color:#8f7a5d;outline:none;cursor:pointer;}
+.sq-tagchip{background:#f2ece4;border-radius:4px;padding:2px 7px;font-size:11px;color:#2a2520;}
+.sq-tagchip b{cursor:pointer;margin-left:3px;color:#7a6e62;}
+.sq-upload{display:flex;align-items:center;justify-content:center;border:1px dashed #cfc4b7;border-radius:6px;padding:14px;font-size:12px;color:#8f7a5d;cursor:pointer;background:#fcfaf7;}
+.sq-prev-img{max-width:100%;max-height:200px;border-radius:6px;align-self:flex-start;}
+.sq-arq{font-size:12px;color:#2a2520;background:#f7f2ec;border-radius:5px;padding:8px 10px;}
+.sq-var{display:flex;align-items:center;gap:8px;font-size:11px;color:#5a4e44;}
+.sq-cinza{filter:grayscale(1);}
+@media (max-width:700px){.sq-tab .sq-desc,.sq-tab th:nth-child(3){display:none;}.sq-gat-linha{grid-template-columns:1fr 1fr 22px 22px;}.sq-horas{grid-template-columns:1fr;}}
 .wa-modal-fundo{position:fixed;inset:0;background:rgba(42,37,32,.35);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;}
 .wa-modal{background:#fff;border-radius:12px;width:min(520px,100%);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);}
 .wa-modal-cab{padding:14px 16px;border-bottom:0.5px solid #e0d8ce;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:#2a2520;}
@@ -13283,38 +13379,6 @@ async function auCarregar(){
   _au.carregando=false;
   if(currentPage==='automacoes'&&_au.modo==='lista')auRender();
 }
-function auRender(){
-  const el=document.getElementById('au-conteudo');if(!el)return;
-  const pode=_auPodeEditar();
-  if(_au.erro&&/automacoes/.test(_au.erro)){el.innerHTML='<div class="au-vazio">As automações ainda não foram ligadas no banco.<br><span style="font-size:11px">'+_auEsc(_au.erro)+'</span></div>';return;}
-  const geral='<div class="au-geral '+(_au.chaveGeral?'ligada':'')+'">'+
-    '<div><div style="font-weight:600;font-size:13px">'+(_au.chaveGeral?'🟢 Chave geral ligada':'🧪 Chave geral pausada: só o modo teste funciona')+'</div>'+
-    '<div style="font-size:12px;margin-top:3px">'+(_au.chaveGeral
-      ?'O motor roda a cada minuto. Funcionam as automações com “Ligada” marcada.'
-      :'Automações em modo teste já funcionam, só para os telefones de teste. As que estiverem fora do teste ficam paradas até ligar a chave geral, no dia em que o Cloudia for desligado (para o paciente não receber em dobro).')+'</div></div>'+
-    (_waEhGestao()?'<button class="wa-btn'+(_au.chaveGeral?'':' primario')+'" onclick="auChaveGeral('+(!_au.chaveGeral)+')">'+(_au.chaveGeral?'Pausar tudo':'Ligar chave geral')+'</button>':'')+
-  '</div>';
-  const cab='<div class="au-topo"><div style="font-size:12px;color:#9a8c7e">Sequências de follow-up, lembretes e respostas automáticas. Cada automação tem um gatilho (o que faz o contato entrar) e passos em ordem.</div>'+
-    (pode?'<button class="wa-btn primario" onclick="auNova()">＋ Nova automação</button>':'')+'</div>';
-  const itens=_au.lista.length?_au.lista.map(a=>{
-    const n=_au.ativos[a.id]||0;
-    const passos=(a.passos||[]);
-    return '<div class="au-card">'+
-      '<div class="au-card-topo"><div style="min-width:0"><div class="au-card-nome">'+_auEsc(a.nome)+'</div>'+
-        '<div class="au-card-gat">⚡ '+_auResumoGatilho(a.gatilho)+'</div></div>'+
-        '<div class="au-chaves">'+
-          '<label class="au-chave" title="Ligada: o gatilho coloca contatos e o motor executa"><input type="checkbox" '+(a.ligada?'checked':'')+(pode?'':' disabled')+' onchange="auLigar('+a.id+',this.checked)"><span>Ligada</span></label>'+
-          '<label class="au-chave" title="Modo teste: só entram os telefones da lista de teste"><input type="checkbox" '+(a.modo_teste?'checked':'')+(pode?'':' disabled')+' onchange="auTeste('+a.id+',this.checked)"><span>Modo teste</span></label>'+
-        '</div></div>'+
-      '<div class="au-card-passos">'+passos.slice(0,6).map((p,i)=>'<span class="au-chip">'+(i+1)+'. '+(AU_PASSOS[p.tipo]?AU_PASSOS[p.tipo].icone+' ':'')+_auResumoPasso(p)+'</span>').join('')+(passos.length>6?'<span class="au-chip">+'+(passos.length-6)+'</span>':'')+(passos.length?'':'<span style="font-size:11px;color:#b5a898">Sem passos</span>')+'</div>'+
-      '<div class="au-card-rodape"><span>'+(a.modo_teste?'🧪 Teste: '+((a.telefones_teste||[]).length?(a.telefones_teste||[]).map(_waTelFormatado).join(', '):'nenhum telefone'):'')+'</span>'+
-        '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="wa-btn" onclick="auVerContatos('+a.id+')">👥 '+n+' em andamento</button>'+
-        (pode?'<button class="wa-btn" onclick="auEditar('+a.id+')">Editar</button><button class="wa-btn" onclick="auDuplicar('+a.id+')">Duplicar</button>':'')+
-        (_waEhGestao()?'<button class="wa-btn" onclick="auApagar('+a.id+')">Apagar</button>':'')+'</div></div>'+
-    '</div>';
-  }).join(''):(_au.carregando?'<div class="au-vazio">Carregando…</div>':'<div class="au-vazio">Nenhuma automação ainda.'+(pode?'<br><button class="wa-btn primario" style="margin-top:10px" onclick="auNova()">Criar a primeira</button>':'')+'</div>');
-  el.innerHTML=geral+cab+'<div class="au-lista">'+itens+'</div>';
-}
 async function auChaveGeral(ligar){
   if(ligar&&!confirm('Ligar a chave geral?\n\nAs automações ligadas fora do modo teste começam a enviar para todos os contatos. Se o Cloudia ainda estiver com sequências ativas, o paciente pode receber em dobro.'))return;
   try{
@@ -13345,194 +13409,355 @@ async function auApagar(id){
 }
 
 // ---------- editor ----------
+// ---------- Sequências (layout do Cloudia, cores Bulhões) ----------
+const SQ_GAT_TIPOS={etapa:'Mudança para a etapa',tag_adicionada:'Adição da tag',tag_removida:'Remoção da tag',estado:'Mudança de estado da conversa',mensagem_recebida:'Mensagem recebida (palavra-chave)',lead_criado:'Lead novo criado'};
+const SQ_ESTADOS={atendimento:'Atendimento',fila:'Na fila',concluido:'Concluído'};
+const SQ_SAIDAS={nenhuma:'Não remover contato automaticamente',qualquer:'Remover ao receber qualquer mensagem',igual:'Mensagem - É igual à',contem:'Mensagem - Contém',tag:'Adição de TAG'};
+const SQ_PASSOS_NOVOS=[['texto','Texto','📄'],['audio','Áudio','🎵'],['video','Vídeo','🎬'],['image','Imagem','🖼'],['document','Arquivo','📎'],['esperar','Delay','⏱'],['acao','Ação','⚡'],['modelo','Template WhatsApp Oficial','📋']];
+const SQ_MIDIA={image:{nome:'Imagem',icone:'🖼',accept:'image/jpeg,image/png',mb:5},video:{nome:'Vídeo',icone:'🎬',accept:'video/mp4,video/3gpp',mb:16},audio:{nome:'Áudio',icone:'🎵',accept:'audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg,.m4a,.mp3,.ogg',mb:16},document:{nome:'Arquivo',icone:'📎',accept:'.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt',mb:100}};
+function _auOpt(v,t,sel){return '<option value="'+_auEsc(v)+'"'+(String(v)===String(sel==null?'':sel)?' selected':'')+'>'+_auEsc(t)+'</option>';}
+function _auOptsTags(sel){return _auOpt('','Selecione o valor',sel)+(_wa.tags||[]).map(t=>_auOpt(t.id,t.nome,sel)).join('');}
+function _sqLista(g){g=g||{};if(Array.isArray(g.lista))return g.lista;if(!g.tipo||g.tipo==='manual')return [];return [g];}
+function _sqHoras(min){min=Number(min)||0;if(!min)return '0min';const d=Math.floor(min/1440),h=Math.floor(min%1440/60),m=min%60;return [d?d+'d':'',h?h+'h':'',m?m+'min':''].filter(Boolean).join(' ');}
+function _auResumoGatilho(g){
+  const l=_sqLista(g);if(!l.length)return 'Só quando a equipe colocar o contato';
+  return l.map(x=>{
+    if(x.tipo==='etapa')return 'etapa vira <b>'+_auEsc(WA_ETAPA_ROTULO[x.etapa]||x.etapa||'?')+'</b>';
+    if(x.tipo==='tag_adicionada'||x.tipo==='tag_removida'){const t=_auTag(x.tag_id);return (x.tipo==='tag_adicionada'?'recebe a tag ':'perde a tag ')+'<b>'+_auEsc(t?t.nome:'?')+'</b>';}
+    if(x.tipo==='estado')return 'conversa vai para <b>'+_auEsc(SQ_ESTADOS[x.estado]||'?')+'</b>';
+    if(x.tipo==='mensagem_recebida')return (x.palavras&&x.palavras.length)?'mensagem com <b>'+_auEsc(x.palavras.join(', '))+'</b>':'qualquer mensagem do paciente';
+    if(x.tipo==='lead_criado')return 'lead novo'+(x.origem?' de <b>'+_auEsc(x.origem)+'</b>':'');
+    return '?';
+  }).join(' ou ');
+}
+// passos antigos (por_tag, tirar_tag, atribuir) viram o passo "Ação" do Cloudia
+function _sqNormalizarPassos(ps){
+  return (ps||[]).map(p=>{
+    if(p.tipo==='por_tag'||p.tipo==='tirar_tag')return {tipo:'acao',acao:p.tipo,tags:p.tag_id?[Number(p.tag_id)]:[]};
+    if(p.tipo==='atribuir')return {tipo:'acao',acao:'atribuir',email:p.email||''};
+    return JSON.parse(JSON.stringify(p));
+  });
+}
+
+function auRender(){
+  const el=document.getElementById('au-conteudo');if(!el)return;
+  const pode=_auPodeEditar();
+  if(_au.erro&&/automacoes/.test(_au.erro)){el.innerHTML='<div class="au-vazio">As automações ainda não foram ligadas no banco.<br><span style="font-size:11px">'+_auEsc(_au.erro)+'</span></div>';return;}
+  const busca=(_au.busca||'').toLowerCase();
+  const lista=_au.lista.filter(a=>!busca||(a.nome+' '+(a.descricao||'')+' '+a.id).toLowerCase().includes(busca));
+  const geral='<div class="au-geral '+(_au.chaveGeral?'ligada':'')+'">'+
+    '<div><div style="font-weight:600;font-size:13px">'+(_au.chaveGeral?'🟢 Chave geral ligada':'🧪 Chave geral pausada: só o modo teste funciona')+'</div>'+
+    '<div style="font-size:12px;margin-top:3px">'+(_au.chaveGeral
+      ?'O motor roda a cada minuto. Funcionam as sequências com “Ligada” marcada.'
+      :'Sequências em modo teste já funcionam, só para os telefones de teste. As outras ficam paradas até ligar a chave geral, no dia em que o Cloudia for desligado (para o paciente não receber em dobro).')+'</div></div>'+
+    (_waEhGestao()?'<button class="wa-btn'+(_au.chaveGeral?'':' primario')+'" onclick="auChaveGeral('+(!_au.chaveGeral)+')">'+(_au.chaveGeral?'Pausar tudo':'Ligar chave geral')+'</button>':'')+
+  '</div>';
+  const linhas=lista.map(a=>{
+    const n=_au.ativos[a.id]||0;
+    return '<tr>'+
+      '<td class="sq-id">'+a.id+'</td>'+
+      '<td><span class="sq-nome" onclick="'+(pode?'auEditar('+a.id+')':'auVerContatos('+a.id+')')+'">'+_auEsc(a.nome)+'</span><div class="sq-gat">⚡ '+_auResumoGatilho(a.gatilho)+'</div></td>'+
+      '<td class="sq-desc">'+_auEsc(a.descricao||'')+'</td>'+
+      '<td><label class="sq-switch" title="Ligada"><input type="checkbox" '+(a.ligada?'checked':'')+(pode?'':' disabled')+' onchange="auLigar('+a.id+',this.checked)"><span></span></label>'+
+        (a.modo_teste?'<span class="sq-teste" title="Só os telefones de teste entram"'+(pode?' onclick="auTeste('+a.id+',false)"':'')+'>🧪 teste</span>':'')+'</td>'+
+      '<td><button class="sq-cont" onclick="auVerContatos('+a.id+')">'+n+'</button></td>'+
+      '<td class="sq-acoes">'+(pode?'<button title="Editar" onclick="auEditar('+a.id+')">✏️</button><button title="Duplicar" onclick="auDuplicar('+a.id+')">⧉</button>':'')+
+        (_waEhGestao()?'<button title="Apagar" class="sq-lixo" onclick="auApagar('+a.id+')">🗑</button>':'')+'</td>'+
+    '</tr>';
+  }).join('');
+  el.innerHTML=geral+
+    '<div class="sq-info"><span>ℹ</span><div><b>Limitação da WhatsApp Business API</b><br><b>Importante:</b> Para contatos que utilizam a WhatsApp Business API, <b>somente mensagens de template são enviadas fora da janela de interação de 24 horas com o contato</b>, contabilizadas a partir da última mensagem recebida.</div></div>'+
+    '<div class="dp-card">'+
+      '<div class="sq-topo"><div class="dp-busca" style="max-width:240px"><input placeholder="Digite para buscar..." value="'+_auEsc(_au.busca||'')+'" oninput="_au.busca=this.value;auRender();this.focus();this.setSelectionRange(this.value.length,this.value.length)" style="border:none;outline:none;flex:1;font-size:12.5px;background:transparent;min-width:0"><span>🔍</span></div>'+
+        (pode?'<button class="sq-nova" onclick="auNova()">＋ Nova sequência</button>':'')+'</div>'+
+      (lista.length?'<div class="dp-tabela" style="border-radius:8px"><table class="sq-tab"><thead><tr><th>ID</th><th>NOME</th><th>DESCRIÇÃO</th><th>STATUS</th><th title="Contatos em andamento">CONTATOS</th><th>AÇÕES</th></tr></thead><tbody>'+linhas+'</tbody></table></div>'
+        :'<div class="au-vazio">'+(_au.carregando?'Carregando…':busca?'Nenhuma sequência com esse nome.':'Nenhuma sequência ainda.')+'</div>')+
+    '</div>';
+}
+
+// ---------- editor (gaveta lateral) ----------
+function _sqAbrir(a){
+  a.regras=Object.assign({},AU_REGRAS_PADRAO,a.regras||{});
+  if(!a.regras.saida)a.regras.saida={tipo:a.regras.sair_se_responder===false?'nenhuma':'qualquer'};
+  a.gatilho={lista:_sqLista(a.gatilho).map(x=>Object.assign({},x))};
+  a.passos=_sqNormalizarPassos(a.passos);
+  _au.atual=a;_au.modo='editor';_au.secCfg=true;_au.secGat=true;_au.secAv=false;_au.sujo=false;
+  auRenderEditor();
+}
 function auNova(){
-  _au.atual={id:null,nome:'',descricao:'',ligada:false,modo_teste:true,telefones_teste:[],gatilho:{tipo:'etapa',etapa:'Lead'},regras:Object.assign({},AU_REGRAS_PADRAO),passos:[{tipo:'esperar',minutos:120}]};
-  _au.modo='editor';auRenderEditor();
+  _sqAbrir({id:null,nome:'',descricao:'',ligada:false,modo_teste:true,telefones_teste:[],numero_clinica_id:null,
+    gatilho:{lista:[{tipo:'etapa',etapa:'Lead'}]},regras:Object.assign({},AU_REGRAS_PADRAO,{saida:{tipo:'qualquer'}}),passos:[{tipo:'esperar',minutos:120}]});
 }
-function auEditar(id){
-  const a=_au.lista.find(x=>x.id===id);if(!a)return;
-  _au.atual=JSON.parse(JSON.stringify(a));
-  _au.atual.regras=Object.assign({},AU_REGRAS_PADRAO,_au.atual.regras||{});
-  _au.modo='editor';auRenderEditor();
-}
+function auEditar(id){const a=_au.lista.find(x=>x.id===id);if(a)_sqAbrir(JSON.parse(JSON.stringify(a)));}
 function auDuplicar(id){
   const a=_au.lista.find(x=>x.id===id);if(!a)return;
-  _au.atual=JSON.parse(JSON.stringify(a));
-  Object.assign(_au.atual,{id:null,nome:a.nome+' (cópia)',ligada:false,modo_teste:true});
-  _au.modo='editor';auRenderEditor();
+  const c=JSON.parse(JSON.stringify(a));Object.assign(c,{id:null,nome:a.nome+' (cópia)',ligada:false,modo_teste:true});_sqAbrir(c);
 }
 function auVoltar(){
+  document.getElementById('sq-gaveta')&&document.getElementById('sq-gaveta').remove();
   _au.modo='lista';_au.atual=null;_au.contatosDe=null;auRender();auCarregar();
 }
-function _auOpt(v,t,sel){return '<option value="'+_auEsc(v)+'"'+(String(v)===String(sel==null?'':sel)?' selected':'')+'>'+_auEsc(t)+'</option>';}
-function _auOptsTags(sel){return _auOpt('','Escolha a tag…',sel)+(_wa.tags||[]).map(t=>_auOpt(t.id,t.nome,sel)).join('');}
+function sqFechar(){
+  if(_au.sujo&&!confirm('Alterações pendentes não salvas\n\nHá alterações que não foram salvas. Tem certeza que deseja sair?'))return;
+  auVoltar();
+}
+function _sqSujo(){_au.sujo=true;}
+function sqSet(campo,v){_au.atual[campo]=v;_sqSujo();}
+function sqRegra(campo,v){_au.atual.regras[campo]=v;_sqSujo();}
+function sqAlternar(sec){_au[sec]=!_au[sec];auRenderEditor();}
+function _sqSwitch(on,acao,rot){return '<label class="sq-tg"><span class="sq-switch"><input type="checkbox" '+(on?'checked':'')+' onchange="'+acao+'"><span></span></span>'+_auEsc(rot)+'</label>';}
+function _sqQ(t){return '<span class="dp-q" title="'+_auEsc(t)+'">?</span>';}
+
 function auRenderEditor(){
-  const el=document.getElementById('au-conteudo');if(!el)return;
-  const a=_au.atual;const g=a.gatilho||{};const r=a.regras||{};
-  let gp='';
-  if(g.tipo==='etapa')gp='<select class="wa-sel" onchange="_au.atual.gatilho.etapa=this.value">'+AU_ETAPAS.map(e=>_auOpt(e,WA_ETAPA_ROTULO[e]||e,g.etapa)).join('')+'</select>';
-  else if(g.tipo==='tag_adicionada'||g.tipo==='tag_removida')gp='<select class="wa-sel" onchange="_au.atual.gatilho.tag_id=this.value?Number(this.value):null">'+_auOptsTags(g.tag_id)+'</select>';
-  else if(g.tipo==='mensagem_recebida')gp='<input class="wa-var" placeholder="Palavras-chave separadas por vírgula (vazio = qualquer mensagem)" value="'+_auEsc((g.palavras||[]).join(', '))+'" oninput="_au.atual.gatilho.palavras=this.value.split(\',\').map(s=>s.trim()).filter(Boolean)">';
-  else if(g.tipo==='lead_criado')gp='<select class="wa-sel" onchange="_au.atual.gatilho.origem=this.value||null">'+_auOpt('','Qualquer origem',g.origem)+_waOrigens().map(o=>_auOpt(o,o,g.origem)).join('')+'</select>';
-  const passos=(a.passos||[]).map((p,i)=>auHtmlPasso(p,i)).join('');
-  el.innerHTML=
-    '<div class="au-topo"><button class="wa-btn" onclick="auVoltar()">← Voltar</button>'+
-      '<div style="display:flex;gap:8px"><button class="wa-btn" onclick="auVoltar()">Cancelar</button><button class="wa-btn primario" id="au-salvar" onclick="auSalvar()">Salvar automação</button></div></div>'+
-    '<div class="au-editor">'+
-      '<div class="au-col">'+
-        '<div class="au-bloco"><h4>Nome</h4><input class="wa-var" id="au-nome" maxlength="80" placeholder="Ex.: Follow-up de lead novo" value="'+_auEsc(a.nome)+'" oninput="_au.atual.nome=this.value">'+
-          '<textarea class="wa-textarea" placeholder="Para que serve (opcional)" oninput="_au.atual.descricao=this.value">'+_auEsc(a.descricao||'')+'</textarea></div>'+
-        '<div class="au-bloco"><h4>⚡ Gatilho: quando o contato entra</h4>'+
-          '<select class="wa-sel" onchange="auMudarGatilho(this.value)">'+Object.keys(AU_GATILHOS).map(k=>_auOpt(k,AU_GATILHOS[k],g.tipo)).join('')+'</select>'+gp+
-          '<div class="au-dica">'+(g.tipo==='etapa'?'Vale quando a etapa muda no CRM (card do lead ou Conversas). Quem já está na etapa hoje não entra.':g.tipo==='mensagem_recebida'?'Mensagens antigas importadas do celular não contam.':g.tipo==='manual'?'A equipe coloca o contato pela lista “em andamento”.':'')+'</div></div>'+
-        '<div class="au-bloco"><h4>Regras</h4>'+
-          '<div class="au-linha">Enviar só entre <input class="wa-var au-hora" type="time" value="'+_auEsc(r.inicio||'')+'" onchange="_au.atual.regras.inicio=this.value"> e <input class="wa-var au-hora" type="time" value="'+_auEsc(r.fim||'')+'" onchange="_au.atual.regras.fim=this.value"></div>'+
-          '<label class="au-check"><input type="checkbox" '+(r.pular_fim_de_semana?'checked':'')+' onchange="_au.atual.regras.pular_fim_de_semana=this.checked"> Não enviar no sábado e domingo</label>'+
-          '<label class="au-check"><input type="checkbox" '+(r.sair_se_responder!==false?'checked':'')+' onchange="_au.atual.regras.sair_se_responder=this.checked"> Sair da automação quando o paciente responder</label>'+
-          '<div class="au-linha">Entrar de novo: <select class="wa-sel" onchange="_au.atual.regras.reentrada=this.value">'+_auOpt('depois_de_sair','pode, depois de sair ou terminar',r.reentrada)+_auOpt('nunca','nunca (só uma vez por contato)',r.reentrada)+'</select></div>'+
-          '<div class="au-dica">Fora do horário, a mensagem espera o próximo horário permitido. Tags e esperas não esperam.</div></div>'+
-        '<div class="au-bloco"><h4>🧪 Modo teste</h4>'+
-          '<label class="au-check"><input type="checkbox" '+(a.modo_teste?'checked':'')+' onchange="_au.atual.modo_teste=this.checked;auRenderEditor()"> Só para os telefones de teste</label>'+
-          (a.modo_teste?'<input class="wa-var" placeholder="Telefones com DDD, separados por vírgula" value="'+_auEsc((a.telefones_teste||[]).join(', '))+'" oninput="_au.atual.telefones_teste=this.value.split(\',\').map(s=>s.replace(/\\D/g,\'\')).filter(s=>s.length>=10)">':'<div class="au-dica" style="color:#9a6a3a">Fora do modo teste, vale para todos os contatos que cumprirem o gatilho'+(_au.chaveGeral?'':' (só depois que a chave geral for ligada)')+'.</div>')+
-          '<label class="au-check"><input type="checkbox" '+(a.ligada?'checked':'')+' onchange="_au.atual.ligada=this.checked"> Ligada</label></div>'+
+  const a=_au.atual;if(!a)return;
+  let g=document.getElementById('sq-gaveta');
+  const rolagem=g?g.querySelector('.dp-g-corpo').scrollTop:0;
+  if(!g){g=document.createElement('div');g.id='sq-gaveta';document.body.appendChild(g);}
+  const r=a.regras;const sa=r.saida||{tipo:'qualquer'};
+  const nums=_wa.numeros||[];
+  const gats=a.gatilho.lista.map((x,i)=>{
+    let val='';
+    if(x.tipo==='etapa')val='<select class="dp-in" onchange="sqGat('+i+',\'etapa\',this.value)">'+_auOpt('','Selecione o valor',x.etapa)+AU_ETAPAS.map(e=>_auOpt(e,WA_ETAPA_ROTULO[e]||e,x.etapa)).join('')+'</select>';
+    else if(x.tipo==='tag_adicionada'||x.tipo==='tag_removida')val='<select class="dp-in" onchange="sqGat('+i+',\'tag_id\',this.value?Number(this.value):null)">'+_auOptsTags(x.tag_id)+'</select>';
+    else if(x.tipo==='estado')val='<select class="dp-in" onchange="sqGat('+i+',\'estado\',this.value)">'+_auOpt('','Selecione o valor',x.estado)+Object.keys(SQ_ESTADOS).map(k=>_auOpt(k,SQ_ESTADOS[k],x.estado)).join('')+'</select>';
+    else if(x.tipo==='mensagem_recebida')val='<input class="dp-in" placeholder="Palavras, separadas por vírgula (vazio = qualquer)" value="'+_auEsc((x.palavras||[]).join(', '))+'" oninput="sqGat('+i+',\'palavras\',this.value.split(\',\').map(s=>s.trim()).filter(Boolean),true)">';
+    else if(x.tipo==='lead_criado')val='<select class="dp-in" onchange="sqGat('+i+',\'origem\',this.value||null)">'+_auOpt('','Qualquer origem',x.origem)+_waOrigens().map(o=>_auOpt(o,o,x.origem)).join('')+'</select>';
+    return '<div class="sq-gat-linha"><select class="dp-in" onchange="sqGatTipo('+i+',this.value)">'+Object.keys(SQ_GAT_TIPOS).map(k=>_auOpt(k,SQ_GAT_TIPOS[k],x.tipo)).join('')+'</select>'+val+
+      '<b class="sq-ou">'+(i<a.gatilho.lista.length-1?'OU':'')+'</b><button class="sq-x" title="Remover gatilho" onclick="sqGatTirar('+i+')">✕</button></div>';
+  }).join('');
+  let saidaVal='';
+  if(sa.tipo==='igual'||sa.tipo==='contem')saidaVal='<input class="dp-in" placeholder="Texto da mensagem" value="'+_auEsc(sa.valor||'')+'" oninput="_au.atual.regras.saida.valor=this.value;_sqSujo()">';
+  if(sa.tipo==='tag')saidaVal='<select class="dp-in" onchange="_au.atual.regras.saida.tag_id=this.value?Number(this.value):null;_sqSujo()">'+_auOptsTags(sa.tag_id)+'</select>';
+  const notaSaida={nenhuma:'* O contato só sai ao terminar os passos (ou se a equipe tirar).',qualquer:'* Qualquer mensagem enviada pelo contato irá removê-lo automaticamente da sequência',igual:'* O contato sai quando a mensagem dele for exatamente esse texto.',contem:'* O contato sai quando a mensagem dele tiver esse texto.',tag:'* O contato sai quando a conversa receber essa tag.'}[sa.tipo]||'';
+  const evitar=!!(r.inicio&&r.fim);
+  const passos=a.passos.map((p,i)=>_sqHtmlPasso(p,i)).join('<div class="sq-fio"></div>');
+  g.innerHTML='<div class="dp-gaveta-fundo" onclick="sqFechar()"></div><div class="dp-gaveta sq-gaveta">'+
+    '<div class="dp-g-cab"><span>✏️ '+(a.id?'Editar sequência':'Nova sequência')+'</span><button class="sq-x" onclick="sqFechar()">✕</button></div>'+
+    '<div class="dp-g-corpo sq-corpo">'+
+      '<div class="sq-info"><span>ℹ</span><div><b>Limitação da WhatsApp Business API</b><br><b>Importante:</b> Para contatos que utilizam a WhatsApp Business API, <b>somente mensagens de template são enviadas fora da janela de interação de 24 horas com o contato</b>, contabilizadas a partir da última mensagem recebida.</div></div>'+
+      '<div class="sq-cfg">'+
+        '<div class="sq-cfg-cab" onclick="sqAlternar(\'secCfg\')">Configurações e gatilhos da sequência <span>'+(_au.secCfg?'⌃':'⌄')+'</span></div>'+
+        (_au.secCfg?'<div class="sq-cfg-corpo">'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Título *</div><input class="dp-in" maxlength="80" value="'+_auEsc(a.nome)+'" oninput="sqSet(\'nome\',this.value)"></div>'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Descrição</div><textarea class="dp-in sq-ta" oninput="sqSet(\'descricao\',this.value)">'+_auEsc(a.descricao||'')+'</textarea></div>'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Conexão do WhatsApp '+_sqQ('De qual número da clínica as mensagens saem.')+'</div><select class="dp-in" onchange="sqSet(\'numero_clinica_id\',this.value||null)">'+_auOpt('','Todas as conexões',a.numero_clinica_id)+nums.map(n=>_auOpt(n.phone_number_id,n.apelido||n.numero_exibicao,a.numero_clinica_id)).join('')+'</select></div>'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Gatilho de entrada '+_sqQ('O que faz o contato entrar na sequência. Basta um dos gatilhos acontecer.')+'</div><div class="sq-sub">Adicione os gatilhos de entrada desejados para iniciar a sequência automaticamente.</div>'+
+            '<div class="sq-gats"><div class="sq-gats-cab" onclick="sqAlternar(\'secGat\')">Gatilhos de entrada <span>'+(_au.secGat?'⌃':'⌄')+'</span></div>'+
+            (_au.secGat?'<div class="sq-gats-corpo">'+(gats||'<div class="sq-sub" style="text-align:center">Sem gatilho: só entra quem a equipe colocar.</div>')+'<button class="sq-add-gat" onclick="sqGatNovo()">＋ Adicionar gatilho de entrada</button></div>':'')+'</div></div>'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Gatilho de saída '+_sqQ('Quando o contato sai da sequência antes de terminar.')+'</div><div class="sq-sub">Selecione o gatilho de saída da sequência.</div>'+
+            '<select class="dp-in" onchange="sqSaida(this.value)">'+Object.keys(SQ_SAIDAS).map(k=>_auOpt(k,SQ_SAIDAS[k],sa.tipo)).join('')+'</select>'+saidaVal+'<div class="sq-nota">'+notaSaida+'</div></div>'+
+          '<div class="sq-av-cab" onclick="sqAlternar(\'secAv\')">'+(_au.secAv?'⌃':'⌄')+' Opções avançadas gerais da sequência</div>'+
+          (_au.secAv?'<div class="sq-av">'+
+            _sqSwitch(r.pular_fim_de_semana,'sqRegra(\'pular_fim_de_semana\',this.checked)','Pular finais de semana')+
+            _sqSwitch(evitar,'sqEvitar(this.checked)','Evitar horário')+
+            (evitar?'<div class="sq-horas"><label>Se o horário for superior à:<input class="dp-in" type="time" value="'+_auEsc(r.fim)+'" onchange="sqRegra(\'fim\',this.value)"></label><label>Envie no dia seguinte às:<input class="dp-in" type="time" value="'+_auEsc(r.inicio)+'" onchange="sqRegra(\'inicio\',this.value)"></label></div>':'')+
+            _sqSwitch(r.reentrada!=='nunca','sqRegra(\'reentrada\',this.checked?\'depois_de_sair\':\'nunca\')','Permitir que o contato entre de novo depois de sair')+
+            '<div class="sq-sep"></div>'+
+            _sqSwitch(a.ligada,'sqSet(\'ligada\',this.checked)','Sequência ligada')+
+            _sqSwitch(a.modo_teste,'sqSet(\'modo_teste\',this.checked);auRenderEditor()','Modo teste (só os telefones abaixo entram)')+
+            (a.modo_teste?'<input class="dp-in" placeholder="Telefones de teste com DDD, separados por vírgula" value="'+_auEsc((a.telefones_teste||[]).join(', '))+'" oninput="sqSet(\'telefones_teste\',this.value.split(\',\').map(s=>s.replace(/\\D/g,\'\')).filter(s=>s.length>=10))">':'<div class="sq-nota" style="color:#9a6a3a">Fora do modo teste, vale para todos os contatos'+(_au.chaveGeral?'':' (depois que a chave geral for ligada)')+'.</div>')+
+          '</div>':'')+
+          '<div class="sq-nota">* Campos com asterisco são obrigatórios para salvar a sequência</div>'+
+        '</div>':'')+
       '</div>'+
-      '<div class="au-col au-col-passos"><div class="au-bloco"><h4>Passos (em ordem)</h4>'+
-        '<div class="au-fluxo"><div class="au-inicio">⚡ '+_auResumoGatilho(g)+'</div>'+((a.passos||[]).length?passos:auHtmlAdicionar(0))+'</div>'+
-        '<div class="au-dica">Variáveis no texto: <code>{primeiro_nome}</code>, <code>{nome}</code>. Texto livre só sai com a janela de 24 h aberta; depois disso, use um modelo aprovado.</div>'+
-      '</div></div>'+
-    '</div>';
-  if((a.passos||[]).some(p=>p.tipo==='modelo')&&!_au.modelos)auCarregarModelos();
+      '<div class="sq-fluxo"><div class="sq-comeco">Começo do fluxo</div><div class="sq-fio"></div>'+passos+(a.passos.length?'<div class="sq-fio"></div>':'')+
+        '<button class="sq-mais" title="Adicionar passo" onclick="sqNovoPasso()">＋</button></div>'+
+    '</div>'+
+    '<button class="sq-salvar" id="au-salvar" onclick="auSalvar()">'+(a.id?'Editar sequência':'Criar sequência')+'</button>'+
+  '</div>';
+  g.querySelector('.dp-g-corpo').scrollTop=rolagem;
+  if(a.passos.some(p=>p.tipo==='modelo')&&!_au.modelos)auCarregarModelos();
 }
-function auMudarGatilho(t){
-  const g={tipo:t};
-  if(t==='etapa')g.etapa='Lead';
-  if(t==='mensagem_recebida')g.palavras=[];
-  _au.atual.gatilho=g;auRenderEditor();
+function sqEvitar(on){const r=_au.atual.regras;if(on){r.fim=r.fim||'17:00';r.inicio=r.inicio||'11:00';}else{r.inicio='';r.fim='';}_sqSujo();auRenderEditor();}
+function sqSaida(t){const r=_au.atual.regras;r.saida={tipo:t};r.sair_se_responder=(t==='qualquer');_sqSujo();auRenderEditor();}
+function sqGatNovo(){_au.atual.gatilho.lista.push({tipo:'tag_adicionada',tag_id:null});_sqSujo();auRenderEditor();}
+function sqGatTirar(i){_au.atual.gatilho.lista.splice(i,1);_sqSujo();auRenderEditor();}
+function sqGatTipo(i,t){const x={tipo:t};if(t==='etapa')x.etapa='Lead';if(t==='mensagem_recebida')x.palavras=[];_au.atual.gatilho.lista[i]=x;_sqSujo();auRenderEditor();}
+function sqGat(i,c,v,semRender){_au.atual.gatilho.lista[i][c]=v;_sqSujo();if(!semRender)auRenderEditor();}
+
+// ---------- passos ----------
+function _sqTituloPasso(p){
+  if(p.tipo==='esperar')return ['⏱','Tempo de espera em minutos','cinza'];
+  if(p.tipo==='acao')return ['⚡','Ação','amarelo'];
+  if(p.tipo==='texto')return ['📄','Mensagem de texto','azul'];
+  if(p.tipo==='midia'){const m=SQ_MIDIA[p.formato]||SQ_MIDIA.document;return [m.icone,m.nome,'rosa'];}
+  if(p.tipo==='modelo')return ['📋','Template WhatsApp Oficial','verde'];
+  if(p.tipo==='novo')return ['⊕','Selecione um novo passo','roxo'];
+  if(p.tipo==='se')return ['🔀','Condição','cinza'];
+  if(p.tipo==='fim')return ['⏹','Encerrar','cinza'];
+  return ['?',p.tipo,'cinza'];
 }
-function auHtmlAdicionar(pos){
-  return '<div class="au-add"><select class="wa-sel" onchange="if(this.value){auAddPasso('+pos+',this.value);}this.value=\'\'">'+
-    _auOpt('','＋ Adicionar passo aqui','')+Object.keys(AU_PASSOS).map(k=>_auOpt(k,AU_PASSOS[k].icone+' '+AU_PASSOS[k].nome,'')).join('')+'</select></div>';
+function _sqHtmlPasso(p,i){
+  const [ic,tit,cor]=_sqTituloPasso(p);
+  const k='_au.atual.passos['+i+']';
+  let corpo='',av='';
+  if(p.tipo==='novo'){
+    corpo='<div class="sq-chips">'+SQ_PASSOS_NOVOS.map(([t,n,e])=>'<button class="sq-chip" onclick="sqTipoPasso('+i+',\''+t+'\')">'+e+' '+n+'</button>').join('')+'</div>';
+  }else if(p.tipo==='esperar'){
+    corpo='<div class="sq-lab">Adicione o tempo de espera em minutos abaixo:</div><div class="sq-espera"><input class="dp-in" type="number" min="1" value="'+(Number(p.minutos)||'')+'" oninput="'+k+'.minutos=Math.max(0,Math.round(Number(this.value)||0));_sqSujo();this.parentNode.querySelector(\'b\').textContent=_sqHoras('+k+'.minutos)"><span>=</span><b>'+_sqHoras(p.minutos)+'</b></div>';
+  }else if(p.tipo==='texto'){
+    const n=String(p.texto||'').length;
+    corpo='<div class="sq-lab">Digite a mensagem abaixo:</div><div class="sq-cont-car" id="sq-car-'+i+'">('+n+'/2000)</div>'+
+      '<div class="sq-ta-wrap"><textarea class="dp-in sq-ta" maxlength="2000" id="sq-txt-'+i+'" oninput="'+k+'.texto=this.value;_sqSujo();document.getElementById(\'sq-car-'+i+'\').textContent=\'(\'+this.value.length+\'/2000)\'">'+_auEsc(p.texto||'')+'</textarea>'+
+      '<div class="sq-ta-ic"><button title="Emoji" onclick="sqEmoji(event,'+i+')">😊</button><button title="Variáveis" onclick="sqVars(event,'+i+')"><i>(x)</i></button></div></div>';
+    av=_sqAvMsg(p,i,true);
+  }else if(p.tipo==='midia'){
+    const m=SQ_MIDIA[p.formato]||SQ_MIDIA.document;
+    let prev='';
+    if(p.link){
+      if(p.formato==='image')prev='<img src="'+_auEsc(p.link)+'" class="sq-prev-img">';
+      else if(p.formato==='video')prev='<video src="'+_auEsc(p.link)+'" controls class="sq-prev-img"></video>';
+      else if(p.formato==='audio')prev='<audio src="'+_auEsc(p.link)+'" controls style="width:100%"></audio>';
+      else prev='<div class="sq-arq">📎 '+_auEsc(p.nome||'arquivo')+'</div>';
+    }
+    corpo='<div class="sq-lab">'+_auEsc(m.nome)+' (até '+m.mb+' MB)</div>'+prev+
+      '<label class="sq-upload">'+(p.link?'Trocar arquivo':'Clique para enviar o arquivo')+'<input type="file" accept="'+m.accept+'" style="display:none" onchange="sqSubirMidia('+i+',this)"></label>'+
+      '<div class="sq-nota">O arquivo fica num link público para o WhatsApp baixar. Não use fotos de pacientes sem autorização por escrito.</div>'+
+      (p.formato!=='audio'?'<div class="sq-lab">Legenda (opcional)</div><textarea class="dp-in sq-ta" maxlength="1024" oninput="'+k+'.legenda=this.value;_sqSujo()">'+_auEsc(p.legenda||'')+'</textarea>':'');
+    av=_sqAvMsg(p,i,true);
+  }else if(p.tipo==='acao'){
+    const tags=(p.tags||[]).map(id=>{const t=_auTag(id);return '<span class="sq-tagchip">'+_auEsc(t?t.nome:id)+' <b onclick="sqTagTirar('+i+','+id+')">×</b></span>';}).join('');
+    corpo='<select class="dp-in" style="max-width:220px" onchange="sqAcao('+i+',this.value)">'+_auOpt('','Selecione uma ação',p.acao)+_auOpt('por_tag','Adicionar TAG',p.acao)+_auOpt('tirar_tag','Remover TAG',p.acao)+_auOpt('atribuir','Atribuir atendente',p.acao)+'<option disabled>Ligar Robô (chega com a IA)</option></select>';
+    if(p.acao==='por_tag'||p.acao==='tirar_tag')corpo+='<div class="sq-lab">Informe as tags que devem ser <b>'+(p.acao==='por_tag'?'adicionadas':'removidas')+'</b></div><div class="sq-tags-box">'+tags+
+      '<select onchange="if(this.value)sqTagPor('+i+',Number(this.value))">'+_auOpt('','＋',' ')+(_wa.tags||[]).filter(t=>!(p.tags||[]).includes(t.id)).map(t=>_auOpt(t.id,t.nome,'')).join('')+'</select></div>';
+    if(p.acao==='atribuir')corpo+='<div class="sq-lab">Atribuir a</div><select class="dp-in" onchange="'+k+'.email=this.value;_sqSujo()">'+_auOpt('','Sem atendente',p.email)+(_wa.equipeLista||[]).map(x=>_auOpt(x.email,x.nome,p.email)).join('')+'</select>';
+  }else if(p.tipo==='modelo'){
+    const ms=_au.modelos;
+    const m=ms&&ms.find(x=>x.nome===p.nome);
+    corpo=ms?'<select class="dp-in" onchange="auEscolherModelo('+i+',this.value)">'+_auOpt('','Selecione o template',p.nome)+ms.map(x=>_auOpt(x.nome,x.nome+' ('+String(x.categoria).toLowerCase()+')',p.nome)).join('')+(p.nome&&!ms.some(x=>x.nome===p.nome)?_auOpt(p.nome,p.nome+' (não está mais aprovado)',p.nome):'')+'</select>':'<div class="sq-nota">Carregando templates da Meta…</div>';
+    if(m){
+      if(!p.cabecalho&&m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato))p.cabecalho={formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''};
+      corpo+='<div class="au-preview">'+_auEsc(m.texto)+'</div>';
+      if(p.cabecalho)corpo+='<div class="sq-lab">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[p.cabecalho.formato]||'mídia')+': link público do arquivo</div><input class="dp-in" value="'+_auEsc(p.cabecalho.link||'')+'" placeholder="https://…" oninput="auSetCabecalho('+i+',this.value);_sqSujo()">';
+      (p.variaveis||[]).forEach((v,j)=>{corpo+='<div class="sq-var"><span>'+_auEsc(m.formato==='NAMED'?'{{'+(m.campos[j]||j+1)+'}}':'{{'+(j+1)+'}}')+'</span><input class="dp-in" value="'+_auEsc(v)+'" placeholder="ex.: {primeiro_nome}" oninput="auSetVar('+i+','+j+',this.value);_sqSujo()"></div>';});
+    }
+    av=_sqAvMsg(p,i,false);
+  }else if(p.tipo==='se'){
+    corpo='<div class="sq-nota">Condição criada na versão anterior: '+_auResumoCond(p.condicao)+', senão '+(p.senao==='fim'||p.senao==null?'encerra':'vai ao passo '+p.senao)+'.</div>';
+  }else if(p.tipo==='fim'){corpo='<div class="sq-nota">O contato termina a sequência aqui.</div>';}
+  return '<div class="sq-passo">'+
+    '<div class="sq-p-cab"><span class="sq-ic sq-'+cor+'">'+ic+'</span><span class="sq-num">'+(i+1)+'.</span><span class="sq-p-tit">'+_auEsc(tit)+'</span>'+
+      '<div style="position:relative;margin-left:auto"><button class="sq-dots" onclick="sqMenuPasso(event,'+i+')">⋮</button></div></div>'+
+    '<div class="sq-p-corpo">'+corpo+'</div>'+av+'</div>';
 }
-function auHtmlPasso(p,i){
-  const n=(_au.atual.passos||[]).length;
-  const info=AU_PASSOS[p.tipo]||{nome:p.tipo,icone:'?'};
-  let corpo='';
-  const set=(campo)=>'auSetPasso('+i+',\''+campo+'\',this.value)';
-  switch(p.tipo){
-    case 'esperar':{
-      const m=Number(p.minutos)||0;const un=(m%1440===0&&m>=1440)?1440:(m%60===0&&m>=60)?60:1;
-      corpo='<div class="au-linha"><input class="wa-var" type="number" min="1" style="width:90px" value="'+(m/un)+'" oninput="auSetEspera('+i+')" id="au-esp-v-'+i+'">'+
-        '<select class="wa-sel" id="au-esp-u-'+i+'" onchange="auSetEspera('+i+')">'+_auOpt(1,'minutos',un)+_auOpt(60,'horas',un)+_auOpt(1440,'dias',un)+'</select></div>';
-      break;}
-    case 'texto':
-      corpo='<textarea class="wa-textarea" maxlength="4096" placeholder="Oi {primeiro_nome}, …" oninput="'+set('texto')+'">'+_auEsc(p.texto||'')+'</textarea>'+
-        '<div class="au-linha" style="font-size:11px">Se a janela de 24 h estiver fechada: <select class="wa-sel" onchange="'+set('sem_janela')+'">'+_auOpt('pular','pula este passo e segue',p.sem_janela)+_auOpt('parar','tira o contato da automação',p.sem_janela)+'</select></div>';
-      break;
-    case 'modelo':{
-      const ms=_au.modelos;
-      const sel=ms?'<select class="wa-sel" onchange="auEscolherModelo('+i+',this.value)">'+_auOpt('','Escolha o modelo…',p.nome)+ms.map(m=>_auOpt(m.nome,m.nome+' ('+m.categoria.toLowerCase()+')',p.nome)).join('')+(p.nome&&!ms.some(m=>m.nome===p.nome)?_auOpt(p.nome,p.nome+' (não está mais aprovado)',p.nome):'')+'</select>'
-        :'<div class="au-dica">Carregando modelos da Meta…</div>';
-      const m=ms&&ms.find(x=>x.nome===p.nome);
-      let extra='';
-      if(m){
-        extra+='<div class="au-preview">'+_auEsc(m.texto)+'</div>';
-        if(m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato))
-          extra+='<div class="au-dica">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[m.cabecalho.formato])+'. Link público do arquivo:</div><input class="wa-var" value="'+_auEsc(p.cabecalho&&p.cabecalho.link||'')+'" placeholder="https://…" oninput="auSetCabecalho('+i+',this.value)">';
-        (p.variaveis||[]).forEach((v,k)=>{extra+='<div class="au-linha" style="font-size:11px">'+_auEsc(m.formato==='NAMED'?'{{'+(m.campos[k]||k+1)+'}}':'{{'+(k+1)+'}}')+' <input class="wa-var" value="'+_auEsc(v)+'" placeholder="ex.: {primeiro_nome}" oninput="auSetVar('+i+','+k+',this.value)"></div>';});
-      }
-      corpo=sel+extra+'<div class="au-dica">Modelo tem custo por envio na Meta e pode ser enviado a qualquer hora (respeitando o horário da automação).</div>';
-      break;}
-    case 'por_tag':case 'tirar_tag':
-      corpo='<select class="wa-sel" onchange="auSetPasso('+i+',\'tag_id\',this.value?Number(this.value):null)">'+_auOptsTags(p.tag_id)+'</select>';
-      break;
-    case 'atribuir':
-      corpo='<select class="wa-sel" onchange="'+set('email')+'">'+_auOpt('','Sem atendente',p.email)+(_wa.equipeLista||[]).map(x=>_auOpt(x.email,x.nome,p.email)).join('')+'</select>';
-      break;
-    case 'se':{
-      const c=p.condicao||{tipo:'tem_tag'};
-      let cp='';
-      if(c.tipo==='tem_tag'||c.tipo==='nao_tem_tag')cp='<select class="wa-sel" onchange="auSetCond('+i+',\'tag_id\',this.value?Number(this.value):null)">'+_auOptsTags(c.tag_id)+'</select>';
-      if(c.tipo==='etapa')cp='<select class="wa-sel" onchange="auSetCond('+i+',\'etapa\',this.value)">'+AU_ETAPAS.map(e=>_auOpt(e,WA_ETAPA_ROTULO[e]||e,c.etapa)).join('')+'</select>';
-      const alvos=_auOpt('fim','encerra a automação',p.senao==null?'fim':p.senao)+Array.from({length:n},(_,k)=>k+1).filter(k=>k!==i+1).map(k=>_auOpt(k,'vai para o passo '+k,p.senao)).join('');
-      corpo='<div class="au-linha">Se <select class="wa-sel" onchange="auSetCond('+i+',\'tipo\',this.value)">'+_auOpt('tem_tag','tem a tag',c.tipo)+_auOpt('nao_tem_tag','não tem a tag',c.tipo)+_auOpt('etapa','a etapa é',c.tipo)+_auOpt('respondeu','o paciente respondeu',c.tipo)+_auOpt('janela_aberta','a janela de 24 h está aberta',c.tipo)+'</select>'+cp+'</div>'+
-        '<div class="au-linha">segue para o próximo passo; senão <select class="wa-sel" onchange="auSetPasso('+i+',\'senao\',this.value===\'fim\'?\'fim\':Number(this.value))">'+alvos+'</select></div>';
-      break;}
-    case 'fim':corpo='<div class="au-dica">O contato termina a automação aqui.</div>';break;
-  }
-  return '<div class="au-passo"><div class="au-passo-cab"><span class="au-num">'+(i+1)+'</span><b>'+info.icone+' '+_auEsc(info.nome)+'</b>'+
-      '<div class="au-passo-acoes"><button class="wa-btn" title="Subir" '+(i===0?'disabled':'')+' onclick="auMoverPasso('+i+',-1)">↑</button><button class="wa-btn" title="Descer" '+(i===n-1?'disabled':'')+' onclick="auMoverPasso('+i+',1)">↓</button><button class="wa-btn" title="Tirar passo" onclick="auTirarPasso('+i+')">✕</button></div></div>'+
-    '<div class="au-passo-corpo">'+corpo+'</div></div>'+auHtmlAdicionar(i+1).replace('au-add','au-add au-add-meio');
+function _sqAvMsg(p,i,janela){
+  const k='_au.atual.passos['+i+']';
+  const aberto=_au['av'+i];
+  return '<div class="sq-p-av"><div class="sq-av-cab" onclick="_au[\'av'+i+'\']=!_au[\'av'+i+'\'];auRenderEditor()">'+(aberto?'⌃':'⌄')+' Opções avançadas</div>'+
+    (aberto?'<div class="sq-av">'+
+      _sqSwitch(!!p.ignorar_horario,k+'.ignorar_horario=this.checked;_sqSujo()','Enviar mesmo fora do horário da sequência')+
+      (janela?'<div class="sq-lab">Se a janela de 24 h estiver fechada:</div><select class="dp-in" onchange="'+k+'.sem_janela=this.value;_sqSujo()">'+_auOpt('pular','pula este passo e segue',p.sem_janela||'pular')+_auOpt('parar','tira o contato da sequência',p.sem_janela)+'</select>':'')+
+    '</div>':'')+'</div>';
 }
-function auAddPasso(pos,tipo){
-  const p={tipo};
-  if(tipo==='esperar')p.minutos=60;
-  if(tipo==='texto'){p.texto='';p.sem_janela='pular';}
-  if(tipo==='se'){p.condicao={tipo:'tem_tag'};p.senao='fim';}
-  _au.atual.passos.splice(pos,0,p);
-  _auAjustarSaltos(pos,1);
-  auRenderEditor();
+function sqNovoPasso(){
+  const ps=_au.atual.passos;
+  if(ps.length&&ps[ps.length-1].tipo==='novo')return;
+  ps.push({tipo:'novo'});_sqSujo();auRenderEditor();
+  setTimeout(()=>{const c=document.querySelector('.sq-corpo');if(c)c.scrollTop=c.scrollHeight;},30);
 }
-// quando um passo entra ou sai, os "vai para o passo N" continuam apontando para o mesmo passo
-function _auAjustarSaltos(pos,delta){
-  _au.atual.passos.forEach(p=>{if(p.tipo==='se'&&typeof p.senao==='number'&&p.senao>pos)p.senao=Math.max(1,p.senao+delta);});
+function sqTipoPasso(i,t){
+  let p;
+  if(t==='esperar')p={tipo:'esperar',minutos:60};
+  else if(t==='texto')p={tipo:'texto',texto:'',sem_janela:'pular'};
+  else if(t==='acao')p={tipo:'acao',acao:'',tags:[]};
+  else if(t==='modelo')p={tipo:'modelo',nome:''};
+  else p={tipo:'midia',formato:t,link:'',nome:'',legenda:'',sem_janela:'pular'};
+  _au.atual.passos[i]=p;_sqSujo();auRenderEditor();
+  if(t==='modelo')auCarregarModelos();
 }
-function auTirarPasso(i){
-  _au.atual.passos.splice(i,1);
-  _au.atual.passos.forEach(p=>{if(p.tipo==='se'&&p.senao===i+1)p.senao='fim';});
-  _auAjustarSaltos(i+1,-1);
-  auRenderEditor();
+function sqMenuPasso(ev,i){
+  ev.stopPropagation();
+  document.querySelectorAll('.sq-menu').forEach(m=>m.remove());
+  const n=_au.atual.passos.length;
+  const m=document.createElement('div');m.className='sq-menu';
+  m.innerHTML=(i>0?'<button onclick="sqMover('+i+',-1)">Mover para cima</button>':'')+(i<n-1?'<button onclick="sqMover('+i+',1)">Mover para baixo</button>':'')+
+    '<button onclick="sqDuplicarPasso('+i+')">Duplicar</button><button style="color:#c0392b" onclick="sqTirarPasso('+i+')">Excluir passo</button>';
+  ev.target.parentNode.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',function f(){m.remove();document.removeEventListener('click',f);}),0);
 }
-function auMoverPasso(i,d){
-  const ps=_au.atual.passos;const j=i+d;if(j<0||j>=ps.length)return;
-  [ps[i],ps[j]]=[ps[j],ps[i]];
-  ps.forEach(p=>{if(p.tipo==='se'){if(p.senao===i+1)p.senao=j+1;else if(p.senao===j+1)p.senao=i+1;}});
-  auRenderEditor();
+function sqMover(i,d){const ps=_au.atual.passos;const j=i+d;[ps[i],ps[j]]=[ps[j],ps[i]];_sqSujo();auRenderEditor();}
+function sqDuplicarPasso(i){_au.atual.passos.splice(i+1,0,JSON.parse(JSON.stringify(_au.atual.passos[i])));_sqSujo();auRenderEditor();}
+function sqTirarPasso(i){_au.atual.passos.splice(i,1);_sqSujo();auRenderEditor();}
+function sqAcao(i,v){const p=_au.atual.passos[i];p.acao=v;if(v==='atribuir'){delete p.tags;}else{p.tags=p.tags||[];}_sqSujo();auRenderEditor();}
+function sqTagPor(i,id){const p=_au.atual.passos[i];p.tags=p.tags||[];if(!p.tags.includes(id))p.tags.push(id);_sqSujo();auRenderEditor();}
+function sqTagTirar(i,id){const p=_au.atual.passos[i];p.tags=(p.tags||[]).filter(x=>x!==id);_sqSujo();auRenderEditor();}
+function _sqInserir(i,txt){
+  const t=document.getElementById('sq-txt-'+i);if(!t)return;
+  const a=t.selectionStart||t.value.length,b=t.selectionEnd||t.value.length;
+  t.value=t.value.slice(0,a)+txt+t.value.slice(b);t.dispatchEvent(new Event('input'));t.focus();t.selectionStart=t.selectionEnd=a+txt.length;
 }
-function auSetPasso(i,campo,v){_au.atual.passos[i][campo]=v;}
-function auSetCond(i,campo,v){
-  const p=_au.atual.passos[i];p.condicao=p.condicao||{};
-  if(campo==='tipo'){p.condicao={tipo:v};if(v==='etapa')p.condicao.etapa='Lead';auRenderEditor();return;}
-  p.condicao[campo]=v;
+function sqVars(ev,i){
+  ev.stopPropagation();document.querySelectorAll('.sq-menu').forEach(m=>m.remove());
+  const m=document.createElement('div');m.className='sq-menu sq-menu-dir';
+  m.innerHTML=[['{primeiro_nome}','Primeiro nome'],['{nome}','Nome completo'],['{telefone}','Telefone']].map(([v,t])=>'<button onclick="_sqInserir('+i+',\''+v+'\')">'+t+' <code>'+v+'</code></button>').join('');
+  ev.currentTarget.parentNode.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',function f(){m.remove();document.removeEventListener('click',f);}),0);
 }
-function auSetEspera(i){
-  const v=Number(document.getElementById('au-esp-v-'+i).value)||0;
-  const u=Number(document.getElementById('au-esp-u-'+i).value)||1;
-  _au.atual.passos[i].minutos=Math.max(1,Math.round(v*u));
+function sqEmoji(ev,i){
+  ev.stopPropagation();document.querySelectorAll('.sq-menu').forEach(m=>m.remove());
+  const m=document.createElement('div');m.className='sq-menu sq-menu-dir sq-emojis';
+  m.innerHTML='😊 😍 🥰 😉 🙏 💙 💛 🤍 ✨ 😁 🤩 👏 👋 🦷 📅 📍 ✅ 🙌 💬 ❤️'.split(' ').map(e=>'<button onclick="_sqInserir('+i+',\''+e+'\')">'+e+'</button>').join('');
+  ev.currentTarget.parentNode.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',function f(){m.remove();document.removeEventListener('click',f);}),0);
 }
-function auSetCabecalho(i,link){const p=_au.atual.passos[i];p.cabecalho=Object.assign({},p.cabecalho||{},{link:link.trim()});}
-function auSetVar(i,k,v){_au.atual.passos[i].variaveis[k]=v;}
+async function sqSubirMidia(i,inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  const p=_au.atual.passos[i];const m=SQ_MIDIA[p.formato]||SQ_MIDIA.document;
+  if(f.size>m.mb*1048576){showToast('error','Arquivo grande demais','Máximo de '+m.mb+' MB para '+m.nome.toLowerCase()+'.');return;}
+  if(!_sb){showToast('error','Entre no CRM de novo para enviar arquivos','');return;}
+  const nome=f.name.replace(/[^\w.\-]+/g,'_').slice(-80);
+  const caminho='sequencias/'+Date.now()+'-'+nome;
+  showToast('info','Enviando arquivo…','');
+  try{
+    const {error}=await _sb.storage.from('automacoes-midia').upload(caminho,f,{contentType:f.type||undefined,upsert:false});
+    if(error)throw error;
+    p.link=SUPABASE_URL+'/storage/v1/object/public/automacoes-midia/'+caminho.split('/').map(encodeURIComponent).join('/');
+    p.nome=f.name;_sqSujo();auRenderEditor();
+    showToast('success','Arquivo enviado','');
+  }catch(e){showToast('error','Não foi possível enviar o arquivo',e.message||String(e));}
+}
 async function auCarregarModelos(){
   if(_au.modelos||_au.carregandoModelos)return;
   _au.carregandoModelos=true;
   try{const r=await _waAcao({acao:'modelos'});_au.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
-  catch(e){_au.modelos=[];showToast('error','Não consegui carregar os modelos da Meta',e.message);}
+  catch(e){_au.modelos=[];showToast('error','Não consegui carregar os templates da Meta',e.message);}
   _au.carregandoModelos=false;
   if(_au.modo==='editor')auRenderEditor();
 }
+function auSetCabecalho(i,link){const p=_au.atual.passos[i];p.cabecalho=Object.assign({},p.cabecalho||{},{link:link.trim()});}
+function auSetVar(i,k,v){_au.atual.passos[i].variaveis[k]=v;}
 function auEscolherModelo(i,nome){
   const m=(_au.modelos||[]).find(x=>x.nome===nome);const p=_au.atual.passos[i];
+  _sqSujo();
   if(!m){p.nome=nome;auRenderEditor();return;}
-  p.nome=m.nome;p.idioma=m.idioma;p.formato=m.formato;p.campos=m.campos||[];
-  p.variaveis=Array.from({length:m.variaveis||0},(_,k)=>k===0?'{primeiro_nome}':'');
-  p.texto_preview=m.texto;
-  p.cabecalho=m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null;
+  Object.assign(p,{nome:m.nome,idioma:m.idioma,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,
+    variaveis:Array.from({length:m.variaveis||0},(_,k)=>k===0?'{primeiro_nome}':''),
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null});
   auRenderEditor();
 }
 function _auValidar(a){
-  if(!String(a.nome||'').trim())return 'Dê um nome para a automação.';
-  const g=a.gatilho||{};
-  if((g.tipo==='tag_adicionada'||g.tipo==='tag_removida')&&!g.tag_id)return 'Escolha a tag do gatilho.';
+  if(!String(a.nome||'').trim())return 'O título é obrigatório.';
+  for(const x of a.gatilho.lista){
+    if(x.tipo==='etapa'&&!x.etapa)return 'Escolha a etapa do gatilho de entrada.';
+    if((x.tipo==='tag_adicionada'||x.tipo==='tag_removida')&&!x.tag_id)return 'Escolha a tag do gatilho de entrada.';
+    if(x.tipo==='estado'&&!x.estado)return 'Escolha o estado da conversa no gatilho de entrada.';
+  }
+  const sa=a.regras.saida||{};
+  if((sa.tipo==='igual'||sa.tipo==='contem')&&!String(sa.valor||'').trim())return 'Escreva o texto do gatilho de saída.';
+  if(sa.tipo==='tag'&&!sa.tag_id)return 'Escolha a tag do gatilho de saída.';
   if(!a.passos.length)return 'Adicione pelo menos um passo.';
   for(let i=0;i<a.passos.length;i++){
     const p=a.passos[i];const n='Passo '+(i+1)+': ';
-    if(p.tipo==='texto'&&!String(p.texto||'').trim())return n+'escreva o texto.';
-    if(p.tipo==='modelo'&&!p.nome)return n+'escolha o modelo.';
-    if(p.tipo==='modelo'&&p.cabecalho&&!/^https:\/\//.test(p.cabecalho.link||''))return n+'o modelo tem imagem/vídeo no cabeçalho: coloque o link (https://…).';
-    if((p.tipo==='por_tag'||p.tipo==='tirar_tag')&&!p.tag_id)return n+'escolha a tag.';
-    if(p.tipo==='se'&&(p.condicao.tipo==='tem_tag'||p.condicao.tipo==='nao_tem_tag')&&!p.condicao.tag_id)return n+'escolha a tag da condição.';
-    if(p.tipo==='esperar'&&!(p.minutos>0))return n+'informe quanto tempo esperar.';
+    if(p.tipo==='novo')return n+'escolha o tipo do passo.';
+    if(p.tipo==='esperar'&&!(p.minutos>0))return n+'informe o tempo de espera.';
+    if(p.tipo==='texto'&&!String(p.texto||'').trim())return n+'escreva a mensagem.';
+    if(p.tipo==='midia'&&!p.link)return n+'envie o arquivo.';
+    if(p.tipo==='modelo'&&!p.nome)return n+'escolha o template.';
+    if(p.tipo==='modelo'&&p.cabecalho&&!/^https:\/\//.test(p.cabecalho.link||''))return n+'o template tem mídia no cabeçalho: coloque o link (https://…).';
+    if(p.tipo==='acao'&&!p.acao)return n+'selecione a ação.';
+    if(p.tipo==='acao'&&(p.acao==='por_tag'||p.acao==='tirar_tag')&&!(p.tags||[]).length)return n+'escolha pelo menos uma tag.';
   }
-  if(a.modo_teste&&a.ligada&&!(a.telefones_teste||[]).length)return 'No modo teste, coloque pelo menos um telefone de teste.';
+  if(a.modo_teste&&a.ligada&&!(a.telefones_teste||[]).length)return 'No modo teste, coloque pelo menos um telefone de teste (Opções avançadas).';
   return null;
 }
 async function auSalvar(){
@@ -13540,17 +13765,19 @@ async function auSalvar(){
   const erro=_auValidar(a);if(erro){showToast('error','Falta algo',erro);return;}
   if(a.ligada&&!a.modo_teste){
     const orig=a.id&&_au.lista.find(x=>x.id===a.id);
-    if(!(orig&&orig.ligada&&!orig.modo_teste)&&!confirm('Esta automação vai ficar ligada para TODOS os contatos (fora do modo teste)'+(_au.chaveGeral?'':', e começa assim que a chave geral for ligada')+'. Confirmar?'))return;
+    if(!(orig&&orig.ligada&&!orig.modo_teste)&&!confirm('Esta sequência vai ficar ligada para TODOS os contatos (fora do modo teste)'+(_au.chaveGeral?'':', e começa assim que a chave geral for ligada')+'. Confirmar?'))return;
   }
-  const campos={nome:a.nome.trim(),descricao:a.descricao||null,ligada:!!a.ligada,modo_teste:!!a.modo_teste,telefones_teste:a.telefones_teste||[],gatilho:a.gatilho,regras:a.regras,passos:a.passos};
+  const gl=a.gatilho.lista;
+  const campos={nome:a.nome.trim(),descricao:a.descricao||null,ligada:!!a.ligada,modo_teste:!!a.modo_teste,telefones_teste:a.telefones_teste||[],
+    numero_clinica_id:a.numero_clinica_id||null,gatilho:gl.length?{tipo:gl[0].tipo,lista:gl}:{tipo:'manual',lista:[]},regras:a.regras,passos:a.passos};
   const b=document.getElementById('au-salvar');if(b){b.disabled=true;b.textContent='Salvando…';}
   try{
     if(a.id)await _waRest('automacoes?id=eq.'+a.id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(campos)});
     else await _waRest('automacoes',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(campos)});
-    showToast('success','Automação salva',campos.ligada?(campos.modo_teste?'Ligada em modo teste.':'Ligada para todos.'):'Está desligada: ligue quando quiser.');
-    auVoltar();
+    showToast('success','Sequência salva',campos.ligada?(campos.modo_teste?'Ligada em modo teste.':'Ligada para todos.'):'Está desligada: ligue quando quiser.');
+    _au.sujo=false;auVoltar();
   }catch(e){
-    if(b){b.disabled=false;b.textContent='Salvar automação';}
+    if(b){b.disabled=false;b.textContent=a.id?'Editar sequência':'Criar sequência';}
     showToast('error','Não foi possível salvar',e.message);
   }
 }

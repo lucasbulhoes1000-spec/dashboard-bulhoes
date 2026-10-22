@@ -5,7 +5,7 @@
 // O agendador do banco (pg_cron) chama esta função a cada minuto com a
 // chave do motor (cabeçalho x-motor-chave). Ela pega quem tem passo vencido
 // (automacao_pegar) e executa os passos em ordem até chegar numa espera:
-//   esperar · texto · modelo · por_tag · tirar_tag · atribuir · se · fim
+//   esperar · texto · midia · modelo · acao · por_tag · tirar_tag · atribuir · se · fim
 // Também envia os disparos em massa (tabela disparos), no ritmo de cada um.
 //
 // Regras de cada automação (campo regras):
@@ -203,8 +203,9 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           return "esperando";
         }
         case "texto":
+        case "midia":
         case "modelo": {
-          const quando = proximoHorario(agora(), regras);
+          const quando = p.ignorar_horario ? agora() : proximoHorario(agora(), regras);
           if (quando > agora() + 30_000) {
             await avancar(x, i, null, "adiado", null, i, quando); // sem log: só reagenda
             return "fora_do_horario";
@@ -213,15 +214,27 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           if (!k.c) throw new Error("não achei a conversa do contato");
           const dados = { nome: k.nome, telefone: x.telefone };
           let corpo: any, registro: string, tipo: string;
-          if (p.tipo === "texto") {
+          if (p.tipo === "texto" || p.tipo === "midia") {
             if (!janelaAberta(k.c, agora())) {
               if (p.sem_janela === "parar") {
-                await avancar(x, i, "texto", "pulado", "janela de 24 h fechada: saiu da automação", i, null, "saiu", k.c.id);
+                await avancar(x, i, p.tipo, "pulado", "janela de 24 h fechada: saiu da automação", i, null, "saiu", k.c.id);
                 return "saiu";
               }
-              await avancar(x, i, "texto", "pulado", "janela de 24 h fechada", i + 1, null, "ativa", k.c.id);
+              await avancar(x, i, p.tipo, "pulado", "janela de 24 h fechada", i + 1, null, "ativa", k.c.id);
               i++; continue;
             }
+          }
+          if (p.tipo === "midia") {
+            const fmt = ["image", "video", "audio", "document"].includes(p.formato) ? p.formato : "document";
+            if (!/^https:\/\//.test(String(p.link ?? ""))) throw new Error("passo de mídia sem arquivo");
+            const conteudo: any = { link: String(p.link) };
+            const legenda = preencher(p.legenda ?? "", dados).trim();
+            if (legenda && fmt !== "audio") conteudo.caption = legenda.slice(0, 1024);
+            if (fmt === "document") conteudo.filename = String(p.nome || "arquivo");
+            corpo = { type: fmt, [fmt]: conteudo };
+            registro = legenda || ({ image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 " + (p.nome || "Arquivo") }[fmt]!);
+            tipo = fmt;
+          } else if (p.tipo === "texto") {
             registro = preencher(p.texto, dados).trim();
             if (!registro) { await avancar(x, i, "texto", "pulado", "texto vazio", i + 1, null, "ativa", k.c.id); i++; continue; }
             corpo = { type: "text", text: { body: registro.slice(0, 4096), preview_url: true } };
@@ -241,6 +254,24 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           }
           await registrar(k.c, r.j?.messages?.[0]?.id ?? null, tipo, registro, autor, "enviada", null, r.j);
           await avancar(x, i, p.tipo, "ok", p.tipo === "modelo" ? p.nome : registro.slice(0, 120), i + 1, null, "ativa", k.c.id);
+          i++; continue;
+        }
+        case "acao": {
+          // passo "Ação" do Cloudia: adicionar/remover várias tags ou atribuir
+          const k = await garantir();
+          if (!k.c) throw new Error("não achei a conversa do contato");
+          const tags: number[] = (Array.isArray(p.tags) ? p.tags : []).map(Number).filter(Boolean);
+          if (p.acao === "por_tag" || p.acao === "tirar_tag") {
+            for (const t of tags) {
+              const r = p.acao === "por_tag"
+                ? await banco(`/rest/v1/conversa_tags`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ conversa_id: k.c.id, tag_id: t, adicionada_por: autor }) })
+                : await banco(`/rest/v1/conversa_tags?conversa_id=eq.${k.c.id}&tag_id=eq.${t}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+              if (!r.ok && r.status !== 409) throw new Error("tag: " + (await r.text()).slice(0, 200));
+            }
+          } else if (p.acao === "atribuir") {
+            await bancoJson(`/rest/v1/conversas?id=eq.${k.c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ atribuida_a: p.email || null }) });
+          }
+          await avancar(x, i, "acao", "ok", (p.acao || "?") + (tags.length ? " " + tags.join(",") : p.email ? " " + p.email : ""), i + 1, null, "ativa", k.c.id);
           i++; continue;
         }
         case "por_tag":
