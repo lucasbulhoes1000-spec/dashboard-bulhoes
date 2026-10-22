@@ -116,6 +116,13 @@ async function conversa(dados: any) {
   return c[0];
 }
 
+export function tipoDaMidia(mime: string): "image" | "video" | "audio" | "document" {
+  if (/^image\/(jpeg|png)$/.test(mime)) return "image";
+  if (/^video\/(mp4|3gpp)$/.test(mime)) return "video";
+  if (/^audio\/(ogg|mpeg|mp4|aac|amr)$/.test(mime)) return "audio";
+  return "document";
+}
+
 export function janelaAberta(c: { ultima_recebida_em?: string | null; janela_gratis_ate?: string | null }, agora = Date.now()): boolean {
   const ultima = c.ultima_recebida_em ? Date.parse(c.ultima_recebida_em) : 0;
   const gratis = c.janela_gratis_ate ? Date.parse(c.janela_gratis_ate) : 0;
@@ -166,6 +173,51 @@ export async function handler(req: Request): Promise<Response> {
           return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente. Use um modelo aprovado." }, 409);
         }
         return await enviar(req, quem, c, { type: "text", text: { body: texto, preview_url: true } }, "text", texto);
+      }
+      case "enviar_midia": {
+        // A equipe já subiu o arquivo em whatsapp-midia/envios/<conversa>/...; aqui ele vai
+        // para a Meta (upload de mídia) e sai como mensagem.
+        const c = await conversa(dados);
+        const caminho = String(dados.caminho ?? "");
+        if (!caminho.startsWith(`envios/${c.id}/`)) return resposta(req, { ok: false, erro: "arquivo inválido" }, 400);
+        if (!janelaAberta(c)) {
+          return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente. Use um modelo aprovado." }, 409);
+        }
+        const arq = await banco(`/storage/v1/object/whatsapp-midia/${caminho.split("/").map(encodeURIComponent).join("/")}`, { headers: { "Content-Type": "application/octet-stream" } });
+        if (!arq.ok) return resposta(req, { ok: false, erro: "não encontrei o arquivo enviado" }, 400);
+        const mime = String(dados.mime || arq.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+        const bytes = new Uint8Array(await arq.arrayBuffer());
+        const tipo = tipoDaMidia(mime);
+        const limite = { image: 5, video: 16, audio: 16, document: 100 }[tipo]! * 1024 * 1024;
+        if (bytes.byteLength > limite) return resposta(req, { ok: false, erro: `arquivo grande demais para o WhatsApp (máx. ${limite / 1048576} MB para ${tipo === "image" ? "fotos" : tipo === "video" ? "vídeos" : tipo === "audio" ? "áudios" : "documentos"})` }, 400);
+        const nome = String(dados.nome || caminho.split("/").pop() || "arquivo");
+        const token = await tokenDoNumero(c.numero_clinica_id);
+        const fd = new FormData();
+        fd.append("messaging_product", "whatsapp");
+        fd.append("type", mime);
+        fd.append("file", new Blob([bytes], { type: mime }), nome);
+        const up = await fetch(`${GRAPH}/${c.numero_clinica_id}/media`, { method: "POST", headers: { Authorization: "Bearer " + token }, body: fd });
+        const uj = await up.json().catch(() => ({}));
+        if (!up.ok || !uj.id) return resposta(req, { ok: false, erro: "A Meta recusou o arquivo: " + erroMeta(uj) }, 502);
+        const legenda = String(dados.legenda ?? "").trim().slice(0, 1024);
+        const conteudo: any = { id: uj.id };
+        if (legenda && tipo !== "audio") conteudo.caption = legenda;
+        if (tipo === "document") conteudo.filename = nome;
+        const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, type: tipo, [tipo]: conteudo }, token);
+        const texto = legenda || ({ image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 " + nome }[tipo]!);
+        const reg = (status: string, waId: string | null, erro: string | null, bruto: unknown) => bancoJson("/rest/v1/rpc/wa_registrar_enviada_midia", {
+          method: "POST",
+          body: JSON.stringify({ p_conversa: c.id, p_wa_message_id: waId, p_tipo: tipo, p_texto: texto, p_autor: quem.email,
+            p_status: status, p_erro: erro, p_bruto: bruto, p_caminho: caminho, p_mime: mime, p_nome: nome }),
+        });
+        if (!r.ok) {
+          const erro = erroMeta(r.j);
+          await reg("falhou", null, erro, r.j);
+          return resposta(req, { ok: false, erro }, 502);
+        }
+        const waId = r.j?.messages?.[0]?.id ?? null;
+        const id = await reg("enviada", waId, null, r.j);
+        return resposta(req, { ok: true, mensagem_id: id, wa_message_id: waId });
       }
       case "enviar_modelo": {
         const nome = String(dados.nome ?? "").trim();
