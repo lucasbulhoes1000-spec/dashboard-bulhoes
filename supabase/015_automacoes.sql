@@ -118,7 +118,7 @@ create index if not exists automacao_log_exec on public.automacao_log (execucao_
 alter table public.automacoes enable row level security;
 alter table public.automacao_execucoes enable row level security;
 alter table public.automacao_log enable row level security;
-revoke all on public.automacoes, public.automacao_execucoes, public.automacao_log from anon;
+revoke all on public.automacoes, public.automacao_execucoes, public.automacao_log from anon, authenticated;
 grant select, insert, delete on public.automacoes to authenticated;
 grant update (nome, descricao, ligada, modo_teste, telefones_teste, gatilho, regras, passos, numero_clinica_id, atualizada_em, atualizada_por)
   on public.automacoes to authenticated;

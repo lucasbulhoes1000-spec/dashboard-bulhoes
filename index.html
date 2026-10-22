@@ -289,7 +289,7 @@ tbody tr:hover td{background:#faf7f3;}
 .wa-cab,.wa-janela,.wa-comp,.wa-aviso-cloudia{flex-shrink:0;}
 .wa-aviso-cloudia{font-size:10px;color:#b5a898;padding:6px 12px;border-top:0.5px solid #f0e9e0;text-align:center;}
 /* ===== Automações ===== */
-#page-automacoes .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
+#page-automacoes .au-wrap,#page-disparos .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
 .au-geral{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fbf1e6;border:0.5px solid #e9d5bb;color:#7a5530;border-radius:10px;padding:12px 14px;flex-wrap:wrap;}
 .au-geral.ligada{background:#eef5ef;border-color:#cfe3d3;color:#3f6b4c;}
 .au-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -336,6 +336,16 @@ tbody tr:hover td{background:#faf7f3;}
 .au-st{font-size:10.5px;border-radius:8px;padding:1px 7px;background:#f5efe8;color:#7a6550;white-space:nowrap;}
 .au-st.ativa{background:#eef5ef;color:#3f6b4c;}.au-st.erro{background:#fbeaea;color:#a04040;}.au-st.saiu{background:#f0eef9;color:#5d5490;}
 @media (max-width:900px){.au-editor{grid-template-columns:1fr;}.au-lista{grid-template-columns:1fr;}}
+.dp-barra{height:6px;background:#f0e9e0;border-radius:4px;overflow:hidden;}
+.dp-barra>div{height:100%;background:#A18B6C;transition:width .4s;}
+.dp-nums{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:#7a6550;}
+.dp-nums b{color:#2a2520;}
+.dp-etapas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;}
+.dp-amostra{max-height:420px;overflow-y:auto;}
+.dp-amostra-item{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:0.5px solid #f5f0ea;font-size:12px;color:#2a2520;}
+.dp-res-linha{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#7a6550;padding:3px 0;}
+.dp-res-linha b{color:#2a2520;white-space:nowrap;}
+.dp-alerta{font-size:11.5px;color:#7a5530;background:#fbf1e6;border:0.5px solid #e9d5bb;border-radius:7px;padding:8px;}
 .wa-modal-fundo{position:fixed;inset:0;background:rgba(42,37,32,.35);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px;}
 .wa-modal{background:#fff;border-radius:12px;width:min(520px,100%);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.2);}
 .wa-modal-cab{padding:14px 16px;border-bottom:0.5px solid #e0d8ce;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:#2a2520;}
@@ -455,6 +465,10 @@ tbody tr:hover td{background:#faf7f3;}
     <div class="nav-item" onclick="switchPage('automacoes',this)">
       <span class="nav-icon">⚡</span>
       <span class="nav-label">Automações</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('disparos',this)">
+      <span class="nav-icon">📣</span>
+      <span class="nav-label">Disparos</span>
     </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
@@ -1186,6 +1200,7 @@ tbody tr:hover td{background:#faf7f3;}
       </div>
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
+    <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
     <div class="page" id="page-automacoes"><div class="au-wrap" id="au-conteudo"></div></div>
     <div class="page" id="page-pacientes">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
@@ -2323,13 +2338,14 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',disparos:'Disparos',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='pacientes') renderPacientesPage();
   else if(page==='conversas') abrirConversas();
   else if(page==='automacoes') abrirAutomacoes();
+  else if(page==='disparos') abrirDisparos();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='trafego-pago') abrirTrafegoPago();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
@@ -13567,6 +13583,276 @@ async function auColocarContato(autoId){
     if(r==null)showToast('error','Não entrou','A automação está desligada, a chave geral está pausada, o número não está na lista de teste, ou ele já está nela.');
     else{showToast('success','Contato colocado','O motor começa no próximo minuto.');auVerContatos(autoId);}
   }catch(e){showToast('error','Não foi possível colocar',e.message);}
+}
+
+// =====================================================================
+// DISPAROS EM MASSA — público por filtros, modelo aprovado, ritmo e agendamento
+// =====================================================================
+const _dp={lista:[],resumos:{},modo:'lista',novo:null,base:null,publico:[],precos:null,modelos:null,timer:null};
+const DP_FILTRO_VAZIO={etapas:[],origem:'',tag:'',atendente:'',campanha:'',criadoDe:'',criadoAte:'',msgDe:'',msgAte:'',soComConversa:false,colados:'',soColados:false};
+function _dpPode(){return typeof _auPodeEditar==='function'?_auPodeEditar():_waEhGestao();}
+function _dpData(iso){try{return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
+
+function abrirDisparos(){
+  iniciarWhatsApp();
+  if(_dp.modo==='novo'&&_dp.novo){dpRenderNovo();return;}
+  _dp.modo='lista';dpRenderLista();dpCarregar();
+  clearInterval(_dp.timer);
+  _dp.timer=setInterval(()=>{if(currentPage==='disparos'&&_dp.modo==='lista'&&document.visibilityState==='visible'&&_dp.lista.some(d=>d.status==='enviando'||d.status==='agendado'))dpCarregar();},20000);
+}
+async function dpCarregar(){
+  if(!_sbAccessToken){setTimeout(dpCarregar,1200);return;}
+  try{
+    _dp.lista=(await _waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em&order=criado_em.desc&limit=50'))||[];
+    _dp.erro=null;
+    await Promise.all(_dp.lista.slice(0,15).map(async d=>{
+      try{_dp.resumos[d.id]=await _waRest('rpc/disparo_resumo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_disparo:d.id})});}catch(e){}
+    }));
+  }catch(e){_dp.erro=e.message;}
+  if(currentPage==='disparos'&&_dp.modo==='lista')dpRenderLista();
+}
+function dpRenderLista(){
+  const el=document.getElementById('dp-conteudo');if(!el)return;
+  if(_dp.erro&&/disparos/.test(_dp.erro)){el.innerHTML='<div class="au-vazio">O disparo em massa ainda não foi ligado no banco.<br><span style="font-size:11px">'+_auEsc(_dp.erro)+'</span></div>';return;}
+  const pode=_dpPode();
+  const st={agendado:'⏰ agendado',enviando:'📤 enviando',pausado:'⏸ pausado',concluido:'✓ concluído',cancelado:'✕ cancelado'};
+  const itens=_dp.lista.map(d=>{
+    const r=_dp.resumos[d.id]||{};
+    const base=Math.max(1,d.total||1);
+    const pct=Math.min(100,Math.round(((d.total||0)-(r.pendentes||0))/base*100));
+    return '<div class="au-card">'+
+      '<div class="au-card-topo"><div style="min-width:0"><div class="au-card-nome">'+_auEsc(d.nome)+'</div>'+
+        '<div class="au-card-gat">📋 '+_auEsc(d.modelo&&d.modelo.nome||'')+' · '+(d.status==='agendado'?'sai em '+_dpData(d.agendado_para):'criado em '+_dpData(d.criado_em))+'</div></div>'+
+        '<span class="au-st '+(d.status==='enviando'?'ativa':d.status==='cancelado'?'erro':'')+'">'+st[d.status]+'</span></div>'+
+      '<div class="dp-barra"><div style="width:'+pct+'%"></div></div>'+
+      '<div class="dp-nums">'+
+        '<span><b>'+(d.total||0)+'</b> no público</span><span><b>'+(r.enviados||0)+'</b> enviados</span><span><b>'+(r.entregues||0)+'</b> entregues</span><span><b>'+(r.lidos||0)+'</b> lidos</span><span><b>'+(r.responderam||0)+'</b> responderam</span>'+
+        ((r.falharam||0)?'<span style="color:#a04040"><b>'+r.falharam+'</b> falharam</span>':'')+((r.pulados||0)?'<span><b>'+r.pulados+'</b> pulados</span>':'')+
+      '</div>'+
+      '<div class="au-card-rodape"><span>'+_auEsc(_waNomeEquipe(d.criado_por)||d.criado_por||'')+' · '+d.ritmo_por_minuto+'/min</span><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+        '<button class="wa-btn" onclick="dpVerContatos('+d.id+')">👥 Contatos</button>'+
+        (pode&&d.status==='enviando'?'<button class="wa-btn" onclick="dpStatus('+d.id+',\'pausado\')">Pausar</button>':'')+
+        (pode&&d.status==='pausado'?'<button class="wa-btn primario" onclick="dpStatus('+d.id+',\'enviando\')">Retomar</button>':'')+
+        (pode&&['agendado','enviando','pausado'].includes(d.status)?'<button class="wa-btn" onclick="dpStatus('+d.id+',\'cancelado\')">Cancelar</button>':'')+
+      '</div></div></div>';
+  }).join('');
+  el.innerHTML='<div class="au-topo"><div style="font-size:12px;color:#9a8c7e">Envio de um modelo aprovado para muitos contatos de uma vez. Cada contato que recebe ganha uma tag do disparo, para filtrar depois ou usar numa automação.</div>'+
+    (pode?'<button class="wa-btn primario" onclick="dpNovo()">＋ Novo disparo</button>':'')+'</div>'+
+    (itens?'<div class="au-lista">'+itens+'</div>':'<div class="au-vazio">Nenhum disparo ainda.'+(pode?'<br><button class="wa-btn primario" style="margin-top:10px" onclick="dpNovo()">Criar o primeiro</button>':'')+'</div>');
+}
+async function dpStatus(id,s){
+  const d=_dp.lista.find(x=>x.id===id);if(!d)return;
+  const txt={pausado:'Pausar o disparo? Quem ainda não recebeu fica esperando até retomar.',enviando:'Retomar o disparo?',cancelado:'Cancelar o disparo? Quem ainda não recebeu não vai receber.'}[s];
+  if(!confirm(txt))return;
+  try{await _waRest('disparos?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:s})});d.status=s;dpRenderLista();}
+  catch(e){showToast('error','Não foi possível mudar',e.message);}
+}
+
+// ---------- base de contatos (CRM + conversas) ----------
+function dpMontarBase(){
+  const mapa=new Map();
+  const conv=new Map();
+  (_wa.conversas||[]).forEach(c=>{const ph=normalizePhone(c.telefone);if(ph&&!conv.has(ph))conv.set(ph,c);});
+  const add=(bruto,nome)=>{
+    const ph=normalizePhone(bruto);if(!ph||mapa.has(ph))return;
+    const c=conv.get(ph)||null;
+    const L=_waLead({telefone:ph,pacientes:c&&c.pacientes});
+    let tags=null;
+    if(c&&_wa.convTags[c.id])tags=_wa.convTags[c.id];
+    mapa.set(ph,{ph,bruto:String(bruto||''),nome:nome||(c?_waNome(c):''),etapa:L.etapa||'',origem:L.origem||'',ad:(L.adName||'')+' '+(L.campanha||''),criado:L.criadoEm||'',conversa:c,tags,
+      ultMsg:c&&c.ultima_recebida_em||'',atendente:c&&c.atribuida_a||''});
+  };
+  (allCloudiaRows||[]).forEach(r=>add(r.phone,r.name));
+  Object.keys(_ccData||{}).forEach(k=>{if(/^\d{10,13}$/.test(k))add(k,(_ccData[k]&&(_ccData[k].nome||_ccData[k].name))||'');});
+  conv.forEach((c,ph)=>add(ph,_waNome(c)));
+  _dp.base=[...mapa.values()];
+}
+function dpFiltrar(){
+  const f=_dp.novo.f;
+  const colados=(f.colados||'').split(/[\n,;\t]+/).map(x=>x.trim()).filter(x=>x.replace(/\D/g,'').length>=10).map(x=>({ph:normalizePhone(x),bruto:x})).filter(x=>x.ph);
+  let lista=[];
+  if(!f.soColados){
+    lista=_dp.base.filter(x=>{
+      if(f.etapas.length&&!f.etapas.includes(x.etapa||'_sem'))return false;
+      if(f.origem&&x.origem!==f.origem)return false;
+      if(f.campanha&&!x.ad.toLowerCase().includes(f.campanha.toLowerCase()))return false;
+      if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
+      if(f.atendente&&(x.conversa?x.conversa.atribuida_a||'':'')!==(f.atendente==='_ninguem'?'':f.atendente))return false;
+      if(f.soComConversa&&!x.conversa)return false;
+      if(f.criadoDe&&(!x.criado||x.criado.slice(0,10)<f.criadoDe))return false;
+      if(f.criadoAte&&(!x.criado||x.criado.slice(0,10)>f.criadoAte))return false;
+      if(f.msgDe&&(!x.ultMsg||x.ultMsg.slice(0,10)<f.msgDe))return false;
+      if(f.msgAte&&(!x.ultMsg||x.ultMsg.slice(0,10)>f.msgAte))return false;
+      return true;
+    });
+  }
+  if(colados.length){
+    const ja=new Set(lista.map(x=>x.ph));
+    colados.forEach(c=>{if(!ja.has(c.ph)){ja.add(c.ph);const b=_dp.base.find(x=>x.ph===c.ph);lista.push(b||{ph:c.ph,bruto:c.bruto,nome:'',etapa:'',origem:''});}});
+  }
+  _dp.publico=lista;
+}
+
+// ---------- novo disparo ----------
+async function dpNovo(){
+  _dp.novo={nome:'',f:JSON.parse(JSON.stringify(DP_FILTRO_VAZIO)),modelo:null,quando:'agora',agendado:'',ritmo:20,repeticao:7,previa:null};
+  _dp.modo='novo';
+  if(!allCloudiaRows||!allCloudiaRows.length)showToast('info','Carregando a base de contatos…','Se a contagem ficar zerada, abra o Dashboard uma vez e volte.');
+  dpMontarBase();dpFiltrar();dpRenderNovo();
+  if(!_dp.modelos){
+    try{const r=await _waAcao({acao:'modelos'});_dp.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
+    catch(e){_dp.modelos=[];showToast('error','Não consegui carregar os modelos da Meta',e.message);}
+  }
+  if(!_dp.precos){try{const p=await _waRest('configuracoes?chave=eq.whatsapp_precos&select=valor');_dp.precos=p&&p[0]&&p[0].valor||null;}catch(e){}}
+  if(_dp.modo==='novo')dpRenderNovo();
+}
+function dpVoltar(){_dp.modo='lista';_dp.novo=null;dpRenderLista();dpCarregar();}
+function dpSetF(campo,v){_dp.novo.f[campo]=v;dpFiltrar();dpAtualizarContagem();}
+function dpToggleEtapa(e,on){const a=_dp.novo.f.etapas;const i=a.indexOf(e);if(on&&i<0)a.push(e);if(!on&&i>=0)a.splice(i,1);dpFiltrar();dpAtualizarContagem();}
+function dpCusto(n){
+  const m=_dp.novo&&_dp.novo.modelo;const p=_dp.precos;
+  if(!m||!p)return '';
+  const v=Number(p[m.categoria]||p.MARKETING||0)*n;
+  return (p.moeda==='BRL'?'R$ ':'US$ ')+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function dpAtualizarContagem(){
+  const n=_dp.publico.length;
+  const el=document.getElementById('dp-contagem');if(el)el.textContent=n.toLocaleString('pt-BR');
+  const lista=document.getElementById('dp-amostra');
+  if(lista)lista.innerHTML=_dp.publico.slice(0,40).map(x=>'<div class="dp-amostra-item"><span>'+_auEsc(x.nome||'(sem nome)')+'</span><span class="au-sub">'+_waTelFormatado(x.ph)+(x.etapa?' · '+_auEsc(WA_ETAPA_ROTULO[x.etapa]||x.etapa):'')+'</span></div>').join('')+(n>40?'<div class="au-sub" style="padding:6px 0">e mais '+(n-40).toLocaleString('pt-BR')+'…</div>':'')+(n?'':'<div class="au-sub" style="padding:6px 0">Nenhum contato com esses filtros.</div>');
+  dpAtualizarResumo();
+}
+function dpAtualizarResumo(){
+  const el=document.getElementById('dp-resumo');if(!el)return;
+  const n=_dp.publico.length;const v=_dp.novo;const pv=v.previa;
+  const estim=Math.max(0,n-(pv?(pv.optout||0)+(pv.repetidos||0):0));
+  const min=Math.ceil(estim/Math.max(1,v.ritmo));
+  el.innerHTML=
+    '<div class="dp-res-linha"><span>No público</span><b>'+n.toLocaleString('pt-BR')+'</b></div>'+
+    (pv?'<div class="dp-res-linha"><span>Pediram para não receber</span><b>−'+(pv.optout||0)+'</b></div><div class="dp-res-linha"><span>Já receberam este modelo há menos de '+v.repeticao+' dias</span><b>−'+(pv.repetidos||0)+'</b></div>':'<div class="au-sub">Clique em “Conferir” para ver quantos serão pulados.</div>')+
+    '<div class="dp-res-linha"><span>Devem receber (aprox.)</span><b>'+estim.toLocaleString('pt-BR')+'</b></div>'+
+    (v.modelo?'<div class="dp-res-linha"><span>Custo estimado na Meta ('+_auEsc((v.modelo.categoria||'').toLowerCase())+')</span><b>'+dpCusto(estim)+'</b></div>':'')+
+    (estim?'<div class="dp-res-linha"><span>Duração no ritmo de '+v.ritmo+'/min</span><b>'+(min<60?min+' min':Math.floor(min/60)+' h '+(min%60)+' min')+'</b></div>':'')+
+    (estim>1000?'<div class="dp-alerta">⚠ Acima de 1.000 pessoas: a Meta limita quantos contatos novos o número pode receber por dia, de acordo com o nível do número. Se passar do limite, os envios falham. Prefira dividir em dias.</div>':'')+
+    (v.modelo&&String(v.modelo.categoria).toUpperCase()==='MARKETING'?'<div class="au-dica">Modelo de marketing: lembre das regras do CFO (sem preço/desconto sem revisão, sem promessa de resultado).</div>':'')+
+    '<div class="au-dica">O preço por mensagem é uma estimativa (configurações “whatsapp_precos”). Confira na fatura da Meta.</div>';
+}
+async function dpConferir(){
+  const v=_dp.novo;if(!v.modelo){showToast('error','Escolha o modelo primeiro','');return;}
+  if(_dp.publico.length>20000){showToast('error','Público grande demais','Máximo de 20.000 por disparo.');return;}
+  try{
+    v.previa=await _waRest('rpc/disparo_previa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_modelo:v.modelo.nome,p_telefones:_dp.publico.map(x=>x.bruto||x.ph),p_dias_repeticao:Number(v.repeticao)||0})});
+    dpAtualizarResumo();
+  }catch(e){showToast('error','Não foi possível conferir',e.message);}
+}
+function dpEscolherModelo(nome){
+  const m=(_dp.modelos||[]).find(x=>x.nome===nome);const v=_dp.novo;
+  if(!m){v.modelo=null;dpRenderNovo();return;}
+  v.modelo={nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],
+    variaveis:Array.from({length:m.variaveis||0},(_,k)=>k===0?'{primeiro_nome}':''),texto_preview:m.texto,
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null};
+  v.previa=null;
+  dpRenderNovo();
+}
+function dpRenderNovo(){
+  const el=document.getElementById('dp-conteudo');if(!el)return;
+  const v=_dp.novo;const f=v.f;
+  const opt=_auOpt;
+  const etapas=['Lead','Agendou','Faltou/desmarcou','Compareceu','Ganho','Perdido','Paciente','_sem'];
+  const ms=_dp.modelos;
+  const m=v.modelo&&ms&&ms.find(x=>x.nome===v.modelo.nome);
+  let modeloHtml=ms?'<select class="wa-sel" onchange="dpEscolherModelo(this.value)">'+opt('','Escolha o modelo aprovado…',v.modelo&&v.modelo.nome)+ms.map(x=>opt(x.nome,x.nome+' ('+String(x.categoria).toLowerCase()+')',v.modelo&&v.modelo.nome)).join('')+'</select>':'<div class="au-dica">Carregando modelos da Meta…</div>';
+  if(m){
+    modeloHtml+='<div class="au-preview">'+_auEsc(m.texto)+'</div>';
+    if(v.modelo.cabecalho)modeloHtml+='<div class="au-dica">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[v.modelo.cabecalho.formato])+'. Link público do arquivo:</div><input class="wa-var" value="'+_auEsc(v.modelo.cabecalho.link||'')+'" placeholder="https://…" oninput="_dp.novo.modelo.cabecalho.link=this.value.trim()">';
+    v.modelo.variaveis.forEach((x,k)=>{modeloHtml+='<div class="au-linha" style="font-size:11px">'+_auEsc(m.formato==='NAMED'?'{{'+(m.campos[k]||k+1)+'}}':'{{'+(k+1)+'}}')+' <input class="wa-var" value="'+_auEsc(x)+'" placeholder="ex.: {primeiro_nome}" oninput="_dp.novo.modelo.variaveis['+k+']=this.value"></div>';});
+    if(v.modelo.variaveis.length)modeloHtml+='<div class="au-dica">Use <code>{primeiro_nome}</code> ou <code>{nome}</code>; sem nome, entra um texto vazio.</div>';
+  }
+  el.innerHTML=
+    '<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button><div style="display:flex;gap:8px"><button class="wa-btn" onclick="dpVoltar()">Cancelar</button><button class="wa-btn primario" id="dp-criar" onclick="dpCriar()">Criar disparo</button></div></div>'+
+    '<div class="au-editor">'+
+      '<div class="au-col">'+
+        '<div class="au-bloco"><h4>1. Público</h4>'+
+          '<div class="au-dica">Base: '+(_dp.base||[]).length.toLocaleString('pt-BR')+' contatos (CRM + conversas).</div>'+
+          '<div style="font-size:12px;color:#7a6550">Etapa</div><div class="dp-etapas">'+etapas.map(e=>'<label class="au-check"><input type="checkbox" '+(f.etapas.includes(e)?'checked':'')+' onchange="dpToggleEtapa(\''+e.replace(/'/g,"\\'")+'\',this.checked)"> '+_auEsc(e==='_sem'?'Sem etapa':(WA_ETAPA_ROTULO[e]||e))+'</label>').join('')+'</div>'+
+          '<select class="wa-sel" onchange="dpSetF(\'origem\',this.value)">'+opt('','Todas as origens',f.origem)+_waOrigens().map(o=>opt(o,o,f.origem)).join('')+'</select>'+
+          '<input class="wa-var" placeholder="Anúncio ou campanha contém… (ex.: LENTES)" value="'+_auEsc(f.campanha)+'" oninput="dpSetF(\'campanha\',this.value.trim())">'+
+          '<select class="wa-sel" onchange="dpSetF(\'tag\',this.value)">'+opt('','Qualquer tag',f.tag)+(_wa.tags||[]).map(t=>opt(String(t.id),t.nome,f.tag)).join('')+'</select>'+
+          '<select class="wa-sel" onchange="dpSetF(\'atendente\',this.value)">'+opt('','Qualquer atendente',f.atendente)+opt('_ninguem','Sem atendente',f.atendente)+(_wa.equipeLista||[]).map(x=>opt(x.email,x.nome,f.atendente)).join('')+'</select>'+
+          '<div class="au-linha">Lead criado de <input class="wa-var" type="date" value="'+f.criadoDe+'" onchange="dpSetF(\'criadoDe\',this.value)"> até <input class="wa-var" type="date" value="'+f.criadoAte+'" onchange="dpSetF(\'criadoAte\',this.value)"></div>'+
+          '<div class="au-linha">Última mensagem do paciente de <input class="wa-var" type="date" value="'+f.msgDe+'" onchange="dpSetF(\'msgDe\',this.value)"> até <input class="wa-var" type="date" value="'+f.msgAte+'" onchange="dpSetF(\'msgAte\',this.value)"></div>'+
+          '<label class="au-check"><input type="checkbox" '+(f.soComConversa?'checked':'')+' onchange="dpSetF(\'soComConversa\',this.checked)"> Só quem já tem conversa no WhatsApp da clínica</label>'+
+          '<textarea class="wa-textarea" placeholder="Colar telefones (um por linha ou separados por vírgula)" oninput="dpSetF(\'colados\',this.value)">'+_auEsc(f.colados)+'</textarea>'+
+          '<label class="au-check"><input type="checkbox" '+(f.soColados?'checked':'')+' onchange="dpSetF(\'soColados\',this.checked)"> Usar só os telefones colados (ignorar os filtros)</label>'+
+        '</div>'+
+        '<div class="au-bloco"><h4>2. Modelo</h4>'+modeloHtml+'</div>'+
+        '<div class="au-bloco"><h4>3. Quando e como</h4>'+
+          '<input class="wa-var" placeholder="Nome do disparo (ex.: Reativação lentes outubro)" maxlength="60" value="'+_auEsc(v.nome)+'" oninput="_dp.novo.nome=this.value">'+
+          '<label class="au-check"><input type="radio" name="dp-quando" '+(v.quando==='agora'?'checked':'')+' onchange="_dp.novo.quando=\'agora\';dpRenderNovo()"> Enviar agora</label>'+
+          '<label class="au-check"><input type="radio" name="dp-quando" '+(v.quando==='agendar'?'checked':'')+' onchange="_dp.novo.quando=\'agendar\';dpRenderNovo()"> Agendar</label>'+
+          (v.quando==='agendar'?'<input class="wa-var" type="datetime-local" value="'+_auEsc(v.agendado)+'" onchange="_dp.novo.agendado=this.value">':'')+
+          '<div class="au-linha">Ritmo: <select class="wa-sel" onchange="_dp.novo.ritmo=Number(this.value);dpAtualizarResumo()">'+[10,20,40,60,100].map(x=>opt(x,x+' por minuto',v.ritmo)).join('')+'</select></div>'+
+          '<div class="au-linha">Pular quem recebeu este modelo nos últimos <select class="wa-sel" onchange="_dp.novo.repeticao=Number(this.value);_dp.novo.previa=null;dpAtualizarResumo()">'+[0,3,7,15,30].map(x=>opt(x,x?x+' dias':'(não pular)',v.repeticao)).join('')+'</select></div>'+
+          '<div class="au-dica">Ritmo mais lento protege a qualidade do número na Meta. Quem respondeu “sair” ou “parar” é sempre pulado.</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="au-col">'+
+        '<div class="au-bloco"><h4>Público: <span id="dp-contagem">0</span> contatos</h4><div id="dp-amostra" class="dp-amostra"></div></div>'+
+        '<div class="au-bloco"><h4>Resumo</h4><div id="dp-resumo"></div><button class="wa-btn" onclick="dpConferir()">Conferir quem será pulado</button></div>'+
+      '</div>'+
+    '</div>';
+  dpAtualizarContagem();
+}
+async function dpCriar(){
+  const v=_dp.novo;
+  if(!String(v.nome||'').trim()){showToast('error','Dê um nome para o disparo','');return;}
+  if(!v.modelo){showToast('error','Escolha o modelo','');return;}
+  if(v.modelo.cabecalho&&!/^https:\/\//.test(v.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho','O modelo tem imagem/vídeo: coloque o link https://');return;}
+  if(!_dp.publico.length){showToast('error','Nenhum contato no público','');return;}
+  if(_dp.publico.length>20000){showToast('error','Público grande demais','Máximo de 20.000 por disparo.');return;}
+  let quando=null;
+  if(v.quando==='agendar'){
+    if(!v.agendado){showToast('error','Escolha data e hora do agendamento','');return;}
+    const t=new Date(v.agendado);if(isNaN(t)||t<Date.now()-60000){showToast('error','Data de agendamento inválida','Use uma data no futuro.');return;}
+    quando=t.toISOString();
+  }
+  const n=_dp.publico.length;
+  if(!confirm('Criar o disparo “'+v.nome.trim()+'”?\n\nModelo: '+v.modelo.nome+'\nPúblico: '+n.toLocaleString('pt-BR')+' contatos (antes de pular quem saiu ou já recebeu)\nCusto estimado: até '+dpCusto(n)+'\n'+(quando?'Agendado para '+_dpData(quando):'Começa a enviar no próximo minuto')+'.'))return;
+  const b=document.getElementById('dp-criar');if(b){b.disabled=true;b.textContent='Criando…';}
+  try{
+    const filtros=Object.assign({},v.f);delete filtros.colados;filtros.colados_qtd=(v.f.colados||'').split(/[\n,;\t]+/).filter(x=>x.trim()).length;
+    const r=await _waRest('rpc/disparo_criar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      p_nome:v.nome.trim(),p_modelo:v.modelo,p_destinos:_dp.publico.map(x=>({telefone:x.bruto||x.ph,nome:x.nome||null})),
+      p_agendado_para:quando,p_ritmo:v.ritmo,p_filtros:filtros,p_dias_repeticao:v.repeticao})});
+    showToast('success','Disparo criado',r.enviar+' vão receber'+(r.pulados?' · '+r.pulados+' pulados':'')+'.');
+    waCarregarTags();
+    dpVoltar();
+  }catch(e){
+    if(b){b.disabled=false;b.textContent='Criar disparo';}
+    showToast('error','Não foi possível criar o disparo',e.message);
+  }
+}
+async function dpVerContatos(id){
+  _dp.modo='contatos';
+  const d=_dp.lista.find(x=>x.id===id);
+  const el=document.getElementById('dp-conteudo');
+  el.innerHTML='<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button></div><div class="au-vazio">Carregando…</div>';
+  let ds=[];
+  try{ds=await _waRest('disparo_destinos?disparo_id=eq.'+id+'&select=telefone,nome,status,motivo,enviado_em,wa_message_id&order=id&limit=5000');}catch(e){el.innerHTML+='<div class="au-vazio">'+_auEsc(e.message)+'</div>';return;}
+  const stMsg={};
+  try{
+    const ids=ds.filter(x=>x.wa_message_id).map(x=>x.wa_message_id);
+    for(let i=0;i<ids.length;i+=150){
+      const r=await _waRest('mensagens?select=wa_message_id,status&wa_message_id=in.('+ids.slice(i,i+150).map(x=>'"'+x+'"').join(',')+')');
+      (r||[]).forEach(m=>stMsg[m.wa_message_id]=m.status);
+    }
+  }catch(e){}
+  const rot={pendente:'na fila',enviado:'enviado',falhou:'falhou',pulado:'pulado'};
+  const rotM={enviada:'enviado',entregue:'entregue',lida:'lido',falhou:'falhou'};
+  const linhas=ds.map(x=>{const s=x.wa_message_id&&stMsg[x.wa_message_id]?rotM[stMsg[x.wa_message_id]]||stMsg[x.wa_message_id]:rot[x.status];
+    return '<tr><td>'+_auEsc(x.nome||'')+'<div class="au-sub">'+(/^\d+$/.test(x.telefone)?_waTelFormatado(x.telefone):'inválido')+'</div></td><td><span class="au-st '+(s==='lido'||s==='entregue'?'ativa':s==='falhou'?'erro':'')+'">'+_auEsc(s)+'</span>'+(x.motivo?'<div class="au-sub">'+_auEsc(x.motivo)+'</div>':'')+'</td><td class="au-sub">'+(x.enviado_em?_dpData(x.enviado_em):'')+'</td></tr>';}).join('');
+  el.innerHTML='<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button><div style="font-weight:600;color:#2a2520">'+_auEsc(d?d.nome:'')+'</div><button class="wa-btn" onclick="dpVerContatos('+id+')">↻ Atualizar</button></div>'+
+    '<div class="au-bloco"><h4>Contatos ('+ds.length+')</h4>'+(linhas?'<div class="au-tabela"><table><thead><tr><th>Contato</th><th>Situação</th><th>Enviado</th></tr></thead><tbody>'+linhas+'</tbody></table></div>':'<div class="au-vazio">Sem contatos.</div>')+'</div>';
 }
 
 function abrirConversas(){

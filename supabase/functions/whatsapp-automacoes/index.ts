@@ -6,6 +6,7 @@
 // chave do motor (cabeçalho x-motor-chave). Ela pega quem tem passo vencido
 // (automacao_pegar) e executa os passos em ordem até chegar numa espera:
 //   esperar · texto · modelo · por_tag · tirar_tag · atribuir · se · fim
+// Também envia os disparos em massa (tabela disparos), no ritmo de cada um.
 //
 // Regras de cada automação (campo regras):
 //   inicio/fim (horário de Brasília) e pular_fim_de_semana → mensagens fora do
@@ -301,6 +302,50 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
   return "continua";
 }
 
+// ---------- disparo em massa ----------
+type Destino = { destino_id: number; disparo_id: number; telefone: string; nome: string | null };
+export async function enviarDisparo(d: Destino, disp: any) {
+  const marcar = (status: string, motivo: string | null, conversa: string | null, waId: string | null) =>
+    rpc("disparo_marcar", { p_destino: d.destino_id, p_status: status, p_motivo: motivo, p_conversa: conversa, p_wa_message_id: waId });
+  if (!disp || disp.status !== "enviando") return "ignorado";
+  try {
+    const convId = await rpc("automacao_conversa", { p_numero: String(disp.numero_clinica_id || WA_PHONE_NUMBER_ID), p_telefone: d.telefone });
+    const c = (await bancoJson(`/rest/v1/conversas?id=eq.${convId}&select=*`))?.[0];
+    if (!c) throw new Error("não achei a conversa");
+    const nome = d.nome || c.nome_contato || c.nome_perfil || "";
+    const corpo = corpoModelo(disp.modelo, { nome, telefone: d.telefone });
+    const registro = disp.modelo?.texto_preview ? preencher(String(disp.modelo.texto_preview), { nome, telefone: d.telefone }) : `[modelo ${disp.modelo?.nome}]`;
+    const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, ...corpo }, await tokenDoNumero(c.numero_clinica_id));
+    const autor = "disparo: " + disp.nome;
+    if (!r.ok) {
+      const erro = erroMeta(r.j);
+      await registrar(c, null, "template", registro, autor, "falhou", erro, r.j);
+      await marcar("falhou", erro.slice(0, 300), c.id, null);
+      return "falhou";
+    }
+    const waId = r.j?.messages?.[0]?.id ?? null;
+    await registrar(c, waId, "template", registro, autor, "enviada", null, r.j);
+    await marcar("enviado", null, c.id, waId);
+    return "enviado";
+  } catch (e) {
+    await marcar("falhou", String((e as Error)?.message ?? e).slice(0, 300), null, null).catch(() => {});
+    return "falhou";
+  }
+}
+
+async function rodarDisparos(inicio: number, cont: Record<string, number>) {
+  const lote: Destino[] = await rpc("disparo_pegar", {}).catch(() => []);
+  if (!lote?.length) return;
+  const ids = [...new Set(lote.map((x) => x.disparo_id))];
+  const ds = await bancoJson(`/rest/v1/disparos?id=in.(${ids.join(",")})&select=id,nome,modelo,numero_clinica_id,status`);
+  const porId = new Map<number, any>((ds ?? []).map((x: any) => [x.id, x]));
+  for (const d of lote) {
+    if (Date.now() - inicio > TEMPO_MAX_MS) break; // o resto fica pendente para o próximo minuto
+    const r = await enviarDisparo(d, porId.get(d.disparo_id));
+    cont["disparo_" + r] = (cont["disparo_" + r] ?? 0) + 1;
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const json = (c: unknown, s = 200) => new Response(JSON.stringify(c), { status: s, headers: { "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
@@ -311,6 +356,8 @@ export async function handler(req: Request): Promise<Response> {
 
   const inicio = Date.now();
   const cont: Record<string, number> = {};
+  // disparos em massa primeiro (não dependem da chave geral: cada um é decisão da equipe)
+  await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
   const autos = new Map<number, any>();
   while (Date.now() - inicio < TEMPO_MAX_MS) {
     const lote: Exec[] = await rpc("automacao_pegar", { p_limite: 30 });
