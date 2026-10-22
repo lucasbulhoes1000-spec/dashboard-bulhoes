@@ -575,6 +575,21 @@ export async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
   const chave = req.headers.get("x-motor-chave") ?? "";
   if (!chave || !(await rpc("automacao_conferir_chave", { p_chave: chave }))) return json({ ok: false, erro: "chave do motor inválida" }, 401);
+  // conferência da conexão com o Clinicorp (só conta, não envia nada)
+  const pedido = await req.json().catch(() => ({}));
+  if (pedido?.acao === "testar_clinicorp") {
+    if (!CLINICORP_USUARIO || !CLINICORP_TOKEN) return json({ ok: false, erro: "faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN" });
+    try {
+      const dias = [...diasDoLembrete("dia", Date.now()), ...diasDoLembrete("dia", Date.now() + 86_400_000)];
+      const bruto = await agendaClinicorp(dias[0], dias[1]);
+      const validas = consultasDoClinicorp(bruto, dias, "vespera", Date.now());
+      const porDia: Record<string, number> = {};
+      for (const c of validas) porDia[c.data] = (porDia[c.data] ?? 0) + 1;
+      return json({ ok: true, itens_na_agenda: bruto.length, pacientes_com_celular_por_dia: porDia });
+    } catch (e) {
+      return json({ ok: false, erro: String((e as Error)?.message ?? e).slice(0, 300) });
+    }
+  }
   // chave geral pausada: só as automações em modo teste andam
   const geral = await chaveGeralLigada();
 
