@@ -274,7 +274,7 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           let v = false;
           if (cond.tipo === "tem_tag") v = !!k.c && (await tagIds(k.c.id)).includes(Number(cond.tag_id));
           else if (cond.tipo === "nao_tem_tag") v = !k.c || !(await tagIds(k.c.id)).includes(Number(cond.tag_id));
-          else if (cond.tipo === "etapa") v = (k.etapa ?? "") === (cond.etapa ?? "");
+          else if (cond.tipo === "etapa") v = String(k.etapa ?? "").toLowerCase() === String(cond.etapa ?? "").toLowerCase();
           else if (cond.tipo === "respondeu") {
             v = !!x.contexto?.respondeu_em || (!!k.c?.ultima_recebida_em && Date.parse(k.c.ultima_recebida_em) > Date.parse(x.entrou_em));
           } else if (cond.tipo === "janela_aberta") v = !!k.c && janelaAberta(k.c, agora());

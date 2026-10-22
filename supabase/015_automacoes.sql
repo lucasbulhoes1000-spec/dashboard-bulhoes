@@ -211,7 +211,7 @@ declare a record; n integer := 0; ok boolean;
 begin
   for a in select * from public.automacoes where ligada and gatilho->>'tipo' = p_tipo loop
     ok := case p_tipo
-      when 'etapa' then coalesce(a.gatilho->>'etapa', '') = coalesce(p_dados->>'etapa', '')
+      when 'etapa' then lower(coalesce(a.gatilho->>'etapa', '')) = lower(coalesce(p_dados->>'etapa', ''))
       when 'tag_adicionada' then (a.gatilho->>'tag_id') = (p_dados->>'tag_id')
       when 'tag_removida' then (a.gatilho->>'tag_id') = (p_dados->>'tag_id')
       when 'lead_criado' then coalesce(a.gatilho->>'origem', '') in ('', coalesce(p_dados->>'origem', ''))
@@ -241,7 +241,7 @@ begin
     if new.etapa is not null then
       perform public.automacao_disparar('etapa', new.telefone, jsonb_build_object('etapa', new.etapa, 'antes', null));
     end if;
-  elsif new.etapa is distinct from old.etapa and new.etapa is not null then
+  elsif lower(new.etapa) is distinct from lower(old.etapa) and new.etapa is not null then
     perform public.automacao_disparar('etapa', new.telefone, jsonb_build_object('etapa', new.etapa, 'antes', old.etapa));
   end if;
   return new;

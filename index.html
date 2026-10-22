@@ -13673,7 +13673,7 @@ function dpFiltrar(){
   let lista=[];
   if(!f.soColados){
     lista=_dp.base.filter(x=>{
-      if(f.etapas.length&&!f.etapas.includes(x.etapa||'_sem'))return false;
+      if(f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
       if(f.origem&&x.origem!==f.origem)return false;
       if(f.campanha&&!x.ad.toLowerCase().includes(f.campanha.toLowerCase()))return false;
       if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
