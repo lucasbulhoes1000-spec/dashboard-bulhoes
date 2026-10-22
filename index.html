@@ -580,6 +580,70 @@ tbody tr:hover td{background:#faf7f3;}
   .wa-msgs{padding:10px;}
 }
 
+/* ===== Mensagens em massa (layout do Cloudia) ===== */
+#page-disparos .au-wrap{max-width:none;}
+.dp-card{background:#fff;border:0.5px solid #ece4da;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
+.dp-busca{display:flex;align-items:center;gap:8px;max-width:420px;height:34px;border:0.5px solid #ddd2c5;border-radius:6px;padding:0 10px;color:#9a8c7e;}
+.dp-busca input{flex:1;border:none;outline:none;font-size:13px;color:#2a2520;background:transparent;}
+.dp-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:0.5px solid #f2ece4;padding-top:10px;}
+.dp-bt{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0.5px solid #ddd2c5;border-radius:6px;background:#fff;color:#2a2520;font-size:12px;cursor:pointer;}
+.dp-bt:hover{background:#faf5ef;}
+.dp-bt:disabled{opacity:.45;cursor:default;}
+.dp-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.dp-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.dp-verde,.dp-azul{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:none;border-radius:6px;color:#fff;font-size:12.5px;cursor:pointer;}
+.dp-verde{background:#6c9a6f;}
+.dp-verde:hover{background:#5d8a60;}
+.dp-azul{background:#A18B6C;}
+.dp-azul:hover{background:#8f7a5d;}
+.dp-info-sel{font-size:12px;color:#5a4e44;}
+.dp-dica{background:#f2ebe1;border-radius:6px;padding:9px 12px;font-size:12px;color:#5a4e44;}
+.dp-tabela{background:#fff;border:0.5px solid #ece4da;border-radius:10px;overflow-x:auto;}
+.dp-tabela table{width:100%;border-collapse:collapse;font-size:12px;min-width:880px;}
+.dp-tabela th{background:#f7f2ec;text-align:left;font-weight:600;color:#2a2520;padding:10px 10px;border-bottom:0.5px solid #ece4da;white-space:nowrap;user-select:none;}
+.dp-tabela td{padding:9px 10px;border-bottom:0.5px solid #f4efe8;color:#2a2520;vertical-align:middle;}
+.dp-tabela tr.sel td{background:#fbf7f1;}
+.dp-nome{color:#8f7a5d;cursor:pointer;}
+.dp-nome:hover{text-decoration:underline;}
+.dp-tel{color:#8f7a5d;white-space:nowrap;}
+.dp-sub{font-size:11px;color:#7a6e62;}
+.dp-etapa{display:inline-block;border:0.5px solid #ddd2c5;border-radius:4px;padding:3px 8px;font-size:11px;background:#fff;min-width:90px;}
+.dp-tagvazia{font-size:10.5px;background:#f2ece4;border-radius:4px;padding:2px 8px;color:#5a4e44;}
+.dp-pag{display:flex;justify-content:flex-end;align-items:center;gap:10px;font-size:12px;color:#5a4e44;}
+.dp-gaveta-fundo{position:fixed;inset:0;background:rgba(42,37,32,.18);z-index:1000;}
+.dp-gaveta{position:fixed;top:0;right:0;bottom:0;width:min(690px,100%);background:#fff;z-index:1001;box-shadow:-8px 0 30px rgba(0,0,0,.12);display:flex;flex-direction:column;}
+.dp-g-cab{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 4px;font-size:16px;color:#2a2520;}
+.dp-q{display:inline-flex;width:15px;height:15px;border-radius:50%;background:#5a4e44;color:#fff;font-size:10px;align-items:center;justify-content:center;cursor:help;vertical-align:middle;}
+.dp-g-abas{display:flex;gap:4px;border-bottom:0.5px solid #ece4da;padding:0 12px;}
+.dp-g-abas button{background:none;border:none;border-bottom:2px solid transparent;padding:8px 10px;font-size:13px;color:#2a2520;cursor:pointer;}
+.dp-g-abas button.ativo{color:#8f7a5d;border-bottom-color:#A18B6C;}
+.dp-g-corpo{flex:1;overflow-y:auto;padding:12px 20px;display:flex;flex-direction:column;gap:16px;}
+.dp-g-sec{display:flex;flex-direction:column;gap:6px;}
+.dp-g-tit{font-size:12.5px;font-weight:600;color:#2a2520;}
+.dp-in{width:100%;height:36px;border:0.5px solid #ddd2c5;border-radius:6px;padding:0 10px;font-size:13px;color:#2a2520;background:#fff;outline:none;}
+select.dp-in{max-width:420px;}
+.dp-in:focus{border-color:#A18B6C;}
+.dp-slider{display:flex;align-items:center;gap:10px;border:0.5px solid #ddd2c5;border-radius:6px 6px 0 0;padding:10px 12px;}
+.dp-slider input{flex:1;accent-color:#A18B6C;}
+.dp-slider span{font-size:12px;color:#5a4e44;width:44px;text-align:right;}
+.dp-tempo{border:0.5px solid #ddd2c5;border-top:none;border-radius:0 0 6px 6px;background:#faf7f3;padding:8px 12px;font-size:12px;color:#2a2520;}
+.dp-alvo{align-self:flex-start;background:#A18B6C;color:#fff;font-size:11px;border-radius:5px;padding:5px 10px;font-weight:600;}
+.dp-erros{margin:0;padding-left:18px;color:#c0392b;font-size:12px;display:flex;flex-direction:column;gap:3px;}
+.dp-g-rodape{display:flex;align-items:center;gap:8px;padding:12px 20px;border-top:0.5px solid #ece4da;font-size:12.5px;color:#2a2520;}
+.dp-g-rodape span{margin-right:auto;}
+.dp-disparar{height:34px;padding:0 18px;border:none;border-radius:6px;background:#6c9a6f;color:#fff;font-size:13px;cursor:pointer;}
+.dp-disparar:disabled{background:#b9cdb9;cursor:default;}
+.dp-res{width:100%;border-collapse:collapse;font-size:12px;}
+.dp-res th{text-align:left;font-size:10.5px;font-weight:600;color:#5a4e44;text-transform:uppercase;padding:10px 8px;border-bottom:0.5px solid #ece4da;}
+.dp-res td{padding:10px 8px;border-bottom:0.5px solid #f4efe8;}
+.dp-res tbody tr:nth-child(odd) td{background:#faf6f1;}
+.dp-st{font-size:11.5px;}
+.dp-st.enviando{color:#2f7a45;font-weight:600;}.dp-st.cancelado{color:#a04040;}.dp-st.agendado{color:#9a6a1f;}
+.dp-nums{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:#7a6550;}
+.dp-nums b{color:#2a2520;}
+.dp-alerta{font-size:11.5px;color:#7a5530;background:#fbf1e6;border:0.5px solid #e9d5bb;border-radius:7px;padding:8px;}
+@media (max-width:768px){.dp-g-corpo{padding:12px;}}
+
 </style>
 </head>
 <body>
@@ -634,7 +698,7 @@ tbody tr:hover td{background:#faf7f3;}
     </div>
     <div class="nav-item" onclick="switchPage('disparos',this)">
       <span class="nav-icon">📣</span>
-      <span class="nav-label">Disparos</span>
+      <span class="nav-label">Mensagens em Massa</span>
     </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
@@ -2499,7 +2563,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',disparos:'Disparos',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',disparos:'Mensagens em Massa',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -13536,81 +13600,54 @@ async function auColocarContato(autoId){
 }
 
 // =====================================================================
-// DISPAROS EM MASSA — público por filtros, modelo aprovado, ritmo e agendamento
+// MENSAGENS EM MASSA — lista de contatos com filtros + gaveta de envio (layout do Cloudia)
 // =====================================================================
-const _dp={lista:[],resumos:{},modo:'lista',novo:null,base:null,publico:[],precos:null,modelos:null,timer:null};
-const DP_FILTRO_VAZIO={etapas:[],origem:'',tag:'',atendente:'',campanha:'',criadoDe:'',criadoAte:'',msgDe:'',msgAte:'',soComConversa:false,colados:'',soColados:false};
+const _dp={lista:[],resumos:{},base:null,publico:[],sel:new Set(),f:{},busca:'',pag:0,ordem:{col:'criado',dir:-1},precos:null,modelos:null,timer:null,gaveta:null,envio:null};
+const DP_POR_PAG=50;
 function _dpPode(){return typeof _auPodeEditar==='function'?_auPodeEditar():_waEhGestao();}
-function _dpData(iso){try{return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
-
+function _dpData(iso){try{return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
+function _dpDataCurta(iso){if(!iso)return '-';try{return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '-';}}
+const DP_RAPIDOS=[
+  ['marcaram','Contatos que já marcaram consulta',{etapas:['Agendou','Compareceu','Ganho','Faltou/desmarcou']}],
+  ['nunca','Contatos que nunca marcaram consulta',{etapas:['Lead','_sem']}],
+  ['faltaram','Contatos que faltaram ou desmarcaram',{etapas:['Faltou/desmarcou']}],
+  ['compareceram','Contatos que compareceram e não fecharam',{etapas:['Compareceu']}],
+  ['fecharam','Contatos que fecharam',{etapas:['Ganho']}],
+  ['perdidos','Contatos perdidos',{etapas:['Perdido']}],
+  ['semconversa','Contatos sem conversa no WhatsApp da clínica',{conversa:'nao'}]
+];
+function _dpFiltroDefs(){
+  return [
+    {k:'nome',nome:'Nome',tipo:'texto'},
+    {k:'tel',nome:'Telefone',tipo:'texto'},
+    {k:'etapas',nome:'Etapa',tipo:'multi',ops:['Lead','Agendou','Faltou/desmarcou','Compareceu','Ganho','Perdido','Paciente','_sem'].map(e=>[e,e==='_sem'?'Sem etapa':(WA_ETAPA_ROTULO[e]||e)])},
+    {k:'origem',nome:'Origem de aquisição',tipo:'opcao',ops:_waOrigens().map(o=>[o,o])},
+    {k:'anuncio',nome:'Anúncio de origem',tipo:'texto'},
+    {k:'campanha',nome:'Campanha',tipo:'texto'},
+    {k:'tag',nome:'Tags',tipo:'opcao',ops:(_wa.tags||[]).map(t=>[String(t.id),t.nome])},
+    {k:'atendente',nome:'Usuários atribuídos',tipo:'opcao',ops:[['_ninguem','Sem atendente']].concat((_wa.equipeLista||[]).map(p=>[p.email,p.nome]))},
+    {k:'criado',nome:'Data e hora de criação do contato',tipo:'periodo'},
+    {k:'msg',nome:'Data e hora da última mensagem',tipo:'periodo'},
+    {k:'conversa',nome:'Tem conversa no WhatsApp?',tipo:'opcao',ops:[['sim','Sim'],['nao','Não']]}
+  ];
+}
 function abrirDisparos(){
   iniciarWhatsApp();
-  if(_dp.modo==='novo'&&_dp.novo){dpRenderNovo();return;}
-  _dp.modo='lista';dpRenderLista();dpCarregar();
+  if(!_dp.base||!_dp.base.length)dpMontarBase();
+  dpFiltrar();dpRenderPagina();
+  if(!_dp.precos)_waRest('configuracoes?chave=eq.whatsapp_precos&select=valor').then(p=>{_dp.precos=p&&p[0]&&p[0].valor||null;}).catch(()=>{});
   clearInterval(_dp.timer);
-  _dp.timer=setInterval(()=>{if(currentPage==='disparos'&&_dp.modo==='lista'&&document.visibilityState==='visible'&&_dp.lista.some(d=>d.status==='enviando'||d.status==='agendado'))dpCarregar();},20000);
+  _dp.timer=setInterval(()=>{if(currentPage==='disparos'&&_dp.gaveta&&_dp.gaveta.aba==='resultados'&&document.visibilityState==='visible')dpCarregarResultados();},20000);
 }
-async function dpCarregar(){
-  if(!_sbAccessToken){setTimeout(dpCarregar,1200);return;}
-  try{
-    _dp.lista=(await _waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em&order=criado_em.desc&limit=50'))||[];
-    _dp.erro=null;
-    await Promise.all(_dp.lista.slice(0,15).map(async d=>{
-      try{_dp.resumos[d.id]=await _waRest('rpc/disparo_resumo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_disparo:d.id})});}catch(e){}
-    }));
-  }catch(e){_dp.erro=e.message;}
-  if(currentPage==='disparos'&&_dp.modo==='lista')dpRenderLista();
-}
-function dpRenderLista(){
-  const el=document.getElementById('dp-conteudo');if(!el)return;
-  if(_dp.erro&&/disparos/.test(_dp.erro)){el.innerHTML='<div class="au-vazio">O disparo em massa ainda não foi ligado no banco.<br><span style="font-size:11px">'+_auEsc(_dp.erro)+'</span></div>';return;}
-  const pode=_dpPode();
-  const st={agendado:'⏰ agendado',enviando:'📤 enviando',pausado:'⏸ pausado',concluido:'✓ concluído',cancelado:'✕ cancelado'};
-  const itens=_dp.lista.map(d=>{
-    const r=_dp.resumos[d.id]||{};
-    const base=Math.max(1,d.total||1);
-    const pct=Math.min(100,Math.round(((d.total||0)-(r.pendentes||0))/base*100));
-    return '<div class="au-card">'+
-      '<div class="au-card-topo"><div style="min-width:0"><div class="au-card-nome">'+_auEsc(d.nome)+'</div>'+
-        '<div class="au-card-gat">📋 '+_auEsc(d.modelo&&d.modelo.nome||'')+' · '+(d.status==='agendado'?'sai em '+_dpData(d.agendado_para):'criado em '+_dpData(d.criado_em))+'</div></div>'+
-        '<span class="au-st '+(d.status==='enviando'?'ativa':d.status==='cancelado'?'erro':'')+'">'+st[d.status]+'</span></div>'+
-      '<div class="dp-barra"><div style="width:'+pct+'%"></div></div>'+
-      '<div class="dp-nums">'+
-        '<span><b>'+(d.total||0)+'</b> no público</span><span><b>'+(r.enviados||0)+'</b> enviados</span><span><b>'+(r.entregues||0)+'</b> entregues</span><span><b>'+(r.lidos||0)+'</b> lidos</span><span><b>'+(r.responderam||0)+'</b> responderam</span>'+
-        ((r.falharam||0)?'<span style="color:#a04040"><b>'+r.falharam+'</b> falharam</span>':'')+((r.pulados||0)?'<span><b>'+r.pulados+'</b> pulados</span>':'')+
-      '</div>'+
-      '<div class="au-card-rodape"><span>'+_auEsc(_waNomeEquipe(d.criado_por)||d.criado_por||'')+' · '+d.ritmo_por_minuto+'/min</span><div style="display:flex;gap:6px;flex-wrap:wrap">'+
-        '<button class="wa-btn" onclick="dpVerContatos('+d.id+')">👥 Contatos</button>'+
-        (pode&&d.status==='enviando'?'<button class="wa-btn" onclick="dpStatus('+d.id+',\'pausado\')">Pausar</button>':'')+
-        (pode&&d.status==='pausado'?'<button class="wa-btn primario" onclick="dpStatus('+d.id+',\'enviando\')">Retomar</button>':'')+
-        (pode&&['agendado','enviando','pausado'].includes(d.status)?'<button class="wa-btn" onclick="dpStatus('+d.id+',\'cancelado\')">Cancelar</button>':'')+
-      '</div></div></div>';
-  }).join('');
-  el.innerHTML='<div class="au-topo"><div style="font-size:12px;color:#9a8c7e">Envio de um modelo aprovado para muitos contatos de uma vez. Cada contato que recebe ganha uma tag do disparo, para filtrar depois ou usar numa automação.</div>'+
-    (pode?'<button class="wa-btn primario" onclick="dpNovo()">＋ Novo disparo</button>':'')+'</div>'+
-    (itens?'<div class="au-lista">'+itens+'</div>':'<div class="au-vazio">Nenhum disparo ainda.'+(pode?'<br><button class="wa-btn primario" style="margin-top:10px" onclick="dpNovo()">Criar o primeiro</button>':'')+'</div>');
-}
-async function dpStatus(id,s){
-  const d=_dp.lista.find(x=>x.id===id);if(!d)return;
-  const txt={pausado:'Pausar o disparo? Quem ainda não recebeu fica esperando até retomar.',enviando:'Retomar o disparo?',cancelado:'Cancelar o disparo? Quem ainda não recebeu não vai receber.'}[s];
-  if(!confirm(txt))return;
-  try{await _waRest('disparos?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:s})});d.status=s;dpRenderLista();}
-  catch(e){showToast('error','Não foi possível mudar',e.message);}
-}
-
-// ---------- base de contatos (CRM + conversas) ----------
+// base de contatos (CRM + conversas)
 function dpMontarBase(){
-  const mapa=new Map();
-  const conv=new Map();
+  const mapa=new Map();const conv=new Map();
   (_wa.conversas||[]).forEach(c=>{const ph=normalizePhone(c.telefone);if(ph&&!conv.has(ph))conv.set(ph,c);});
   const add=(bruto,nome)=>{
     const ph=normalizePhone(bruto);if(!ph||mapa.has(ph))return;
     const c=conv.get(ph)||null;
     const L=_waLead({telefone:ph,pacientes:c&&c.pacientes});
-    let tags=null;
-    if(c&&_wa.convTags[c.id])tags=_wa.convTags[c.id];
-    mapa.set(ph,{ph,bruto:String(bruto||''),nome:nome||(c?_waNome(c):''),etapa:L.etapa||'',origem:L.origem||'',ad:(L.adName||'')+' '+(L.campanha||''),criado:L.criadoEm||'',conversa:c,tags,
-      ultMsg:c&&c.ultima_recebida_em||'',atendente:c&&c.atribuida_a||''});
+    mapa.set(ph,{ph,bruto:String(bruto||''),nome:nome||(c?_waNome(c):''),etapa:L.etapa||'',origem:L.origem||'',adName:L.adName||'',campanha:L.campanha||'',criado:L.criadoEm||'',conversa:c,ultMsg:c&&c.ultima_recebida_em||''});
   };
   (allCloudiaRows||[]).forEach(r=>add(r.phone,r.name));
   Object.keys(_ccData||{}).forEach(k=>{if(/^\d{10,13}$/.test(k))add(k,(_ccData[k]&&(_ccData[k].nome||_ccData[k].name))||'');});
@@ -13618,191 +13655,278 @@ function dpMontarBase(){
   _dp.base=[...mapa.values()];
 }
 function dpFiltrar(){
-  const f=_dp.novo.f;
-  const colados=(f.colados||'').split(/[\n,;\t]+/).map(x=>x.trim()).filter(x=>x.replace(/\D/g,'').length>=10).map(x=>({ph:normalizePhone(x),bruto:x})).filter(x=>x.ph);
-  let lista=[];
-  if(!f.soColados){
-    lista=_dp.base.filter(x=>{
-      if(f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
-      if(f.origem&&x.origem!==f.origem)return false;
-      if(f.campanha&&!x.ad.toLowerCase().includes(f.campanha.toLowerCase()))return false;
-      if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
-      if(f.atendente&&(x.conversa?x.conversa.atribuida_a||'':'')!==(f.atendente==='_ninguem'?'':f.atendente))return false;
-      if(f.soComConversa&&!x.conversa)return false;
-      if(f.criadoDe&&(!x.criado||x.criado.slice(0,10)<f.criadoDe))return false;
-      if(f.criadoAte&&(!x.criado||x.criado.slice(0,10)>f.criadoAte))return false;
-      if(f.msgDe&&(!x.ultMsg||x.ultMsg.slice(0,10)<f.msgDe))return false;
-      if(f.msgAte&&(!x.ultMsg||x.ultMsg.slice(0,10)>f.msgAte))return false;
-      return true;
-    });
+  const f=_dp.f;const b=String(_dp.busca||'').trim().toLowerCase();const bn=b.replace(/\D/g,'');
+  _dp.publico=(_dp.base||[]).filter(x=>{
+    if(b&&!(String(x.nome).toLowerCase().includes(b)||(bn.length>=3&&x.ph.includes(bn))))return false;
+    if(f.nome&&!String(x.nome).toLowerCase().includes(f.nome.toLowerCase()))return false;
+    if(f.tel&&!x.ph.includes(String(f.tel).replace(/\D/g,'')))return false;
+    if(f.etapas&&f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
+    if(f.origem&&x.origem!==f.origem)return false;
+    if(f.anuncio&&!String(x.adName).toLowerCase().includes(f.anuncio.toLowerCase()))return false;
+    if(f.campanha&&!String(x.campanha).toLowerCase().includes(f.campanha.toLowerCase()))return false;
+    if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
+    if(f.atendente&&(x.conversa?x.conversa.atribuida_a||'':'')!==(f.atendente==='_ninguem'?'':f.atendente))return false;
+    if(f.conversa&&(!!x.conversa)!==(f.conversa==='sim'))return false;
+    if(f.criado&&f.criado.de&&(!x.criado||x.criado.slice(0,10)<f.criado.de))return false;
+    if(f.criado&&f.criado.ate&&(!x.criado||x.criado.slice(0,10)>f.criado.ate))return false;
+    if(f.msg&&f.msg.de&&(!x.ultMsg||x.ultMsg.slice(0,10)<f.msg.de))return false;
+    if(f.msg&&f.msg.ate&&(!x.ultMsg||x.ultMsg.slice(0,10)>f.msg.ate))return false;
+    return true;
+  });
+  const o=_dp.ordem;
+  _dp.publico.sort((a,b2)=>{const va=String(a[o.col]||''),vb=String(b2[o.col]||'');return va===vb?0:(va<vb?-1:1)*o.dir;});
+}
+function _dpAlvo(){return _dp.sel.size?(_dp.base||[]).filter(x=>_dp.sel.has(x.ph)):_dp.publico;}
+function dpRenderPagina(){
+  const el=document.getElementById('dp-conteudo');if(!el)return;
+  const pode=_dpPode();
+  const n=_dp.publico.length;const pags=Math.max(1,Math.ceil(n/DP_POR_PAG));if(_dp.pag>=pags)_dp.pag=pags-1;
+  const pag=_dp.publico.slice(_dp.pag*DP_POR_PAG,(_dp.pag+1)*DP_POR_PAG);
+  const todosPag=pag.length&&pag.every(x=>_dp.sel.has(x.ph));
+  const defs=_dpFiltroDefs();
+  const chips=Object.keys(_dp.f).filter(k=>{const v=_dp.f[k];return v&&(!Array.isArray(v)||v.length)&&(typeof v!=='object'||Array.isArray(v)||v.de||v.ate);}).map(k=>{
+    const d=defs.find(x=>x.k===k)||{nome:k};const v=_dp.f[k];
+    let t=Array.isArray(v)?v.map(e=>e==='_sem'?'Sem etapa':(WA_ETAPA_ROTULO[e]||e)).join(', '):typeof v==='object'?(v.de?'de '+v.de.split('-').reverse().join('/'):'')+(v.ate?' até '+v.ate.split('-').reverse().join('/'):''):(d.ops?((d.ops.find(o=>o[0]===v)||[])[1]||v):'contém “'+v+'”');
+    return '<span class="cl-fchip">'+_waEsc(d.nome)+': '+_waEsc(t)+'<button onclick="dpTirarFiltro(\''+k+'\')">×</button></span>';
+  }).join('');
+  const seta=c=>_dp.ordem.col===c?(_dp.ordem.dir>0?' ↑':' ↓'):'';
+  const th=(c,t)=>'<th onclick="dpOrdenar(\''+c+'\')" style="cursor:pointer">'+t+seta(c)+'</th>';
+  el.innerHTML=
+    '<div class="dp-card">'+
+      '<div class="dp-busca">'+_clIc('sort')+'<input placeholder="Nome, telefone ou observações" value="'+_waEsc(_dp.busca)+'" oninput="_dp.busca=this.value;_dp.pag=0;dpFiltrar();dpRenderTabela()"></div>'+
+      '<div class="dp-linha"><button class="dp-bt" onclick="dpMenuRapidos(event)">'+_clIc('filter')+' Filtros rápidos</button><button class="dp-bt" onclick="dpMenuFiltro(event)">'+_clIc('plus')+' Adicionar Filtro</button>'+
+        '<span class="dp-chips">'+chips+'</span><button class="cl-link" style="margin-left:auto" onclick="_dp.f={};_dp.busca=\'\';_dp.pag=0;dpFiltrar();dpRenderPagina()">Limpar filtros</button></div>'+
+    '</div>'+
+    '<div class="dp-acoes">'+
+      (pode?'<button class="dp-verde" onclick="dpMenuEnvio(event)">'+_clIc('mega')+' Envio de mensagens '+_clIc('down')+'</button>':'')+
+      '<button class="dp-azul" onclick="dpAbrirGaveta(\'resultados\')">'+_clIc('lista')+' Resultados dos envios</button>'+
+      '<span class="dp-info-sel">'+(_dp.sel.size?'<b>'+_dp.sel.size+'</b> selecionado(s) · <button class="cl-link" onclick="_dp.sel.clear();dpRenderPagina()">limpar seleção</button>':'')+'</span>'+
+      '<span style="margin-left:auto;font-size:12px;color:#7a6550"><b>'+n.toLocaleString('pt-BR')+'</b> contatos no filtro</span>'+
+    '</div>'+
+    '<div class="dp-dica">Para ordenar, clique no título da coluna. <b>Exemplo:</b> para ver quem mandou mensagem mais recentemente, clique em “Última mensagem”. Sem contatos marcados, o envio vai para todos os contatos do filtro.</div>'+
+    '<div class="dp-tabela" id="dp-tabela"><table><thead><tr><th style="width:34px"><input type="checkbox" '+(todosPag?'checked':'')+' title="Marcar todos desta página" onchange="dpMarcarPagina(this.checked)"></th>'+
+      th('nome','Nome')+'<th>Telefone</th><th>Tags</th>'+th('etapa','Etapa')+th('origem','Origem')+th('adName','Anúncio')+th('criado','Criado em')+th('ultMsg','Última mensagem')+'</tr></thead><tbody id="dp-tbody"></tbody></table></div>'+
+    '<div class="dp-pag" id="dp-pag"></div>';
+  dpRenderTabela();
+  if(_dp.gaveta)dpRenderGaveta();
+}
+function dpRenderTabela(){
+  const tb=document.getElementById('dp-tbody');if(!tb){dpRenderPagina();return;}
+  const n=_dp.publico.length;const pags=Math.max(1,Math.ceil(n/DP_POR_PAG));if(_dp.pag>=pags)_dp.pag=pags-1;
+  const pag=_dp.publico.slice(_dp.pag*DP_POR_PAG,(_dp.pag+1)*DP_POR_PAG);
+  tb.innerHTML=pag.map(x=>{
+    const ids=x.conversa&&_wa.convTags[x.conversa.id];
+    const tags=ids&&ids.size?_wa.tags.filter(t=>ids.has(t.id)).slice(0,3).map(t=>'<span class="cl-tag" style="background:'+_waEsc(t.cor)+'26;border-color:'+_waEsc(t.cor)+'">'+_clIc('tag')+'<span>'+_waEsc(t.nome)+'</span></span>').join(''):'<span class="dp-tagvazia">Tags</span>';
+    return '<tr class="'+(_dp.sel.has(x.ph)?'sel':'')+'"><td><input type="checkbox" '+(_dp.sel.has(x.ph)?'checked':'')+' onchange="dpMarcar(\''+x.ph+'\',this.checked)"></td>'+
+      '<td><a class="dp-nome" onclick="dpAbrirContato(\''+x.ph+'\')">'+_waEsc(x.nome||'SEM NOME')+'</a></td>'+
+      '<td class="dp-tel">+55 '+_waTelFormatado(x.ph)+' '+(x.conversa?'<span title="Tem conversa no WhatsApp" style="color:#25a768">●</span>':'')+'</td>'+
+      '<td><div class="cl-tags">'+tags+'</div></td>'+
+      '<td>'+(x.etapa?'<span class="dp-etapa">'+_waEsc(WA_ETAPA_ROTULO[x.etapa]||x.etapa)+'</span>':'-')+'</td>'+
+      '<td>'+_waEsc(x.origem||'-')+'</td><td class="dp-sub">'+_waEsc(x.adName||'-')+'</td>'+
+      '<td class="dp-sub">'+_dpDataCurta(x.criado)+'</td><td class="dp-sub">'+_dpDataCurta(x.ultMsg)+'</td></tr>';
+  }).join('')||'<tr><td colspan="9"><div class="wa-vazio">Nenhum contato com esses filtros.</div></td></tr>';
+  const p=document.getElementById('dp-pag');
+  if(p)p.innerHTML='<button class="dp-bt" '+(_dp.pag?'':'disabled')+' onclick="_dp.pag--;dpRenderTabela()">‹</button><span>Página '+(_dp.pag+1)+' de '+pags+'</span><button class="dp-bt" '+(_dp.pag<pags-1?'':'disabled')+' onclick="_dp.pag++;dpRenderTabela()">›</button>';
+}
+function dpOrdenar(c){_dp.ordem=_dp.ordem.col===c?{col:c,dir:-_dp.ordem.dir}:{col:c,dir:c==='nome'||c==='etapa'||c==='origem'||c==='adName'?1:-1};dpFiltrar();dpRenderPagina();}
+function dpMarcar(ph,on){if(on)_dp.sel.add(ph);else _dp.sel.delete(ph);dpRenderPagina();}
+function dpMarcarPagina(on){_dp.publico.slice(_dp.pag*DP_POR_PAG,(_dp.pag+1)*DP_POR_PAG).forEach(x=>on?_dp.sel.add(x.ph):_dp.sel.delete(x.ph));dpRenderPagina();}
+function dpAbrirContato(ph){
+  const c=(_wa.conversas||[]).find(x=>normalizePhone(x.telefone)===ph);
+  if(c){switchPage('conversas',[...document.querySelectorAll('.nav-item')].find(n=>n.textContent.includes('Conversas')));setTimeout(()=>waAbrir(c.id),100);return;}
+  try{abrirCardPorTelefone(ph);}catch(e){showToast('info','Contato sem card','Este número ainda não tem conversa nem card no CRM.');}
+}
+function dpTirarFiltro(k){delete _dp.f[k];_dp.pag=0;dpFiltrar();dpRenderPagina();}
+function dpMenuRapidos(ev){
+  ev.stopPropagation();_clFecharPop();
+  const m=document.createElement('div');m.className='cl-menu';
+  m.innerHTML=DP_RAPIDOS.map(r=>'<button onclick="_clFecharPop();dpAplicarRapido(\''+r[0]+'\')">'+_waEsc(r[1])+'</button>').join('');
+  _clPosicionar(m,ev.currentTarget,false);
+}
+function dpAplicarRapido(k){const r=DP_RAPIDOS.find(x=>x[0]===k);if(!r)return;_dp.f=Object.assign({},JSON.parse(JSON.stringify(r[2])));_dp.pag=0;dpFiltrar();dpRenderPagina();}
+function dpMenuFiltro(ev,k){
+  ev&&ev.stopPropagation();_clFecharPop();
+  const ancora=document.querySelector('.dp-linha .dp-bt:nth-child(2)');
+  const pop=document.createElement('div');pop.className='cl-pop';pop.style.minWidth='280px';
+  const defs=_dpFiltroDefs();
+  if(!k){
+    pop.innerHTML='<div style="padding:8px 10px"><input class="wa-var" id="dp-fbusca" placeholder="Buscar pelo nome do filtro..." oninput="[...document.querySelectorAll(\'#dp-flista .cl-pop-item\')].forEach(b=>b.style.display=b.textContent.toLowerCase().includes(this.value.toLowerCase())?\'flex\':\'none\')"></div>'+
+      '<div id="dp-flista">'+defs.filter(d=>d.tipo!=='opcao'||d.ops.length).map(d=>'<button class="cl-pop-item" onclick="dpMenuFiltro(event,\''+d.k+'\')"><span style="display:flex;gap:8px;align-items:center"><b style="font-weight:400;color:#9a8c7e;width:14px">'+({texto:'T',multi:'☑',opcao:'☰',periodo:'◷'}[d.tipo])+'</b>'+_waEsc(d.nome)+'</span><span class="seta">›</span></button>').join('')+'</div>';
+  }else{
+    const d=defs.find(x=>x.k===k);const v=_dp.f[k];
+    let corpo='';
+    if(d.tipo==='texto')corpo='<input class="wa-var" id="dp-fv" placeholder="Contém…" value="'+_waEsc(v||'')+'">';
+    else if(d.tipo==='opcao')corpo='<select class="wa-sel" id="dp-fv" style="width:100%">'+d.ops.map(o=>'<option value="'+_waEsc(o[0])+'"'+(o[0]===v?' selected':'')+'>'+_waEsc(o[1])+'</option>').join('')+'</select>';
+    else if(d.tipo==='multi')corpo=d.ops.map(o=>'<label class="au-check" style="padding:3px 0"><input type="checkbox" class="dp-fm" value="'+_waEsc(o[0])+'" '+((v||[]).includes(o[0])?'checked':'')+'> '+_waEsc(o[1])+'</label>').join('');
+    else corpo='<div class="au-linha">De <input class="wa-var" type="date" id="dp-fde" value="'+_waEsc(v&&v.de||'')+'"></div><div class="au-linha">Até <input class="wa-var" type="date" id="dp-fate" value="'+_waEsc(v&&v.ate||'')+'"></div>';
+    pop.innerHTML='<div class="cl-pop-cab"><button class="cl-link" onclick="dpMenuFiltro(event)">‹ '+_waEsc(d.nome)+'</button></div><div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">'+corpo+
+      '<button class="cl-primario" style="height:30px;justify-content:center" onclick="dpAplicarFiltro(\''+k+'\',\''+d.tipo+'\')">Aplicar</button></div>';
   }
-  if(colados.length){
-    const ja=new Set(lista.map(x=>x.ph));
-    colados.forEach(c=>{if(!ja.has(c.ph)){ja.add(c.ph);const b=_dp.base.find(x=>x.ph===c.ph);lista.push(b||{ph:c.ph,bruto:c.bruto,nome:'',etapa:'',origem:''});}});
-  }
-  _dp.publico=lista;
+  _clPosicionar(pop,ancora,false);
+  setTimeout(()=>{const i=document.getElementById(k?'dp-fv':'dp-fbusca');if(i&&i.focus)i.focus();},30);
+}
+function dpAplicarFiltro(k,tipo){
+  let v;
+  if(tipo==='multi')v=[...document.querySelectorAll('.dp-fm:checked')].map(x=>x.value);
+  else if(tipo==='periodo')v={de:document.getElementById('dp-fde').value,ate:document.getElementById('dp-fate').value};
+  else v=(document.getElementById('dp-fv').value||'').trim();
+  if(!v||(Array.isArray(v)&&!v.length)||(tipo==='periodo'&&!v.de&&!v.ate))delete _dp.f[k];else _dp.f[k]=v;
+  _clFecharPop();_dp.pag=0;dpFiltrar();dpRenderPagina();
+}
+function dpMenuEnvio(ev){
+  ev.stopPropagation();_clFecharPop();
+  const m=document.createElement('div');m.className='cl-menu';
+  m.innerHTML='<button onclick="_clFecharPop();dpAbrirGaveta(\'envio\')"><span style="color:#25a768">●</span> WhatsApp</button>';
+  _clPosicionar(m,ev.currentTarget,false);
 }
 
-// ---------- novo disparo ----------
-async function dpNovo(){
-  _dp.novo={nome:'',f:JSON.parse(JSON.stringify(DP_FILTRO_VAZIO)),modelo:null,quando:'agora',agendado:'',ritmo:20,repeticao:7,previa:null};
-  _dp.modo='novo';
-  if(!allCloudiaRows||!allCloudiaRows.length)showToast('info','Carregando a base de contatos…','Se a contagem ficar zerada, abra o Dashboard uma vez e volte.');
-  dpMontarBase();dpFiltrar();dpRenderNovo();
-  if(!_dp.modelos){
+// ---------- gaveta "Mensagens em massa via WhatsApp" ----------
+async function dpAbrirGaveta(aba){
+  _dp.gaveta={aba};
+  if(aba==='envio'&&!_dp.envio)_dp.envio={agendar:false,agendado:'',numero:'',modelo:null,espera:3,repeticao:7,ciente:false,nome:'',previa:null};
+  dpRenderGaveta();
+  if(aba==='resultados')dpCarregarResultados();
+  if(aba==='envio'&&!_dp.modelos){
     try{const r=await _waAcao({acao:'modelos'});_dp.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
     catch(e){_dp.modelos=[];showToast('error','Não consegui carregar os modelos da Meta',e.message);}
+    if(_dp.gaveta&&_dp.gaveta.aba==='envio')dpRenderGaveta();
   }
-  if(!_dp.precos){try{const p=await _waRest('configuracoes?chave=eq.whatsapp_precos&select=valor');_dp.precos=p&&p[0]&&p[0].valor||null;}catch(e){}}
-  if(_dp.modo==='novo')dpRenderNovo();
 }
-function dpVoltar(){_dp.modo='lista';_dp.novo=null;dpRenderLista();dpCarregar();}
-function dpSetF(campo,v){_dp.novo.f[campo]=v;dpFiltrar();dpAtualizarContagem();}
-function dpToggleEtapa(e,on){const a=_dp.novo.f.etapas;const i=a.indexOf(e);if(on&&i<0)a.push(e);if(!on&&i>=0)a.splice(i,1);dpFiltrar();dpAtualizarContagem();}
-function dpCusto(n){
-  const m=_dp.novo&&_dp.novo.modelo;const p=_dp.precos;
-  if(!m||!p)return '';
-  const v=Number(p[m.categoria]||p.MARKETING||0)*n;
+function dpFecharGaveta(){_dp.gaveta=null;const g=document.getElementById('dp-gaveta');if(g)g.remove();const f=document.getElementById('dp-gaveta-fundo');if(f)f.remove();}
+function _dpCusto(n){
+  const m=_dp.envio&&_dp.envio.modelo;const p=_dp.precos;if(!m||!p)return '';
+  const v=Number(p[String(m.categoria).toUpperCase()]||p.MARKETING||0)*n;
   return (p.moeda==='BRL'?'R$ ':'US$ ')+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-function dpAtualizarContagem(){
-  const n=_dp.publico.length;
-  const el=document.getElementById('dp-contagem');if(el)el.textContent=n.toLocaleString('pt-BR');
-  const lista=document.getElementById('dp-amostra');
-  if(lista)lista.innerHTML=_dp.publico.slice(0,40).map(x=>'<div class="dp-amostra-item"><span>'+_auEsc(x.nome||'(sem nome)')+'</span><span class="au-sub">'+_waTelFormatado(x.ph)+(x.etapa?' · '+_auEsc(WA_ETAPA_ROTULO[x.etapa]||x.etapa):'')+'</span></div>').join('')+(n>40?'<div class="au-sub" style="padding:6px 0">e mais '+(n-40).toLocaleString('pt-BR')+'…</div>':'')+(n?'':'<div class="au-sub" style="padding:6px 0">Nenhum contato com esses filtros.</div>');
-  dpAtualizarResumo();
+function _dpDur(seg){const h=Math.floor(seg/3600),m=Math.floor(seg%3600/60),s=Math.round(seg%60);return String(h).padStart(2,'0')+'h'+String(m).padStart(2,'0')+'m'+String(s).padStart(2,'0')+'s';}
+function dpRenderGaveta(){
+  let g=document.getElementById('dp-gaveta');
+  if(!g){
+    const fundo=document.createElement('div');fundo.id='dp-gaveta-fundo';fundo.className='dp-gaveta-fundo';fundo.onclick=dpFecharGaveta;document.body.appendChild(fundo);
+    g=document.createElement('div');g.id='dp-gaveta';g.className='dp-gaveta';document.body.appendChild(g);
+  }
+  const aba=_dp.gaveta.aba;
+  let corpo='';
+  if(aba==='envio'){
+    const e=_dp.envio;const alvo=_dpAlvo();const n=alvo.length;
+    const ms=_dp.modelos;
+    const m=e.modelo&&ms&&ms.find(x=>x.nome===e.modelo.nome);
+    const erros=[];
+    if(!e.modelo)erros.push('É necessário selecionar um modelo');
+    if(!n)erros.push('Nenhum contato no filtro');
+    if(e.agendar&&!e.agendado)erros.push('Escolha a data e a hora do agendamento');
+    if(e.modelo&&e.modelo.cabecalho&&!/^https:\/\//.test(e.modelo.cabecalho.link||''))erros.push('O modelo tem imagem/vídeo no cabeçalho: coloque o link (https://)');
+    if(n>20000)erros.push('Máximo de 20.000 contatos por envio');
+    if(!e.ciente)erros.push('Confirme que está ciente dos custos da WhatsApp Business API.');
+    const pv=e.previa;const estim=Math.max(0,n-(pv?(pv.optout||0)+(pv.repetidos||0):0));
+    if(n&&pv&&!estim)erros.push('Ninguém deste público vai receber: todos pediram para sair ou já receberam este modelo.');
+    let modeloHtml=ms?'<select class="dp-in" onchange="dpEscolherModelo(this.value)"><option value="">Selecione um modelo</option>'+ms.map(x=>'<option value="'+_waEsc(x.nome)+'"'+(e.modelo&&e.modelo.nome===x.nome?' selected':'')+'>'+_waEsc(x.nome)+' ('+String(x.categoria).toLowerCase()+')</option>').join('')+'</select>':'<div class="au-dica">Carregando modelos da Meta…</div>';
+    if(m){
+      modeloHtml+='<div class="au-preview" style="margin-top:6px">'+_waEsc(m.texto)+'</div>';
+      if(e.modelo.cabecalho)modeloHtml+='<div class="au-dica" style="margin-top:6px">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[e.modelo.cabecalho.formato])+' (link público):</div><input class="dp-in" value="'+_waEsc(e.modelo.cabecalho.link||'')+'" oninput="_dp.envio.modelo.cabecalho.link=this.value.trim()">';
+      e.modelo.variaveis.forEach((v,k)=>{modeloHtml+='<div class="au-linha" style="margin-top:6px;font-size:11px">'+_waEsc(m.formato==='NAMED'?'{{'+(m.campos[k]||k+1)+'}}':'{{'+(k+1)+'}}')+'<input class="dp-in" style="flex:1" value="'+_waEsc(v)+'" placeholder="ex.: {primeiro_nome}" oninput="_dp.envio.modelo.variaveis['+k+']=this.value"></div>';});
+    }
+    const porMin=Math.max(1,Math.min(200,Math.round(60/Math.max(0.3,e.espera))));
+    corpo=
+      '<div class="dp-g-sec"><div class="dp-g-tit">Agendamento das mensagens <span class="dp-q" title="Escolha uma data e hora para o envio começar sozinho.">?</span></div>'+
+        '<label class="au-check"><input type="checkbox" '+(e.agendar?'checked':'')+' onchange="_dp.envio.agendar=this.checked;dpRenderGaveta()"> Deseja agendar a ação em massa?</label>'+
+        (e.agendar?'<input class="dp-in" type="datetime-local" value="'+_waEsc(e.agendado)+'" onchange="_dp.envio.agendado=this.value;dpRenderGaveta()">':'')+'</div>'+
+      '<div class="dp-g-sec"><div class="dp-g-tit">Conexão de WhatsApp <span class="dp-q" title="Número da clínica que vai enviar.">?</span></div>'+
+        '<select class="dp-in" onchange="_dp.envio.numero=this.value">'+(_wa.numeros.length?_wa.numeros:[{phone_number_id:'',apelido:'Clínica'}]).map(x=>'<option value="'+_waEsc(x.phone_number_id)+'"'+(e.numero===x.phone_number_id?' selected':'')+'>● '+_waEsc(x.apelido||x.numero_exibicao)+'  ON</option>').join('')+'</select></div>'+
+      '<div class="dp-g-sec"><div class="dp-g-tit">Modelo da mensagem</div>'+modeloHtml+'</div>'+
+      '<div class="dp-g-sec"><div class="dp-g-tit">Tempo de espera em segundos entre envio de cada mensagem <span class="dp-q" title="Mais tempo protege a qualidade do número na Meta.">?</span></div>'+
+        '<div class="dp-slider"><input type="range" min="0.3" max="10" step="0.1" value="'+e.espera+'" oninput="_dp.envio.espera=Number(this.value);this.nextElementSibling.textContent=this.value+\' s\'"  onchange="dpRenderGaveta()"><span>'+e.espera+' s</span></div>'+
+        '<div class="dp-tempo">Tempo estimado de duração: <b>'+_dpDur(estim*Math.max(e.espera,60/porMin))+'</b> <span style="color:#9a8c7e">('+porMin+' por minuto)</span></div></div>'+
+      '<div class="dp-g-sec"><div class="dp-g-tit">Enviando para</div>'+
+        '<div class="au-dica">* Para enviar para contatos específicos, marque-os na lista à esquerda.</div>'+
+        '<span class="dp-alvo">'+(_dp.sel.size?_dp.sel.size+' contatos selecionados':'Todos os contatos do filtro')+'</span></div>'+
+      '<div class="dp-g-sec"><div class="dp-g-tit">Opções</div>'+
+        '<div class="au-linha" style="font-size:12px">Pular quem recebeu este modelo nos últimos <select class="wa-sel" onchange="_dp.envio.repeticao=Number(this.value);_dp.envio.previa=null;dpRenderGaveta()">'+[0,3,7,15,30].map(x=>'<option value="'+x+'"'+(x===e.repeticao?' selected':'')+'>'+(x?x+' dias':'(não pular)')+'</option>').join('')+'</select></div>'+
+        '<input class="dp-in" placeholder="Nome do envio (opcional, vira a tag dos contatos)" maxlength="40" value="'+_waEsc(e.nome)+'" oninput="_dp.envio.nome=this.value">'+
+        '<div class="au-dica">Quem respondeu “sair” ou “parar”, números fixos e inválidos são pulados automaticamente.</div>'+
+        (pv?'<div class="au-dica">Pulados: '+(pv.optout||0)+' pediram para sair, '+(pv.repetidos||0)+' já receberam este modelo.</div>':(e.modelo&&n?'<button class="cl-link" onclick="dpConferir()">Conferir quantos serão pulados</button>':''))+'</div>'+
+      '<div class="dp-g-sec"><label class="au-check" style="align-items:flex-start"><input type="checkbox" '+(e.ciente?'checked':'')+' onchange="_dp.envio.ciente=this.checked;dpRenderGaveta()"> <span>Estou ciente que há custos com o WhatsApp Business API para disparar estas mensagens do tipo “Conversa Iniciada pela Empresa”.'+(e.modelo&&_dp.precos?' Estimativa: <b>'+_dpCusto(estim)+'</b> ('+String(e.modelo.categoria||'').toLowerCase()+').':'')+'</span></label>'+
+        (e.modelo&&String(e.modelo.categoria).toUpperCase()==='MARKETING'?'<div class="au-dica">Modelo de marketing: confira as regras do CFO (sem preço ou desconto sem revisão, sem promessa de resultado).</div>':'')+
+        (estim>1000?'<div class="dp-alerta">Acima de 1.000 contatos: a Meta limita quantos contatos novos o número pode receber por dia. Prefira dividir em dias.</div>':'')+'</div>'+
+      (erros.length?'<ul class="dp-erros">'+erros.map(x=>'<li>'+_waEsc(x)+'</li>').join('')+'</ul>':'');
+    g.innerHTML=_dpGavetaCab()+'<div class="dp-g-corpo">'+corpo+'</div>'+
+      '<div class="dp-g-rodape"><span>Em torno de <b>'+estim.toLocaleString('pt-BR')+'</b> contatos serão alcançados</span><button class="dp-bt" onclick="dpFecharGaveta()">Cancelar</button><button class="dp-disparar" id="dp-disparar" '+(erros.length?'disabled':'')+' onclick="dpDisparar()">Disparar</button></div>';
+  }else{
+    const linhas=(_dp.lista||[]).map(d=>{
+      const r=_dp.resumos[d.id]||{};
+      const st={agendado:'Agendado',enviando:'Enviando',pausado:'Pausado',concluido:'Finalizado',cancelado:'Interrompido'}[d.status];
+      return '<tr><td>'+_dpData(d.iniciado_em||d.agendado_para)+'<div class="dp-sub">'+_waEsc(d.nome)+' · '+_waEsc(d.modelo&&d.modelo.nome||'')+'</div></td><td>'+(d.total||0)+'</td><td>'+(r.enviados||0)+'</td><td>'+(r.falharam||0)+'</td><td><span class="dp-st '+d.status+'">'+st+'</span></td><td><button class="cl-ib sem-borda" title="Detalhes" onclick="dpDetalhes('+d.id+')">'+_clIc('gear')+'</button></td></tr>';
+    }).join('');
+    g.innerHTML=_dpGavetaCab()+'<div class="dp-g-corpo" style="padding:0 12px">'+(linhas?'<table class="dp-res"><thead><tr><th>Início em</th><th>Agendados</th><th>Alcançados</th><th>Erros</th><th>Status</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table>':'<div class="wa-vazio">Nenhum envio ainda.</div>')+'</div>';
+  }
 }
-function dpAtualizarResumo(){
-  const el=document.getElementById('dp-resumo');if(!el)return;
-  const n=_dp.publico.length;const v=_dp.novo;const pv=v.previa;
-  const estim=Math.max(0,n-(pv?(pv.optout||0)+(pv.repetidos||0):0));
-  const min=Math.ceil(estim/Math.max(1,v.ritmo));
-  el.innerHTML=
-    '<div class="dp-res-linha"><span>No público</span><b>'+n.toLocaleString('pt-BR')+'</b></div>'+
-    (pv?'<div class="dp-res-linha"><span>Pediram para não receber</span><b>−'+(pv.optout||0)+'</b></div><div class="dp-res-linha"><span>Já receberam este modelo há menos de '+v.repeticao+' dias</span><b>−'+(pv.repetidos||0)+'</b></div>':'<div class="au-sub">Clique em “Conferir” para ver quantos serão pulados.</div>')+
-    '<div class="dp-res-linha"><span>Devem receber (aprox.)</span><b>'+estim.toLocaleString('pt-BR')+'</b></div>'+
-    (v.modelo?'<div class="dp-res-linha"><span>Custo estimado na Meta ('+_auEsc((v.modelo.categoria||'').toLowerCase())+')</span><b>'+dpCusto(estim)+'</b></div>':'')+
-    (estim?'<div class="dp-res-linha"><span>Duração no ritmo de '+v.ritmo+'/min</span><b>'+(min<60?min+' min':Math.floor(min/60)+' h '+(min%60)+' min')+'</b></div>':'')+
-    (estim>1000?'<div class="dp-alerta">⚠ Acima de 1.000 pessoas: a Meta limita quantos contatos novos o número pode receber por dia, de acordo com o nível do número. Se passar do limite, os envios falham. Prefira dividir em dias.</div>':'')+
-    (v.modelo&&String(v.modelo.categoria).toUpperCase()==='MARKETING'?'<div class="au-dica">Modelo de marketing: lembre das regras do CFO (sem preço/desconto sem revisão, sem promessa de resultado).</div>':'')+
-    '<div class="au-dica">O preço por mensagem é uma estimativa (configurações “whatsapp_precos”). Confira na fatura da Meta.</div>';
-}
-async function dpConferir(){
-  const v=_dp.novo;if(!v.modelo){showToast('error','Escolha o modelo primeiro','');return;}
-  if(_dp.publico.length>20000){showToast('error','Público grande demais','Máximo de 20.000 por disparo.');return;}
-  try{
-    v.previa=await _waRest('rpc/disparo_previa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_modelo:v.modelo.nome,p_telefones:_dp.publico.map(x=>x.bruto||x.ph),p_dias_repeticao:Number(v.repeticao)||0})});
-    dpAtualizarResumo();
-  }catch(e){showToast('error','Não foi possível conferir',e.message);}
+function _dpGavetaCab(){
+  const aba=_dp.gaveta.aba;
+  return '<div class="dp-g-cab"><span>Mensagens em massa via WhatsApp <span class="dp-q" title="Envia um modelo aprovado pela Meta para vários contatos.">?</span></span><button class="cl-ib sem-borda" onclick="dpFecharGaveta()">'+_clIc('x')+'</button></div>'+
+    '<div class="dp-g-abas"><button class="'+(aba==='envio'?'ativo':'')+'" onclick="dpAbrirGaveta(\'envio\')">Envio</button><button class="'+(aba==='resultados'?'ativo':'')+'" onclick="dpAbrirGaveta(\'resultados\')">Resultados</button></div>';
 }
 function dpEscolherModelo(nome){
-  const m=(_dp.modelos||[]).find(x=>x.nome===nome);const v=_dp.novo;
-  if(!m){v.modelo=null;dpRenderNovo();return;}
-  v.modelo={nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],
+  const m=(_dp.modelos||[]).find(x=>x.nome===nome);const e=_dp.envio;
+  e.modelo=m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],
     variaveis:Array.from({length:m.variaveis||0},(_,k)=>k===0?'{primeiro_nome}':''),texto_preview:m.texto,
-    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null};
-  v.previa=null;
-  dpRenderNovo();
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null}:null;
+  e.previa=null;dpRenderGaveta();
 }
-function dpRenderNovo(){
-  const el=document.getElementById('dp-conteudo');if(!el)return;
-  const v=_dp.novo;const f=v.f;
-  const opt=_auOpt;
-  const etapas=['Lead','Agendou','Faltou/desmarcou','Compareceu','Ganho','Perdido','Paciente','_sem'];
-  const ms=_dp.modelos;
-  const m=v.modelo&&ms&&ms.find(x=>x.nome===v.modelo.nome);
-  let modeloHtml=ms?'<select class="wa-sel" onchange="dpEscolherModelo(this.value)">'+opt('','Escolha o modelo aprovado…',v.modelo&&v.modelo.nome)+ms.map(x=>opt(x.nome,x.nome+' ('+String(x.categoria).toLowerCase()+')',v.modelo&&v.modelo.nome)).join('')+'</select>':'<div class="au-dica">Carregando modelos da Meta…</div>';
-  if(m){
-    modeloHtml+='<div class="au-preview">'+_auEsc(m.texto)+'</div>';
-    if(v.modelo.cabecalho)modeloHtml+='<div class="au-dica">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[v.modelo.cabecalho.formato])+'. Link público do arquivo:</div><input class="wa-var" value="'+_auEsc(v.modelo.cabecalho.link||'')+'" placeholder="https://…" oninput="_dp.novo.modelo.cabecalho.link=this.value.trim()">';
-    v.modelo.variaveis.forEach((x,k)=>{modeloHtml+='<div class="au-linha" style="font-size:11px">'+_auEsc(m.formato==='NAMED'?'{{'+(m.campos[k]||k+1)+'}}':'{{'+(k+1)+'}}')+' <input class="wa-var" value="'+_auEsc(x)+'" placeholder="ex.: {primeiro_nome}" oninput="_dp.novo.modelo.variaveis['+k+']=this.value"></div>';});
-    if(v.modelo.variaveis.length)modeloHtml+='<div class="au-dica">Use <code>{primeiro_nome}</code> ou <code>{nome}</code>; sem nome, entra um texto vazio.</div>';
-  }
-  el.innerHTML=
-    '<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button><div style="display:flex;gap:8px"><button class="wa-btn" onclick="dpVoltar()">Cancelar</button><button class="wa-btn primario" id="dp-criar" onclick="dpCriar()">Criar disparo</button></div></div>'+
-    '<div class="au-editor">'+
-      '<div class="au-col">'+
-        '<div class="au-bloco"><h4>1. Público</h4>'+
-          '<div class="au-dica">Base: '+(_dp.base||[]).length.toLocaleString('pt-BR')+' contatos (CRM + conversas).</div>'+
-          '<div style="font-size:12px;color:#7a6550">Etapa</div><div class="dp-etapas">'+etapas.map(e=>'<label class="au-check"><input type="checkbox" '+(f.etapas.includes(e)?'checked':'')+' onchange="dpToggleEtapa(\''+e.replace(/'/g,"\\'")+'\',this.checked)"> '+_auEsc(e==='_sem'?'Sem etapa':(WA_ETAPA_ROTULO[e]||e))+'</label>').join('')+'</div>'+
-          '<select class="wa-sel" onchange="dpSetF(\'origem\',this.value)">'+opt('','Todas as origens',f.origem)+_waOrigens().map(o=>opt(o,o,f.origem)).join('')+'</select>'+
-          '<input class="wa-var" placeholder="Anúncio ou campanha contém… (ex.: LENTES)" value="'+_auEsc(f.campanha)+'" oninput="dpSetF(\'campanha\',this.value.trim())">'+
-          '<select class="wa-sel" onchange="dpSetF(\'tag\',this.value)">'+opt('','Qualquer tag',f.tag)+(_wa.tags||[]).map(t=>opt(String(t.id),t.nome,f.tag)).join('')+'</select>'+
-          '<select class="wa-sel" onchange="dpSetF(\'atendente\',this.value)">'+opt('','Qualquer atendente',f.atendente)+opt('_ninguem','Sem atendente',f.atendente)+(_wa.equipeLista||[]).map(x=>opt(x.email,x.nome,f.atendente)).join('')+'</select>'+
-          '<div class="au-linha">Lead criado de <input class="wa-var" type="date" value="'+f.criadoDe+'" onchange="dpSetF(\'criadoDe\',this.value)"> até <input class="wa-var" type="date" value="'+f.criadoAte+'" onchange="dpSetF(\'criadoAte\',this.value)"></div>'+
-          '<div class="au-linha">Última mensagem do paciente de <input class="wa-var" type="date" value="'+f.msgDe+'" onchange="dpSetF(\'msgDe\',this.value)"> até <input class="wa-var" type="date" value="'+f.msgAte+'" onchange="dpSetF(\'msgAte\',this.value)"></div>'+
-          '<label class="au-check"><input type="checkbox" '+(f.soComConversa?'checked':'')+' onchange="dpSetF(\'soComConversa\',this.checked)"> Só quem já tem conversa no WhatsApp da clínica</label>'+
-          '<textarea class="wa-textarea" placeholder="Colar telefones (um por linha ou separados por vírgula)" oninput="dpSetF(\'colados\',this.value)">'+_auEsc(f.colados)+'</textarea>'+
-          '<label class="au-check"><input type="checkbox" '+(f.soColados?'checked':'')+' onchange="dpSetF(\'soColados\',this.checked)"> Usar só os telefones colados (ignorar os filtros)</label>'+
-        '</div>'+
-        '<div class="au-bloco"><h4>2. Modelo</h4>'+modeloHtml+'</div>'+
-        '<div class="au-bloco"><h4>3. Quando e como</h4>'+
-          '<input class="wa-var" placeholder="Nome do disparo (ex.: Reativação lentes outubro)" maxlength="60" value="'+_auEsc(v.nome)+'" oninput="_dp.novo.nome=this.value">'+
-          '<label class="au-check"><input type="radio" name="dp-quando" '+(v.quando==='agora'?'checked':'')+' onchange="_dp.novo.quando=\'agora\';dpRenderNovo()"> Enviar agora</label>'+
-          '<label class="au-check"><input type="radio" name="dp-quando" '+(v.quando==='agendar'?'checked':'')+' onchange="_dp.novo.quando=\'agendar\';dpRenderNovo()"> Agendar</label>'+
-          (v.quando==='agendar'?'<input class="wa-var" type="datetime-local" value="'+_auEsc(v.agendado)+'" onchange="_dp.novo.agendado=this.value">':'')+
-          '<div class="au-linha">Ritmo: <select class="wa-sel" onchange="_dp.novo.ritmo=Number(this.value);dpAtualizarResumo()">'+[10,20,40,60,100].map(x=>opt(x,x+' por minuto',v.ritmo)).join('')+'</select></div>'+
-          '<div class="au-linha">Pular quem recebeu este modelo nos últimos <select class="wa-sel" onchange="_dp.novo.repeticao=Number(this.value);_dp.novo.previa=null;dpAtualizarResumo()">'+[0,3,7,15,30].map(x=>opt(x,x?x+' dias':'(não pular)',v.repeticao)).join('')+'</select></div>'+
-          '<div class="au-dica">Ritmo mais lento protege a qualidade do número na Meta. Quem respondeu “sair” ou “parar” é sempre pulado.</div>'+
-        '</div>'+
-      '</div>'+
-      '<div class="au-col">'+
-        '<div class="au-bloco"><h4>Público: <span id="dp-contagem">0</span> contatos</h4><div id="dp-amostra" class="dp-amostra"></div></div>'+
-        '<div class="au-bloco"><h4>Resumo</h4><div id="dp-resumo"></div><button class="wa-btn" onclick="dpConferir()">Conferir quem será pulado</button></div>'+
-      '</div>'+
-    '</div>';
-  dpAtualizarContagem();
+async function dpConferir(){
+  const e=_dp.envio;if(!e.modelo)return;
+  try{
+    e.previa=await _waRest('rpc/disparo_previa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_modelo:e.modelo.nome,p_telefones:_dpAlvo().map(x=>x.bruto||x.ph),p_dias_repeticao:e.repeticao})});
+    dpRenderGaveta();
+  }catch(err){showToast('error','Não foi possível conferir',err.message);}
 }
-async function dpCriar(){
-  const v=_dp.novo;
-  if(!String(v.nome||'').trim()){showToast('error','Dê um nome para o disparo','');return;}
-  if(!v.modelo){showToast('error','Escolha o modelo','');return;}
-  if(v.modelo.cabecalho&&!/^https:\/\//.test(v.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho','O modelo tem imagem/vídeo: coloque o link https://');return;}
-  if(!_dp.publico.length){showToast('error','Nenhum contato no público','');return;}
-  if(_dp.publico.length>20000){showToast('error','Público grande demais','Máximo de 20.000 por disparo.');return;}
+async function dpDisparar(){
+  const e=_dp.envio;const alvo=_dpAlvo();
   let quando=null;
-  if(v.quando==='agendar'){
-    if(!v.agendado){showToast('error','Escolha data e hora do agendamento','');return;}
-    const t=new Date(v.agendado);if(isNaN(t)||t<Date.now()-60000){showToast('error','Data de agendamento inválida','Use uma data no futuro.');return;}
-    quando=t.toISOString();
-  }
-  const n=_dp.publico.length;
-  if(!confirm('Criar o disparo “'+v.nome.trim()+'”?\n\nModelo: '+v.modelo.nome+'\nPúblico: '+n.toLocaleString('pt-BR')+' contatos (antes de pular quem saiu ou já recebeu)\nCusto estimado: até '+dpCusto(n)+'\n'+(quando?'Agendado para '+_dpData(quando):'Começa a enviar no próximo minuto')+'.'))return;
-  const b=document.getElementById('dp-criar');if(b){b.disabled=true;b.textContent='Criando…';}
+  if(e.agendar){const t=new Date(e.agendado);if(isNaN(t)||t<Date.now()-60000){showToast('error','Data de agendamento inválida','Use uma data no futuro.');return;}quando=t.toISOString();}
+  const ritmo=Math.max(1,Math.min(200,Math.round(60/Math.max(0.3,e.espera))));
+  const nome=(e.nome||'').trim()||('Envio '+new Date(quando||Date.now()).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
+  if(!confirm('Disparar o modelo “'+e.modelo.nome+'” para '+alvo.length.toLocaleString('pt-BR')+' contatos'+(quando?' em '+_dpData(quando):' agora')+'?'))return;
+  const b=document.getElementById('dp-disparar');if(b){b.disabled=true;b.textContent='Criando…';}
   try{
-    const filtros=Object.assign({},v.f);delete filtros.colados;filtros.colados_qtd=(v.f.colados||'').split(/[\n,;\t]+/).filter(x=>x.trim()).length;
+    const filtros=Object.assign({busca:_dp.busca,selecionados:_dp.sel.size},_dp.f);
     const r=await _waRest('rpc/disparo_criar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      p_nome:v.nome.trim(),p_modelo:v.modelo,p_destinos:_dp.publico.map(x=>({telefone:x.bruto||x.ph,nome:x.nome||null})),
-      p_agendado_para:quando,p_ritmo:v.ritmo,p_filtros:filtros,p_dias_repeticao:v.repeticao})});
-    showToast('success','Disparo criado',r.enviar+' vão receber'+(r.pulados?' · '+r.pulados+' pulados':'')+'.');
-    waCarregarTags();
-    dpVoltar();
-  }catch(e){
-    if(b){b.disabled=false;b.textContent='Criar disparo';}
-    showToast('error','Não foi possível criar o disparo',e.message);
-  }
+      p_nome:nome,p_modelo:e.modelo,p_destinos:alvo.map(x=>({telefone:x.bruto||x.ph,nome:x.nome||null})),p_agendado_para:quando,
+      p_ritmo:ritmo,p_filtros:filtros,p_dias_repeticao:e.repeticao,p_numero:e.numero||null})});
+    showToast('success','Envio criado',r.enviar+' vão receber'+(r.pulados?' · '+r.pulados+' pulados':'')+'.');
+    _dp.envio=null;_dp.sel.clear();waCarregarTags();
+    dpAbrirGaveta('resultados');dpRenderPagina();
+  }catch(err){if(b){b.disabled=false;b.textContent='Disparar';}showToast('error','Não foi possível disparar',err.message);}
 }
-async function dpVerContatos(id){
-  _dp.modo='contatos';
-  const d=_dp.lista.find(x=>x.id===id);
-  const el=document.getElementById('dp-conteudo');
-  el.innerHTML='<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button></div><div class="au-vazio">Carregando…</div>';
-  let ds=[];
-  try{ds=await _waRest('disparo_destinos?disparo_id=eq.'+id+'&select=telefone,nome,status,motivo,enviado_em,wa_message_id&order=id&limit=5000');}catch(e){el.innerHTML+='<div class="au-vazio">'+_auEsc(e.message)+'</div>';return;}
-  const stMsg={};
+async function dpCarregarResultados(){
   try{
-    const ids=ds.filter(x=>x.wa_message_id).map(x=>x.wa_message_id);
-    for(let i=0;i<ids.length;i+=150){
-      const r=await _waRest('mensagens?select=wa_message_id,status&wa_message_id=in.('+ids.slice(i,i+150).map(x=>'"'+x+'"').join(',')+')');
-      (r||[]).forEach(m=>stMsg[m.wa_message_id]=m.status);
-    }
-  }catch(e){}
-  const rot={pendente:'na fila',enviado:'enviado',falhou:'falhou',pulado:'pulado'};
-  const rotM={enviada:'enviado',entregue:'entregue',lida:'lido',falhou:'falhou'};
-  const linhas=ds.map(x=>{const s=x.wa_message_id&&stMsg[x.wa_message_id]?rotM[stMsg[x.wa_message_id]]||stMsg[x.wa_message_id]:rot[x.status];
-    return '<tr><td>'+_auEsc(x.nome||'')+'<div class="au-sub">'+(/^\d+$/.test(x.telefone)?_waTelFormatado(x.telefone):'inválido')+'</div></td><td><span class="au-st '+(s==='lido'||s==='entregue'?'ativa':s==='falhou'?'erro':'')+'">'+_auEsc(s)+'</span>'+(x.motivo?'<div class="au-sub">'+_auEsc(x.motivo)+'</div>':'')+'</td><td class="au-sub">'+(x.enviado_em?_dpData(x.enviado_em):'')+'</td></tr>';}).join('');
-  el.innerHTML='<div class="au-topo"><button class="wa-btn" onclick="dpVoltar()">← Voltar</button><div style="font-weight:600;color:#2a2520">'+_auEsc(d?d.nome:'')+'</div><button class="wa-btn" onclick="dpVerContatos('+id+')">↻ Atualizar</button></div>'+
-    '<div class="au-bloco"><h4>Contatos ('+ds.length+')</h4>'+(linhas?'<div class="au-tabela"><table><thead><tr><th>Contato</th><th>Situação</th><th>Enviado</th></tr></thead><tbody>'+linhas+'</tbody></table></div>':'<div class="au-vazio">Sem contatos.</div>')+'</div>';
+    _dp.lista=(await _waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em&order=criado_em.desc&limit=50'))||[];
+    await Promise.all(_dp.lista.slice(0,20).map(async d=>{try{_dp.resumos[d.id]=await _waRest('rpc/disparo_resumo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_disparo:d.id})});}catch(e){}}));
+  }catch(e){_dp.lista=[];}
+  if(_dp.gaveta&&_dp.gaveta.aba==='resultados')dpRenderGaveta();
+}
+async function dpDetalhes(id){
+  const d=_dp.lista.find(x=>x.id===id);const r=_dp.resumos[id]||{};
+  const pode=_dpPode();
+  waFecharModal();
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';fundo.style.zIndex=1200;
+  fundo.onclick=ev=>{if(ev.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal" style="width:min(720px,100%)"><div class="wa-modal-cab">'+_waEsc(d.nome)+' · '+_waEsc(d.modelo&&d.modelo.nome||'')+'<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" id="dp-det">'+
+    '<div class="dp-nums"><span><b>'+(d.total||0)+'</b> agendados</span><span><b>'+(r.enviados||0)+'</b> enviados</span><span><b>'+(r.entregues||0)+'</b> entregues</span><span><b>'+(r.lidos||0)+'</b> lidos</span><span><b>'+(r.responderam||0)+'</b> responderam</span><span><b>'+(r.falharam||0)+'</b> erros</span><span><b>'+(r.pulados||0)+'</b> pulados</span></div>'+
+    (pode&&['agendado','enviando','pausado'].includes(d.status)?'<div style="display:flex;gap:6px">'+(d.status==='enviando'?'<button class="wa-btn" onclick="dpStatus('+id+',\'pausado\')">Pausar</button>':'')+(d.status==='pausado'?'<button class="wa-btn primario" onclick="dpStatus('+id+',\'enviando\')">Retomar</button>':'')+'<button class="wa-btn" onclick="dpStatus('+id+',\'cancelado\')">Interromper</button></div>':'')+
+    '<div class="wa-vazio">Carregando contatos…</div></div></div>';
+  document.body.appendChild(fundo);
+  let ds=[];try{ds=await _waRest('disparo_destinos?disparo_id=eq.'+id+'&select=telefone,nome,status,motivo,enviado_em,wa_message_id&order=id&limit=5000');}catch(e){}
+  const stMsg={};
+  try{const ids=ds.filter(x=>x.wa_message_id).map(x=>x.wa_message_id);for(let i=0;i<ids.length;i+=150){(await _waRest('mensagens?select=wa_message_id,status&wa_message_id=in.('+ids.slice(i,i+150).map(x=>'"'+x+'"').join(',')+')')||[]).forEach(m=>stMsg[m.wa_message_id]=m.status);}}catch(e){}
+  const rot={pendente:'na fila',enviado:'enviado',falhou:'erro',pulado:'pulado'},rotM={enviada:'enviado',entregue:'entregue',lida:'lido',falhou:'erro'};
+  const det=document.getElementById('dp-det');if(!det)return;
+  det.querySelector('.wa-vazio').outerHTML='<div class="au-tabela"><table><thead><tr><th>Contato</th><th>Situação</th><th>Enviado</th></tr></thead><tbody>'+ds.map(x=>{const s=x.wa_message_id&&stMsg[x.wa_message_id]?rotM[stMsg[x.wa_message_id]]||stMsg[x.wa_message_id]:rot[x.status];return '<tr><td>'+_waEsc(x.nome||'')+'<div class="au-sub">'+(/^\d+$/.test(x.telefone)?_waTelFormatado(x.telefone):'inválido')+'</div></td><td><span class="au-st '+(s==='lido'||s==='entregue'?'ativa':s==='erro'?'erro':'')+'">'+_waEsc(s)+'</span>'+(x.motivo?'<div class="au-sub">'+_waEsc(x.motivo)+'</div>':'')+'</td><td class="au-sub">'+(x.enviado_em?_dpData(x.enviado_em):'')+'</td></tr>';}).join('')+'</tbody></table></div>';
+}
+async function dpStatus(id,s){
+  const txt={pausado:'Pausar o envio? Quem ainda não recebeu fica esperando até retomar.',enviando:'Retomar o envio?',cancelado:'Interromper o envio? Quem ainda não recebeu não vai receber.'}[s];
+  if(!confirm(txt))return;
+  try{await _waRest('disparos?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:s})});waFecharModal();dpCarregarResultados();}
+  catch(e){showToast('error','Não foi possível mudar',e.message);}
 }
 
 // =====================================================================
@@ -13944,7 +14068,7 @@ function waMenuGerencia(ev){
   m.innerHTML=(_waEhGestao()?'<button onclick="_clFecharPop();waAbrirNumeros()">'+_clIc('gear')+' Números de WhatsApp</button>':'')+
     '<button onclick="_clFecharPop();waGerenciarRapidas()">'+_clIc('zap')+' Respostas rápidas</button>'+
     '<button onclick="_clFecharPop();switchPage(\'automacoes\',[...document.querySelectorAll(\'.nav-item\')].find(n=>n.textContent.includes(\'Automações\')))">'+_clIc('play')+' Sequências e automações</button>'+
-    '<button onclick="_clFecharPop();switchPage(\'disparos\',[...document.querySelectorAll(\'.nav-item\')].find(n=>n.textContent.includes(\'Disparos\')))">'+_clIc('mega')+' Mensagens em massa</button>'+
+    '<button onclick="_clFecharPop();switchPage(\'disparos\',[...document.querySelectorAll(\'.nav-item\')].find(n=>n.textContent.includes(\'Mensagens em Massa\')))">'+_clIc('mega')+' Mensagens em massa</button>'+
     '<div class="sep"></div><button onclick="_clFecharPop();waCarregarConversas()">'+_clIc('sort')+' Atualizar lista</button>';
   _clPosicionar(m,ev.currentTarget,false);
 }
