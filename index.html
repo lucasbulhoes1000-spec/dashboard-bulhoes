@@ -289,7 +289,7 @@ tbody tr:hover td{background:#faf7f3;}
 .wa-cab,.wa-janela,.wa-comp,.wa-aviso-cloudia{flex-shrink:0;}
 .wa-aviso-cloudia{font-size:10px;color:#b5a898;padding:6px 12px;border-top:0.5px solid #f0e9e0;text-align:center;}
 /* ===== Automações ===== */
-#page-automacoes .au-wrap,#page-disparos .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
+#page-automacoes .au-wrap,#page-agente .au-wrap,#page-disparos .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
 .au-geral{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fbf1e6;border:0.5px solid #e9d5bb;color:#7a5530;border-radius:10px;padding:12px 14px;flex-wrap:wrap;}
 .au-geral.ligada{background:#eef5ef;border-color:#cfe3d3;color:#3f6b4c;}
 .au-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -577,6 +577,29 @@ tbody tr:hover td{background:#faf7f3;}
 .wa-cab-nome{font-size:16px;font-weight:400;color:#2a2520;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wa-cab-sub{font-size:11px;color:#9a8c7e;}
 .wa-cab-acoes{gap:4px;flex-wrap:nowrap;}
+.ag-sw{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#5a4e44;}.ag-sw b{font-size:12.5px;color:#2a2520;}
+.ag-chip{font-size:11.5px;color:#7a6550;}.ag-chip.ok{color:#3f6b4c;}.ag-chip.erro{color:#a0472f;}
+.ag-abas{display:flex;gap:2px;border-bottom:0.5px solid #ece4d8;padding:0 10px;overflow-x:auto;}
+.ag-abas button{border:none;background:none;padding:11px 12px;font-size:12.5px;color:#7a6b5c;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;}
+.ag-abas button.ativo{color:#2a2520;border-bottom-color:#A18B6C;font-weight:600;}
+.ag-corpo{padding:14px;display:flex;flex-direction:column;gap:10px;}
+.ag-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
+.ag-grid label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#5a4e44;}
+.ag-grid .wa-sel{height:34px;}
+.ag-dica{font-size:11.5px;color:#9a8c7e;line-height:1.4;}
+.ag-texto{width:100%;min-height:420px;border:0.5px solid #e2d8ca;border-radius:8px;padding:12px;font-size:12.5px;line-height:1.5;font-family:inherit;resize:vertical;box-sizing:border-box;color:#2a2520;background:#fff;}
+.ag-imgs{display:flex;flex-direction:column;gap:8px;}
+.ag-img{display:flex;gap:10px;align-items:center;border:0.5px solid #ece4d8;border-radius:8px;padding:8px;}
+.ag-img img{width:64px;height:64px;object-fit:cover;border-radius:6px;background:#f5efe8;}
+.ag-nova{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.ag-nova .wa-var{flex:1;min-width:160px;}
+.ag-chat{background:#f7f2ec;border-radius:10px;padding:12px;min-height:260px;max-height:460px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+.ag-b{max-width:75%;padding:8px 11px;border-radius:10px;font-size:12.5px;white-space:pre-wrap;line-height:1.4;}
+.ag-b.pac{align-self:flex-start;background:#fff;border:0.5px solid #e9dfd2;}
+.ag-b.ag{align-self:flex-end;background:#efe4d4;}
+.ag-b.sis{align-self:center;background:transparent;color:#7a6550;font-size:11.5px;font-style:italic;}
+.ag-b.sis.erro{color:#a0472f;}
+.cl-robo{cursor:pointer;}
 .cl-robo{display:inline-flex;align-items:center;gap:0;margin:0 4px;}
 .cl-robo .bola{width:30px;height:30px;border-radius:50%;background:#f3ece3;color:#8a7b6c;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;}
 .cl-robo .trilho{width:26px;height:12px;border-radius:6px;background:#e6dccf;margin-left:-6px;}
@@ -798,6 +821,10 @@ select.dp-in{max-width:420px;}
     <div class="nav-item" onclick="switchPage('automacoes',this)">
       <span class="nav-icon">⚡</span>
       <span class="nav-label">Automações</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('agente',this)">
+      <span class="nav-icon">🤖</span>
+      <span class="nav-label">Agente de IA</span>
     </div>
     <div class="nav-item" onclick="switchPage('disparos',this)">
       <span class="nav-icon">📣</span>
@@ -1530,6 +1557,7 @@ select.dp-in{max-width:420px;}
     </div>
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
     <div class="page" id="page-automacoes"><div class="au-wrap" id="au-conteudo"></div></div>
+    <div class="page" id="page-agente"><div class="au-wrap" id="ag-conteudo"></div></div>
     <div class="page" id="page-pacientes">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
         <div style="font-size:12px;color:#9a8c7e;">Base de pacientes por categoria, sincronizada com a agenda real do Clinicorp (inclui reagendamentos e manutenções genéricas reconhecidas pelo histórico).<br><span id="pac-ultima-sync" style="color:#b0a690;"></span></div>
@@ -2666,13 +2694,14 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',disparos:'Mensagens em Massa',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='pacientes') renderPacientesPage();
   else if(page==='conversas') abrirConversas();
   else if(page==='automacoes') abrirAutomacoes();
+  else if(page==='agente') abrirAgente();
   else if(page==='disparos') abrirDisparos();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='trafego-pago') abrirTrafegoPago();
@@ -13289,7 +13318,7 @@ function iniciarWhatsApp(){
   // espera o login da Supabase ficar pronto
   const tentar=()=>{if(!_sbAccessToken){setTimeout(tentar,1500);return;}
     try{if(_sb)_sb.realtime.setAuth(_sbAccessToken);}catch(e){}
-    waCarregarEquipe();waCarregarNumeros();waCarregarTags();waCarregarRapidas();waCarregarConversas(true);waLigarTempoReal();};
+    waCarregarEquipe();waCarregarNumeros();waCarregarTags();waCarregarRapidas();waCarregarAgente();waCarregarConversas(true);waLigarTempoReal();};
   tentar();
   // checagem de segurança: se o tempo real cair, atualiza a lista a cada 30 s
   _wa.poll=setInterval(()=>{
@@ -13307,6 +13336,226 @@ async function waRecarregarMsgsAtual(){
     if(_wa.atual&&_wa.atual.id===c.id){_wa.msgs=(m||[]).reverse();waRenderMsgs(false);}
   }catch(e){}
 }
+// =====================================================================
+// AGENTE DE IA — igual ao "Agentes de IA" do Cloudia (cores Bulhões).
+// A gestão escreve instruções e base de conhecimento, escolhe modelo,
+// criatividade e personalidade e liga: Habilitar IA (responde sozinho),
+// Assistente Virtual (sugestão na Central) e Resumos (Resumir com IA).
+// O cérebro é o Claude (Anthropic), na função whatsapp-agente da Supabase.
+// =====================================================================
+const AG_FUNCAO=SUPABASE_URL+'/functions/v1/whatsapp-agente';
+const AG_MODELOS={'claude-haiku-5-5':'Claude Haiku 5.5 (rápido e econômico)','claude-sonnet-5-5':'Claude Sonnet 5.5 (equilibrado)','claude-opus-5-5':'Claude Opus 5.5 (mais inteligente)'};
+const AG_PERSONALIDADES=['Empático','Profissional','Descontraído','Objetivo','Formal'];
+const _ag={a:null,ed:null,imagens:[],versoes:[],registros:[],status:null,teste:[],testando:false,carregando:false,erro:null,aba:'config'};
+async function _agAcao(dados){
+  if(!_sbAccessToken)throw new Error('Entre no CRM de novo.');
+  const r=await fetch(AG_FUNCAO,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+_sbAccessToken},body:JSON.stringify(dados)});
+  let j={};try{j=await r.json();}catch(e){}
+  if(!r.ok||j.ok===false)throw new Error(j.erro||('Erro '+r.status));
+  return j;
+}
+function abrirAgente(){iniciarWhatsApp();agRender();agCarregar();}
+async function agCarregar(){
+  if(!_sbAccessToken){setTimeout(agCarregar,1200);return;}
+  _ag.carregando=true;
+  try{
+    const g=_waEhGestao();
+    const [a,imgs,regs,vers]=await Promise.all([
+      _waRest('agente_ia?id=eq.1&select=*'),
+      _waRest('agente_imagens?select=*&order=ordem,id'),
+      _waRest('agente_registros?select=id,conversa_id,tipo,detalhe,modelo,tokens_entrada,tokens_saida,autor,criado_em&order=criado_em.desc&limit=30').catch(()=>[]),
+      g?_waRest('agente_versoes?select=id,salva_em,salva_por,instrucoes,base_conhecimento&order=salva_em.desc&limit=20').catch(()=>[]):Promise.resolve([])
+    ]);
+    _ag.a=(a||[])[0]||null;_ag.imagens=imgs||[];_ag.registros=regs||[];_ag.versoes=vers||[];_ag.erro=null;
+    if(_ag.a&&!_ag.ed)_ag.ed=JSON.parse(JSON.stringify(_ag.a));
+  }catch(e){_ag.erro=e.message;}
+  _ag.carregando=false;
+  if(!_ag.status)_agAcao({acao:'status'}).then(s=>{_ag.status=s;if(currentPage==='agente')agRender();}).catch(e=>{_ag.status={erro:e.message};if(currentPage==='agente')agRender();});
+  if(currentPage==='agente')agRender();
+}
+function _agSujo(){return _ag.a&&_ag.ed&&JSON.stringify(_ag.a)!==JSON.stringify(_ag.ed);}
+function _agSw(campo,rotulo,desc,pode){
+  const v=!!(_ag.ed&&_ag.ed[campo]);
+  return '<div class="ag-sw"><label class="sq-switch"><input type="checkbox" '+(v?'checked':'')+(pode?'':' disabled')+' onchange="_ag.ed.'+campo+'=this.checked;agRender()"><span></span></label><div><b>'+rotulo+'</b><div>'+desc+'</div></div></div>';
+}
+function agRender(){
+  const el=document.getElementById('ag-conteudo');if(!el)return;
+  if(_ag.erro){el.innerHTML='<div class="au-vazio">'+(/agente_ia/.test(_ag.erro)?'O Agente de IA ainda não foi ligado no banco.':'Não foi possível carregar.')+'<br><span style="font-size:11px">'+_auEsc(_ag.erro)+'</span></div>';return;}
+  if(!_ag.ed){el.innerHTML='<div class="au-vazio">Carregando…</div>';return;}
+  const E=_ag.ed,pode=_waEhGestao(),dis=pode?'':' disabled';
+  const st=_ag.status;
+  const chave=!st?'<span class="ag-chip">Conferindo a chave…</span>':st.erro?'<span class="ag-chip erro">'+_auEsc(st.erro)+'</span>':st.chave?'<span class="ag-chip ok">● Chave da Anthropic configurada</span>':'<span class="ag-chip erro">● Falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)</span>';
+  const abas=[['config','Configurações'],['instrucoes','Instruções'],['base','Base de conhecimento'],['imagens','Imagens ('+_ag.imagens.length+')'],['testar','Testar agente'],['atividade','Atividade']].concat(pode?[['versoes','Versões']]:[]);
+  let corpo='';
+  if(_ag.aba==='config'){
+    corpo='<div class="ag-grid">'+
+      '<label>Nome do agente<input class="wa-var" value="'+_auEsc(E.nome)+'"'+dis+' oninput="_ag.ed.nome=this.value;_agMarcar()"></label>'+
+      '<label>Modelo<select class="wa-sel"'+dis+' onchange="_ag.ed.modelo=this.value;_agMarcar()">'+Object.entries(AG_MODELOS).map(([k,v])=>'<option value="'+k+'"'+(E.modelo===k?' selected':'')+'>'+v+'</option>').join('')+(AG_MODELOS[E.modelo]?'':'<option selected>'+_auEsc(E.modelo)+'</option>')+'</select></label>'+
+      '<label>Criatividade: <b id="ag-cri">'+Number(E.criatividade).toFixed(1)+'</b><input type="range" min="0" max="1" step="0.1" value="'+Number(E.criatividade)+'"'+dis+' oninput="_ag.ed.criatividade=Number(this.value);document.getElementById(\'ag-cri\').textContent=Number(this.value).toFixed(1);_agMarcar()"><span class="ag-dica">Mais baixo = respostas mais previsíveis. Mais alto = mais variadas.</span></label>'+
+      '<label>Personalidade<select class="wa-sel"'+dis+' onchange="_ag.ed.personalidade=this.value;_agMarcar()">'+AG_PERSONALIDADES.map(p=>'<option'+(E.personalidade===p?' selected':'')+'>'+p+'</option>').join('')+'</select></label>'+
+      '<label>Tempo para responder (segundos)<input class="wa-var" type="number" min="0" max="120" value="'+E.espera_segundos+'"'+dis+' oninput="_ag.ed.espera_segundos=Math.max(0,Math.min(120,parseInt(this.value)||0));_agMarcar()"><span class="ag-dica">Se o paciente mandar várias mensagens seguidas, o agente espera e responde tudo junto.</span></label>'+
+      '<label>Máximo de mensagens por resposta<input class="wa-var" type="number" min="1" max="10" value="'+E.max_blocos+'"'+dis+' oninput="_ag.ed.max_blocos=Math.max(1,Math.min(10,parseInt(this.value)||1));_agMarcar()"></label>'+
+    '</div>'+
+    '<div class="ag-sw"><label class="sq-switch"><input type="checkbox" '+(E.ligar_em_novas?'checked':'')+dis+' onchange="_ag.ed.ligar_em_novas=this.checked;_agMarcar()"><span></span></label><div><b>Ligar o robô em conversas novas</b><div>Quando um contato novo manda a primeira mensagem, o agente já atende. Nas outras conversas, a equipe liga o robô no botão da conversa.</div></div></div>'+
+    '<div class="ag-sw"><label class="sq-switch"><input type="checkbox" '+(E.modo_teste?'checked':'')+dis+' onchange="_ag.ed.modo_teste=this.checked;agRender();_agMarcar()"><span></span></label><div><b>Modo teste</b><div>Só os telefones abaixo recebem resposta automática.</div></div></div>'+
+    (E.modo_teste?'<input class="wa-var" placeholder="Telefones de teste, separados por vírgula (ex.: 13999998888)" value="'+_auEsc((E.telefones_teste||[]).join(', '))+'"'+dis+' oninput="_ag.ed.telefones_teste=this.value.split(/[\\n,;]+/).map(x=>x.replace(/\\D/g,\'\')).filter(Boolean);_agMarcar()">':'')+
+    '<div class="ag-dica" style="margin-top:4px">Quando alguém da equipe responde a conversa, o robô daquela conversa desliga sozinho (a pessoa assumiu). O agente também passa para a equipe quando as instruções mandarem.</div>';
+  }else if(_ag.aba==='instrucoes'){
+    corpo='<div class="ag-dica">Quem é o agente, o roteiro, o que pode e o que não pode fazer, quando passar para a equipe. É o mesmo campo “Instruções” do Cloudia.</div>'+
+      '<textarea class="ag-texto" id="ag-instr"'+dis+' oninput="_ag.ed.instrucoes=this.value;document.getElementById(\'ag-instr-n\').textContent=this.value.length;_agMarcar()" placeholder="Ex.: Você é a Raffa, responsável pelo atendimento da Bulhões Odontologia...">'+_auEsc(E.instrucoes)+'</textarea>'+
+      '<div class="ag-dica" style="text-align:right"><span id="ag-instr-n">'+E.instrucoes.length+'</span> caracteres</div>';
+  }else if(_ag.aba==='base'){
+    corpo='<div class="ag-dica">Informações que o agente consulta para responder: endereço, horários, convênios, formas de pagamento, perguntas frequentes. É o campo “Base de conhecimento” do Cloudia.</div>'+
+      '<textarea class="ag-texto" id="ag-base"'+dis+' oninput="_ag.ed.base_conhecimento=this.value;document.getElementById(\'ag-base-n\').textContent=this.value.length;_agMarcar()" placeholder="Horário de atendimento: ...&#10;Endereço: ...">'+_auEsc(E.base_conhecimento)+'</textarea>'+
+      '<div class="ag-dica" style="text-align:right"><span id="ag-base-n">'+E.base_conhecimento.length+'</span> caracteres</div>';
+  }else if(_ag.aba==='imagens'){
+    corpo='<div class="ag-dica">Fotos que o agente pode mandar (ex.: antes e depois por queixa). Em “quando usar”, explique em que situação mandar. Nas instruções, você pode citar a imagem pelo nome.</div>'+
+      (_ag.imagens.length?'<div class="ag-imgs">'+_ag.imagens.map(i=>'<div class="ag-img"><img src="'+_auEsc(i.link)+'" alt=""><div style="flex:1;min-width:0"><b>'+_auEsc(i.nome)+'</b><div class="ag-dica">'+_auEsc(i.quando_usar||'')+'</div></div>'+(pode?'<button class="cl-lixo" title="Apagar" onclick="agImagemApagar('+i.id+')">'+_clIc('trash')+'</button>':'')+'</div>').join('')+'</div>':'<div class="au-vazio" style="padding:18px">Nenhuma imagem ainda.</div>')+
+      (pode?'<div class="ag-nova"><input class="wa-var" id="ag-img-nome" placeholder="Nome (ex.: Diastemas)" maxlength="80"><input class="wa-var" id="ag-img-quando" placeholder="Quando usar (ex.: paciente com espaço entre os dentes)" style="flex:2"><input type="file" id="ag-img-arq" accept="image/jpeg,image/png" style="display:none" onchange="agImagemEnviar(this.files[0])"><button class="wa-btn primario" onclick="document.getElementById(\'ag-img-arq\').click()">＋ Escolher imagem</button></div>':'');
+  }else if(_ag.aba==='testar'){
+    const bal=_ag.teste.map(x=>x.de==='paciente'?'<div class="ag-b pac">'+_auEsc(x.texto)+'</div>':x.tipo==='imagem'?'<div class="ag-b ag"><img src="'+_auEsc(x.link)+'" style="max-width:160px;border-radius:6px;display:block"><small>'+_auEsc(x.nome)+'</small></div>':x.tipo==='transferir'?'<div class="ag-b sis">↪ Passaria para a equipe: '+_auEsc(x.motivo||'')+'</div>':x.tipo==='erro'?'<div class="ag-b sis erro">'+_auEsc(x.texto)+'</div>':'<div class="ag-b ag">'+_auEsc(x.texto)+'</div>').join('');
+    corpo='<div class="ag-dica">Converse como se fosse o paciente. Nada é enviado no WhatsApp. Usa o que está na tela, mesmo antes de salvar.</div>'+
+      '<div class="ag-chat" id="ag-chat">'+(bal||'<div class="au-vazio" style="padding:18px">Escreva a primeira mensagem do paciente.</div>')+(_ag.testando?'<div class="ag-b ag" style="opacity:.6">digitando…</div>':'')+'</div>'+
+      '<div class="ag-nova"><input class="wa-var" id="ag-teste-txt" placeholder="Mensagem do paciente…" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();agTestar();}"'+(pode&&!_ag.testando?'':' disabled')+'><button class="wa-btn primario" onclick="agTestar()"'+(pode&&!_ag.testando?'':' disabled')+'>Enviar</button><button class="wa-btn" onclick="_ag.teste=[];agRender()">Recomeçar</button></div>'+
+      (pode?'':'<div class="ag-dica">Só a gestão testa o agente.</div>');
+  }else if(_ag.aba==='atividade'){
+    const rot={resposta:'Respondeu',transferencia:'Passou para a equipe',sugestao:'Sugestão',resumo:'Resumo',teste:'Teste',erro:'Erro'};
+    corpo=_ag.registros.length?'<table class="sq-tab" style="width:100%"><thead><tr><th>Quando</th><th>O quê</th><th>Detalhe</th><th>Tokens</th></tr></thead><tbody>'+
+      _ag.registros.map(r=>'<tr><td style="white-space:nowrap">'+new Date(r.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</td><td'+(r.tipo==='erro'?' style="color:#c0392b"':'')+'>'+(rot[r.tipo]||r.tipo)+'</td><td style="max-width:520px;white-space:pre-wrap;font-size:11.5px">'+_auEsc(String(r.detalhe||'').slice(0,300))+(r.conversa_id?' <button class="cl-link" onclick="agAbrirConversa(\''+r.conversa_id+'\')">abrir conversa</button>':'')+'</td><td style="font-size:11px;color:#9a8c7e">'+(r.tokens_entrada||r.tokens_saida?(r.tokens_entrada||0)+' / '+(r.tokens_saida||0):'')+'</td></tr>').join('')+'</tbody></table>'
+      :'<div class="au-vazio" style="padding:18px">Nada ainda.</div>';
+  }else if(_ag.aba==='versoes'){
+    corpo='<div class="ag-dica">Cada vez que as instruções ou a base mudam, a versão anterior fica guardada aqui. “Usar esta” coloca o texto de volta na tela (só vale depois de salvar).</div>'+
+      (_ag.versoes.length?_ag.versoes.map(v=>'<div class="ag-img"><div style="flex:1"><b>'+new Date(v.salva_em).toLocaleString('pt-BR')+'</b><div class="ag-dica">'+_auEsc(_waNomeEquipe(v.salva_por)||v.salva_por||'')+' · instruções '+String(v.instrucoes||'').length+' caracteres · base '+String(v.base_conhecimento||'').length+' caracteres</div></div><button class="wa-btn" onclick="agUsarVersao('+v.id+')">Usar esta</button></div>').join(''):'<div class="au-vazio" style="padding:18px">Nenhuma versão anterior ainda.</div>');
+  }
+  el.innerHTML=
+    '<div class="au-geral'+(E.habilitar_ia?' ligada':'')+'"><div><div style="font-weight:600;font-size:13px">🤖 '+_auEsc(E.nome||'Agente de IA')+(E.habilitar_ia&&E.modo_teste?' <span class="sq-teste">🧪 teste</span>':'')+'</div><div style="font-size:12px;margin-top:3px">'+chave+'</div></div>'+
+      (pode?'<div style="display:flex;gap:8px;align-items:center">'+(_agSujo()?'<span style="font-size:11.5px;color:#9a6a3a">Alterações não salvas</span><button class="wa-btn" onclick="_ag.ed=JSON.parse(JSON.stringify(_ag.a));agRender()">Descartar</button>':'')+'<button class="wa-btn primario" id="ag-salvar" onclick="agSalvar()"'+(_agSujo()?'':' disabled')+'>Salvar</button></div>':'<span style="font-size:11.5px">Só a gestão altera o agente.</span>')+
+    '</div>'+
+    '<div class="dp-card" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">'+
+      _agSw('habilitar_ia','Habilitar IA','O agente responde sozinho as conversas com o robô ligado.',pode)+
+      _agSw('assistente_virtual','Assistente Virtual','Na Central, sugere a próxima resposta para a equipe revisar antes de enviar.',pode)+
+      _agSw('resumos','Resumos','Na Central, “Resumir com IA” faz um resumo da conversa.',pode)+
+    '</div>'+
+    '<div class="dp-card" style="padding:0">'+
+      '<div class="ag-abas">'+abas.map(t=>'<button class="'+(_ag.aba===t[0]?'ativo':'')+'" onclick="_agSalvarRascunhoTela();_ag.aba=\''+t[0]+'\';agRender()">'+t[1]+'</button>').join('')+'</div>'+
+      '<div class="ag-corpo">'+corpo+'</div>'+
+    '</div>';
+  const ch=document.getElementById('ag-chat');if(ch)ch.scrollTop=ch.scrollHeight;
+}
+// atualiza só o botão Salvar enquanto digita (sem redesenhar e perder o cursor)
+function _agMarcar(){const b=document.getElementById('ag-salvar');if(b)b.disabled=!_agSujo();}
+function _agSalvarRascunhoTela(){}
+async function agSalvar(){
+  const E=_ag.ed;if(!E)return;
+  if(E.habilitar_ia&&!String(E.instrucoes||'').trim()){showToast('error','Escreva as instruções','Sem instruções o agente não sabe como atender.');return;}
+  if(E.habilitar_ia&&E.modo_teste&&!(E.telefones_teste||[]).length){showToast('error','Coloque um telefone de teste','No modo teste só esses telefones recebem resposta.');return;}
+  if(E.habilitar_ia&&!E.modo_teste&&!(_ag.a.habilitar_ia&&!_ag.a.modo_teste)&&!confirm('Ligar o Agente de IA para todos os contatos?\n\nConversas novas passam a ser respondidas pela IA. Se o robô do Cloudia ainda estiver ligado, o paciente recebe em dobro.'))return;
+  const campos=['nome','habilitar_ia','assistente_virtual','resumos','modelo','criatividade','personalidade','instrucoes','base_conhecimento','espera_segundos','max_blocos','ligar_em_novas','modo_teste','telefones_teste'];
+  const corpo={};campos.forEach(k=>corpo[k]=E[k]);
+  const b=document.getElementById('ag-salvar');if(b){b.disabled=true;b.textContent='Salvando…';}
+  try{
+    const r=await _waRest('agente_ia?id=eq.1',{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+    if(!r||!r.length)throw new Error('sem permissão para salvar');
+    _ag.a=r[0];_ag.ed=JSON.parse(JSON.stringify(r[0]));
+    _wa.agente=r[0];
+    showToast('success','Agente salvo',E.habilitar_ia?(E.modo_teste?'Ligado em modo teste.':'Ligado para todos.'):'');
+    agCarregar();
+  }catch(e){showToast('error','Não foi possível salvar',e.message);}
+  agRender();
+}
+async function agImagemEnviar(f){
+  const nome=(document.getElementById('ag-img-nome').value||'').trim(),quando=(document.getElementById('ag-img-quando').value||'').trim();
+  document.getElementById('ag-img-arq').value='';
+  if(!f)return;
+  if(!nome){showToast('error','Dê um nome para a imagem','');return;}
+  if(_ag.imagens.some(i=>i.nome.toLowerCase()===nome.toLowerCase())){showToast('error','Já existe uma imagem com esse nome','');return;}
+  if(!/^image\/(jpeg|png)$/.test(f.type)){showToast('error','Use JPG ou PNG','');return;}
+  if(f.size>5*1024*1024){showToast('error','Imagem maior que 5 MB','');return;}
+  try{
+    const caminho='agente/'+Date.now()+'-'+f.name.normalize('NFD').replace(/[^\w.-]+/g,'_');
+    const {error}=await _sb.storage.from('automacoes-midia').upload(caminho,f,{contentType:f.type,upsert:false});
+    if(error)throw error;
+    const link=SUPABASE_URL+'/storage/v1/object/public/automacoes-midia/'+caminho.split('/').map(encodeURIComponent).join('/');
+    await _waRest('agente_imagens',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({nome,quando_usar:quando,link,ordem:_ag.imagens.length})});
+    showToast('success','Imagem adicionada',nome);
+    agCarregar();
+  }catch(e){showToast('error','Não foi possível enviar a imagem',e.message||String(e));}
+}
+async function agImagemApagar(id){
+  const i=_ag.imagens.find(x=>x.id===id);if(!i)return;
+  if(!confirm('Tirar a imagem “'+i.nome+'” do agente?'))return;
+  try{await _waRest('agente_imagens?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}});agCarregar();}
+  catch(e){showToast('error','Não foi possível apagar',e.message);}
+}
+function agUsarVersao(id){
+  const v=_ag.versoes.find(x=>x.id===id);if(!v)return;
+  _ag.ed.instrucoes=v.instrucoes||'';_ag.ed.base_conhecimento=v.base_conhecimento||'';_ag.aba='instrucoes';
+  showToast('success','Versão colocada na tela','Confira e clique em Salvar para valer.');agRender();
+}
+async function agTestar(){
+  const inp=document.getElementById('ag-teste-txt');const t=(inp&&inp.value||'').trim();if(!t||_ag.testando)return;
+  _ag.teste.push({de:'paciente',texto:t});_ag.testando=true;agRender();
+  const historico=[];
+  _ag.teste.forEach(x=>{if(x.de==='paciente')historico.push({de:'paciente',texto:x.texto});else if(x.tipo==='texto')historico.push({de:'agente',texto:x.texto});else if(x.tipo==='imagem')historico.push({de:'agente',texto:'[imagem enviada: '+x.nome+']'});});
+  const E=_ag.ed;
+  try{
+    const r=await _agAcao({acao:'testar',historico,rascunho:{nome:E.nome,modelo:E.modelo,criatividade:E.criatividade,personalidade:E.personalidade,instrucoes:E.instrucoes,base_conhecimento:E.base_conhecimento,max_blocos:E.max_blocos}});
+    (r.acoes||[]).forEach(x=>_ag.teste.push(Object.assign({de:'agente'},x)));
+    if(!(r.acoes||[]).length)_ag.teste.push({de:'agente',tipo:'erro',texto:'(o agente não respondeu nada)'});
+  }catch(e){_ag.teste.push({de:'agente',tipo:'erro',texto:e.message});}
+  _ag.testando=false;agRender();
+  const i2=document.getElementById('ag-teste-txt');if(i2)i2.focus();
+}
+function agAbrirConversa(id){
+  switchPage('conversas',[...document.querySelectorAll('.nav-item')].find(n=>(n.getAttribute('onclick')||'').includes("'conversas'")));
+  setTimeout(()=>{try{waAbrir(id);}catch(e){}},600);
+}
+
+// ---------- Central: robô, sugestão e resumo ----------
+async function waCarregarAgente(){
+  try{const r=await _waRest('agente_ia?id=eq.1&select=habilitar_ia,assistente_virtual,resumos,nome');_wa.agente=(r||[])[0]||null;}
+  catch(e){_wa.agente=null;}
+  if(currentPage==='conversas'&&_wa.atual){waRenderChatBaseBarra();waRenderPainel();}
+}
+function waRenderChatBaseBarra(){const b=document.getElementById('wa-btn-sugerir');if(b)b.style.display=_wa.agente&&_wa.agente.assistente_virtual?'':'none';}
+async function waRoboAlternar(){
+  const c=_wa.atual;if(!c)return;
+  const novo=!c.robo_ligado;
+  if(novo&&!(_wa.agente&&_wa.agente.habilitar_ia)&&!confirm('O Agente de IA está desligado na tela Agente de IA.\n\nLigar o robô desta conversa mesmo assim? Ele só começa a responder quando o agente for habilitado.'))return;
+  try{
+    await _waRest('conversas?id=eq.'+c.id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({robo_ligado:novo})});
+    c.robo_ligado=novo;waRenderCabecalho();waRenderLista();
+    showToast('success',novo?'Robô ligado nesta conversa':'Robô desligado nesta conversa',novo?'O agente responde as próximas mensagens do paciente.':'A equipe atende esta conversa.');
+  }catch(e){showToast('error','Não foi possível mudar o robô',e.message);}
+}
+async function waSugerirResposta(){
+  const c=_wa.atual;if(!c)return;
+  const b=document.getElementById('wa-btn-sugerir');if(b){b.disabled=true;b.style.opacity=.5;}
+  showToast('success','Pensando na sugestão…','');
+  try{
+    const r=await _agAcao({acao:'sugerir',conversa_id:c.id});
+    const t=document.getElementById('wa-texto');
+    if(t&&_wa.atual&&_wa.atual.id===c.id){t.value=r.texto||'';waAjustarTexto(t);waContar(t);t.focus();}
+    showToast('success','Sugestão pronta','Revise antes de enviar.');
+  }catch(e){showToast('error','Não foi possível sugerir',e.message);}
+  if(b){b.disabled=false;b.style.opacity='';}
+}
+async function waResumirIA(){
+  const c=_wa.atual;if(!c)return;
+  c._resumindo=true;_wa.painelAba='geral';
+  if(!_waPainelAberto())waAlternarPainel(true);else waRenderPainel();
+  try{const r=await _agAcao({acao:'resumir',conversa_id:c.id});c.resumo_ia=r.texto;c.resumo_ia_em=r.em;}
+  catch(e){showToast('error','Não foi possível resumir',e.message);}
+  c._resumindo=false;if(_wa.atual&&_wa.atual.id===c.id)waRenderPainel();
+}
+function _waBlocoResumo(c){
+  const on=_wa.agente&&_wa.agente.resumos;
+  if(!on&&!c.resumo_ia)return '';
+  return '<div class="cl-bloco"><div class="cl-bloco-tit"><span style="display:flex;gap:6px;align-items:center">'+_clIc('bot')+' Resumo da IA</span>'+(on?'<button class="cl-link" style="font-size:11px" onclick="waResumirIA()"'+(c._resumindo?' disabled':'')+'>'+(c._resumindo?'Resumindo…':c.resumo_ia?'Atualizar':'Resumir com IA')+'</button>':'')+'</div>'+
+    (c.resumo_ia?'<div style="font-size:12px;color:#3a322b;white-space:pre-wrap;line-height:1.45">'+_waEsc(c.resumo_ia)+'</div><div style="font-size:10px;color:#9a8c7e;margin-top:4px">'+(c.resumo_ia_em?new Date(c.resumo_ia_em).toLocaleString('pt-BR'):'')+'</div>':'<div style="font-size:11.5px;color:#b5a898">'+(c._resumindo?'Lendo a conversa…':'Ainda sem resumo.')+'</div>')+
+  '</div>';
+}
+
 // =====================================================================
 // AUTOMAÇÕES — construtor de sequências (gatilho → passos), motor no Supabase
 // =====================================================================
@@ -14541,6 +14790,7 @@ function waRenderChatBase(){
         '<button class="cl-ib" id="wa-btn-anexo" title="Enviar foto, vídeo, áudio ou documento" onclick="document.getElementById(\'wa-arquivo\').click()">'+_clIc('clip')+'</button>'+
         '<button class="cl-ib" title="Gerenciar respostas rápidas" onclick="waGerenciarRapidas()">'+_clIc('msgs')+'</button>'+
         '<button class="cl-ib" title="Agendar mensagem" onclick="waAgendarAbrir()">'+_clIc('clock')+'</button>'+
+        '<button class="cl-ib" id="wa-btn-sugerir" title="Sugerir resposta (Assistente Virtual)" onclick="waSugerirResposta()" style="'+(_wa.agente&&_wa.agente.assistente_virtual?'':'display:none')+'">'+_clIc('bot')+'</button>'+
         '<div class="dir"><button class="cl-chip-seq" title="Sequências ativas" onclick="waSeqAbrir()">'+_clIc('play')+'<b id="wa-seq-n">0</b> | SEQUÊNCIAS ATIVAS '+_clIc('up')+'</button>'+
         '<button class="cl-chip-seq" title="Mensagens agendadas" onclick="waAgAbrir()">'+_clIc('clock')+'<b id="wa-ag-n">0</b> | MENSAGENS AGENDADAS '+_clIc('up')+'</button></div>'+
       '</div>'+
@@ -14571,7 +14821,7 @@ function waRenderCabecalho(){
     '<div class="wa-cab-acoes">'+
       '<button class="cl-ib sem-borda" title="'+(concluida?'Reabrir conversa':'Concluir atendimento')+'" onclick="waMudarStatus(\''+(concluida?'aberta':'encerrada')+'\')">'+_clIc(concluida?'sort':'check')+'</button>'+
       '<button class="cl-ib sem-borda" title="Atribuir a…" onclick="waMenuAtribuir(event)">'+_clIc('users')+'</button>'+
-      '<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="Robô de atendimento (IA): chega na etapa da IA"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>'+
+      '<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="'+(c.robo_ligado?'Robô (Agente de IA) ligado nesta conversa: clique para desligar':'Robô (Agente de IA) desligado nesta conversa: clique para ligar')+'" onclick="waRoboAlternar()"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>'+
       '<button class="cl-primario" title="Estado da conversa" onclick="waMenuEstado(event)">'+_clIc('chat')+_clIc('down')+'</button>'+
       '<button class="cl-ib sem-borda" title="Mais opções" onclick="waMenuMais(event)">'+_clIc('more')+'</button>'+
     '</div>';
@@ -14604,7 +14854,9 @@ function waMenuMais(ev){
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
     '<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
     '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
-    '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>';
+    '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
+    (_wa.agente&&_wa.agente.resumos?'<button onclick="_clFecharPop();waResumirIA()">'+_clIc('bot')+' Resumir com IA</button>':'')+
+    (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':'');
   _clPosicionar(m,ev.currentTarget,true);
 }
 function waRenderJanela(){
@@ -14768,6 +15020,7 @@ function waRenderPainel(){
       '</div>'+
       '<div class="cl-linha-num"><span class="q"></span><b>'+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</b><span style="color:#8f7a5d">'+_waEsc((_wa.numeros.find(n=>n.phone_number_id===c.numero_clinica_id)||{}).numero_exibicao||'')+'</span></div>'+
       '<button class="cl-link" style="align-self:center;display:flex;gap:5px;align-items:center;color:#5a4e44" onclick="waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
+      _waBlocoResumo(c)+
       '<div class="cl-campo">'+_clIc('pessoa')+'<span>Atribuído a:</span><select onchange="waAtribuir(this.value||null)">'+atendOpts+'</select></div>'+
       (L.existe
         ?'<div class="cl-campo">'+_clIc('mega')+'<span>Origem:</span><select onchange="waMudarOrigem(this.value)">'+opt('','Selecione…',L.origem)+origens.map(o=>opt(o,o,L.origem)).join('')+'</select></div>'+

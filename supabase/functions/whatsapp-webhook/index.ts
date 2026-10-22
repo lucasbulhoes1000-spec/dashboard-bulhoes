@@ -6,7 +6,8 @@
 // • POST: confere a assinatura da Meta (X-Hub-Signature-256 com o segredo do
 //   app), guarda o aviso bruto, entrega ao banco (wa_processar) e responde 200.
 //   Fotos, áudios e documentos são baixados em segundo plano para a pasta
-//   privada "whatsapp-midia".
+//   privada "whatsapp-midia". Se a mensagem entrou na fila do Agente de IA,
+//   chama a função whatsapp-agente em seguida.
 //
 // Segredos (Supabase → Edge Functions → Secrets):
 //   WA_TOKEN         chave permanente do usuário do sistema (crmmaluco)
@@ -115,6 +116,22 @@ function emSegundoPlano(p: Promise<unknown>) {
   else p.catch(() => {});
 }
 
+export async function chamarAgente(): Promise<void> {
+  try {
+    const fila = await (await banco("/rest/v1/agente_fila?select=conversa_id&status=eq.pendente&limit=1")).json();
+    if (!Array.isArray(fila) || !fila.length) return;
+    const k = await (await banco("/rest/v1/automacao_segredo?id=eq.1&select=chave")).json();
+    if (!k?.[0]?.chave) return;
+    await fetch(SUPABASE_URL + "/functions/v1/whatsapp-agente", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-motor-chave": k[0].chave },
+      body: JSON.stringify({ acao: "fila" }),
+    });
+  } catch (e) {
+    console.error("[whatsapp-webhook] agente", String(e));
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
 
@@ -150,6 +167,8 @@ export async function handler(req: Request): Promise<Response> {
   const resultado = await r.json();
   const midias: Midia[] = Array.isArray(resultado?.midias) ? resultado.midias : [];
   if (midias.length) emSegundoPlano(Promise.allSettled(midias.map(baixarMidia)));
+  // Agente de IA: se a mensagem entrou na fila dele, chama na hora (o agendador é só reserva)
+  if (corpoTexto.includes('"messages"')) emSegundoPlano(chamarAgente());
 
   return new Response("ok", { status: 200 });
 }
