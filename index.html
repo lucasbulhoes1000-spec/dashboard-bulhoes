@@ -6,7 +6,7 @@
 <!-- VERSÃO FINAL DEFINITIVA — performance conservadora — 26/08/2026 -->
 <title>Backoffice — Bulhões Odontologia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fahkwang:wght@500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
@@ -788,7 +788,7 @@ body{
     radial-gradient(900px 500px at -10% 110%,rgba(212,175,90,.07),transparent 60%),
     var(--bg) !important;
   background-attachment:fixed !important;
-  font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+  font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
   color:var(--txt) !important;
   font-feature-settings:"tnum" 1;
   -webkit-font-smoothing:antialiased;
@@ -888,6 +888,24 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
 .funnel-tri-shape{color:#1B1405 !important;box-shadow:0 0 18px rgba(231,195,109,.22);}
 .funnel-tri-pct{color:var(--muted) !important;}
 .fb2{color:#1B1405 !important;font-weight:700;}
+
+/* tipografia e ícones (23/10/2026) */
+body,button,input,select,textarea{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;}
+body{letter-spacing:-.1px;}
+.page-title,.pg-title,h1,h2{font-family:'Plus Jakarta Sans',sans-serif !important;letter-spacing:-.4px;}
+.mv,.mc-ind-value{letter-spacing:-.6px !important;}
+.nav-icon{display:flex;align-items:center;justify-content:center;width:20px;height:20px;}
+.nav-icon svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.nav-item{gap:12px !important;}
+.nav-item.active .nav-icon svg{stroke:var(--gold-strong);filter:drop-shadow(0 0 6px rgba(240,203,114,.35));}
+.nav-section{letter-spacing:.4px !important;font-weight:600;}
+.inicio-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;background:rgba(212,175,90,.10);border:1px solid rgba(212,175,90,.32);color:var(--gold-strong);}
+.inicio-ico.grande{width:56px;height:56px;border-radius:16px;margin-bottom:0;flex-shrink:0;}
+.inicio-ico svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.inicio-ico.grande svg{width:27px;height:27px;}
+
+.btn-top{display:inline-flex !important;align-items:center;gap:6px;font-weight:600;}
+.btn-top .ic{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 </style>
 </head>
 <body>
@@ -903,72 +921,71 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
   <div class="sidebar-nav">
     <div class="nav-section">Principal</div>
     <div class="nav-item active" onclick="switchPage('inicio',this)">
-      <span class="nav-icon">🏠</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg></span>
       <span class="nav-label">Início</span>
     </div>
     <div class="nav-item" onclick="switchPage('dashboard',this)">
-      <span class="nav-icon">📊</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
       <span class="nav-label">Dashboard</span>
     </div>
     <div class="nav-item" onclick="switchPage('trafego-pago',this);abrirTrafegoPago();">
-      <span class="nav-icon">📈</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>
       <span class="nav-label">Tráfego Pago</span>
     </div>
     <div class="nav-section">CRM</div>
     <div class="nav-item" onclick="switchPage('leads',this)">
-      <span class="nav-icon">👤</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M19 8v6M16 11h6"/></svg></span>
       <span class="nav-label">Leads</span>
     </div>
     <div class="nav-item" onclick="switchPage('clientes',this)">
-      <span class="nav-icon">👥</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 8"/><path d="M18 14.5c2.4.8 4 3.2 4 6.5"/></svg></span>
       <span class="nav-label">Clientes</span>
     </div>
     <div class="nav-item" onclick="switchPage('fluxo',this);initFluxoTratamento();">
-      <span class="nav-icon">🔄</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M6.5 10v3a2 2 0 0 0 2 2H14"/></svg></span>
       <span class="nav-label">Fluxo</span>
     </div>
     <div class="nav-item" onclick="switchPage('pacientes',this)">
-      <span class="nav-icon">🦷</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3C4.5 3 3 5 3 7.5c0 3 1.5 4.5 2 7.5.4 2.6 1 6 2.6 6 1.5 0 1.6-3 2.2-5 .3-1 .7-1.5 2.2-1.5s1.9.5 2.2 1.5c.6 2 .7 5 2.2 5 1.6 0 2.2-3.4 2.6-6 .5-3 2-4.5 2-7.5C21 5 19.5 3 17 3c-2 0-3 1-5 1S9 3 7 3z"/></svg></span>
       <span class="nav-label">Pacientes</span>
     </div>
     <div class="nav-item" onclick="switchPage('conversas',this)">
-      <span class="nav-icon">💬</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/></svg></span>
       <span class="nav-label">Conversas</span>
       <span class="wa-nav-badge" id="wa-nav-badge" style="display:none"></span>
     </div>
     <div class="nav-item" onclick="switchPage('automacoes',this)">
-      <span class="nav-icon">⚡</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
       <span class="nav-label">Automações</span>
     </div>
     <div class="nav-item" onclick="switchPage('agente',this)">
-      <span class="nav-icon">🤖</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3" r="1"/><path d="M9 13v1.5M15 13v1.5"/><path d="M2 13v3M22 13v3"/></svg></span>
       <span class="nav-label">Agente de IA</span>
     </div>
     <div class="nav-item" onclick="switchPage('disparos',this)">
-      <span class="nav-icon">📣</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg></span>
       <span class="nav-label">Mensagens em Massa</span>
     </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
-      <span class="nav-icon">⚙️</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg></span>
       <span class="nav-label">Gerenciar</span>
     </div>
-    <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('comissoes',this)">
-      <span class="nav-icon">💵</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
       <span class="nav-label">Comissões</span>
     </div>
     <div class="nav-item" onclick="switchPage('calendario',this);initCalendarioSazonal();">
-      <span class="nav-icon">📅</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span>
       <span class="nav-label">Calendário Sazonal</span>
     </div>
     <div class="nav-section">Relatórios</div>
     <div class="nav-item" onclick="switchPage('rel-origem',this)">
-      <span class="nav-icon">📈</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
       <span class="nav-label">Métricas de Origem</span>
     </div>
     <div class="nav-item" onclick="switchPage('rel-orcamentos',this)">
-      <span class="nav-icon">💰</span>
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></span>
       <span class="nav-label">Orçamentos Fechados</span>
     </div>
   </div>
@@ -981,10 +998,10 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
     <span class="topbar-title" id="topbar-title">Início</span>
     <div class="topbar-right">
       <span class="last-update" id="last-update"></span>
-      <button class="btn-top" onclick="pedirPermissaoNotificacao()" title="Ativar notificações de novo lead do Formulário Facebook">🔔</button>
-      <button class="btn-top" onclick="reloadCurrent()">↻ Atualizar</button>
-      <button class="btn-top" onclick="trocarMinhaSenha()" style="background:#12213F;color:#C3CBDB;margin-left:4px;" title="Trocar minha senha">🔑 Senha</button>
-      <button class="btn-top" onclick="fazerLogout()" style="background:#12213F;color:#C3CBDB;margin-left:4px;" title="Sair">⎋ Sair</button>
+      <button class="btn-top" onclick="pedirPermissaoNotificacao()" title="Ativar notificações de novo lead do Formulário Facebook" aria-label="Notificações"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <button class="btn-top" onclick="reloadCurrent()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg>Atualizar</button>
+      <button class="btn-top" onclick="trocarMinhaSenha()" title="Trocar minha senha"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></svg>Senha</button>
+      <button class="btn-top" onclick="fazerLogout()" title="Sair"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>Sair</button>
     </div>
   </div>
 
@@ -1003,7 +1020,7 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#66738F;margin-bottom:12px;padding-left:2px;">Principal</div>
         <div style="display:grid;grid-template-columns:1fr;gap:14px;">
           <div onclick="irParaPagina('dashboard')" class="inicio-card" style="background:linear-gradient(135deg,#1A2C50,#1A2C50);border-radius:16px;padding:26px 28px;cursor:pointer;display:flex;align-items:center;gap:20px;box-shadow:0 2px 10px rgba(42,37,32,.18);">
-            <div style="font-size:36px;flex-shrink:0;">📊</div>
+            <div class="inicio-ico grande"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
             <div style="flex:1;">
               <div style="font-weight:700;color:#FFFFFF;font-size:16px;margin-bottom:3px;">Dashboard</div>
               <div style="font-size:12.5px;color:#A88C4E;">Métricas de tráfego, funil de vendas, anúncios e Social Selling</div>
@@ -1017,22 +1034,22 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#66738F;margin-bottom:12px;padding-left:2px;">CRM</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
           <div onclick="irParaPagina('leads')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">👤</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M19 8v6M16 11h6"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Leads</div>
             <div style="font-size:12px;color:#C3CBDB;">Funil, filtros e criação manual</div>
           </div>
           <div onclick="irParaPagina('clientes')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">👥</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 8"/><path d="M18 14.5c2.4.8 4 3.2 4 6.5"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Clientes</div>
             <div style="font-size:12px;color:#C3CBDB;">CRM, orçamentos e histórico</div>
           </div>
           <div onclick="irParaPagina('fluxo')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">🔄</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M6.5 10v3a2 2 0 0 0 2 2H14"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Fluxo</div>
             <div style="font-size:12px;color:#C3CBDB;">Tratamentos e planejamento clínico</div>
           </div>
           <div onclick="irParaPagina('pacientes')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">🦷</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3C4.5 3 3 5 3 7.5c0 3 1.5 4.5 2 7.5.4 2.6 1 6 2.6 6 1.5 0 1.6-3 2.2-5 .3-1 .7-1.5 2.2-1.5s1.9.5 2.2 1.5c.6 2 .7 5 2.2 5 1.6 0 2.2-3.4 2.6-6 .5-3 2-4.5 2-7.5C21 5 19.5 3 17 3c-2 0-3 1-5 1S9 3 7 3z"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Pacientes</div>
             <div style="font-size:12px;color:#C3CBDB;">Manutenção e controle por categoria</div>
           </div>
@@ -1043,17 +1060,17 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#66738F;margin-bottom:12px;padding-left:2px;">Gestão</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
           <div onclick="irParaPagina('gerenciar')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">⚙️</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Gerenciar</div>
             <div style="font-size:12px;color:#C3CBDB;">Fases, tratamentos, avaliadores e origens</div>
           </div>
           <div onclick="irParaPagina('comissoes')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">💵</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Comissões</div>
             <div style="font-size:12px;color:#C3CBDB;">Relatório por vendedor</div>
           </div>
           <div onclick="irParaPagina('calendario')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">📅</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Calendário Sazonal</div>
             <div style="font-size:12px;color:#C3CBDB;">Campanhas do ano em Kanban</div>
           </div>
@@ -1064,12 +1081,12 @@ input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#66738F;margin-bottom:12px;padding-left:2px;">Relatórios</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
           <div onclick="irParaPagina('rel-origem')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">📈</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.2 15.9A10 10 0 1 1 8 2.8"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Métricas de Origem</div>
             <div style="font-size:12px;color:#C3CBDB;">Desempenho por canal de aquisição</div>
           </div>
           <div onclick="irParaPagina('rel-orcamentos')" class="inicio-card" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:20px;cursor:pointer;">
-            <div style="font-size:26px;margin-bottom:10px;">💰</div>
+            <div class="inicio-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></div>
             <div style="font-weight:700;color:#EEF1F7;font-size:14px;margin-bottom:3px;">Orçamentos Fechados</div>
             <div style="font-size:12px;color:#C3CBDB;">Ticket médio e aprovados por período</div>
           </div>
@@ -2869,8 +2886,8 @@ function switchDashTab(tab,el){
 // funciona em Leads, Clientes, Pacientes e Dashboard.
 async function reloadCurrent(){
   const btn=document.querySelector('.btn-top[onclick="reloadCurrent()"]');
-  const textoOriginal=btn?btn.textContent:null;
-  if(btn){btn.disabled=true;btn.textContent='⏳ Atualizando...';}
+  const textoOriginal=btn?btn.innerHTML:null;
+  if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
     if(currentPage==='dashboard'){
       if(currentDashTab==='trafego')await loadTrafego();
@@ -2898,7 +2915,7 @@ async function reloadCurrent(){
     console.warn('[ATUALIZAR] Erro ao atualizar:',e);
     showToast('error','Erro ao atualizar',e.message);
   }finally{
-    if(btn){btn.disabled=false;btn.textContent=textoOriginal;}
+    if(btn){btn.disabled=false;btn.innerHTML=textoOriginal;}
   }
 }
 
