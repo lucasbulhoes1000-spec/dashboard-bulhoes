@@ -582,14 +582,14 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
 
 // ---------- respostas aos lembretes (confirmar / cancelar) ----------
 async function confirmarNoClinicorp(id: string): Promise<void> {
-  // POST /appointment/confirm_appointment (API do Clinicorp)
+  // POST /appointment/confirm_appointment { subscriber_id, id } (API do Clinicorp)
   const sub = CLINICORP_SUBSCRIBER_ID || CLINICORP_USUARIO;
   const u = new URL("https://api.clinicorp.com/rest/v1/appointment/confirm_appointment");
   u.searchParams.set("subscriber_id", sub);
   const r = await fetch(u, {
     method: "POST",
     headers: { Authorization: "Basic " + btoa(CLINICORP_USUARIO + ":" + CLINICORP_TOKEN), Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ subscriber_id: sub, id: Number(id), appointment_id: Number(id) }),
+    body: JSON.stringify({ subscriber_id: sub, id: Number(id) }),
   });
   if (!r.ok) throw new Error(`Clinicorp ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
