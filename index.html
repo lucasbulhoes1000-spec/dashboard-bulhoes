@@ -874,6 +874,10 @@ tbody tr:hover td,.modal-table tr:hover td{background:rgba(212,175,90,.05) !impo
 .funil-linha{grid-template-columns:minmax(150px,230px) 1fr 64px !important;}
 .sidebar-logo img{height:34px !important;}
 button:disabled{opacity:.45;cursor:default;}
+
+tr.linha-sem-desempenho td{background:rgba(224,103,90,.05) !important;}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--txt);-webkit-box-shadow:0 0 0 1000px var(--surf2) inset;caret-color:var(--txt);transition:background-color 9999s;}
+input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.8) sepia(.6) saturate(2) hue-rotate(5deg);}
 </style>
 </head>
 <body>
@@ -5812,7 +5816,7 @@ function filterAdTable(){
   // CPL: verde = bom (<= mediana), vermelho = ruim (> 1,5x mediana)
   const cpls=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&d.leads>0&&d.spend>0).map(([,d])=>d.spend/d.leads).sort((a,b)=>a-b);
   const medCpl=cpls.length?cpls[Math.floor(cpls.length/2)]:0;
-  const cplBg=(c)=>!c||!medCpl?'':(c<=medCpl?'background:#3B602E;':(c>medCpl*1.5?'background:#371915;':''));
+  const cplBg=(c)=>!c||!medCpl?'':(c<=medCpl?'background:rgba(95,196,138,.16);color:#9BE3B5;':(c>medCpl*1.5?'background:rgba(224,103,90,.16);color:#F2A79C;':''));
   const pctF=v=>v.toFixed(2).replace('.',',')+'%';
 
   const totalRow=`<tr style="font-weight:700;background:#12213F;border-top:2px solid #2A3D66;">
@@ -5839,7 +5843,7 @@ function filterAdTable(){
     const adConv=d.leads>0?d.fechou/d.leads*100:0;
     const lbl=(d.label||name);
     const semDesemp=name!=='__sem_rastreio__'&&d.spend>0&&!(d.fechou>0)&&!(d.vendas>0);
-    return`<tr${semDesemp?' style="background:#371C15;"':''}>
+    return`<tr${semDesemp?' class="linha-sem-desempenho"':''}>
       <td><span class="pill" title="${lbl.replace(/"/g,'&quot;')}">${lbl.substring(0,28)}${lbl.length>28?'...':''}</span></td>
       <td class="tm" title="${(d.adset||'').replace(/"/g,'&quot;')}">${(d.adset||'').substring(0,22)}</td>
       <td class="tm" title="${(d.campaign||'').replace(/"/g,'&quot;')}">${(d.campaign||'').substring(0,22)}</td>
