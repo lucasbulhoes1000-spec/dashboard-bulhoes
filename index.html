@@ -1154,8 +1154,8 @@ select.dp-in{max-width:420px;}
     <div id="tp-filtros" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;background:#fff;border:1px solid #e8dfd2;border-radius:10px;padding:12px 14px;">
       <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">Data inicial</div><input type="date" id="tp-from" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;"></div>
       <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">Data final</div><input type="date" id="tp-to" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;"></div>
-      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Anúncio</div><input type="text" id="tp-ad" oninput="filterAdTable()" placeholder="ID ou nome do anúncio" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
-      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Campanha</div><input type="text" id="tp-camp" oninput="filterAdTable()" placeholder="Nome da campanha" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Anúncio</div><input type="search" id="tp-ad" name="busca-anuncio" autocomplete="off" oninput="filterAdTable()" placeholder="ID ou nome do anúncio" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
+      <div><div style="font-size:10px;color:#9a8c7e;margin-bottom:3px;">ID-Campanha</div><input type="search" id="tp-camp" name="busca-campanha" autocomplete="off" oninput="filterAdTable()" placeholder="Nome da campanha" style="border:1px solid #d4c9bc;border-radius:8px;padding:6px 10px;font-size:12px;color:#5a4e44;background:#fff;min-width:200px;"></div>
       <button class="fb" style="margin-left:auto;background:#5a7a9a;color:#fff;border-color:#5a7a9a;" onclick="exportarFunilParaIA()" title="Baixa 2 planilhas CSV (resumo por anúncio + pessoas anonimizadas) para enviar a outra IA">⬇ Exportar p/ IA</button>
     </div>
     <div id="trafego-pago-host"></div>
@@ -4027,6 +4027,30 @@ function _metaFinalRowGet(r,...keys){
   for(const k of keys){ if(r && r[k]!==undefined && r[k]!==null) return r[k]; }
   return '';
 }
+// ⚠️ CORRIGIDO (23/10/2026): o "FECHOU NO PERÍODO?" da fonte final marca SIM
+// também para RECOMPRA (manutenção, ajuste) de paciente antigo que um dia veio
+// de anúncio. Isso inflava Contratos, derrubava o ticket e o CAC e misturava
+// recompra no ROAS de "novos pacientes". Agora o funil por anúncio conta só
+// vendas "Novo"; as recompras ficam à parte (linha de auditoria).
+function _vendasFinal(r){
+  const det=String(_metaFinalRowGet(r,'DETALHES VENDAS','detalhes vendas')||'');
+  const re=/\d{4}-\d{2}-\d{2}\s*\|\s*(Novo|Recompra)\s*\|\s*R\$\s*([\d.,]+)/gi;
+  let m,novo=0,recompra=0,qNovo=0,qRec=0;
+  while((m=re.exec(det))){
+    let t=m[2];
+    if(t.includes(',')) t=t.replace(/\./g,'').replace(',','.');
+    const v=Number(t)||0;
+    if(/^novo$/i.test(m[1])){novo+=v;qNovo++;}else{recompra+=v;qRec++;}
+  }
+  if(!qNovo&&!qRec){
+    // sem detalhe: mantém como estava (conta como venda nova)
+    return {novo:_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas')),recompra:0,ehNovo:true,ehRecompra:false};
+  }
+  return {novo,recompra,ehNovo:qNovo>0,ehRecompra:qRec>0};
+}
+function _fechouNovoFinal(r){
+  return _metaFinalSim(_metaFinalRowGet(r,'FECHOU NO PERÍODO?','FECHOU NO PERIODO?'))&&_vendasFinal(r).ehNovo;
+}
 
 function aplicarFunilMetaFinal(metaAds, pacote){
   const base=Array.isArray(pacote&&pacote.base)?pacote.base:[];
@@ -4132,13 +4156,20 @@ function aplicarFunilMetaFinal(metaAds, pacote){
       if(ph)d.compPhones.add(ph);
     }
     if(_metaFinalSim(_metaFinalRowGet(r,'FECHOU NO PERÍODO?','FECHOU NO PERIODO?'))){
-      d.fechou++;
-      if(ph)d.fechouPhones.add(ph);
+      const vf=_vendasFinal(r);
+      if(vf.ehNovo){
+        d.fechou++;
+        if(ph)d.fechouPhones.add(ph);
+        d.vendas+=vf.novo;
+      }
+      if(vf.ehRecompra){
+        d.recompras=(d.recompras||0)+1;
+        d.vendasRecompra=(d.vendasRecompra||0)+vf.recompra;
+      }
     }
 
     d.contratos+=_metaFinalNum(_metaFinalRowGet(r,'QTD CONTRATOS','qtd contratos'));
     d.lancamentos+=_metaFinalNum(_metaFinalRowGet(r,'QTD LANÇAMENTOS','QTD LANCAMENTOS','qtd lancamentos'));
-    d.vendas+=_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'));
   });
 
 
@@ -4209,7 +4240,9 @@ function aplicarFunilMetaFinal(metaAds, pacote){
     leadsSemRastreio:sem.leads||0,
     fechamentosSemRastreio:sem.fechou||0,
     vendasSemRastreio:sem.vendas||0,
-    totalVendas:totalVendas
+    totalVendas:totalVendas,
+    recompras:Object.values(adMap).reduce((s,d)=>s+(d.recompras||0),0),
+    vendasRecompra:Object.values(adMap).reduce((s,d)=>s+(d.vendasRecompra||0),0)
   };
 
   filterAdTable();
@@ -5619,6 +5652,8 @@ function filterAdTable(){
   let adRows=Object.entries(adMap).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0)||(b[1].spend||0)-(a[1].spend||0));
   if(campFilt)adRows=adRows.filter(([,d])=>d.campaign===campFilt);
   if(adsetFilt)adRows=adRows.filter(([,d])=>d.adset===adsetFilt);
+  // o Chrome às vezes preenche esses campos com o e-mail do login e a tabela some
+  ['tp-ad','tp-camp'].forEach(id=>{const e=document.getElementById(id);if(e&&e.value.includes('@'))e.value='';});
   const _qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
   const _qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
   if(_qAd)adRows=adRows.filter(([k,d])=>String(k).toLowerCase().includes(_qAd)||String(d.label||'').toLowerCase().includes(_qAd));
@@ -5638,7 +5673,8 @@ function filterAdTable(){
     auditEl.innerHTML=`Rastreamento de anúncios: <b>${pctCov}%</b> dos leads pagos identificados`
       +(aud.leadsSemRastreio?` · ${aud.leadsSemRastreio} lead(s) sem anúncio`:'')
       +(aud.fechamentosSemRastreio?` · ${aud.fechamentosSemRastreio} fechamento(s) sem anúncio`:'')
-      +(aud.vendasSemRastreio?` · ${fmt(aud.vendasSemRastreio)} em vendas sem anúncio`:'');
+      +(aud.vendasSemRastreio?` · ${fmt(aud.vendasSemRastreio)} em vendas sem anúncio`:'')
+      +(aud.recompras?`<br>Fora dos contratos e do ROAS: ${aud.recompras} recompra(s) de pacientes antigos que vieram de anúncio (${fmt(aud.vendasRecompra||0)}, manutenção, ajuste etc.)`:'');
   }
   const totCpl=totLeads>0?totSpend/totLeads:0;
   const totCpa=totAgend>0?totSpend/totAgend:0;
@@ -5652,6 +5688,8 @@ function filterAdTable(){
   // Cards de topo
   const _setTxt=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   _setTxt('ad-kpi-leads',totLeads?fmtN(totLeads):'—');
+  _setTxt('t-leads-sub',totLeads?'leads de anúncios no período':'sem leads de anúncio');
+  _setTxt('t-cpl',totLeads>0&&totSpend>0?fmt(totCpl):'—');
   _setTxt('ad-kpi-cac',totFechou>0?fmt(totCpc):'—');
   const semPerf=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&(d.spend||0)>0&&(d.leads||0)>0&&!(d.fechou>0)&&!(d.vendas>0));
   const gastoSemPerf=semPerf.reduce((s,[,d])=>s+(d.spend||0),0);
@@ -7369,21 +7407,21 @@ function lupaAdComp(adKey){
     ['Nome','Telefone','Origem','Campanha','Conjunto'],rows.map(_linhaPessoaFinal));
 }
 function lupaAdFechou(adKey){
-  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?');
+  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?').filter(r=>_vendasFinal(r).ehNovo);
   openModal('Fechamentos — '+_labelAdFinal(adKey).substring(0,35)+' — '+rows.length+' registros',
     ['Nome','Telefone','Origem','Valor vendas','Detalhes'],rows.map(r=>[
       String(_metaFinalRowGet(r,'NOME','nome')||'—'),
       String(_metaFinalRowGet(r,'TELEFONE','telefone')||'—'),
       String(_metaFinalRowGet(r,'ORIGEM','origem')||'—'),
-      fmt(_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'))),
+      fmt(_vendasFinal(r).novo),
       String(_metaFinalRowGet(r,'DETALHES VENDAS','detalhes vendas')||'—')
     ]));
 }
 function lupaAdVendas(adKey){
-  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?').filter(r=>_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas'))>0);
+  const rows=_linhasFunilMetaFinal(adKey,'FECHOU NO PERÍODO?').filter(r=>_vendasFinal(r).novo>0);
   let total=0;
   const out=rows.map(r=>{
-    const v=_metaFinalNum(_metaFinalRowGet(r,'VALOR VENDAS','valor vendas')); total+=v;
+    const v=_vendasFinal(r).novo; total+=v;
     return [
       String(_metaFinalRowGet(r,'NOME','nome')||'—'),
       String(_metaFinalRowGet(r,'TELEFONE','telefone')||'—'),
