@@ -5816,7 +5816,7 @@ function filterAdTable(){
   // CPL: verde = bom (<= mediana), vermelho = ruim (> 1,5x mediana)
   const cpls=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&d.leads>0&&d.spend>0).map(([,d])=>d.spend/d.leads).sort((a,b)=>a-b);
   const medCpl=cpls.length?cpls[Math.floor(cpls.length/2)]:0;
-  const cplBg=(c)=>!c||!medCpl?'':(c<=medCpl?'background:rgba(95,196,138,.16);color:#9BE3B5;':(c>medCpl*1.5?'background:rgba(224,103,90,.16);color:#F2A79C;':''));
+  const cplBg=(c)=>!c||!medCpl?'':(c<=medCpl?'background:rgba(95,196,138,.16);color:#9BE3B5;':(c>medCpl*1.5?'background:rgba(224,103,90,.16);color:#EAADA4;':''));
   const pctF=v=>v.toFixed(2).replace('.',',')+'%';
 
   const totalRow=`<tr style="font-weight:700;background:#12213F;border-top:2px solid #2A3D66;">
@@ -6282,9 +6282,9 @@ function renderLeadsPage(){
   if(pag){
     pag.innerHTML=`
       <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #2A3D66;font-size:12px;color:#8C98B1;flex-wrap:wrap;">
-        <button onclick="mudaPagLead(${_leadsPage-1})" ${_leadsPage<=1?'disabled':''} style="background:${_leadsPage<=1?'#203A6F':'#203B6F'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">‹ Ant</button>
+        <button onclick="mudaPagLead(${_leadsPage-1})" ${_leadsPage<=1?'disabled':''} style="background:${_leadsPage<=1?'#12213F':'#0D1A33'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">‹ Ant</button>
         <span>${_leadsPerPage===0?'Todos os '+total+' leads':'Pág. '+_leadsPage+' de '+totalPags+' · '+(total>0?start+1+'-'+Math.min(start+perPage,total):0)+' de '+total}</span>
-        <button onclick="mudaPagLead(${_leadsPage+1})" ${(_leadsPage>=totalPags||_leadsPerPage===0)?'disabled':''} style="background:${(_leadsPage>=totalPags||_leadsPerPage===0)?'#203A6F':'#203B6F'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">Próx ›</button>
+        <button onclick="mudaPagLead(${_leadsPage+1})" ${(_leadsPage>=totalPags||_leadsPerPage===0)?'disabled':''} style="background:${(_leadsPage>=totalPags||_leadsPerPage===0)?'#12213F':'#0D1A33'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">Próx ›</button>
       </div>`;
   }
 }
@@ -7232,9 +7232,9 @@ function renderClientesPage(){
   if(pagC){
     pagC.innerHTML=`
       <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:0.5px solid #2A3D66;font-size:12px;color:#8C98B1;flex-wrap:wrap;">
-        <button onclick="mudaPagCliente(${_clientesPage-1})" ${_clientesPage<=1?'disabled':''} style="background:${_clientesPage<=1?'#203A6F':'#203B6F'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">‹ Ant</button>
+        <button onclick="mudaPagCliente(${_clientesPage-1})" ${_clientesPage<=1?'disabled':''} style="background:${_clientesPage<=1?'#12213F':'#0D1A33'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">‹ Ant</button>
         <span>${_clientesPerPage===0?'Todos os '+total+' clientes':'Pág. '+_clientesPage+' de '+totalPags+' · '+(total>0?start+1+'-'+Math.min(start+perPage,total):0)+' de '+total}</span>
-        <button onclick="mudaPagCliente(${_clientesPage+1})" ${(_clientesPage>=totalPags||_clientesPerPage===0)?'disabled':''} style="background:${(_clientesPage>=totalPags||_clientesPerPage===0)?'#203A6F':'#203B6F'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">Próx ›</button>
+        <button onclick="mudaPagCliente(${_clientesPage+1})" ${(_clientesPage>=totalPags||_clientesPerPage===0)?'disabled':''} style="background:${(_clientesPage>=totalPags||_clientesPerPage===0)?'#12213F':'#0D1A33'};border:0.5px solid #2A3D66;border-radius:5px;padding:4px 10px;cursor:pointer;color:#E2BE6A;">Próx ›</button>
       </div>`;
   }
 }
@@ -10603,10 +10603,10 @@ function renderFluxoCards() {
       const procConcluido = feitasProc === totalProc && totalProc > 0;
 
       const subetapasHtml = proc.subetapas.map((sub, subIdx) => `
-        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${sub.ok ? '#325D32' : '#203B6F'};border-radius:6px;border:1px solid ${sub.ok ? '#2A3D66' : '#1D2D4E'};">
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:${sub.ok ? '#1B321B' : '#0D1A33'};border-radius:6px;border:1px solid ${sub.ok ? '#2A3D66' : '#1D2D4E'};">
           <input type="checkbox" ${sub.ok ? 'checked' : ''} onchange="toggleSubetapaFluxo(${pIdx},${prIdx},${subIdx},this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#5a8a6a;flex-shrink:0;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;color:${sub.ok ? '#82C598' : '#A88C4E'};${sub.ok ? 'text-decoration:line-through;' : ''}">${sub.nome}</div>
+            <div style="font-size:12px;color:${sub.ok ? '#82C598' : '#E2BE6A'};${sub.ok ? 'text-decoration:line-through;' : ''}">${sub.nome}</div>
             ${sub.ok && sub.data ? `<div style="font-size:10px;color:#8C98B1;">✓ ${new Date(sub.data+'T12:00').toLocaleDateString('pt-BR')}</div>` : ''}
           </div>
         </div>`).join('');
@@ -10625,7 +10625,7 @@ function renderFluxoCards() {
     const aguardandoPosVenda = !p.concluido && clinicoConcluido(p);
 
     return `
-    <div style="background:${p.concluido ? '#296636' : (aguardandoPosVenda ? '#203A6F' : '#203B6F')};border-radius:12px;border:1px solid ${p.concluido ? '#8FCF9F' : (aguardandoPosVenda ? '#2A3D66' : '#2A3D66')};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div style="background:${p.concluido ? '#16371D' : (aguardandoPosVenda ? '#12213F' : '#0D1A33')};border-radius:12px;border:1px solid ${p.concluido ? '#8FCF9F' : (aguardandoPosVenda ? '#2A3D66' : '#2A3D66')};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
       ${p.concluido ? `
       <div style="background:#153721;border:1px solid #8FCF9F;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="font-size:12px;color:#6ADC96;font-weight:600;">🎉 Tratamento concluído — NPS e pós-venda já enviados.</div>
@@ -10794,7 +10794,7 @@ function renderOrtoCards() {
     const nuncaFez = !p.ultimaManutencao;
     const statusTxt = nuncaFez ? 'Nunca registrada' : (atrasado ? `Atrasado — ${dias} dias desde a última` : `Em dia — última há ${dias} dia(s)`);
     const statusCor = nuncaFez ? '#8C98B1' : (atrasado ? '#D17E76' : '#8DBA8D');
-    const statusFundo = nuncaFez ? '#203A6F' : (atrasado ? '#673327' : '#315E31');
+    const statusFundo = nuncaFez ? '#12213F' : (atrasado ? '#371B15' : '#1A321A');
     const qtdManutencoes = (p.historico || []).length;
     return `
     <div style="background:#0D1A33;border-radius:12px;border:1px solid ${atrasado ? '#2A3D66' : '#2A3D66'};padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -10914,7 +10914,7 @@ function cardTarefaCalendarioHtml(acaoIdx, tIdx, t) {
   return `<div onclick="abrirDetalheTarefa(${acaoIdx},${tIdx})" style="background:#0D1A33;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:box-shadow .15s,border-color .15s;" onmouseover="this.style.boxShadow='0 3px 8px rgba(0,0,0,.12)';this.style.borderColor='#D4AF5A';" onmouseout="this.style.boxShadow='0 1px 2px rgba(0,0,0,.05)';this.style.borderColor='#2A3D66';">
     <div style="display:flex;align-items:flex-start;gap:8px;">
       <input type="checkbox" ${t.feito ? 'checked' : ''} onclick="event.stopPropagation();" onchange="toggleTarefaCalendario(${acaoIdx},${tIdx},this.checked)" style="width:15px;height:15px;cursor:pointer;margin-top:1px;flex-shrink:0;">
-      <span style="font-size:12px;color:${t.feito ? '#929DB5' : '#EEF1F7'};${t.feito ? 'text-decoration:line-through;' : ''}">${t.tarefa}</span>
+      <span style="font-size:12px;color:${t.feito ? '#8C98B1' : '#EEF1F7'};${t.feito ? 'text-decoration:line-through;' : ''}">${t.tarefa}</span>
     </div>
     ${infoLinha ? `<div style="font-size:10px;color:#8C98B1;margin-top:4px;margin-left:23px;">${infoLinha}</div>` : ''}
   </div>`;
@@ -11112,7 +11112,7 @@ function renderFasesCampanha() {
           <input type="date" value="${dataTarefaParaInput(t)}" onchange="mudarDataTarefaCampo(${tIdx},this.value)" style="border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;font-size:11px;outline:none;color:#E2BE6A;">
         </td>
         <td style="padding:6px 12px;">
-          <select onchange="mudarCampoTarefa(${tIdx},'status',this.value)" style="background:${status === 'done' ? '#5a8a6a22' : status === 'doing' ? '#A18B6C22' : '#c9a22722'};color:${status === 'done' ? '#90B79D' : status === 'doing' ? '#D4AF5A' : '#A88C4E'};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
+          <select onchange="mudarCampoTarefa(${tIdx},'status',this.value)" style="background:${status === 'done' ? '#5a8a6a22' : status === 'doing' ? '#A18B6C22' : '#c9a22722'};color:${status === 'done' ? '#90B79D' : status === 'doing' ? '#D4AF5A' : '#E2BE6A'};border:none;border-radius:12px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;outline:none;">
             <option value="todo"${status === 'todo' ? ' selected' : ''}>Pendente</option>
             <option value="doing"${status === 'doing' ? ' selected' : ''}>Fazendo</option>
             <option value="done"${status === 'done' ? ' selected' : ''}>Concluído</option>
