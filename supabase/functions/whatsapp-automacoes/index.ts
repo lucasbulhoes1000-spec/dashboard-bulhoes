@@ -579,6 +579,60 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
   }
 }
 
+
+// ---------- respostas aos lembretes (confirmar / cancelar) ----------
+async function confirmarNoClinicorp(id: string): Promise<void> {
+  // POST /appointment/confirm_appointment (API do Clinicorp)
+  const sub = CLINICORP_SUBSCRIBER_ID || CLINICORP_USUARIO;
+  const u = new URL("https://api.clinicorp.com/rest/v1/appointment/confirm_appointment");
+  u.searchParams.set("subscriber_id", sub);
+  const r = await fetch(u, {
+    method: "POST",
+    headers: { Authorization: "Basic " + btoa(CLINICORP_USUARIO + ":" + CLINICORP_TOKEN), Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ subscriber_id: sub, id: Number(id), appointment_id: Number(id) }),
+  });
+  if (!r.ok) throw new Error(`Clinicorp ${r.status}: ${(await r.text()).slice(0, 200)}`);
+}
+
+async function porTag(conversa: string, nome: string) {
+  if (!nome) return;
+  const t = (await bancoJson(`/rest/v1/wa_tags?nome=ilike.${encodeURIComponent(nome)}&select=id&limit=1`).catch(() => []))?.[0];
+  if (!t?.id) return;
+  await banco(`/rest/v1/conversa_tags`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ conversa_id: conversa, tag_id: t.id }) }).catch(() => {});
+}
+
+export async function rodarRespostasLembrete(cont: Record<string, number>) {
+  const lote: any[] = await rpc("lembrete_respostas_pegar", {}).catch(() => []);
+  if (!lote?.length) return;
+  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor ?? {};
+  for (const x of lote) {
+    let ok = true, erro: string | null = null, confirmado: boolean | null = null;
+    try {
+      const c = (await bancoJson(`/rest/v1/conversas?id=eq.${x.conversa_id}&select=*`))?.[0];
+      if (x.acao === "confirmar") {
+        if (cfg.confirmar_no_clinicorp !== false && x.clinicorp_id) {
+          try { await confirmarNoClinicorp(String(x.clinicorp_id)); confirmado = true; }
+          catch (e) { confirmado = false; erro = "não confirmou no Clinicorp: " + String((e as Error)?.message ?? e).slice(0, 200); }
+        }
+        await porTag(x.conversa_id, cfg.tag_confirmou ?? "confirmou lembrete");
+      } else {
+        await porTag(x.conversa_id, cfg.tag_cancelar ?? "cancelar consulta");
+        // vai para a fila da equipe remarcar
+        await banco(`/rest/v1/conversas?id=eq.${x.conversa_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "aberta", robo_ligado: false }) });
+      }
+      const texto = String((x.acao === "confirmar" ? cfg.resposta_confirmou : cfg.resposta_cancelar) ?? "").trim();
+      if (texto && c && janelaAberta(c)) {
+        const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, type: "text", text: { body: texto } }, await tokenDoNumero(c.numero_clinica_id));
+        await registrar(c, r.ok ? (r.j?.messages?.[0]?.id ?? null) : null, "text", texto, "Lembrete: resposta automática", r.ok ? "enviada" : "falhou", r.ok ? null : erroMeta(r.j), r.j);
+      }
+    } catch (e) {
+      ok = false; erro = String((e as Error)?.message ?? e).slice(0, 300);
+    }
+    await rpc("lembrete_resposta_feita", { p_id: x.id, p_ok: ok, p_erro: erro, p_confirmado: confirmado }).catch(() => {});
+    cont["lembrete_resposta_" + x.acao] = (cont["lembrete_resposta_" + x.acao] ?? 0) + 1;
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const json = (c: unknown, s = 200) => new Response(JSON.stringify(c), { status: s, headers: { "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
@@ -610,6 +664,7 @@ export async function handler(req: Request): Promise<Response> {
   // disparos em massa primeiro (não dependem da chave geral: cada um é decisão da equipe)
   // mensagens agendadas pela equipe primeiro (hora marcada), depois disparos em massa
   await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
+  await rodarRespostasLembrete(cont).catch((e) => { cont.lembrete_resposta_erro_motor = 1; console.error("respostas lembrete", e); });
   await rodarLembretes(inicio, cont).catch((e) => { cont.lembrete_erro_motor = 1; console.error("lembretes", e); });
   await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
   const autos = new Map<number, any>();

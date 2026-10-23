@@ -13890,6 +13890,13 @@ function _auLembHtml(){
       '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Categorias do Clinicorp que recebem (contém): <input class="wa-var" style="flex:1;min-width:200px" value="'+_auEsc(E.categorias==null?'avaliação':E.categorias)+'" placeholder="avaliação" oninput="_au.lembEd.categorias=this.value"></label>'+
       '<div style="font-size:11px;color:#7a6550;margin-top:-6px">Separe por vírgula. “avaliação” pega Avaliação e Avaliação Paciente/Parceria.</div>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('dia')+'</div>'+
+      '<div style="border-top:0.5px solid #efe6da;padding-top:10px;display:flex;flex-direction:column;gap:6px"><b style="font-size:12.5px">Quando o paciente responde</b>'+
+        '<div style="font-size:11px;color:#7a6550">Botão do modelo ou resposta curta (“sim”, “confirmo”) confirma. “Cancelar”, “remarcar”, “não vou conseguir” põe a tag e manda para a fila da equipe remarcar (nada é desmarcado sozinho).</div>'+
+        '<label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" '+(E.confirmar_no_clinicorp!==false?'checked':'')+' onchange="_au.lembEd.confirmar_no_clinicorp=this.checked"> Confirmar a consulta no Clinicorp</label>'+
+        '<label style="font-size:12px">Resposta quando confirma<textarea class="wa-var" style="width:100%;min-height:44px" oninput="_au.lembEd.resposta_confirmou=this.value">'+_auEsc(E.resposta_confirmou||'')+'</textarea></label>'+
+        '<label style="font-size:12px">Resposta quando pede para cancelar ou remarcar<textarea class="wa-var" style="width:100%;min-height:44px" oninput="_au.lembEd.resposta_cancelar=this.value">'+_auEsc(E.resposta_cancelar||'')+'</textarea></label>'+
+        '<div style="font-size:11px;color:#7a6550">Deixe em branco para não responder nada. Tags usadas: “'+_auEsc(E.tag_confirmou||'confirmou lembrete')+'” e “'+_auEsc(E.tag_cancelar||'cancelar consulta')+'”.</div>'+
+      '</div>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12px">'+
         '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" '+(E.ligado?'checked':'')+' onchange="_au.lembEd.ligado=this.checked"> Ligados</label>'+
         '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" '+(E.modo_teste!==false?'checked':'')+' onchange="_au.lembEd.modo_teste=this.checked;auRenderExtras()"> Modo teste (só os telefones abaixo)</label>'+
@@ -13927,15 +13934,15 @@ async function auLembSalvar(){
 }
 async function auLembVer(){
   let ls=[];
-  try{ls=await _waRest('lembretes_consulta?select=data,tipo,nome,hora,status,erro,criado_em,conversa_id&order=criado_em.desc&limit=60');}
+  try{ls=await _waRest('lembretes_consulta?select=data,tipo,nome,hora,status,erro,criado_em,conversa_id,resposta,confirmado_no_clinicorp&order=criado_em.desc&limit=60');}
   catch(e){showToast('error','Não foi possível carregar',e.message);return;}
   const st={enviando:'Enviando',enviado:'Enviado',falhou:'Falhou'};
   waFecharModal();
   const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
   fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
   fundo.innerHTML='<div class="wa-modal" style="max-width:720px"><div class="wa-modal-cab">Lembretes enviados (últimos 60)<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" style="max-height:70vh;overflow:auto">'+
-    (ls.length?'<table class="sq-tab" style="width:100%"><thead><tr><th>Consulta</th><th>Paciente</th><th>Tipo</th><th>Status</th></tr></thead><tbody>'+
-      ls.map(x=>'<tr><td>'+new Date(x.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+(x.hora?' '+_auEsc(x.hora):'')+'</td><td>'+_auEsc(x.nome||'')+'</td><td>'+AU_LEMB_TIPOS[x.tipo].nome+'</td><td>'+st[x.status]+(x.erro?'<div style="font-size:10.5px;color:#c0392b">'+_auEsc(x.erro)+'</div>':'')+'</td></tr>').join('')+
+    (ls.length?'<table class="sq-tab" style="width:100%"><thead><tr><th>Consulta</th><th>Paciente</th><th>Tipo</th><th>Status</th><th>Resposta</th></tr></thead><tbody>'+
+      ls.map(x=>'<tr><td>'+new Date(x.data+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+(x.hora?' '+_auEsc(x.hora):'')+'</td><td>'+_auEsc(x.nome||'')+'</td><td>'+AU_LEMB_TIPOS[x.tipo].nome+'</td><td>'+st[x.status]+(x.erro?'<div style="font-size:10.5px;color:#c0392b">'+_auEsc(x.erro)+'</div>':'')+'</td><td>'+(x.resposta==='confirmou'?'<span style="color:#3f6b4c">✓ Confirmou'+(x.confirmado_no_clinicorp===false?' (confirme no Clinicorp)':'')+'</span>':x.resposta==='cancelar'?'<span style="color:#a0472f">Pediu para remarcar</span>':'—')+'</td></tr>').join('')+
       '</tbody></table>':'<div class="wa-vazio">Nenhum lembrete enviado ainda.</div>')+'</div></div>';
   document.body.appendChild(fundo);
 }
