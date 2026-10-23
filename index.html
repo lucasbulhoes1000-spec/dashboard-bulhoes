@@ -878,6 +878,16 @@ button:disabled{opacity:.45;cursor:default;}
 tr.linha-sem-desempenho td{background:rgba(224,103,90,.05) !important;}
 input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--txt);-webkit-box-shadow:0 0 0 1000px var(--surf2) inset;caret-color:var(--txt);transition:background-color 9999s;}
 input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.8) sepia(.6) saturate(2) hue-rotate(5deg);}
+
+.sq-switch span{background:#2A3D66 !important;}
+.sq-switch span:before{background:#E8ECF4 !important;box-shadow:0 1px 3px rgba(0,0,0,.4);}
+.sq-switch input:checked+span{background:linear-gradient(90deg,#B08A3E,#E2BE6A) !important;}
+.sq-switch input:checked+span:before{background:#fff !important;}
+input[type="checkbox"],input[type="radio"]{accent-color:#D4AF5A;}
+
+.funnel-tri-shape{color:#1B1405 !important;box-shadow:0 0 18px rgba(231,195,109,.22);}
+.funnel-tri-pct{color:var(--muted) !important;}
+.fb2{color:#1B1405 !important;font-weight:700;}
 </style>
 </head>
 <body>
@@ -1115,8 +1125,8 @@ input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local
                 Visualizar informações mais detalhadas
                 <span style="position:relative;display:inline-block;width:38px;height:20px;">
                   <input type="checkbox" id="toggle-detalhes-trafego" onchange="toggleDetalhesTrafego()" style="opacity:0;width:0;height:0;">
-                  <span id="toggle-detalhes-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#B08A3E;border-radius:20px;transition:.2s;"></span>
-                  <span id="toggle-detalhes-knob" style="position:absolute;height:16px;width:16px;left:2px;top:2px;background:#0D1A33;border-radius:50%;transition:.2s;"></span>
+                  <span id="toggle-detalhes-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:#2A3D66;border-radius:20px;transition:.2s;"></span>
+                  <span id="toggle-detalhes-knob" style="position:absolute;height:16px;width:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s;"></span>
                 </span>
               </label>
             </div>
@@ -3206,7 +3216,7 @@ function toggleDetalhesTrafego(){
   document.getElementById('bloco-detalhes-trafego').style.display=checked?'block':'none';
   const slider=document.getElementById('toggle-detalhes-slider');
   const knob=document.getElementById('toggle-detalhes-knob');
-  if(slider)slider.style.background=checked?'#5a8a6a':'#d4c9bc';
+  if(slider)slider.style.background=checked?'linear-gradient(90deg,#B08A3E,#E2BE6A)':'#2A3D66';
   if(knob)knob.style.left=checked?'20px':'2px';
 }
 
@@ -5360,10 +5370,10 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // função caso o elemento não exista mais na página.
   const maxF=Math.max(leadsBase,agend,comp,contratos,1);
   const funnelStages=[
-    {label:'Leads',val:leadsBase,pct:'',color:'#A18B6C'},
-    {label:'Agendamentos',val:agend,pct:pct(agend,leadsBase),color:'#8a7358'},
-    {label:'Comparecimentos',val:comp,pct:pct(comp,agend),color:'#6b5940'},
-    {label:'Contratos',val:contratos,pct:pct(contratos,comp),color:'#4a3d2b'},
+    {label:'Leads',val:leadsBase,pct:'',color:'linear-gradient(90deg,#C9A24C,#F0CB72)'},
+    {label:'Agendamentos',val:agend,pct:pct(agend,leadsBase),color:'linear-gradient(90deg,#B08A3E,#E2BE6A)'},
+    {label:'Comparecimentos',val:comp,pct:pct(comp,agend),color:'linear-gradient(90deg,#9A7632,#D4AF5A)'},
+    {label:'Contratos',val:contratos,pct:pct(contratos,comp),color:'linear-gradient(90deg,#7E5F22,#B8913F)'},
   ];
   const _tFunnelEl=document.getElementById('t-funnel');
   if(_tFunnelEl)_tFunnelEl.innerHTML='<div class="funnel-tri">'+funnelStages.map(f=>{
@@ -6020,11 +6030,11 @@ function renderSocial(rows){
   bar.className='progress-fill'+(metaPct<30?' danger':metaPct<60?' warn':'');
   const maxF=abord||1;
   document.getElementById('ss-funnel').innerHTML=[
-    {label:'Abordagens',val:abord,pct:'',color:'#A18B6C'},
-    {label:'Respostas',val:resp,pct:txResp+'%',color:'#8a7358'},
-    {label:'Agendamentos',val:agend,pct:txAgend+'%',color:'#6b5940'},
-    {label:'Comparecimentos',val:comp,pct:showRate+'%',color:'#CCBCA6'},
-    {label:'Vendas',val:vendas,pct:txVenda+'%',color:'#9a7d5a'},
+    {label:'Abordagens',val:abord,pct:'',color:'linear-gradient(90deg,#C9A24C,#F0CB72)'},
+    {label:'Respostas',val:resp,pct:txResp+'%',color:'linear-gradient(90deg,#B08A3E,#E2BE6A)'},
+    {label:'Agendamentos',val:agend,pct:txAgend+'%',color:'linear-gradient(90deg,#9A7632,#D4AF5A)'},
+    {label:'Comparecimentos',val:comp,pct:showRate+'%',color:'linear-gradient(90deg,#8A6A2A,#C9A24C)'},
+    {label:'Vendas',val:vendas,pct:txVenda+'%',color:'linear-gradient(90deg,#7E5F22,#B8913F)'},
   ].map(f=>`<div class="frow"><span class="fl">${f.label}</span><div class="fw"><div class="fb2" style="width:${Math.max(f.val/maxF*100,f.val>0?4:0)}%;background:${f.color};"><span class="fn">${f.val}</span></div></div><span class="fp">${f.pct}</span></div>`).join('');
   const resColors={'FOLLOW UP 1':'#A88C4E','FOLLOW UP 2':'#D4AF5A','FOLLOW UP 3':'#E2BE6A','AGENDADO':'#E2BE6A','COMPARECEU':'#66738F','VENDA':'#90B79D','DESQUALIFICADO':'#D4AF5A'};
   const resEntries=Object.entries(resultados).sort((a,b)=>b[1]-a[1]);
@@ -6296,9 +6306,9 @@ function setLeadsPerPage(n){
     const btn=document.getElementById('lpb-'+v);
     if(!btn)return;
     const active=v===n;
-    btn.style.background=active?'#A18B6C':'#fff';
-    btn.style.color=active?'#fff':'#7a6550';
-    btn.style.borderColor=active?'#A18B6C':'#d4c9bc';
+    btn.style.background=active?'#B08A3E':'#0D1A33';
+    btn.style.color=active?'#FFFFFF':'#E2BE6A';
+    btn.style.borderColor=active?'#D4AF5A':'#2A3D66';
     btn.style.fontWeight=active?'600':'400';
   });
   renderLeadsPage();
@@ -7010,15 +7020,15 @@ function setTipoOrcamentoClientes(tipo){
   const bRec=document.getElementById('clientes-tab-recompra');
   if(bNovo){
     const ativo=_clientesTipoOrcamento==='novo';
-    bNovo.style.background=ativo?'#A18B6C':'#fff';
-    bNovo.style.color=ativo?'#fff':'#7a6550';
-    bNovo.style.borderColor=ativo?'#A18B6C':'#d4c9bc';
+    bNovo.style.background=ativo?'#B08A3E':'#0D1A33';
+    bNovo.style.color=ativo?'#FFFFFF':'#E2BE6A';
+    bNovo.style.borderColor=ativo?'#D4AF5A':'#2A3D66';
   }
   if(bRec){
     const ativo=_clientesTipoOrcamento==='recompra';
-    bRec.style.background=ativo?'#A18B6C':'#fff';
-    bRec.style.color=ativo?'#fff':'#7a6550';
-    bRec.style.borderColor=ativo?'#A18B6C':'#d4c9bc';
+    bRec.style.background=ativo?'#B08A3E':'#0D1A33';
+    bRec.style.color=ativo?'#FFFFFF':'#E2BE6A';
+    bRec.style.borderColor=ativo?'#D4AF5A':'#2A3D66';
   }
 
   _clientesPage=1;
@@ -7061,7 +7071,7 @@ function popularTratamentosClientesMulti(tratsTodos){
   [..._clientesTratSelecionados].forEach(v=>{if(!validos.has(v))_clientesTratSelecionados.delete(v);});
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 7px 7px;border-bottom:1px solid #1D2D4E;margin-bottom:4px;"><span style="color:#8C98B1;font-size:11px;">Selecione um ou mais</span><button type="button" onclick="limparTratClientes();event.preventDefault();" style="border:0;background:none;color:#E2BE6A;cursor:pointer;font-size:11px;text-decoration:underline;">Limpar</button></div>'+
-    agrupados.map(t=>'<label style="display:flex;align-items:center;gap:7px;padding:6px 7px;cursor:pointer;font-size:11px;color:#EEF1F7;border-radius:4px;" onmouseover="this.style.background=\'#f7f3ee\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" '+(_clientesTratSelecionados.has(t)?'checked ':'')+'onchange="toggleTratClienteFiltro(this.dataset.trat,this.checked)" data-trat="'+esc(t)+'"> <span>'+esc(t)+'</span></label>').join('');
+    agrupados.map(t=>'<label style="display:flex;align-items:center;gap:7px;padding:6px 7px;cursor:pointer;font-size:11px;color:#EEF1F7;border-radius:4px;" onmouseover="this.style.background=\'#12213F\'" onmouseout="this.style.background=\'transparent\'"><input type="checkbox" '+(_clientesTratSelecionados.has(t)?'checked ':'')+'onchange="toggleTratClienteFiltro(this.dataset.trat,this.checked)" data-trat="'+esc(t)+'"> <span>'+esc(t)+'</span></label>').join('');
   atualizarResumoTratClientes();
 }
 
@@ -7137,9 +7147,9 @@ function setClientesPerPage(n){
     const btn=document.getElementById('cpb-'+v);
     if(!btn)return;
     const active=v===n;
-    btn.style.background=active?'#A18B6C':'#fff';
-    btn.style.color=active?'#fff':'#7a6550';
-    btn.style.borderColor=active?'#A18B6C':'#d4c9bc';
+    btn.style.background=active?'#B08A3E':'#0D1A33';
+    btn.style.color=active?'#FFFFFF':'#E2BE6A';
+    btn.style.borderColor=active?'#D4AF5A':'#2A3D66';
     btn.style.fontWeight=active?'600':'normal';
   });
   renderClientesPage();
@@ -7427,7 +7437,7 @@ function toggleNovoRecompraManual(ph, valorFechado, botaoEl){
   const novaClasse=orc.pacienteAntigo?'Recompra':'Novo';
   if(botaoEl){
     botaoEl.textContent=novaClasse+' ✏️';
-    botaoEl.style.color=novaClasse==='Novo'?'#3a7a50':'#A18B6C';
+    botaoEl.style.color=novaClasse==='Novo'?'#83C499':'#D4AF5A';
   }
   showToast('success','Classificação alterada',`Marcado como "${novaClasse}" manualmente — vai prevalecer sempre, inclusive no financeiro real.`);
 }
@@ -7641,7 +7651,7 @@ function openModal(title,headers,rows,customCount){
   if(searchEl)searchEl.value='';
   renderModalRows();
   document.getElementById('modal-overlay').classList.add('open');
-  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===0?'#A18B6C':'#fff';b.style.color=v===0?'#fff':'#7a6550';b.style.borderColor=v===0?'#A18B6C':'#d4c9bc';b.style.fontWeight=v===0?'600':'400';}});
+  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===0?'#B08A3E':'#0D1A33';b.style.color=v===0?'#FFFFFF':'#E2BE6A';b.style.borderColor=v===0?'#D4AF5A':'#2A3D66';b.style.fontWeight=v===0?'600':'400';}});
 }
 function filterModal(q){
   const all=_modalExportData.allRows||_modalExportData.rows;
@@ -7759,7 +7769,7 @@ function abrirCardPorTelefone(phone){
 function setModalPerPage(n){
   _modalPerPage=n;
   renderModalRows();
-  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===n?'#A18B6C':'#fff';b.style.color=v===n?'#fff':'#7a6550';b.style.borderColor=v===n?'#A18B6C':'#d4c9bc';b.style.fontWeight=v===n?'600':'400';}});
+  [10,50,100,0].forEach(v=>{const b=document.getElementById('mpb-'+v);if(b){b.style.background=v===n?'#B08A3E':'#0D1A33';b.style.color=v===n?'#FFFFFF':'#E2BE6A';b.style.borderColor=v===n?'#D4AF5A':'#2A3D66';b.style.fontWeight=v===n?'600':'400';}});
 }
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
 function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
@@ -12919,7 +12929,7 @@ async function waRenomearNumero(id){
 }
 function _waStatusConexao(txt,erro){
   const el=document.getElementById('wa-conectar-status');
-  if(el){el.style.color=erro?'#b04a3e':'#7a6550';el.textContent=txt;}
+  if(el){el.style.color=erro?'#CF8077':'#E2BE6A';el.textContent=txt;}
 }
 async function _waConfigCadastro(){
   try{
