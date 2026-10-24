@@ -14407,6 +14407,7 @@ function _auResumoCond(c){
   if(c.tipo==='etapa')return 'a etapa é <b>'+_auEsc(WA_ETAPA_ROTULO[c.etapa]||c.etapa||'?')+'</b>';
   if(c.tipo==='respondeu')return 'o paciente respondeu';
   if(c.tipo==='janela_aberta')return 'a janela de 24 h está aberta';
+  if(c.tipo==='calado_ha'){const m=Number(c.minutos)||0;return 'o paciente está sem mandar mensagem há <b>'+(m>=1440?Math.round(m/1440)+' dia(s)':m>=60?Math.round(m/60)+' h':m+' min')+'</b>';}
   return '?';
 }
 

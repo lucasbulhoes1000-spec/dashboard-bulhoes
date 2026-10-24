@@ -315,6 +315,12 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           else if (cond.tipo === "respondeu") {
             v = !!x.contexto?.respondeu_em || (!!k.c?.ultima_recebida_em && Date.parse(k.c.ultima_recebida_em) > Date.parse(x.entrou_em));
           } else if (cond.tipo === "janela_aberta") v = !!k.c && janelaAberta(k.c, agora());
+          else if (cond.tipo === "calado_ha") {
+            // (24/10/2026) o paciente não mandou mensagem nos últimos N minutos
+            // (conversa parada): só então o follow-up sai; se falou há pouco, pula
+            const ult = k.c?.ultima_recebida_em ? Date.parse(k.c.ultima_recebida_em) : 0;
+            v = !ult || agora() - ult >= Math.max(1, Number(cond.minutos) || 0) * 60_000;
+          }
           if (v) { await avancar(x, i, "se", "ok", "sim", i + 1, null, "ativa", k.c?.id ?? null); i++; continue; }
           if (p.senao === "fim" || p.senao == null) {
             await avancar(x, i, "se", "ok", "não: terminou", i, null, "concluida", k.c?.id ?? null);
