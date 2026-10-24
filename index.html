@@ -15942,7 +15942,9 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('clientes-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('clientes-pagination')];},
     colunas:()=>{
       const ativas=(_listas.fases&&_listas.fases.ativos)||[];
-      const ordem=KB_FASES_ORDEM.filter(f=>ativas.includes(f)).concat(ativas.filter(f=>!KB_FASES_ORDEM.includes(f)));
+      // ordem do processo; "N° contato" novos entram na sequência numérica
+      const chave=f=>{const i=KB_FASES_ORDEM.indexOf(f);if(i>=0)return i;const m=String(f).match(/^(\d+)\s*°/);if(m)return KB_FASES_ORDEM.indexOf('2° contato - Antes/Depois + lembrei de você')+(Number(m[1])-2)*0.1;return 99;};
+      const ordem=ativas.slice().sort((x,y)=>chave(x)-chave(y));
       return [{id:'',nome:'Sem fase',dica:'Compareceu e ainda não tem fase de follow-up'},...ordem.map(f=>({id:f,nome:f,solta:true}))];
     },
     itens:()=>(_clientesFiltrados||[]).map(r=>{
