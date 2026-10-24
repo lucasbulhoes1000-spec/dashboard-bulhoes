@@ -1165,7 +1165,6 @@ body{letter-spacing:-.1px;}
     <div class="page" id="page-dashboard">
       <div class="dash-tabs">
         <div class="tab active" onclick="switchDashTab('trafego',this)"><span class="tab-dot"></span>Dashboard</div>
-        <div class="tab" onclick="switchDashTab('social',this)"><span class="tab-dot"></span>Social Selling</div>
       </div>
       <div style="padding-top:20px;">
         <div id="dash-trafego" class="dash-tab-content">
@@ -1757,7 +1756,16 @@ body{letter-spacing:-.1px;}
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
-    <div class="page" id="page-social-selling"><div class="au-wrap" id="ss-conteudo"></div></div>
+    <div class="page" id="page-social-selling">
+      <div class="dash-tabs ss-tabs">
+        <div class="tab active" id="ss-tab-registro" onclick="ssAba('registro')"><span class="tab-dot"></span>Registro</div>
+        <div class="tab" id="ss-tab-painel" onclick="ssAba('painel')"><span class="tab-dot"></span>Painel</div>
+      </div>
+      <div style="padding-top:20px;">
+        <div class="au-wrap" id="ss-conteudo"></div>
+        <div id="ss-painel-host" style="display:none;"></div>
+      </div>
+    </div>
     <div class="page" id="page-automacoes"><div class="au-wrap" id="au-conteudo"></div></div>
     <div class="page" id="page-agente"><div class="au-wrap" id="ag-conteudo"></div></div>
     <div class="page" id="page-pacientes">
@@ -3022,7 +3030,7 @@ function switchPage(page,el){
 
 function switchDashTab(tab,el){
   currentDashTab=tab;
-  document.querySelectorAll('.dash-tabs .tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#page-dashboard .dash-tabs .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   document.querySelectorAll('.dash-tab-content').forEach(c=>c.style.display='none');
   document.getElementById('dash-'+tab).style.display='block';
@@ -3049,6 +3057,10 @@ async function reloadCurrent(){
   const textoOriginal=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
+    if(currentPage==='social-selling'){
+      if(_ss.aba==='painel')await loadSocial();else{_ss.clinChave='';await abrirSocialSelling();}
+      return;
+    }
     if(currentPage==='dashboard'){
       if(currentDashTab==='trafego'){_gsCache.forcar=true;try{await loadTrafego();}finally{_gsCache.forcar=false;}}
       else loadSocial();
@@ -3471,7 +3483,9 @@ function origemAtualPaciente(ph,nomeFallback){
 // usado pra cruzar dados do Clinicorp (que não sabe a origem) com a origem
 // reconciliada de cada telefone (mesma fonte usada no resto do Dashboard).
 function origemMatchClinicorp(ph){
-  if(!_origemFilter)return true;
+  // (24/10/2026) sem filtro, o Dashboard principal não conta Social Selling
+  // como lead (mesma regra de excluirSocialSelling); ele tem painel próprio
+  if(!_origemFilter)return !/social/i.test(origemAtualPaciente(ph,'')||'');
   return origemBateFiltro(origemAtualPaciente(ph,''),_origemFilter);
 }
 // Recalcula Agendamentos/Leads na agenda/Comparecimentos (fonte Clinicorp) já
@@ -6276,7 +6290,22 @@ async function ssLinhasDashboard(){
     'DATA':l.abordado_em+'T12:00:00','LINK DO INSTAGRAM':'https://www.instagram.com/'+l.instagram+'/',
     'RESPONDEU?':(l.respondeu||r.agendou)?'SIM':'','TIPO':l.tipo||'','RESULTADO':r.etapa,'Tentativas de Follow':l.tentativas||0};});
 }
+function ssAba(qual){
+  _ss.aba=qual;
+  document.getElementById('ss-tab-registro').classList.toggle('active',qual==='registro');
+  document.getElementById('ss-tab-painel').classList.toggle('active',qual==='painel');
+  document.getElementById('ss-conteudo').style.display=qual==='registro'?'':'none';
+  const host=document.getElementById('ss-painel-host');host.style.display=qual==='painel'?'':'none';
+  if(qual==='painel'){
+    // o painel que ficava no Dashboard agora mora aqui
+    const pn=document.getElementById('dash-social');
+    if(pn&&pn.parentElement!==host){host.appendChild(pn);}
+    if(pn)pn.style.display='block';
+    loadSocial();
+  }
+}
 async function abrirSocialSelling(){
+  if(_ss.aba==='painel'){ssAba('painel');return;}
   const el=document.getElementById('ss-conteudo');if(!el)return;
   if(!_ss.carregado)el.innerHTML='<div class="au-vazio">Carregando…</div>';
   try{await ssCarregar();}catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar: '+_waEsc(e.message)+'</div>';return;}
@@ -6310,9 +6339,11 @@ function ssRender(){
       '<td style="white-space:nowrap;text-align:center;"><span style="display:inline-block;min-width:18px;">'+(l.tentativas||0)+'</span> <button class="wa-btn" style="padding:2px 8px;" title="Mais um follow-up" onclick="ssSalvar('+id+',\'tentativas\','+((l.tentativas||0)+1)+')">+1</button></td>'+
       '<td style="text-align:center;"><input type="checkbox" '+(l.respondeu?'checked':'')+' onchange="ssSalvar('+id+',\'respondeu\',this.checked)"></td>'+
       '<td>'+sel(l.status,Object.entries(SS_STATUS),'ssSalvar('+id+',\'status\',this.value)')+'</td>'+
-      '<td>'+inp('nome','text',l.nome,'140px')+'</td>'+
-      '<td>'+inp('telefone','tel',l.telefone,'130px')+'</td>'+
-      '<td>'+inp('agendado_para','date',l.agendado_para,'132px')+'</td>'+
+      (l.status==='agendou'?
+        '<td>'+inp('nome','text',l.nome,'140px')+'</td>'+
+        '<td>'+inp('telefone','tel',l.telefone,'130px')+'</td>'+
+        '<td>'+inp('agendado_para','date',l.agendado_para,'132px')+'</td>'
+        :'<td style="color:#66738F;" colspan="3">só ao agendar</td>')+
       '<td style="white-space:nowrap;">'+res+'</td>'+
       '<td>'+inp('obs','text',l.obs,'160px')+'</td>'+
       '<td><button class="wa-btn" style="padding:2px 8px;" title="Apagar" onclick="ssApagar('+id+')">✕</button></td></tr>';
@@ -6334,7 +6365,7 @@ function ssRender(){
       sel(_ss.periodo,[['mes','Este mês'],['30','Últimos 30 dias'],['mespassado','Mês passado'],['tudo','Tudo']],'_ss.periodo=this.value;ssRender()')+
       sel(_ss.status,[['','Todos os status']].concat(Object.entries(SS_STATUS)),'_ss.status=this.value;ssRender()')+
       '<input class="dp-in" style="height:32px;width:220px;" placeholder="Buscar @, nome ou telefone" value="'+_waEsc(_ss.busca)+'" oninput="_ss.busca=this.value;clearTimeout(_ss.tb);_ss.tb=setTimeout(ssRender,300)">'+
-    '</div><div class="au-dica">Agendou pelo direct? Mude o status para <b>Agendou</b> e preencha telefone e data da avaliação: comparecimento e venda o CRM busca sozinho no Clinicorp.</div></div>'+
+    '</div><div class="au-dica">Agendou pelo direct? Mude o status para <b>Agendou</b> e preencha nome, telefone e data da avaliação: comparecimento e venda o CRM busca sozinho no Clinicorp. Quem vem do Social Selling não conta como lead no Dashboard.</div></div>'+
     (lista.length?'<div class="table-card" style="overflow:auto;"><table style="width:100%;font-size:12px;"><thead><tr><th>Abordagem</th><th>Instagram</th><th>Perfil</th><th>Tipo</th><th>Follow-ups</th><th>Respondeu</th><th>Status</th><th>Nome</th><th>Telefone</th><th>Avaliação</th><th>Clinicorp</th><th>Obs.</th><th></th></tr></thead><tbody>'+lista.map(linhaTabela).join('')+'</tbody></table></div>'
       :'<div class="au-vazio">Nenhuma abordagem neste filtro.</div>');
   if(_ss.foco){const i=document.getElementById('ss-novo-insta');if(i)i.focus();_ss.foco=false;}
@@ -6372,8 +6403,19 @@ async function ssSalvar(id,campo,valor,semRender){
     const r=await _waRest('social_selling?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
     if(r&&r[0])Object.assign(l,r[0]);
     if(campo==='telefone')_ss.clinChave='';
+    if(l.status==='agendou'&&l.telefone)ssMarcarOrigem(l.telefone);
     if(!semRender){ssRender();if(campo==='telefone'||campo==='agendado_para'||campo==='status')ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling')ssRender();});}
   }catch(e){showToast('error','Não salvou',e.message);}
+}
+function ssMarcarOrigem(tel){
+  try{
+    const atual=ccDataLookup(tel);
+    if(atual&&atual.origemAtual)return; // origem já marcada à mão: não mexe
+    const ph=normalizePhone(tel)||String(tel).replace(/\D/g,'');if(!ph)return;
+    const d=atual||(_ccData[ph]=_ccData[ph]||{orcamentos:[],anotacoes:[]});
+    d.origemAtual='#Social Selling';d.editadoManualmente=true;_ccDataNormIndex=null;
+    salvarCRMDebounced();
+  }catch(e){console.warn('[SOCIAL] não marcou a origem',e);}
 }
 async function ssApagar(id){
   const l=_ss.linhas.find(x=>x.id===id);if(!l)return;
