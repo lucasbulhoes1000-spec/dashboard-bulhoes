@@ -292,7 +292,7 @@ tbody tr:hover td{background:#0D1A33;}
 .wa-cab,.wa-janela,.wa-comp,.wa-aviso-cloudia{flex-shrink:0;}
 .wa-aviso-cloudia{font-size:10px;color:#66738F;padding:6px 12px;border-top:0.5px solid #1D2D4E;text-align:center;}
 /* ===== Automações ===== */
-#page-automacoes .au-wrap,#page-agente .au-wrap,#page-disparos .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
+#page-automacoes .au-wrap,#page-agente .au-wrap,#page-disparos .au-wrap,#page-social-selling .au-wrap{display:flex;flex-direction:column;gap:12px;max-width:1200px;}
 .au-geral{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#12213F;border:0.5px solid #2A3D66;color:#E2BE6A;border-radius:10px;padding:12px 14px;flex-wrap:wrap;}
 .au-geral.ligada{background:#1C301F;border-color:#2A3D66;color:#8BBB99;}
 .au-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -710,7 +710,7 @@ tbody tr:hover td{background:#0D1A33;}
 }
 
 /* ===== Mensagens em massa (layout do Cloudia) ===== */
-#page-disparos .au-wrap{max-width:none;}
+#page-disparos .au-wrap,#page-social-selling .au-wrap{max-width:none;}
 .dp-card{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
 .dp-busca{display:flex;align-items:center;gap:8px;max-width:420px;height:34px;border:0.5px solid #2A3D66;border-radius:6px;padding:0 10px;color:#8C98B1;}
 .dp-busca input{flex:1;border:none;outline:none;font-size:13px;color:#EEF1F7;background:transparent;}
@@ -1023,6 +1023,10 @@ body{letter-spacing:-.1px;}
     <div class="nav-item" onclick="switchPage('agente',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3" r="1"/><path d="M9 13v1.5M15 13v1.5"/><path d="M2 13v3M22 13v3"/></svg></span>
       <span class="nav-label">Agente de IA</span>
+    </div>
+    <div class="nav-item" onclick="switchPage('social-selling',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></span>
+      <span class="nav-label">Social Selling</span>
     </div>
     <div class="nav-item" onclick="switchPage('disparos',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg></span>
@@ -1753,6 +1757,7 @@ body{letter-spacing:-.1px;}
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
+    <div class="page" id="page-social-selling"><div class="au-wrap" id="ss-conteudo"></div></div>
     <div class="page" id="page-automacoes"><div class="au-wrap" id="au-conteudo"></div></div>
     <div class="page" id="page-agente"><div class="au-wrap" id="ag-conteudo"></div></div>
     <div class="page" id="page-pacientes">
@@ -2983,7 +2988,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -2992,6 +2997,7 @@ function switchPage(page,el){
   else if(page==='automacoes') abrirAutomacoes();
   else if(page==='agente') abrirAgente();
   else if(page==='disparos') abrirDisparos();
+  else if(page==='social-selling') abrirSocialSelling();
   else if(page==='dashboard') reloadCurrent();
   else if(page==='trafego-pago') abrirTrafegoPago();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
@@ -6199,14 +6205,216 @@ function filterAdTable(){
 }
 
 // ===== SOCIAL SELLING =====
+// ===== SOCIAL SELLING DENTRO DO CRM (24/10/2026) =====
+// Substitui a planilha externa. Uma linha por pessoa abordada no Instagram
+// (tabela social_selling). A Lívia registra a abordagem e, quando agenda pelo
+// direct, o telefone e a data da avaliação; comparecimento e venda vêm do
+// Clinicorp pelo telefone (mesmas fontes do Dashboard).
+const SS_TIPOS=['Seguidor','Curtida','Comentário','Enquete/Reação','Stories','Reativação'];
+const SS_PERFIS=['Dra. Larissa','Clínica'];
+const SS_STATUS={em_andamento:'Em andamento',agendou:'Agendou',desqualificado:'Desqualificado'};
+const _ss={linhas:[],carregado:false,periodo:'mes',status:'',busca:'',clin:null,clinChave:''};
+function ssUsuario(v){
+  const s=String(v||'').trim();
+  const m=s.match(/instagram\.com\/([^/?#\s]+)/i);
+  return (m?m[1]:s).replace(/^@+/,'').replace(/[/?#].*$/,'').trim().toLowerCase();
+}
+function ssHoje(){return localDateStr(new Date());}
+function ssFmt(d){if(!d)return '';const p=String(d).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+function ssPeriodo(){
+  const now=new Date();
+  if(_ss.periodo==='mes')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth(),1)),until:ssHoje()};
+  if(_ss.periodo==='mespassado')return{since:localDateStr(new Date(now.getFullYear(),now.getMonth()-1,1)),until:localDateStr(new Date(now.getFullYear(),now.getMonth(),0))};
+  if(_ss.periodo==='30')return{since:localDateStr(new Date(now.getTime()-29*86400000)),until:ssHoje()};
+  return{since:'2000-01-01',until:ssHoje()};
+}
+async function ssCarregar(){
+  let out=[],de=0;
+  for(;;){
+    const r=await fetch(SUPABASE_URL+'/rest/v1/social_selling?select=*&order=abordado_em.desc,id.desc',{headers:{Range:de+'-'+(de+999),'Range-Unit':'items'}});
+    if(!r.ok)throw new Error('Supabase '+r.status+': '+(await r.text()).slice(0,160));
+    const j=await r.json();out=out.concat(j);if(j.length<1000)break;de+=1000;
+  }
+  _ss.linhas=out;_ss.carregado=true;
+  return out;
+}
+// comparecimento e venda no Clinicorp, desde a abordagem mais antiga com telefone
+async function ssResultadosClinicorp(linhas){
+  const comTel=(linhas||[]).filter(l=>l.telefone);
+  if(!comTel.length)return{comp:new Set(),vendas:{}};
+  const desde=comTel.map(l=>l.abordado_em).sort()[0];
+  const ate=ssHoje();
+  const chave=desde+'|'+ate;
+  if(_ss.clin&&_ss.clinChave===chave)return _ss.clin;
+  const q=a=>fetch(CLOUDIA_URL+'?action='+a+'&from='+desde+'&to='+ate).then(r=>r.json()).catch(()=>null);
+  const [ag,v]=await Promise.all([q('analyticsAgendaClinicorp'),q('analyticsVendasReaisClinicorp')]);
+  const comp=new Set(((ag&&ag.status==='ok'&&ag.detalheComparecimentos)||[]).map(x=>normalizePhone(x.tel)).filter(Boolean));
+  const agend=new Set(((ag&&ag.status==='ok'&&ag.detalheAgendados)||[]).map(x=>normalizePhone(x.tel)).filter(Boolean));
+  const vendas={};
+  ((v&&v.status==='ok'&&v.registros)||[]).forEach(x=>{const p=normalizePhone(x.telefone);if(!p)return;(vendas[p]=vendas[p]||[]).push(x);});
+  _ss.clin={comp,agend,vendas,ok:!!(ag&&ag.status==='ok'),okVendas:!!(v&&v.status==='ok')};_ss.clinChave=chave;
+  return _ss.clin;
+}
+function ssResultado(l,clin){
+  const p=normalizePhone(l.telefone||'');
+  const vs=p&&clin&&clin.vendas[p]?clin.vendas[p].filter(x=>String(x.data)>=String(l.abordado_em)):[];
+  const valor=vs.reduce((s,x)=>s+Number(x.valor||0),0);
+  const compareceu=!!(p&&clin&&clin.comp.has(p));
+  const agendou=l.status==='agendou'||!!l.agendado_para||!!(p&&clin&&clin.agend&&clin.agend.has(p));
+  let etapa='FOLLOW UP '+Math.max(1,Math.min(3,Number(l.tentativas)||1));
+  if(l.status==='desqualificado')etapa='DESQUALIFICADO';
+  if(agendou)etapa='AGENDADO';
+  if(compareceu)etapa='COMPARECEU';
+  if(vs.length)etapa='VENDA';
+  return{etapa,compareceu,agendou,venda:vs.length>0,valor};
+}
+// linhas no formato da planilha antiga, para a aba Social Selling do Dashboard
+async function ssLinhasDashboard(){
+  const linhas=await ssCarregar();
+  const clin=await ssResultadosClinicorp(linhas);
+  return linhas.map(l=>{const r=ssResultado(l,clin);return{
+    'DATA':l.abordado_em+'T12:00:00','LINK DO INSTAGRAM':'https://www.instagram.com/'+l.instagram+'/',
+    'RESPONDEU?':(l.respondeu||r.agendou)?'SIM':'','TIPO':l.tipo||'','RESULTADO':r.etapa,'Tentativas de Follow':l.tentativas||0};});
+}
+async function abrirSocialSelling(){
+  const el=document.getElementById('ss-conteudo');if(!el)return;
+  if(!_ss.carregado)el.innerHTML='<div class="au-vazio">Carregando…</div>';
+  try{await ssCarregar();}catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar: '+_waEsc(e.message)+'</div>';return;}
+  ssRender();
+  ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling')ssRender();}).catch(()=>{});
+}
+function ssFiltradas(){
+  const pr=ssPeriodo();const b=_ss.busca.trim().toLowerCase();
+  return _ss.linhas.filter(l=>l.abordado_em>=pr.since&&l.abordado_em<=pr.until)
+    .filter(l=>!_ss.status||l.status===_ss.status)
+    .filter(l=>!b||[l.instagram,l.nome,l.telefone,l.obs].some(x=>String(x||'').toLowerCase().includes(b)));
+}
+function ssRender(){
+  const el=document.getElementById('ss-conteudo');if(!el)return;
+  const sel=(v,ops,on)=>'<select class="dp-in" style="height:32px;width:auto;" onchange="'+on+'">'+ops.map(([k,t])=>'<option value="'+_waEsc(k)+'"'+(String(v||'')===String(k)?' selected':'')+'>'+_waEsc(t)+'</option>').join('')+'</select>';
+  const lista=ssFiltradas();const clin=_ss.clin;
+  let abord=lista.length,resp=0,ag=0,comp=0,vend=0,valor=0;
+  lista.forEach(l=>{const r=ssResultado(l,clin);if(l.respondeu||r.agendou)resp++;if(r.agendou)ag++;if(r.compareceu)comp++;if(r.venda){vend++;valor+=r.valor;}});
+  const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+  const card=(t,v,s)=>'<div class="au-card" style="flex:1;min-width:140px;"><div style="font-size:11px;color:#8C98B1;">'+t+'</div><div style="font-size:22px;font-weight:700;color:#fff;">'+v+'</div><div style="font-size:11px;color:#66738F;">'+(s||'')+'</div></div>';
+  const linhaTabela=l=>{
+    const r=ssResultado(l,clin);const id=l.id;
+    const inp=(campo,tipo,val,w)=>'<input class="dp-in" style="height:30px;width:'+w+';" type="'+tipo+'" value="'+_waEsc(val||'')+'" onchange="ssSalvar('+id+',\''+campo+'\',this.value)">';
+    const res=r.venda?'<span style="color:#7FD3A0;">Fechou '+(r.valor?('R$ '+r.valor.toLocaleString('pt-BR',{maximumFractionDigits:0})):'')+'</span>':r.compareceu?'<span style="color:#E2BE6A;">Compareceu</span>':r.agendou?'<span style="color:#C3CBDB;">Agendou</span>':'<span style="color:#66738F;">—</span>';
+    const faltaDado=l.status==='agendou'&&(!l.telefone||!l.agendado_para);
+    return '<tr'+(faltaDado?' style="background:rgba(212,175,90,.07)"':'')+'>'+
+      '<td style="white-space:nowrap;">'+inp('abordado_em','date',l.abordado_em,'132px')+'</td>'+
+      '<td><a href="https://www.instagram.com/'+encodeURIComponent(l.instagram)+'/" target="_blank" rel="noopener" style="color:#E2BE6A;">@'+_waEsc(l.instagram)+'</a></td>'+
+      '<td>'+sel(l.perfil,[['','—']].concat(SS_PERFIS.map(x=>[x,x])),'ssSalvar('+id+',\'perfil\',this.value)')+'</td>'+
+      '<td>'+sel(l.tipo,[['','—']].concat(SS_TIPOS.map(x=>[x,x])),'ssSalvar('+id+',\'tipo\',this.value)')+'</td>'+
+      '<td style="white-space:nowrap;text-align:center;"><span style="display:inline-block;min-width:18px;">'+(l.tentativas||0)+'</span> <button class="wa-btn" style="padding:2px 8px;" title="Mais um follow-up" onclick="ssSalvar('+id+',\'tentativas\','+((l.tentativas||0)+1)+')">+1</button></td>'+
+      '<td style="text-align:center;"><input type="checkbox" '+(l.respondeu?'checked':'')+' onchange="ssSalvar('+id+',\'respondeu\',this.checked)"></td>'+
+      '<td>'+sel(l.status,Object.entries(SS_STATUS),'ssSalvar('+id+',\'status\',this.value)')+'</td>'+
+      '<td>'+inp('nome','text',l.nome,'140px')+'</td>'+
+      '<td>'+inp('telefone','tel',l.telefone,'130px')+'</td>'+
+      '<td>'+inp('agendado_para','date',l.agendado_para,'132px')+'</td>'+
+      '<td style="white-space:nowrap;">'+res+'</td>'+
+      '<td>'+inp('obs','text',l.obs,'160px')+'</td>'+
+      '<td><button class="wa-btn" style="padding:2px 8px;" title="Apagar" onclick="ssApagar('+id+')">✕</button></td></tr>';
+  };
+  el.innerHTML=
+    '<div class="au-bloco"><h4>Registrar abordagem</h4>'+
+      '<div class="au-linha" style="gap:8px;">'+
+        '<input id="ss-novo-insta" class="dp-in" style="height:34px;flex:1;min-width:220px;" placeholder="@usuario ou link do perfil" oninput="ssConferirNovo()" onkeydown="if(event.key===\'Enter\')ssRegistrar()">'+
+        '<select id="ss-novo-perfil" class="dp-in" style="height:34px;width:auto;">'+SS_PERFIS.map(x=>'<option>'+x+'</option>').join('')+'</select>'+
+        '<select id="ss-novo-tipo" class="dp-in" style="height:34px;width:auto;">'+SS_TIPOS.map(x=>'<option>'+x+'</option>').join('')+'</select>'+
+        '<input id="ss-novo-data" type="date" class="dp-in" style="height:34px;width:150px;" value="'+ssHoje()+'">'+
+        '<button class="wa-btn primario" onclick="ssRegistrar()">Registrar</button>'+
+      '</div><div id="ss-novo-aviso" class="au-dica"></div></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">'+
+      card('Abordagens',abord,'no período')+card('Responderam',resp,pct(resp,abord)+' das abordagens')+card('Agendaram',ag,pct(ag,resp)+' das respostas')+
+      card('Compareceram',comp,(clin&&clin.ok?pct(comp,ag)+' dos agendados':'buscando no Clinicorp…'))+card('Fecharam',vend,(valor?('R$ '+valor.toLocaleString('pt-BR',{maximumFractionDigits:0})):'')+(clin&&clin.okVendas?'':' buscando…'))+
+    '</div>'+
+    '<div class="au-topo"><div class="au-linha" style="gap:8px;">'+
+      sel(_ss.periodo,[['mes','Este mês'],['30','Últimos 30 dias'],['mespassado','Mês passado'],['tudo','Tudo']],'_ss.periodo=this.value;ssRender()')+
+      sel(_ss.status,[['','Todos os status']].concat(Object.entries(SS_STATUS)),'_ss.status=this.value;ssRender()')+
+      '<input class="dp-in" style="height:32px;width:220px;" placeholder="Buscar @, nome ou telefone" value="'+_waEsc(_ss.busca)+'" oninput="_ss.busca=this.value;clearTimeout(_ss.tb);_ss.tb=setTimeout(ssRender,300)">'+
+    '</div><div class="au-dica">Agendou pelo direct? Mude o status para <b>Agendou</b> e preencha telefone e data da avaliação: comparecimento e venda o CRM busca sozinho no Clinicorp.</div></div>'+
+    (lista.length?'<div class="table-card" style="overflow:auto;"><table style="width:100%;font-size:12px;"><thead><tr><th>Abordagem</th><th>Instagram</th><th>Perfil</th><th>Tipo</th><th>Follow-ups</th><th>Respondeu</th><th>Status</th><th>Nome</th><th>Telefone</th><th>Avaliação</th><th>Clinicorp</th><th>Obs.</th><th></th></tr></thead><tbody>'+lista.map(linhaTabela).join('')+'</tbody></table></div>'
+      :'<div class="au-vazio">Nenhuma abordagem neste filtro.</div>');
+  if(_ss.foco){const i=document.getElementById('ss-novo-insta');if(i)i.focus();_ss.foco=false;}
+}
+function ssConferirNovo(){
+  const u=ssUsuario((document.getElementById('ss-novo-insta')||{}).value);const av=document.getElementById('ss-novo-aviso');if(!av)return;
+  const ja=u&&_ss.linhas.find(l=>l.instagram===u);
+  av.innerHTML=ja?'⚠️ @'+_waEsc(u)+' já foi abordado em '+ssFmt(ja.abordado_em)+' ('+SS_STATUS[ja.status]+', '+(ja.tentativas||0)+' follow-up). Registrar de novo soma mais um follow-up.':'';
+}
+async function ssRegistrar(){
+  const i=document.getElementById('ss-novo-insta');const u=ssUsuario(i&&i.value);
+  if(!u){showToast('error','Coloque o @ ou o link do perfil','');return;}
+  const ja=_ss.linhas.find(l=>l.instagram===u);
+  try{
+    if(ja){await ssSalvar(ja.id,'tentativas',(ja.tentativas||0)+1,true);showToast('success','Mais um follow-up para @'+u,'');}
+    else{
+      const corpo={instagram:u,perfil:document.getElementById('ss-novo-perfil').value,tipo:document.getElementById('ss-novo-tipo').value,abordado_em:document.getElementById('ss-novo-data').value||ssHoje()};
+      const r=await _waRest('social_selling',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+      if(r&&r[0])_ss.linhas.unshift(r[0]);
+    }
+    i.value='';_ss.foco=true;ssRender();
+  }catch(e){showToast('error','Não salvou',e.message);}
+}
+async function ssSalvar(id,campo,valor,semRender){
+  const l=_ss.linhas.find(x=>x.id===id);if(!l)return;
+  let v=valor;
+  if(campo==='tentativas')v=Math.max(0,parseInt(valor)||0);
+  if(campo==='respondeu')v=!!valor;
+  if(['nome','telefone','obs','perfil','tipo','agendado_para'].includes(campo))v=String(valor||'').trim()||null;
+  if(campo==='abordado_em'&&!valor)return;
+  const corpo={[campo]:v};
+  if(campo==='agendado_para'&&v&&l.status==='em_andamento')corpo.status='agendou';
+  if(campo==='status'&&v==='agendou'&&!l.respondeu)corpo.respondeu=true;
+  try{
+    const r=await _waRest('social_selling?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+    if(r&&r[0])Object.assign(l,r[0]);
+    if(campo==='telefone')_ss.clinChave='';
+    if(!semRender){ssRender();if(campo==='telefone'||campo==='agendado_para'||campo==='status')ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling')ssRender();});}
+  }catch(e){showToast('error','Não salvou',e.message);}
+}
+async function ssApagar(id){
+  const l=_ss.linhas.find(x=>x.id===id);if(!l)return;
+  const b=document.querySelector('button[onclick="ssApagar('+id+')"]');
+  if(!b||b.dataset.conf!=='1'){if(b){b.dataset.conf='1';b.textContent='Apagar?';setTimeout(()=>{if(b){b.dataset.conf='';b.textContent='✕';}},3000);}return;}
+  try{await _waRest('social_selling?id=eq.'+id,{method:'DELETE'});_ss.linhas=_ss.linhas.filter(x=>x.id!==id);ssRender();}
+  catch(e){showToast('error','Não apagou',e.message);}
+}
+// traz as linhas da planilha antiga (uma vez; quem já existe não duplica)
+async function ssImportarPlanilha(){
+  const raw=await (await fetch(SS_SOCIAL)).json();
+  if(!Array.isArray(raw)||raw.length<2)return 0;
+  const h=raw[0];const linhas=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});
+  const vistos=new Set();const corpo=[];
+  linhas.forEach(o=>{
+    const u=ssUsuario(o['LINK DO INSTAGRAM']);if(!u||vistos.has(u))return;vistos.add(u);
+    const d=parseDateSS(o['DATA']);const res=String(o['RESULTADO']||'').toUpperCase();
+    const n=parseInt((res.match(/FOLLOW UP (\d)/)||[])[1]||'1');
+    corpo.push({instagram:u,tipo:o['TIPO']||null,abordado_em:d?localDateStr(d):ssHoje(),tentativas:Math.max(n,parseInt(o['Tentativas de Follow'])||0,1),
+      respondeu:String(o['RESPONDEU?']||'').toUpperCase()==='SIM',status:res.includes('DESQUALIFICADO')?'desqualificado':(/AGENDADO|COMPARECEU|VENDA/.test(res)?'agendou':'em_andamento'),obs:'importado da planilha'});
+  });
+  if(!corpo.length)return 0;
+  await _waRest('social_selling?on_conflict=instagram',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(corpo)});
+  return corpo.length;
+}
+
 async function loadSocial(){
   document.getElementById('loading-social').style.display='flex';
   document.getElementById('content-social').style.display='none';
   try{
-    const res=await fetch(SS_SOCIAL);const raw=await res.json();
-    if(!Array.isArray(raw)||raw.length<2){allSSRows=[];}
-    else{const h=raw[0];allSSRows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});}
-    document.getElementById('badge-ss').textContent='⬤ Google Sheets — '+allSSRows.length+' registros';
+    // (24/10/2026) lê do próprio CRM (tela Social Selling); a planilha só
+    // é usada se a tabela ainda não existir
+    let doCRM=null;
+    try{doCRM=await ssLinhasDashboard();}catch(e){console.warn('[SOCIAL] tabela do CRM indisponível, usando a planilha:',e&&e.message);}
+    if(doCRM){allSSRows=doCRM;document.getElementById('badge-ss').textContent='⬤ CRM — '+allSSRows.length+' registros';}
+    else{
+      const res=await fetch(SS_SOCIAL);const raw=await res.json();
+      if(!Array.isArray(raw)||raw.length<2){allSSRows=[];}
+      else{const h=raw[0];allSSRows=raw.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});}
+      document.getElementById('badge-ss').textContent='⬤ Google Sheets — '+allSSRows.length+' registros';
+    }
     renderSocial(allSSRows);
     document.getElementById('loading-social').style.display='none';
     document.getElementById('content-social').style.display='block';
