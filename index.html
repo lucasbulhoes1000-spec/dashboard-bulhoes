@@ -2522,7 +2522,7 @@ const DASHBOARD_TOKEN='4b88a3c50b1d5152112db15bc4a35c0f774f5ddcb9e50bf0';
 // Apps Script. Só respostas com status "ok" são guardadas.
 const GS_CACHE_ACOES={metaInsightsFinal:1,funilMetaFinal:1,analyticsAgendaClinicorp:1,analyticsVendasReaisClinicorp:1};
 const GS_CACHE_FRESCO_MS=2*60*1000;
-const _gsCache={mem:new Map(),emVoo:new Map(),pendentes:0,forcar:false,timerRender:null,maisAntigo:null};
+const _gsCache={mem:new Map(),emVoo:new Map(),buscando:new Map(),pendentes:0,forcar:false,timerRender:null,maisAntigo:null};
 function _gsHora(ms){return new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
 function _gsAtualizarSelo(){
   const el=document.getElementById('last-update');if(!el)return;
@@ -2587,7 +2587,12 @@ function _gsAgendarRender(){
     const forcar=_gsCache.forcar;
     return(async()=>{
       const c=forcar?null:await lerCache(chave);
-      if(!c){const n=await buscarNovo(input,chave,init);return json(n.texto,n.status);}
+      if(!c){
+        // duas telas pedindo o mesmo período ao mesmo tempo: uma busca só
+        let pb=_gsCache.buscando.get(chave);
+        if(!pb){pb=buscarNovo(input,chave,init);_gsCache.buscando.set(chave,pb);pb.then(()=>{},()=>{}).then(()=>{if(_gsCache.buscando.get(chave)===pb)_gsCache.buscando.delete(chave);});}
+        const n=await pb;return json(n.texto,n.status);
+      }
       if(Date.now()-c.em>GS_CACHE_FRESCO_MS)revalidar(input,chave,init,c.texto);
       if(!_gsCache.maisAntigo||c.em<_gsCache.maisAntigo)_gsCache.maisAntigo=c.em;
       return json(c.texto);
@@ -4274,7 +4279,116 @@ function rebuildStageIndex(cloudiaRows){
 // A tabela "Funil por Anúncio" e TODAS as suas lupas passam a usar
 // FUNIL_META_BASE_FINAL + FUNIL_META_RESUMO_FINAL como fonte da verdade.
 // A Meta continua sendo usada somente para investimento/spend.
+// ===== FUNIL POR ANÚNCIO CALCULADO NO CRM (24/10/2026) =====
+// Antes a tabela "Funil por Anúncio" vinha pronta do Apps Script
+// (funilMetaFinal), montada a partir da planilha do Cloudia. Quando o Cloudia
+// for desligado a planilha para de receber leads, então o funil passa a ser
+// montado aqui, no MESMO formato ({base, resumo, totais}), juntando:
+//   - quem veio de anúncio: eventos da cópia da planilha (importacao_cloudia)
+//     + eventos do próprio CRM (eventos_proprios, a partir de funil_proprio_desde)
+//     + origem marcada à mão no CRM;
+//   - agendou / compareceu no período: agenda do Clinicorp (analyticsAgendaClinicorp);
+//   - fechou / vendas: lançamentos do Clinicorp (analyticsVendasReaisClinicorp);
+//   - nome de campanha, conjunto e anúncio: Meta (metaInsightsFinal).
+// Regras, conferidas contra o Apps Script em 24/10 (jul–out/2026: mesmos totais
+// de leads, agendados e vendas em jul, ago e set; diferença de 1 a 4 pessoas por mês):
+//   - origem paga = "#Instagram ADS" ou formulário do Facebook;
+//   - entra quem tem evento de origem paga (em qualquer data) — ou origem paga
+//     marcada à mão no CRM; origem NÃO paga marcada à mão tira a pessoa — E,
+//     no período, virou lead, agendou, compareceu ou teve lançamento;
+//   - lead no período = CUSTOMER_CREATED com data de criação dentro do período;
+//   - anúncio = o PRIMEIRO anúncio que trouxe a pessoa (sem anúncio: SEM_AD_ID);
+//   - contrato = lançamento "Novo" ou "Lançamento de Tratamento".
+const FUNIL_ANUNCIO_DO_CRM=true; // false = volta a usar o funil pronto do Apps Script
+function montarFunilMetaLocal(range,linhas,agenda,vendas,meta){
+  const np=p=>normalizePhone(p);
+  const dia=d=>{const x=parseCloudiaDate(d);return x?localDateStr(x):'';};
+  const ts=x=>{const d=parseCloudiaDate(x.timestamp||x.created_at);return d?d.getTime():0;};
+  const noPeriodo=s=>!!s&&s>=range.since&&s<=range.until;
+  const NOME_ORIGEM={'#Instagram ADS':'#Instagram ADS','#Formulário Facebook':'#Formulário Facebook','#Formulário':'#Formulário Facebook'};
+  const pagaCanonica=o=>{const c=NOME_ORIGEM[String(o||'').trim()];if(c)return c;const l=origemLabelCanonico(o);return NOME_ORIGEM[l]||'';};
+  const M={};(meta||[]).forEach(a=>{if(a&&a.ad_id)M[String(a.ad_id)]=a;});
+  const porTel={};
+  (linhas||[]).forEach((x,i)=>{const p=np(x.phone);if(!p)return;(porTel[p]=porTel[p]||[]).push(Object.assign({_i:i},x));});
+  const manualDe=p=>{try{const d=ccDataLookup(p);return d&&d.origemAtual?String(d.origemAtual):'';}catch(e){return '';}};
+  try{Object.keys(_ccData||{}).forEach(k=>{const p=np(k);const d=_ccData[k];if(p&&!porTel[p]&&d&&d.origemAtual&&pagaCanonica(d.origemAtual))porTel[p]=[];});}catch(e){}
+  const agend=new Set(((agenda&&agenda.detalheAgendados)||[]).map(x=>np(x.tel)));
+  const comp=new Set(((agenda&&agenda.detalheComparecimentos)||[]).map(x=>np(x.tel)));
+  const vend={};
+  ((vendas&&vendas.registros)||[]).forEach(x=>{const p=np(x.telefone);if(!p)return;(vend[p]=vend[p]||[]).push(x);});
+  const base=[];
+  Object.keys(porTel).forEach(p=>{
+    const ev=porTel[p].slice().sort((a,b)=>(ts(a)-ts(b))||(a._i-b._i));
+    const pagos=ev.filter(x=>pagaCanonica(x.origin));
+    const manual=manualDe(p);
+    if(manual?!pagaCanonica(manual):!pagos.length)return;
+    const criados=ev.filter(x=>x.type==='CUSTOMER_CREATED'&&noPeriodo(dia(x.created_at)));
+    const lead=criados.length>0;
+    const rs=vend[p]||[];
+    const ag=agend.has(p),co=comp.has(p),fe=rs.length>0;
+    if(!(lead||ag||co||fe))return;
+    const comAd=ev.filter(x=>String(x.ad_id||'').trim());
+    const ad=comAd.length?comAd[0]:null;
+    const adId=ad?String(ad.ad_id).replace(/\D/g,''):'';
+    const mm=M[adId];
+    const comNome=ev.filter(x=>x.type==='CUSTOMER_CREATED'&&String(x.name||'').trim());
+    const qualquerNome=ev.filter(x=>String(x.name||'').trim());
+    const nome=comNome.length?comNome[comNome.length-1].name:(qualquerNome.length?qualquerNome[qualquerNome.length-1].name:'');
+    const valor=rs.reduce((s,x)=>s+Number(x.valor||0),0);
+    base.push({
+      'NOME':String(nome||'').trim(),
+      'TELEFONE':p,
+      'ORIGEM':manual?pagaCanonica(manual):pagaCanonica(pagos[0].origin),
+      'CAMPANHA':mm?mm.campaign_name:(ad?String(ad.campaign_name||''):''),
+      'CONJUNTO':mm?mm.adset_name:(ad?String(ad.adset_name||''):''),
+      'ANÚNCIO':mm?mm.ad_name:(ad?String(ad.ad_name||''):''),
+      'AD_ID':adId,
+      'STATUS RASTREIO':adId?'OK':'SEM_AD_ID',
+      'LEAD NO PERÍODO?':lead?'SIM':'NÃO',
+      'AGENDOU NO PERÍODO?':ag?'SIM':'NÃO',
+      'COMPARECEU NO PERÍODO?':co?'SIM':'NÃO',
+      'FECHOU NO PERÍODO?':fe?'SIM':'NÃO',
+      'QTD CONTRATOS':rs.filter(x=>x.classe==='Novo'||x.descricao==='Lançamento de Tratamento').length,
+      'QTD LANÇAMENTOS':rs.length,
+      'VALOR VENDAS':Math.round(valor*100)/100,
+      'DATA CRIAÇÃO LEAD':lead?dia(criados[0].created_at):'',
+      'DETALHES VENDAS':rs.map(x=>x.data+' | '+x.classe+' | R$ '+Number(x.valor||0).toFixed(2)+' | '+x.descricao).join(' || ')
+    });
+  });
+  const porAd={};
+  base.forEach(b=>{
+    const k=b.AD_ID;
+    const r=porAd[k]=porAd[k]||{'CAMPANHA':b.CAMPANHA,'CONJUNTO':b.CONJUNTO,'ANÚNCIO':b['ANÚNCIO'],'AD_ID':k,'LEADS':0,'AGENDADOS':0,'COMPARECIMENTOS':0,'FECHAMENTOS':0,'CONTRATOS':0,'LANÇAMENTOS':0,'VENDAS':0};
+    if(b['LEAD NO PERÍODO?']==='SIM')r.LEADS++;
+    if(b['AGENDOU NO PERÍODO?']==='SIM')r.AGENDADOS++;
+    if(b['COMPARECEU NO PERÍODO?']==='SIM')r.COMPARECIMENTOS++;
+    if(b['FECHOU NO PERÍODO?']==='SIM')r.FECHAMENTOS++;
+    r.CONTRATOS+=b['QTD CONTRATOS'];r['LANÇAMENTOS']+=b['QTD LANÇAMENTOS'];
+    r.VENDAS=Math.round((r.VENDAS+b['VALOR VENDAS'])*100)/100;
+  });
+  const resumo=Object.values(porAd).sort((a,b)=>b.LEADS-a.LEADS||b.VENDAS-a.VENDAS);
+  const tot={leads:0,agendados:0,comparecimentos:0,fechamentos:0,contratos:0,lancamentos:0,vendas:0};
+  resumo.forEach(r=>{tot.leads+=r.LEADS;tot.agendados+=r.AGENDADOS;tot.comparecimentos+=r.COMPARECIMENTOS;tot.fechamentos+=r.FECHAMENTOS;tot.contratos+=r.CONTRATOS;tot.lancamentos+=r['LANÇAMENTOS'];tot.vendas+=r.VENDAS;});
+  tot.vendas=Math.round(tot.vendas*100)/100;
+  return{status:'ok',from:range.since,to:range.until,base,resumo,totais:tot,atualizado_em:new Date().toISOString(),fonte:'crm'};
+}
+async function montarFunilMetaDoCRM(range){
+  const q=a=>fetch(CLOUDIA_URL+'?action='+a+'&from='+range.since+'&to='+range.until).then(r=>r.json());
+  const [linhasMescladas,ag,v,me]=await Promise.all([fetchCloudia(),q('analyticsAgendaClinicorp'),q('analyticsVendasReaisClinicorp'),q('metaInsightsFinal')]);
+  const linhas=window._cloudiaLinhasSemMescla;
+  if(!Array.isArray(linhas)||!linhas.length||!linhasMescladas||!linhasMescladas.length)throw new Error('eventos dos leads indisponíveis');
+  if(!ag||ag.status!=='ok')throw new Error('agenda do Clinicorp indisponível');
+  if(!v||v.status!=='ok')throw new Error('vendas do Clinicorp indisponíveis');
+  return montarFunilMetaLocal(range,linhas,ag,v,(me&&me.status==='ok'&&me.data)||[]);
+}
+
 async function fetchFunilMetaFinal(){
+  // (24/10/2026) funil montado no próprio CRM; se faltar alguma fonte, cai
+  // para o funil pronto do Apps Script, como antes.
+  if(FUNIL_ANUNCIO_DO_CRM){
+    try{return await montarFunilMetaDoCRM(getRange('trafego'));}
+    catch(e){console.warn('[FUNIL CRM] não deu para montar no CRM, usando o Apps Script:',e&&e.message);}
+  }
   // ⚠️ CORRIGIDO (28/09/2026 — URGENTE, "quebrou o backoffice inteiro"):
   // essa função rodava dentro do MESMO Promise.all que carrega o dashboard
   // inteiro (fetchMeta + fetchCloudia) — quando o backend (.gs) não tinha
@@ -4808,6 +4922,9 @@ async function _fetchCloudiaImpl(){
       if(r.origin&&_normOri[String(r.origin).trim()])r.origin=_normOri[String(r.origin).trim()];
       return r;
     });
+    // cópia antes de mesclar as trocas de origem na linha do lead (o funil por
+    // anúncio precisa saber a origem de cada evento como ele foi gravado)
+    window._cloudiaLinhasSemMescla=rows.map(r=>Object.assign({},r));
     allCloudiaRows=rows;
     _nomeParaTelefoneIndex=null;
     // Mescla CUSTOMER_ACQUISITION_ORIGIN_UPDATED na linha do lead original (mesmo telefone)
