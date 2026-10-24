@@ -6367,7 +6367,7 @@ async function ssSalvar(id,campo,valor,semRender){
   if(campo==='abordado_em'&&!valor)return;
   const corpo={[campo]:v};
   if(campo==='agendado_para'&&v&&l.status==='em_andamento')corpo.status='agendou';
-  if(campo==='status'&&v==='agendou'&&!l.respondeu)corpo.respondeu=true;
+  if(corpo.status==='agendou'&&!l.respondeu)corpo.respondeu=true;
   try{
     const r=await _waRest('social_selling?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
     if(r&&r[0])Object.assign(l,r[0]);
