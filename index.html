@@ -6241,7 +6241,7 @@ async function ssCarregar(){
 // comparecimento e venda no Clinicorp, desde a abordagem mais antiga com telefone
 async function ssResultadosClinicorp(linhas){
   const comTel=(linhas||[]).filter(l=>l.telefone);
-  if(!comTel.length)return{comp:new Set(),vendas:{}};
+  if(!comTel.length){_ss.clin={comp:new Set(),agend:new Set(),vendas:{},ok:true,okVendas:true};_ss.clinChave='';return _ss.clin;}
   const desde=comTel.map(l=>l.abordado_em).sort()[0];
   const ate=ssHoje();
   const chave=desde+'|'+ate;
