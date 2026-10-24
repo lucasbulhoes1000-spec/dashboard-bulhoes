@@ -906,6 +906,45 @@ body{letter-spacing:-.1px;}
 
 .btn-top{display:inline-flex !important;align-items:center;gap:6px;font-weight:600;}
 .btn-top .ic{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ===== KANBAN ===== */
+.kb-modo{display:inline-flex;gap:4px;padding:4px;margin:0 0 12px;border:1px solid var(--line2);border-radius:999px;background:rgba(255,255,255,.02);}
+.kb-modo button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:6px 14px;border-radius:999px;cursor:pointer;}
+.kb-modo button svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.kb-modo button.ativo{background:rgba(212,175,90,.16);color:var(--gold-strong);box-shadow:inset 0 0 0 1px var(--gold-soft);}
+.kb-aviso{font-size:11.5px;color:var(--muted);margin:0 0 10px;max-width:980px;line-height:1.5;}
+.kb-trilho{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 14px;align-items:flex-start;min-height:60vh;}
+.kb-col{flex:0 0 268px;width:268px;min-width:0;display:flex;flex-direction:column;max-height:calc(100vh - 230px);border-radius:14px;background:rgba(13,26,51,.72);border:1px solid var(--line2);}
+.kb-col.cad{background:rgba(13,26,51,.5);}
+.kb-col.alvo{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,90,.15);}
+.kb-cab{padding:12px 12px 10px;border-bottom:1px solid rgba(42,61,102,.6);position:sticky;top:0;}
+.kb-col.solta .kb-cab{border-top:2px solid rgba(212,175,90,.55);border-radius:14px 14px 0 0;}
+.kb-tit{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;color:var(--txt);}
+.kb-tit span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kb-tit b{flex-shrink:0;min-width:24px;text-align:center;font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(212,175,90,.14);color:var(--gold-strong);}
+.kb-soma{margin-top:5px;font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px;}
+.kb-met{margin-top:4px;font-size:11px;color:#9BE3B5;font-weight:600;}
+.kb-met.fraco{color:var(--muted2);font-weight:500;}
+.kb-cards{padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;}
+.kb-card{background:linear-gradient(180deg,#152748,#102040);border:1px solid rgba(42,61,102,.9);border-radius:11px;padding:10px 11px;cursor:grab;transition:border-color .15s,transform .15s;}
+.kb-card:hover{border-color:var(--gold-soft);}
+.kb-card.pegando{opacity:.45;transform:scale(.98);}
+.kb-nome{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kb-linha{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:11px;color:var(--muted);margin-top:3px;}
+.kb-valor{font-size:12.5px;color:var(--gold-strong);}
+.kb-valor.ok{color:#7FD3A0;}
+.kb-tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.05);color:var(--txt2);margin-top:4px;}
+.kb-tag.ok{background:rgba(95,196,138,.13);color:#9BE3B5;}
+.kb-tag.hoje{background:rgba(212,175,90,.16);color:var(--gold-strong);}
+.kb-tag.atraso{background:rgba(224,103,90,.15);color:#F2A79C;}
+.kb-barra{height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin:6px 0 2px;overflow:hidden;}
+.kb-barra i{display:block;height:100%;background:linear-gradient(90deg,#B08A3E,#F0CB72);}
+.kb-wa{display:inline-block;margin-top:7px;font-size:11px;font-weight:600;color:#7FD3A0;text-decoration:none;}
+.kb-wa:hover{text-decoration:underline;}
+.kb-mais{border:1px dashed var(--line2);background:transparent;color:var(--txt2);font-size:11.5px;border-radius:9px;padding:8px;cursor:pointer;}
+.kb-mais:hover{border-color:var(--gold-soft);color:#fff;}
+.kb-vazio{font-size:11.5px;color:var(--muted2);text-align:center;padding:18px 6px;border:1px dashed rgba(42,61,102,.7);border-radius:10px;}
+@media (max-width:700px){.kb-col{flex-basis:82vw;}}
 </style>
 </head>
 <body>
@@ -15726,5 +15765,427 @@ function abrirConversas(){
     </div>
   </div>
 </div>
+<script>
+// ============================================================
+// KANBAN POR ETAPA DO PROCESSO COMERCIAL (24/10/2026)
+// Leads, Clientes, Em Fluxo e Pacientes ganham a visão Kanban ao lado da
+// tabela (botão Lista / Kanban). As colunas seguem o processo comercial e
+// ficam em KB_QUADROS (fácil de trocar quando o processo novo chegar).
+// • Leads: as colunas de cadência (FUP 2h … 2 meses, Faltantes) são
+//   calculadas pelo horário de entrada + regras das sequências (dias úteis,
+//   11h às 17h). Quem já respondeu sai das cadências ("Em atendimento").
+//   A taxa de resposta de cada cadência usa as mensagens gravadas no CRM.
+//   Quando as sequências do próprio CRM substituírem o Cloudia, a posição
+//   passa a vir do passo real de cada sequência.
+// • Arrastar: Leads → Agendou / Faltou / Perdido (abre o card para a data);
+//   Clientes → muda a fase. Fluxo e Pacientes andam sozinhos pelos dados.
+// ============================================================
+const KB_CAD_LEAD=[
+  {id:'fup2h',nome:'FUP 2h',min:120},
+  {id:'fup4h',nome:'FUP 4h',min:240},
+  {id:'fup24h',nome:'FUP 24h',min:1440},
+  {id:'fup2d',nome:'FUP 2 dias',min:2880},
+  {id:'fup3d',nome:'FUP 3 dias',min:4200},
+  {id:'fup7d',nome:'FUP 7 dias',min:10080},
+  {id:'fup14d',nome:'FUP 14 dias',min:20160},
+  {id:'fup21d',nome:'FUP 21 dias',min:30240},
+  {id:'fup2m',nome:'FUP 2 meses',min:86400}
+];
+const KB_CAD_FALTA=[
+  {id:'falt1',nome:'Faltantes 1',min:1440},
+  {id:'falt2',nome:'Faltantes 2',min:2880},
+  {id:'falt3',nome:'Faltantes 3',min:4320}
+];
+const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Sem resposta','Agendou retorno','Avaliação comercial','Aguardando entrada','Fechou','Pós venda'];
+const KB_LIMITE=40;
+const _kb={modo:{},limite:{},resp:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{}};
+try{const m=JSON.parse(localStorage.getItem('kb_modo')||'{}');if(m&&typeof m==='object')_kb.modo=m;}catch(e){}
+
+function _kbEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function _kbDias(d){if(!d)return null;const t=d instanceof Date?d.getTime():new Date(d).getTime();if(isNaN(t))return null;return Math.floor((Date.now()-t)/86400000);}
+function _kbTempo(d){const n=_kbDias(d);if(n==null)return '';if(n<=0)return 'hoje';if(n===1)return 'há 1 dia';if(n<60)return 'há '+n+' dias';const m=Math.floor(n/30);return m<24?'há '+m+' meses':'há '+Math.floor(m/12)+' anos';}
+function _kbPrimeiroNome(n){return String(n||'').trim().split(/\s+/)[0]||'';}
+function _kbIni(n){const p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+((p.length>1?p[p.length-1]:'')[0]||'')).toUpperCase();}
+
+// próximo horário em que a sequência pode enviar (dias úteis, 11h às 17h)
+function _kbJanela(d){
+  const x=new Date(d.getTime());
+  for(let i=0;i<10;i++){
+    const dia=x.getDay(),h=x.getHours()+x.getMinutes()/60;
+    if(dia===0||dia===6){x.setDate(x.getDate()+(dia===6?2:1));x.setHours(11,0,0,0);continue;}
+    if(h<11){x.setHours(11,0,0,0);return x;}
+    if(h>=17){x.setDate(x.getDate()+1);x.setHours(11,0,0,0);continue;}
+    return x;
+  }
+  return x;
+}
+function _kbEnvios(t0,cads){return cads.map(c=>_kbJanela(new Date(t0.getTime()+c.min*60000)));}
+
+// ---------- dados das respostas (uma consulta por carregamento) ----------
+async function _kbCarregarRespostas(itens){
+  if(_kb.carregandoResp)return;
+  _kb.carregandoResp=true;
+  try{
+    if(_kb.mensagensDesde===undefined){
+      try{const r=await _waRest('rpc/kanban_mensagens_desde',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});_kb.mensagensDesde=r?new Date(r):null;}
+      catch(e){_kb.mensagensDesde=null;}
+    }
+    if(!_kb.mensagensDesde)return;
+    const pedir=[];
+    itens.forEach(it=>{if(it.t0&&it.t0>=_kb.mensagensDesde&&it.ph&&_kb.resp[it.ph+'|'+it.t0.toISOString()]===undefined)pedir.push({t:it.ph,d:it.t0.toISOString()});});
+    for(let i=0;i<pedir.length;i+=800){
+      const lote=pedir.slice(i,i+800);
+      let r=[];
+      try{r=await _waRest('rpc/kanban_primeiras_respostas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_itens:lote})})||[];}catch(e){r=null;}
+      if(r===null)break;
+      const mapa={};r.forEach(x=>{mapa[x.telefone]=x.primeira_resposta?new Date(x.primeira_resposta):null;});
+      lote.forEach(x=>{_kb.resp[x.t+'|'+x.d]=mapa[x.t]===undefined?null:mapa[x.t];});
+    }
+  }finally{_kb.carregandoResp=false;}
+}
+function _kbResposta(it){
+  if(!it.t0||!_kb.mensagensDesde||it.t0<_kb.mensagensDesde)return undefined; // sem histórico
+  const v=_kb.resp[it.ph+'|'+it.t0.toISOString()];
+  return v; // undefined = ainda carregando, null = não respondeu, Date = respondeu
+}
+
+// ---------- quadros ----------
+const KB_QUADROS={
+  leads:{
+    titulo:'Leads',
+    lista:()=>{const tb=document.getElementById('leads-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('leads-pagination')];},
+    colunas:()=>[
+      {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
+      {id:'atendimento',nome:'Em atendimento',dica:'Respondeu: as cadências param e a SDR conduz'},
+      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true})),
+      {id:'agendou',nome:'Agendou',solta:true},
+      {id:'faltou',nome:'Faltou/desmarcou',solta:true},
+      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true})),
+      {id:'perdido',nome:'Perdido',solta:true,vazia:true,dica:'Solte aqui para marcar como perdido'}
+    ],
+    itens:()=>(_leadsFiltered||[]).map(r=>{
+      const e=applyEdits(r);
+      const ph=normalizePhone(e.phone||r.phone);
+      const t0=parseCloudiaDate(r.created_at||r.timestamp)||null;
+      const tEv=parseCloudiaDate(r.timestamp||r.created_at)||t0;
+      return {r,e,ph,t0,tEv,nome:e.name||'—',stage:(e.stage||'').toLowerCase()};
+    }),
+    coluna:(it)=>{
+      const s=it.stage;
+      const futuro=it.ph&&window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph);
+      if(futuro||s.includes('agendou'))return 'agendou';
+      if(s.includes('faltou')||s.includes('desmarcou')){
+        if(!it.tEv)return 'faltou';
+        const env=_kbEnvios(it.tEv,KB_CAD_FALTA);let col='faltou';
+        env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_FALTA[i].id;});
+        return col;
+      }
+      const resp=_kbResposta(it);
+      if(resp instanceof Date)return 'atendimento';
+      if(!it.t0)return 'novo';
+      const env=_kbEnvios(it.t0,KB_CAD_LEAD);let col='novo';
+      env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
+      return col;
+    },
+    metricas:(cols,todos)=>{
+      // taxa de resposta por cadência: entre quem chegou na cadência sem ter
+      // respondido, quantos responderam antes da próxima cadência
+      const m={};
+      const base=todos.filter(it=>it.t0&&_kbResposta(it)!==undefined);
+      const pontos=[{id:'novo',idx:-1},...KB_CAD_LEAD.map((c,i)=>({id:c.id,idx:i}))];
+      pontos.forEach(p=>{
+        let chegou=0,resp=0;
+        base.forEach(it=>{
+          const env=_kbEnvios(it.t0,KB_CAD_LEAD);
+          const ini=p.idx<0?it.t0:env[p.idx];
+          if(ini.getTime()>Date.now())return;
+          const fim=env[p.idx+1]||null;
+          const r=_kbResposta(it);
+          if(r instanceof Date&&r<ini)return; // já tinha respondido antes
+          chegou++;
+          if(r instanceof Date&&(!fim||r<fim))resp++;
+        });
+        m[p.id]=chegou?{txt:Math.round(resp/chegou*100)+'% responderam',det:resp+' de '+chegou+' leads com histórico de mensagens'}:null;
+      });
+      return m;
+    },
+    card:(it,col)=>{
+      const sub=it.e.origin?_kbEsc(String(it.e.origin).replace(/^#/,'')):'';
+      const r=_kbResposta(it);
+      const resp=r instanceof Date?'<span class="kb-tag ok">respondeu '+_kbTempo(r)+'</span>':(r===undefined&&it.t0&&_kb.mensagensDesde&&it.t0>=_kb.mensagensDesde?'':'');
+      let prox='';
+      if(!(r instanceof Date)&&it.t0&&(col==='novo'||KB_CAD_LEAD.some(c=>c.id===col))){
+        const env=_kbEnvios(it.t0,KB_CAD_LEAD);const k=env.findIndex(d=>d.getTime()>Date.now());
+        if(k>=0)prox='<div class="kb-linha"><span>próximo: '+KB_CAD_LEAD[k].nome+' '+env[k].toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+env[k].toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
+      }
+      return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+        <div class="kb-linha">${sub?'<span>'+sub+'</span>':''}<span>entrou ${_kbTempo(it.t0)||'—'}</span></div>
+        ${prox}${resp}`;
+    },
+    abrir:(it)=>{const i=leadsData.indexOf(it.r);if(i>=0)openLeadCard(i);},
+    soltar:(it,col)=>{
+      const mapa={agendou:'Agendou',faltou:'Faltou/desmarcou',perdido:'Perdido'};
+      const nova=mapa[col];
+      if(!nova){showToast('error','Essa coluna anda sozinha','As cadências mudam quando o follow-up é enviado. Arraste só para Agendou, Faltou ou Perdido.');return false;}
+      const i=leadsData.indexOf(it.r);if(i<0)return false;
+      openLeadCard(i);
+      const st=document.getElementById('lc-status');
+      if(st){st.value=nova;if(typeof lcOnStatusChange==='function')lcOnStatusChange(nova);}
+      showToast('success','Confirme no card',(nova==='Perdido'?'Confira':'Preencha a data')+' e clique em Salvar.');
+      return false;
+    },
+    aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Quem respondeu sai das cadências. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
+  },
+  clientes:{
+    titulo:'Clientes',
+    lista:()=>{const tb=document.getElementById('clientes-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('clientes-pagination')];},
+    colunas:()=>{
+      const ativas=(_listas.fases&&_listas.fases.ativos)||[];
+      const ordem=KB_FASES_ORDEM.filter(f=>ativas.includes(f)).concat(ativas.filter(f=>!KB_FASES_ORDEM.includes(f)));
+      return [{id:'',nome:'Sem fase',dica:'Compareceu e ainda não tem fase de follow-up'},...ordem.map(f=>({id:f,nome:f,solta:true}))];
+    },
+    itens:()=>(_clientesFiltrados||[]).map(r=>{
+      const ph=String(r.phone||'').replace(/\D/g,'');
+      const d=ccDataLookup(ph)||{};
+      const orcs=r._orcamentosPeriodo||[];
+      const fechou=orcs.some(o=>o.status==='Aprovado');
+      const aberto=orcs.filter(o=>o.status!=='Aprovado'&&o.status!=='Reprovado'&&o.status!=='Cancelado').reduce((s,o)=>s+Number(o.valor||0),0);
+      const fechado=orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+      const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
+      const atv=(d.atividades&&d.atividades[0])||null;
+      return {r,ph,d,fechou,aberto,fechado,top,atv,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
+    }),
+    coluna:(it)=>{
+      if(it.fechou){const cols=(_listas.fases&&_listas.fases.ativos)||[];if(cols.includes('Fechou')&&!['Pós venda'].includes(it.fase))return 'Fechou';}
+      return it.fase||'';
+    },
+    valor:(it)=>it.fechou?it.fechado:it.aberto,
+    metricas:(cols,todos,porCol)=>{
+      const m={};const hoje=localDateStr(new Date());
+      cols.forEach(c=>{
+        const l=porCol[c.id]||[];
+        const atras=l.filter(it=>it.atv&&it.atv.proximo&&it.atv.proximo<hoje).length;
+        const hj=l.filter(it=>it.atv&&it.atv.proximo===hoje).length;
+        const partes=[];if(hj)partes.push(hj+' para hoje');if(atras)partes.push(atras+' atrasado'+(atras>1?'s':''));
+        m[c.id]=partes.length?{txt:partes.join(' · '),det:'Próximo contato marcado na atividade'}:null;
+      });
+      return m;
+    },
+    card:(it)=>{
+      const hoje=localDateStr(new Date());
+      const prox=it.atv&&it.atv.proximo?it.atv.proximo:'';
+      const proxTxt=prox?new Date(prox+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
+      const proxCls=prox&&prox<hoje?'atraso':(prox===hoje?'hoje':'');
+      const trat=it.top&&it.top.tratamento?String(it.top.tratamento).split(',')[0].trim():'';
+      const valor=it.fechou?it.fechado:it.aberto;
+      return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+        ${trat?'<div class="kb-linha"><span>'+_kbEsc(trat)+'</span></div>':''}
+        <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${proxTxt?'<span class="kb-tag '+proxCls+'">contato '+proxTxt+'</span>':''}</div>`;
+    },
+    abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
+    soltar:(it,col)=>{
+      if(col===''){showToast('error','Escolha uma fase','Arraste para uma das fases do follow-up.');return false;}
+      editarFaseAtivTabela(ccKey(it.r),col);return true;
+    },
+    aviso:()=>'Arraste o card para mudar a fase do follow-up. O valor de cada coluna soma os orçamentos em aberto (ou fechados, na coluna Fechou) do período filtrado.'
+  },
+  fluxo:{
+    titulo:'Em Fluxo',
+    lista:()=>[document.getElementById('fluxo-cards')],
+    colunas:()=>[
+      {id:'inicio',nome:'Início do tratamento',dica:'Nenhuma subetapa concluída ainda'},
+      {id:'tratamento',nome:'Em tratamento'},
+      {id:'clinico',nome:'Parte clínica finalizada',dica:'Falta NPS e pós-venda'},
+      {id:'nps',nome:'NPS enviado'},
+      {id:'posvenda',nome:'Pós-venda enviado',dica:'Falta confirmar a conclusão'}
+    ],
+    itens:()=>{
+      const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
+      const procFil=document.getElementById('fluxo-procedimento-filter')?.value||'';
+      return (_fluxoPacientes||[]).filter(p=>{
+        if(p.concluido)return false;
+        if(busca){const dg=busca.replace(/\D/g,'');if(!(p.nome||'').toLowerCase().includes(busca)&&!(dg&&String(p.tel||'').replace(/\D/g,'').includes(dg)))return false;}
+        if(procFil&&!(p.procedimentos||[]).some(pr=>normalizarNomeProcedimentoFiltro(pr.nome)===procFil))return false;
+        return true;
+      }).map(p=>{
+        const tot=(p.procedimentos||[]).reduce((s,pr)=>s+(pr.subetapas||[]).length,0);
+        const feitas=(p.procedimentos||[]).reduce((s,pr)=>s+(pr.subetapas||[]).filter(e=>e.ok).length,0);
+        return {p,tot,feitas,nome:p.nome||'—'};
+      });
+    },
+    coluna:(it)=>{
+      const p=it.p;
+      if(typeof clinicoConcluido==='function'&&clinicoConcluido(p)){
+        if(p.npsEnviado&&p.posVendaEnviado)return 'posvenda';
+        if(p.npsEnviado||p.posVendaEnviado)return 'nps';
+        return 'clinico';
+      }
+      return it.feitas>0?'tratamento':'inicio';
+    },
+    card:(it)=>{
+      const pct=it.tot?Math.round(it.feitas/it.tot*100):0;
+      const procs=(it.p.procedimentos||[]).map(pr=>pr.nome).filter(Boolean);
+      return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+        ${procs.length?'<div class="kb-linha"><span>'+_kbEsc(procs[0])+(procs.length>1?' +'+(procs.length-1):'')+'</span></div>':''}
+        <div class="kb-barra"><i style="width:${pct}%"></i></div>
+        <div class="kb-linha"><span>${it.feitas}/${it.tot} subetapas</span><span>início ${it.p.dataInicio?new Date(it.p.dataInicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</span></div>`;
+    },
+    abrir:(it)=>{kbModo('fluxo','lista');const s=document.getElementById('fluxo-search');if(s){s.value=it.nome;renderFluxoCards();}},
+    aviso:()=>'O card anda sozinho conforme as subetapas, o NPS e o pós-venda são marcados na lista. Clique no card para abrir o paciente na lista.'
+  },
+  pacientes:{
+    titulo:'Pacientes',
+    lista:()=>{const tb=document.getElementById('pacientes-tbody');return [tb&&tb.closest('.table-card')];},
+    colunas:()=>[
+      {id:'agendado',nome:'Manutenção agendada'},
+      {id:'emdia',nome:'Em dia'},
+      {id:'contato',nome:'Chamado sem retorno',dica:'Foi chamado há 30+ dias e não agendou'},
+      {id:'atrasado6_12',nome:'Atrasado 6 a 12 meses'},
+      {id:'atrasado1_2anos',nome:'Atrasado 1 a 2 anos'},
+      {id:'atrasadomais2anos',nome:'Atrasado +2 anos'},
+      {id:'nuncafez',nome:'Nunca fez manutenção'},
+      {id:'semdado',nome:'Sem dado'}
+    ],
+    itens:()=>{
+      const cat=_catAtivaPacientes;const cfg=_categoriasPacientes[cat]||{};
+      const busca=(document.getElementById('pacientes-search')?.value||'').toLowerCase();
+      let regs=getRegistrosPaciente(cat).map(r=>({...r,_status:statusPaciente(r,cfg.intervalo),_precisaContato:precisaNovoContato(r)}));
+      if(busca)regs=regs.filter(r=>String(r.nome||'').toLowerCase().includes(busca));
+      return regs.map(r=>({r,nome:r.nome||'—'}));
+    },
+    coluna:(it)=>it.r._precisaContato&&it.r._status!=='agendado'?'contato':it.r._status,
+    card:(it)=>{
+      const r=it.r;
+      const base=r.dataBase||r.dataInstalacao;
+      const wa=typeof linkWhatsapp==='function'?linkWhatsapp(r.telefone):'';
+      return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+        <div class="kb-linha"><span>${base?(r.dataBase?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span></div>
+        ${r.agendado?'<div class="kb-linha"><span class="kb-tag ok">agendado '+new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':''}
+        ${wa?'<a class="kb-wa" href="'+wa+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Chamar no WhatsApp</a>':''}`;
+    },
+    aviso:()=>'A coluna vem da data da última manutenção e da agenda do Clinicorp: o card anda sozinho quando o paciente agenda ou faz a manutenção. Mostra a categoria escolhida nas abas acima.'
+  }
+};
+
+// ---------- botão Lista / Kanban ----------
+function kbPreparar(q){
+  const cfg=KB_QUADROS[q];if(!cfg)return null;
+  let host=document.getElementById('kb-'+q);
+  if(host)return host;
+  const lista=cfg.lista().filter(Boolean);
+  if(!lista.length)return null;
+  const ancora=lista[0];
+  const barra=document.createElement('div');
+  barra.className='kb-modo';barra.id='kb-modo-'+q;
+  barra.innerHTML=`<button type="button" data-m="lista" onclick="kbModo('${q}','lista')">${_KB_IC.lista}Lista</button><button type="button" data-m="kanban" onclick="kbModo('${q}','kanban')">${_KB_IC.kanban}Kanban</button>`;
+  ancora.parentNode.insertBefore(barra,ancora);
+  host=document.createElement('div');
+  host.id='kb-'+q;host.className='kb-quadro';host.style.display='none';
+  const ultimo=lista[lista.length-1];
+  ultimo.parentNode.insertBefore(host,ultimo.nextSibling);
+  kbAplicarModo(q);
+  return host;
+}
+const _KB_IC={
+  lista:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+  kanban:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="5" height="18" rx="1.5"/><rect x="10" y="3" width="5" height="12" rx="1.5"/><rect x="17" y="3" width="4" height="8" rx="1.5"/></svg>'
+};
+function kbModo(q,m){
+  _kb.modo[q]=m;
+  try{localStorage.setItem('kb_modo',JSON.stringify(_kb.modo));}catch(e){}
+  kbAplicarModo(q);
+  if(m==='kanban')kbRender(q);
+}
+function kbAplicarModo(q){
+  const cfg=KB_QUADROS[q];const host=document.getElementById('kb-'+q);const barra=document.getElementById('kb-modo-'+q);
+  if(!cfg||!host)return;
+  const kan=_kb.modo[q]==='kanban';
+  cfg.lista().filter(Boolean).forEach(el=>{el.style.display=kan?'none':'';});
+  host.style.display=kan?'block':'none';
+  if(barra)barra.querySelectorAll('button').forEach(b=>b.classList.toggle('ativo',b.dataset.m===(kan?'kanban':'lista')));
+}
+function kbSeAtivo(q){
+  const host=kbPreparar(q);
+  if(host&&_kb.modo[q]==='kanban')kbRender(q);
+}
+
+// ---------- desenho do quadro ----------
+function kbRender(q){
+  const cfg=KB_QUADROS[q];const host=kbPreparar(q);if(!cfg||!host)return;
+  let itens=[];
+  try{itens=cfg.itens()||[];}catch(e){console.warn('[KANBAN]',q,e);itens=[];}
+  _kb.itens[q]=itens;
+  const cols=cfg.colunas();
+  const porCol={};cols.forEach(c=>porCol[c.id]=[]);
+  itens.forEach((it,i)=>{it._i=i;let c;try{c=cfg.coluna(it);}catch(e){c=cols[0].id;}if(!(c in porCol))c=cols[0].id;porCol[c].push(it);});
+  const met=cfg.metricas?cfg.metricas(cols,itens,porCol):{};
+  const valorDe=cfg.valor||null;
+  const scroll=host.querySelector('.kb-trilho')?host.querySelector('.kb-trilho').scrollLeft:0;
+  host.innerHTML=`<div class="kb-aviso">${_kbEsc(cfg.aviso?cfg.aviso():'')}</div>
+    <div class="kb-trilho">${cols.map(c=>{
+      const l=porCol[c.id]||[];
+      const lim=_kb.limite[q+'|'+c.id]||KB_LIMITE;
+      const soma=valorDe?l.reduce((s,it)=>s+(Number(valorDe(it))||0),0):0;
+      const mm=met&&met[c.id];
+      return `<section class="kb-col${c.cad?' cad':''}${c.solta?' solta':''}" data-q="${q}" data-col="${_kbEsc(c.id)}"
+          ondragover="kbSobre(event)" ondragleave="kbSaiu(event)" ondrop="kbSoltou(event)">
+        <header class="kb-cab" title="${_kbEsc(c.dica||'')}">
+          <div class="kb-tit"><span>${_kbEsc(c.nome)}</span><b>${l.length}</b></div>
+          ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
+          ${mm?'<div class="kb-met" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
+        </header>
+        <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card" draggable="true" data-q="${q}" data-i="${it._i}"
+            ondragstart="kbPegou(event)" ondragend="kbLargou(event)" onclick="kbAbrir('${q}',${it._i})">${cfg.card(it,c.id)}</article>`).join('')}
+          ${l.length>lim?`<button type="button" class="kb-mais" onclick="kbMais('${q}','${_kbEsc(c.id).replace(/'/g,"\\'")}')">mostrar mais ${Math.min(KB_LIMITE,l.length-lim)} de ${l.length-lim}</button>`:''}
+          ${!l.length?'<div class="kb-vazio">'+(c.vazia?'Solte um card aqui':'Nenhum card')+'</div>':''}
+        </div>
+      </section>`;}).join('')}</div>`;
+  const tr=host.querySelector('.kb-trilho');if(tr&&scroll)tr.scrollLeft=scroll;
+  // Leads: busca as respostas e redesenha uma vez quando chegarem
+  if(q==='leads'&&!_kb.carregandoResp){
+    const falta=itens.some(it=>it.t0&&(_kb.mensagensDesde===undefined||(_kb.mensagensDesde&&it.t0>=_kb.mensagensDesde&&_kb.resp[it.ph+'|'+it.t0.toISOString()]===undefined)));
+    if(falta)_kbCarregarRespostas(itens).then(()=>{if(_kb.modo.leads==='kanban')kbRender('leads');});
+  }
+}
+function kbMais(q,col){_kb.limite[q+'|'+col]=(_kb.limite[q+'|'+col]||KB_LIMITE)+KB_LIMITE;kbRender(q);}
+function kbAbrir(q,i){const it=(_kb.itens[q]||[])[i];const cfg=KB_QUADROS[q];if(it&&cfg&&cfg.abrir)cfg.abrir(it);}
+function kbPegou(ev){
+  const el=ev.currentTarget;_kb.arrastando={q:el.dataset.q,i:Number(el.dataset.i)};
+  el.classList.add('pegando');
+  try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',el.dataset.i);}catch(e){}
+}
+function kbLargou(ev){ev.currentTarget.classList.remove('pegando');document.querySelectorAll('.kb-col.alvo').forEach(c=>c.classList.remove('alvo'));}
+function kbSobre(ev){
+  const col=ev.currentTarget;if(!_kb.arrastando||col.dataset.q!==_kb.arrastando.q)return;
+  ev.preventDefault();col.classList.add('alvo');
+}
+function kbSaiu(ev){if(!ev.currentTarget.contains(ev.relatedTarget))ev.currentTarget.classList.remove('alvo');}
+function kbSoltou(ev){
+  ev.preventDefault();
+  const col=ev.currentTarget;col.classList.remove('alvo');
+  const a=_kb.arrastando;_kb.arrastando=null;
+  if(!a||col.dataset.q!==a.q)return;
+  const cfg=KB_QUADROS[a.q];const it=(_kb.itens[a.q]||[])[a.i];
+  if(!cfg||!it)return;
+  if(!cfg.soltar){showToast('error','Esse quadro anda sozinho','O card muda de coluna quando os dados mudam.');return;}
+  let atual;try{atual=cfg.coluna(it);}catch(e){}
+  if(atual===col.dataset.col)return;
+  const ok=cfg.soltar(it,col.dataset.col);
+  if(ok)kbRender(a.q);
+}
+
+// liga o Kanban nas telas, sem mexer na lógica das tabelas
+(function kbLigar(){
+  const embrulhar=(nome,q)=>{
+    const orig=window[nome];if(typeof orig!=='function')return;
+    window[nome]=function(){const r=orig.apply(this,arguments);try{kbSeAtivo(q);}catch(e){console.warn('[KANBAN]',e);}return r;};
+  };
+  embrulhar('filterLeadsTable','leads');
+  embrulhar('renderClientesPage','clientes');
+  embrulhar('renderFluxoCards','fluxo');
+  embrulhar('renderTabelaPacientes','pacientes');
+})();
+
+</script>
 </body>
 </html>
