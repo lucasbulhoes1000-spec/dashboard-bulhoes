@@ -15850,14 +15850,14 @@ function _kbDataAgendamento(it){
 }
 async function _kbCarregarAgenda(){
   if(_kb.carregandoAgenda)return;
-  _kb.carregandoAgenda=true;
+  _kb.carregandoAgenda=true;_kb.agendaTentativa=Date.now();
   try{
     const r=await _agAcao({acao:'agenda_futura'});
     const m={};(r.agenda||[]).forEach(a=>{const t=normalizePhone(a.tel);if(t&&(!m[t]||(a.data+a.hora)<(m[t].data+m[t].hora)))m[t]=a;});
     _kb.agenda=m;
   }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
   finally{_kb.carregandoAgenda=false;}
-  if(_kb.modo.fluxo==='kanban')kbRender('fluxo');
+  if(_kb.agenda&&_kb.modo.fluxo==='kanban')kbRender('fluxo');
 }
 function kbGrupo(q,g){_kb.grupos[q+'|'+g]=!_kb.grupos[q+'|'+g];try{localStorage.setItem('kb_grupos',JSON.stringify(_kb.grupos));}catch(e){}kbRender(q);}
 // exporta a coluna no formato de importação do Cloudia (com tag da etapa) para disparo
@@ -16089,7 +16089,7 @@ const KB_QUADROS={
     itens:()=>{
       const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
       const procFil=document.getElementById('fluxo-procedimento-filter')?.value||'';
-      if(!_kb.agenda&&!_kb.carregandoAgenda)_kbCarregarAgenda();
+      if(!_kb.agenda&&!_kb.carregandoAgenda&&Date.now()-(_kb.agendaTentativa||0)>60000)_kbCarregarAgenda();
       return (_fluxoPacientes||[]).filter(p=>{
         if(p.concluido)return false;
         if(busca){const dg=busca.replace(/\D/g,'');if(!(p.nome||'').toLowerCase().includes(busca)&&!(dg&&String(p.tel||'').replace(/\D/g,'').includes(dg)))return false;}
@@ -16109,7 +16109,7 @@ const KB_QUADROS={
       return it.feitas>0?'tratamento':'boasvindas';
     },
     metricas:(cols,todos,porCol)=>{
-      if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:null};
+      if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:{txt:'agenda do Clinicorp indisponível agora',fraco:true}};
       const sem=(porCol.tratamento||[]).filter(it=>it.ph&&!_kb.agenda[it.ph]).length;
       return {tratamento:sem?{txt:sem+' sem consulta marcada',det:'Sem nenhuma consulta nos próximos 90 dias no Clinicorp',alerta:true}:{txt:'todos com consulta marcada'}};
     },
@@ -16270,7 +16270,7 @@ function kbRender(q){
   // Leads: busca as respostas e redesenha uma vez quando chegarem
   if(q==='leads'&&!_kb.carregandoResp){
     const falta=itens.some(it=>it.t0&&(_kb.mensagensDesde===undefined||(_kb.mensagensDesde&&it.t0>=_kb.mensagensDesde&&_kb.resp[it.ph+'|'+it.t0.toISOString()]===undefined)));
-    if(falta)_kbCarregarRespostas(itens).then(()=>{if(_kb.modo.leads==='kanban')kbRender('leads');});
+    if(falta&&Date.now()-(_kb.respTentativa||0)>60000){_kb.respTentativa=Date.now();_kbCarregarRespostas(itens).then(()=>{if(_kb.modo.leads==='kanban')kbRender('leads');});}
   }
 }
 function kbMais(q,col){_kb.limite[q+'|'+col]=(_kb.limite[q+'|'+col]||KB_LIMITE)+KB_LIMITE;kbRender(q);}
