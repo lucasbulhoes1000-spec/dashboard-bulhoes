@@ -5309,7 +5309,8 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       // do período selecionado, igual o bloco "orçamentos extras" logo
       // abaixo já fazia certo.
       const orcsNoPeriodo=d.orcamentos.filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
-      const tot=orcsNoPeriodo.reduce((s,o)=>s+Number(o.valor||0),0);
+      // vários orçamentos = opções de tratamento: conta só o de maior valor (24/10/2026)
+      const tot=orcsNoPeriodo.reduce((m,o)=>Math.max(m,Number(o.valor||0)),0);
       totalOport+=tot;
       if(classe==='Recompra')oportRecompra+=tot;else oportNovas+=tot;
       if(tot>0)_oportRows.push({name:nome,ph,value:tot,classe});
@@ -5335,7 +5336,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     }
     const orcs=(d.orcamentos||[]).filter(o=>o.data&&o.data>=_range.since&&o.data<=_range.until);
     if(!orcs.length)return;
-    const tot=orcs.reduce((s,o)=>s+Number(o.valor||0),0);
+    const tot=orcs.reduce((m,o)=>Math.max(m,Number(o.valor||0)),0);
     if(tot>0){
       totalOport+=tot;
       const classeExtra=classificarNovoOuRecompra(ph,_range);
