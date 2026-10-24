@@ -27,12 +27,29 @@ begin
     v_etapa := a.gatilho->'lista'->0->>'etapa';
     if v_espera <= 0 or v_etapa is null then continue; end if;
     v_n := 0; v_min := null; v_max := null;
-    for r in select p.telefone, coalesce(p.etapa_alterada_em, p.criado_em) as desde
+    -- "desde quando está na etapa" vem dos eventos do Cloudia (e do lead novo
+    -- do CRM), não de pacientes.etapa_alterada_em: a sincronização da planilha
+    -- e a limpeza de Agendou de 24/10 regravaram essa data com a hora do momento
+    for r in select p.telefone, ev.desde
                from public.pacientes p
+               cross join lateral (
+                 select max(x.t) as desde from (
+                   select migracao.ts(i."timestamp") as t
+                     from public.importacao_cloudia i
+                    where migracao.tel(i.phone) = p.telefone and i.ativo
+                      and case when lower(v_etapa) = 'lead'
+                               then i.type = 'CUSTOMER_CREATED' or (i.type = 'CUSTOMER_STAGE_UPDATED' and lower(btrim(i.stage)) = 'lead')
+                               else i.type = 'CUSTOMER_STAGE_UPDATED' and lower(btrim(i.stage)) = lower(v_etapa) end
+                   union all
+                   select e.ocorrido_em from public.eventos_proprios e
+                    where e.telefone = p.telefone and lower(v_etapa) = 'lead' and e.tipo = 'CUSTOMER_CREATED'
+                 ) x
+               ) ev
               where lower(btrim(p.etapa)) = lower(v_etapa)
                 and p.telefone ~ '^[0-9]{10,13}$'
-                and coalesce(p.etapa_alterada_em, p.criado_em) + make_interval(mins => v_espera) > now()
-                and coalesce(p.etapa_alterada_em, p.criado_em) > now() - interval '61 days' loop
+                and ev.desde is not null
+                and ev.desde + make_interval(mins => v_espera) > now()
+                and ev.desde > now() - interval '61 days' loop
       if exists (select 1 from public.automacao_execucoes e where e.automacao_id = a.id and e.telefone = r.telefone and e.status = 'ativa') then
         continue;
       end if;
