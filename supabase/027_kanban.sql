@@ -30,7 +30,13 @@ $$;
 create or replace function public.kanban_mensagens_desde()
 returns timestamptz
 language sql stable security definer set search_path = public, pg_temp as $$
-  select min(enviada_em) from public.mensagens where public.tem_papel('gestao', 'avaliacao', 'comercial');
+  -- início do espelho ao vivo (primeiro evento do webhook); ignora mensagens
+  -- antigas soltas que vieram junto com algum histórico
+  select coalesce(
+    (select min(m.enviada_em) from public.mensagens m
+      where m.enviada_em >= (select min(recebido) - interval '1 day' from public.whatsapp_eventos_brutos)),
+    (select min(enviada_em) from public.mensagens))
+  where public.tem_papel('gestao', 'avaliacao', 'comercial');
 $$;
 
 revoke all on function public.kanban_primeiras_respostas(jsonb) from public, anon;

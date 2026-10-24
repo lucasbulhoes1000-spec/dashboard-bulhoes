@@ -15905,7 +15905,8 @@ const KB_QUADROS={
           chegou++;
           if(r instanceof Date&&(!fim||r<fim))resp++;
         });
-        m[p.id]=chegou?{txt:Math.round(resp/chegou*100)+'% responderam',det:resp+' de '+chegou+' leads com histórico de mensagens'}:null;
+        m[p.id]=chegou>=5?{txt:Math.round(resp/chegou*100)+'% responderam ('+resp+' de '+chegou+')',det:'Entre os leads que chegaram nesta cadência sem ter respondido antes, quantos responderam antes da próxima'}
+          :(chegou?{txt:'poucos dados ('+chegou+')',det:'Menos de 5 leads com histórico chegaram nesta cadência',fraco:true}:null);
       });
       return m;
     },
@@ -16132,7 +16133,7 @@ function kbRender(q){
         <header class="kb-cab" title="${_kbEsc(c.dica||'')}">
           <div class="kb-tit"><span>${_kbEsc(c.nome)}</span><b>${l.length}</b></div>
           ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
-          ${mm?'<div class="kb-met" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
+          ${mm?'<div class="kb-met'+(mm.fraco?' fraco':'')+'" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
         </header>
         <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card" draggable="true" data-q="${q}" data-i="${it._i}"
             ondragstart="kbPegou(event)" ondragend="kbLargou(event)" onclick="kbAbrir('${q}',${it._i})">${cfg.card(it,c.id)}</article>`).join('')}
