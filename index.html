@@ -2513,6 +2513,93 @@ const DASHBOARD_TOKEN='4b88a3c50b1d5152112db15bc4a35c0f774f5ddcb9e50bf0';
     return _fetchOriginal.call(this,input,init);
   };
 })();
+// ===== DASHBOARD RÁPIDO (24/10/2026) =====
+// O Dashboard esperava o Apps Script toda vez que abria (funil por anúncio
+// ~12 s, Meta ~5 s, agenda e vendas do Clinicorp ~6 s cada). Agora a última
+// resposta de cada período fica na Supabase (tabela cache_painel): abre na
+// hora com ela e, se tiver mais de 2 min, busca a nova em segundo plano e
+// redesenha sozinho quando chega. "↻ Atualizar" ignora o retrato e espera o
+// Apps Script. Só respostas com status "ok" são guardadas.
+const GS_CACHE_ACOES={metaInsightsFinal:1,funilMetaFinal:1,analyticsAgendaClinicorp:1,analyticsVendasReaisClinicorp:1};
+const GS_CACHE_FRESCO_MS=2*60*1000;
+const _gsCache={mem:new Map(),emVoo:new Map(),pendentes:0,forcar:false,timerRender:null,maisAntigo:null};
+function _gsHora(ms){return new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+function _gsAtualizarSelo(){
+  const el=document.getElementById('last-update');if(!el)return;
+  const base=String(el.textContent||'').replace(/ · atualizando…$/,'');
+  el.textContent=base+(_gsCache.pendentes>0?' · atualizando…':'');
+}
+function _gsAgendarRender(){
+  clearTimeout(_gsCache.timerRender);
+  _gsCache.timerRender=setTimeout(()=>{
+    if(_gsCache.pendentes>0)return _gsAgendarRender(); // espera todas chegarem e redesenha uma vez só
+    try{loadTrafego({silencioso:true});}catch(e){}
+  },800);
+}
+(function(){
+  const _fetchComToken=window.fetch;
+  function chaveDe(url){
+    if(typeof url!=='string'||url.indexOf(CLOUDIA_URL)!==0)return null;
+    let u;try{u=new URL(url);}catch(e){return null;}
+    const a=u.searchParams.get('action');
+    if(!GS_CACHE_ACOES[a])return null;
+    return a+'|'+(u.searchParams.get('from')||'')+'|'+(u.searchParams.get('to')||'');
+  }
+  async function lerCache(chave){
+    if(_gsCache.mem.has(chave))return _gsCache.mem.get(chave);
+    if(typeof _sbAccessToken==='undefined'||!_sbAccessToken)return null;
+    try{
+      const r=await _fetchComToken(SUPABASE_URL+'/rest/v1/cache_painel?chave=eq.'+encodeURIComponent(chave)+'&select=texto,atualizado_em');
+      if(!r.ok)return null;
+      const j=await r.json();
+      if(!Array.isArray(j)||!j.length)return null;
+      const c={texto:j[0].texto,em:new Date(j[0].atualizado_em).getTime()};
+      _gsCache.mem.set(chave,c);
+      return c;
+    }catch(e){return null;}
+  }
+  function gravarCache(chave,texto){
+    _gsCache.mem.set(chave,{texto,em:Date.now()});
+    if(typeof _sbAccessToken==='undefined'||!_sbAccessToken)return;
+    _fetchComToken(SUPABASE_URL+'/rest/v1/cache_painel',{method:'POST',
+      headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({chave,texto,atualizado_em:new Date().toISOString()})}).catch(()=>{});
+  }
+  async function buscarNovo(url,chave,init){
+    const resp=await _fetchComToken(url,init);
+    const texto=await resp.text();
+    let ok=false;try{const j=JSON.parse(texto);ok=!!(j&&j.status==='ok');}catch(e){}
+    if(ok)gravarCache(chave,texto);
+    return{texto,ok,status:resp.status};
+  }
+  function revalidar(url,chave,init,textoAntigo){
+    if(_gsCache.emVoo.has(chave))return;
+    _gsCache.pendentes++;_gsAtualizarSelo();
+    const p=buscarNovo(url,chave,init).then(n=>{
+      if(n.ok&&n.texto!==textoAntigo)_gsAgendarRender();
+    }).catch(()=>{}).finally(()=>{_gsCache.emVoo.delete(chave);_gsCache.pendentes--;_gsAtualizarSelo();});
+    _gsCache.emVoo.set(chave,p);
+  }
+  const json=(t,st)=>new Response(t,{status:st||200,headers:{'Content-Type':'application/json'}});
+  window.fetch=function(input,init){
+    const chave=(!init||!init.method||String(init.method).toUpperCase()==='GET')?chaveDe(input):null;
+    if(!chave)return _fetchComToken.call(this,input,init);
+    const forcar=_gsCache.forcar;
+    return(async()=>{
+      const c=forcar?null:await lerCache(chave);
+      if(!c){const n=await buscarNovo(input,chave,init);return json(n.texto,n.status);}
+      if(Date.now()-c.em>GS_CACHE_FRESCO_MS)revalidar(input,chave,init,c.texto);
+      if(!_gsCache.maisAntigo||c.em<_gsCache.maisAntigo)_gsCache.maisAntigo=c.em;
+      return json(c.texto);
+    })();
+  };
+})();
+// Cópia da planilha guardada no navegador (IndexedDB): abrir o CRM de novo
+// baixa só as linhas que mudaram, em vez das ~10 mil linhas (~13 s).
+function _idbAbrir(){return new Promise((ok,erro)=>{const r=indexedDB.open('bulhoes_crm',1);r.onupgradeneeded=()=>r.result.createObjectStore('cache');r.onsuccess=()=>ok(r.result);r.onerror=()=>erro(r.error);});}
+async function _idbLer(k){try{const db=await _idbAbrir();return await new Promise(ok=>{const q=db.transaction('cache').objectStore('cache').get(k);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null);});}catch(e){return null;}}
+async function _idbGravar(k,v){try{const db=await _idbAbrir();await new Promise(ok=>{const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(v,k);tx.oncomplete=ok;tx.onerror=ok;tx.onabort=ok;});}catch(e){}}
+function _idbLimpar(){try{indexedDB.deleteDatabase('bulhoes_crm');}catch(e){}}
 const SS_SOCIAL='https://script.google.com/macros/s/AKfycbzWcVTrS7K3L9eA3Ei_erMPFT5i75mHT4B_roP7W6ENC-XHSFFQq8pUhxUjgljb1y6u/exec';
 const SS_URL='https://script.google.com/macros/s/AKfycbya5tJt56XgbOjzPje_5K2td3rFlb5qV4fcNV70zwWvrEV8upLVsDwJjLVaH-9MZrH0/exec';
 
@@ -2952,7 +3039,7 @@ async function reloadCurrent(){
   if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
     if(currentPage==='dashboard'){
-      if(currentDashTab==='trafego')await loadTrafego();
+      if(currentDashTab==='trafego'){_gsCache.forcar=true;try{await loadTrafego();}finally{_gsCache.forcar=false;}}
       else loadSocial();
       return;
     }
@@ -4466,19 +4553,26 @@ function aplicarFunilMetaFinal(metaAds, pacote){
 // competindo entre si no Apps Script. Agora, se já há um carregamento em curso
 // para o MESMO período, reaproveita a mesma promessa em vez de disparar outro.
 let _loadTrafegoEmCurso=null,_loadTrafegoChave='';
-function loadTrafego(){
+function loadTrafego(op){
   let chave='';
   try{const r=getRange('trafego');chave=r.since+'|'+r.until;}catch(e){}
   if(_loadTrafegoEmCurso&&_loadTrafegoChave===chave)return _loadTrafegoEmCurso;
   _loadTrafegoChave=chave;
-  const p=_loadTrafegoImpl().finally(()=>{if(_loadTrafegoEmCurso===p)_loadTrafegoEmCurso=null;});
+  const p=_loadTrafegoImpl(op).finally(()=>{if(_loadTrafegoEmCurso===p)_loadTrafegoEmCurso=null;});
   _loadTrafegoEmCurso=p;
   return p;
 }
-async function _loadTrafegoImpl(){
-  window._trafegoPronto=false;
-  document.getElementById('loading-trafego').style.display='flex';
-  document.getElementById('content-trafego').style.display='none';
+async function _loadTrafegoImpl(op){
+  // silencioso: redesenho depois que chegou dado novo do Apps Script, sem
+  // tela de carregando e sem perder a posição da página.
+  const silencioso=!!(op&&op.silencioso);
+  const rolagem=window.scrollY;
+  _gsCache.maisAntigo=null;
+  if(!silencioso){
+    window._trafegoPronto=false;
+    document.getElementById('loading-trafego').style.display='flex';
+    document.getElementById('content-trafego').style.display='none';
+  }
   document.getElementById('error-trafego').style.display='none';
   try{
     const[metaAds,cloudiaRows,funilMetaFinal]=await Promise.all([fetchMeta(),fetchCloudia(),fetchFunilMetaFinal()]);
@@ -4517,11 +4611,22 @@ async function _loadTrafegoImpl(){
       try{sincronizarFiltroTrafegoPago();}catch(e){}
       try{if(window._lastAdMap)filterAdTable();}catch(e){}
     };
-    Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]).then(_fimClinicorp);
-    setTimeout(_fimClinicorp,25000);
+    if(silencioso){
+      Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]).then(()=>{
+        window._trafegoPronto=true;
+        try{sincronizarFiltroTrafegoPago();}catch(e){}
+        try{if(window._lastAdMap)filterAdTable();}catch(e){}
+      });
+    }else{
+      Promise.allSettled([carregarComparecimentoClinicorp(),carregarVendasReaisClinicorp()]).then(_fimClinicorp);
+      setTimeout(_fimClinicorp,25000);
+    }
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
-    document.getElementById('last-update').textContent='Atualizado: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    if(silencioso)window.scrollTo(0,rolagem);
+    // hora do dado mais antigo usado (retrato guardado) ou agora
+    document.getElementById('last-update').textContent='Atualizado: '+_gsHora(_gsCache.maisAntigo||Date.now());
+    _gsAtualizarSelo();
   }catch(e){
     document.getElementById('loading-trafego').style.display='none';
     document.getElementById('content-trafego').style.display='block';
@@ -4566,7 +4671,7 @@ async function fetchMeta(){
 // Chave no banco (configuracoes.crm_ler_cloudia_da_base_nova = true) liga;
 // sem a chave, ou se a Supabase falhar, volta sozinho para o Apps Script.
 const COLUNAS_PLANILHA_CLOUDIA=['timestamp','type','customer_id','name','phone','stage','value','ad_id','ad_name','adset_name','campaign_name','origin','created_at'];
-let _cloudiaBase=null; // {linhas: Map(linha → valores), ultimo: recebido_em mais recente, renumerado}
+let _cloudiaBase=null,_cloudiaSemNavegador=false; // {linhas: Map(linha → valores), ultimo: recebido_em mais recente, renumerado}
 async function _lerTabelaBaseNova(caminho){
   let out=[],de=0;
   for(;;){
@@ -4584,7 +4689,18 @@ async function _baixarCloudiaDaBaseNova(){
   const renumerado=JSON.stringify(valor('cloudia_renumerado_em')||'');
   const sel='select=linha,'+COLUNAS_PLANILHA_CLOUDIA.join(',')+',ativo,recebido_em';
   const valores=r=>COLUNAS_PLANILHA_CLOUDIA.map(c=>r[c]==null?'':r[c]);
+  let mudou=false;
+  if(!_cloudiaBase&&!_cloudiaSemNavegador){
+    // (24/10/2026) cópia guardada no navegador: vale se a planilha não foi
+    // renumerada, tem até 3 dias e o total de linhas confere depois de
+    // aplicar as mudanças (se não conferir, baixa tudo de novo).
+    const salvo=await _idbLer('cloudiaBase');
+    if(salvo&&salvo.renumerado===renumerado&&Array.isArray(salvo.linhas)&&salvo.salvoEm>Date.now()-3*86400000){
+      _cloudiaBase={linhas:new Map(salvo.linhas),ultimo:salvo.ultimo,renumerado,doNavegador:true};
+    }
+  }
   if(!_cloudiaBase||_cloudiaBase.renumerado!==renumerado){
+    mudou=true;
     // Carga completa em paralelo, por faixas de 1.000 linhas (antes: 11 pedidos
     // em sequência, cada um mais lento que o anterior, ~12 s no total).
     const ultimaLinha=(await _lerTabelaBaseNova('importacao_cloudia?select=linha&order=linha.desc&limit=1'))[0];
@@ -4603,7 +4719,18 @@ async function _baixarCloudiaDaBaseNova(){
       if(r.ativo)_cloudiaBase.linhas.set(r.linha,valores(r));else _cloudiaBase.linhas.delete(r.linha);
       if(r.recebido_em>_cloudiaBase.ultimo)_cloudiaBase.ultimo=r.recebido_em;
     });
+    if(rows.length)mudou=true;
+    if(_cloudiaBase.doNavegador){
+      _cloudiaBase.doNavegador=false;
+      let total=-1;
+      try{
+        const rc=await fetch(SUPABASE_URL+'/rest/v1/importacao_cloudia?select=linha&ativo=is.true',{headers:{Range:'0-0','Range-Unit':'items',Prefer:'count=exact'}});
+        const cr=rc.headers.get('content-range')||'';total=Number(cr.split('/')[1]);
+      }catch(e){}
+      if(total!==_cloudiaBase.linhas.size){_cloudiaBase=null;_cloudiaSemNavegador=true;return _baixarCloudiaDaBaseNova();}
+    }
   }
+  if(mudou)_idbGravar('cloudiaBase',{linhas:[..._cloudiaBase.linhas],ultimo:_cloudiaBase.ultimo,renumerado,salvoEm:Date.now()});
   const ordem=[..._cloudiaBase.linhas.keys()].sort((a,b)=>a-b);
   return [COLUNAS_PLANILHA_CLOUDIA.slice()].concat(ordem.map(k=>_cloudiaBase.linhas.get(k)));
 }
@@ -11794,6 +11921,7 @@ function verificarLogin(){
     return true;
   }
   // Sessão antiga (ou inexistente) — limpa qualquer resquício e força login novo.
+  _idbLimpar();
   localStorage.removeItem('bulhoes_email');
   localStorage.removeItem('bulhoes_logado');
   localStorage.removeItem('bulhoes_nome');
@@ -11874,6 +12002,7 @@ async function _sessaoRecusadaPeloServidor(){
 async function fazerLogout(){
   // scope local: sair aqui não derruba o login da pessoa nos outros aparelhos/abas.
   try{if(_sb)await _sb.auth.signOut({scope:'local'});}catch(e){}
+  _idbLimpar();
   ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
   location.reload();
 }
