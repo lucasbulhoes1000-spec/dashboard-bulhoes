@@ -15832,11 +15832,14 @@ function _kbDias(d){if(!d)return null;const t=d instanceof Date?d.getTime():new 
 function _kbTempo(d){const n=_kbDias(d);if(n==null)return '';if(n<=0)return 'hoje';if(n===1)return 'há 1 dia';if(n<60)return 'há '+n+' dias';const m=Math.floor(n/30);return m<24?'há '+m+' meses':'há '+Math.floor(m/12)+' anos';}
 const _kbIcAgenda='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
 function _kbDataAgendamento(it){
-  // 1) agenda do Clinicorp (consultas futuras de avaliação); 2) data da consulta salva no card
+  // 1) próxima consulta no Clinicorp (qualquer categoria, com hora); 2) agenda de
+  // avaliações já carregada na tela; 3) data da consulta salva no card
+  const prox=_kb.agenda&&it.ph&&_kb.agenda[it.ph];
   const det=window._lastAgendamentosFuturosClinicorpDetalhe||[];
   const ag=det.filter(d=>normalizePhone(d.tel)===it.ph).map(d=>d.data).sort()[0];
   let d=null,temHora=false;
-  if(ag)d=new Date(ag+'T12:00');
+  if(prox){d=new Date(prox.data+'T'+(prox.hora||'12:00'));temHora=!!prox.hora;}
+  else if(ag)d=new Date(ag+'T12:00');
   else{
     const cc=ccDataLookup(it.ph)||{};
     const ts=cc.consultaTimestamp||cc.agendTimestamp;
@@ -15857,8 +15860,9 @@ async function _kbCarregarAgenda(){
     _kb.agenda=m;
   }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
   finally{_kb.carregandoAgenda=false;}
-  if(_kb.agenda&&_kb.modo.fluxo==='kanban')kbRender('fluxo');
+  if(_kb.agenda){['fluxo','leads'].forEach(q=>{if(_kb.modo[q]==='kanban'&&document.getElementById('page-'+(q==='fluxo'?'fluxo':'leads'))?.classList.contains('active'))kbRender(q);});}
 }
+function _kbMetricasLeads(c,t){return KB_QUADROS.leads._metr(c,t);}
 function kbGrupo(q,g){_kb.grupos[q+'|'+g]=!_kb.grupos[q+'|'+g];try{localStorage.setItem('kb_grupos',JSON.stringify(_kb.grupos));}catch(e){}kbRender(q);}
 // exporta a coluna no formato de importação do Cloudia (com tag da etapa) para disparo
 function kbExportar(q,colId,ev){
@@ -15941,16 +15945,16 @@ const KB_QUADROS={
       ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
       {id:'perdido',nome:'Perdido',solta:true,vazia:true,dica:'Solte aqui para marcar como perdido'}
     ],
-    itens:()=>(_leadsFiltered||[]).map(r=>{
+    itens:()=>{if(!_kb.agenda&&!_kb.carregandoAgenda&&Date.now()-(_kb.agendaTentativa||0)>60000)_kbCarregarAgenda();return (_leadsFiltered||[]).map(r=>{
       const e=applyEdits(r);
       const ph=normalizePhone(e.phone||r.phone);
       const t0=parseCloudiaDate(r.created_at||r.timestamp)||null;
       const tEv=parseCloudiaDate(r.timestamp||r.created_at)||t0;
       return {r,e,ph,t0,tEv,nome:e.name||'—',stage:(e.stage||'').toLowerCase()};
-    }),
+    });},
     coluna:(it)=>{
       const s=it.stage;
-      const futuro=it.ph&&window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph);
+      const futuro=it.ph&&((window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph))||(_kb.agenda&&_kb.agenda[it.ph]));
       if(futuro||s.includes('agendou'))return 'agendou';
       if(s.includes('faltou')||s.includes('desmarcou')){
         if(!it.tEv)return 'faltou';
@@ -15965,7 +15969,12 @@ const KB_QUADROS={
       env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
       return col;
     },
-    metricas:(cols,todos)=>{
+    metricas:(cols,todos,porCol)=>{
+      const extra={};
+      if(_kb.agenda){const sem=(porCol.agendou||[]).filter(it=>!_kbDataAgendamento(it)).length;if(sem)extra.agendou={txt:sem+' sem consulta futura no Clinicorp',det:'Etapa Agendou, mas nenhuma consulta marcada nos próximos 90 dias',alerta:true};}
+      const m0=_kbMetricasLeads(cols,todos);return Object.assign(m0,extra);
+    },
+    _metr:(cols,todos)=>{
       // taxa de resposta por cadência: entre quem chegou na cadência sem ter
       // respondido, quantos responderam antes da próxima cadência
       const m={};
@@ -16000,7 +16009,8 @@ const KB_QUADROS={
       let agend='';
       if(col==='agendou'){
         const a=_kbDataAgendamento(it);
-        agend='<div class="kb-agenda">'+(a?_kbIcAgenda+a:_kbIcAgenda+'data não informada')+'</div>';
+        if(a)agend='<div class="kb-agenda">'+_kbIcAgenda+a+'</div>';
+        else agend=_kb.agenda?'<span class="kb-tag atraso">sem consulta futura no Clinicorp</span>':'<div class="kb-agenda">'+_kbIcAgenda+'conferindo a agenda…</div>';
       }
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         ${agend}
