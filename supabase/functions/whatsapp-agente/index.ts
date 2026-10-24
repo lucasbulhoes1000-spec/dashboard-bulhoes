@@ -700,7 +700,18 @@ export async function handler(req: Request): Promise<Response> {
             todas.push({ tel: t, data: d, hora, categoria: String(x?.CategoryDescription ?? ""), nome: String(x?.PatientName ?? "") });
           }
         }
-        return json({ ok: true, agenda: todas });
+        // quem foi ATENDIDO nos últimos 30 dias (status atendido ou check-in): o Kanban
+        // não manda essas pessoas para "Faltou" quando a etapa ainda diz "Agendou"
+        const atendidos: { tel: string; nome: string; data: string; categoria: string }[] = [];
+        const ag30 = await clinicorp("/appointment/list", { ...sub, from: diaLocal(agora, -30), to: diaLocal(agora, -1) }).catch(() => []);
+        for (const x of Array.isArray(ag30) ? ag30 : []) {
+          if (String(x?.Canceled ?? "").toUpperCase() === "X" || String(x?.Deleted ?? "").toUpperCase() === "X") continue;
+          if (!(x?.CheckinTime || String(x?.StatusId ?? "") === "5329595793145856")) continue;
+          let t = String(x?.MobilePhone ?? "").replace(/\D/g, "");
+          if (t.startsWith("55") && t.length >= 12) t = t.slice(2);
+          atendidos.push({ tel: t, nome: String(x?.PatientName ?? ""), data: dataDoItem(x), categoria: String(x?.CategoryDescription ?? "") });
+        }
+        return json({ ok: true, agenda: todas, atendidos });
       }
       case "agenda_passada": {
         // última consulta JÁ PASSADA de cada pessoa pedida (telefone ou nome completo),

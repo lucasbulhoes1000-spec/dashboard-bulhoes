@@ -15876,6 +15876,8 @@ async function _kbCarregarAgenda(){
       if(t&&(!av[t]||(a.data+a.hora)<(av[t].data+av[t].hora)))av[t]=a;
       const k=nn(a.nome);if(k&&(!avNome[k]||(a.data+a.hora)<(avNome[k].data+avNome[k].hora)))avNome[k]=a;});
     _kb.aval=av;_kb.avalNome=avNome;
+    const at={},atNome={};(r.atendidos||[]).forEach(a=>{const t=normalizePhone(a.tel);if(t)at[t]=a;const k=nn(a.nome);if(k)atNome[k]=a;});
+    _kb.atend=at;_kb.atendNome=atNome;
   }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
   finally{_kb.carregandoAgenda=false;}
   if(_kb.agenda){['fluxo','leads'].forEach(q=>{if(_kb.modo[q]==='kanban'&&document.getElementById('page-'+(q==='fluxo'?'fluxo':'leads'))?.classList.contains('active'))kbRender(q);});}
@@ -15961,6 +15963,7 @@ const KB_QUADROS={
       {id:'agendou',nome:'Agendou',solta:true},
       {id:'faltou',nome:'Faltou/desmarcou',solta:true},
       ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
+      {id:'compareceu',nome:'Compareceu (vai para Clientes)',dica:'Etapa ainda diz Agendou, mas foi atendido no Clinicorp nos últimos 30 dias: atualize a etapa no card'},
       {id:'perdido',nome:'Perdido',solta:true,vazia:true,dica:'Solte aqui para marcar como perdido'}
     ],
     itens:()=>{if(!_kb.agenda&&!_kb.carregandoAgenda&&Date.now()-(_kb.agendaTentativa||0)>60000)_kbCarregarAgenda();return (_leadsFiltered||[]).map(r=>{
@@ -15976,7 +15979,10 @@ const KB_QUADROS={
       // Etapa "Agendou" com a data já passada (e sem avaliação futura) = Faltou.
       if(_kb.agenda){
         if(_kbAvaliacaoFutura(it))return 'agendou';
-        if(s.includes('agendou'))return 'faltou';
+        if(s.includes('agendou')){
+          const at=(_kb.atend&&it.ph&&_kb.atend[it.ph])||(_kb.atendNome&&String(it.nome).trim().includes(' ')&&_kb.atendNome[_kb.nn(it.nome)]);
+          return at?'compareceu':'faltou';
+        }
       }else{
         const futuro=it.ph&&window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph);
         if(futuro||s.includes('agendou'))return 'agendou';
