@@ -15836,7 +15836,7 @@ function _kbDataAgendamento(it){
   // 1) próxima consulta no Clinicorp (qualquer categoria, com hora); 2) agenda de
   // avaliações já carregada na tela; 3) data da consulta salva no card
   // pelo telefone; se o cadastro do Clinicorp tiver outro número, pelo nome completo
-  const prox=(_kb.agenda&&it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&it.nome&&it.nome.trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
+  const prox=_kbAvaliacaoFutura(it)||(_kb.agenda&&it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&it.nome&&it.nome.trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
   const det=window._lastAgendamentosFuturosClinicorpDetalhe||[];
   const ag=det.filter(d=>normalizePhone(d.tel)===it.ph).map(d=>d.data).sort()[0];
   let d=null,temHora=false;
@@ -15853,6 +15853,7 @@ function _kbDataAgendamento(it){
   const quando=dias===0?' · hoje':(dias===1?' · amanhã':(dias<0?' · já passou':''));
   return txt+quando;
 }
+function _kbAvaliacaoFutura(it){return (_kb.aval&&it.ph&&_kb.aval[it.ph])||(_kb.avalNome&&_kb.nn&&it.nome&&String(it.nome).trim().includes(' ')&&_kb.avalNome[_kb.nn(it.nome)])||null;}
 function _kbTemConsultaFutura(it){return !!((_kb.agenda&&it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&it.nome&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]));}
 async function _kbCarregarAgenda(){
   if(_kb.carregandoAgenda)return;
@@ -15868,6 +15869,13 @@ async function _kbCarregarAgenda(){
       if(t&&(!m[t]||(a.data+a.hora)<(m[t].data+m[t].hora)))m[t]=a;
       const k=nn(a.nome);if(k&&(!porNome[k]||(a.data+a.hora)<(porNome[k].data+porNome[k].hora)))porNome[k]=a;});
     _kb.agenda=m;_kb.agendaNome=porNome;_kb.nn=nn;
+    // só AVALIAÇÃO futura conta como "Agendou" no Kanban de Leads
+    const av={},avNome={};
+    (r.agenda||[]).forEach(a0=>{if(!/avalia/i.test(String(a0.categoria||'')))return;const a={...a0,hora:hh(a0.hora)};
+      const t=String(a.tel||'').startsWith('nome:')?'':normalizePhone(a.tel);
+      if(t&&(!av[t]||(a.data+a.hora)<(av[t].data+av[t].hora)))av[t]=a;
+      const k=nn(a.nome);if(k&&(!avNome[k]||(a.data+a.hora)<(avNome[k].data+avNome[k].hora)))avNome[k]=a;});
+    _kb.aval=av;_kb.avalNome=avNome;
   }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
   finally{_kb.carregandoAgenda=false;}
   if(_kb.agenda){['fluxo','leads'].forEach(q=>{if(_kb.modo[q]==='kanban'&&document.getElementById('page-'+(q==='fluxo'?'fluxo':'leads'))?.classList.contains('active'))kbRender(q);});}
@@ -15964,8 +15972,15 @@ const KB_QUADROS={
     });},
     coluna:(it)=>{
       const s=it.stage;
-      const futuro=it.ph&&((window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph))||_kbTemConsultaFutura(it));
-      if(futuro||s.includes('agendou'))return 'agendou';
+      // Agendou = SÓ quem tem avaliação marcada daqui pra frente no Clinicorp.
+      // Etapa "Agendou" com a data já passada (e sem avaliação futura) = Faltou.
+      if(_kb.agenda){
+        if(_kbAvaliacaoFutura(it))return 'agendou';
+        if(s.includes('agendou'))return 'faltou';
+      }else{
+        const futuro=it.ph&&window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph);
+        if(futuro||s.includes('agendou'))return 'agendou';
+      }
       if(s.includes('faltou')||s.includes('desmarcou')){
         if(!it.tEv)return 'faltou';
         const env=_kbEnvios(it.tEv,KB_CAD_FALTA);let col='faltou';
@@ -15981,7 +15996,7 @@ const KB_QUADROS={
     },
     metricas:(cols,todos,porCol)=>{
       const extra={};
-      if(_kb.agenda){const sem=(porCol.agendou||[]).filter(it=>!_kbTemConsultaFutura(it)).length;if(sem)extra.agendou={txt:sem+' sem consulta futura no Clinicorp',det:'Etapa Agendou, mas nenhuma consulta marcada nos próximos 90 dias',alerta:true};}
+      if(_kb.agenda){const sem=(porCol.agendou||[]).filter(it=>!_kbAvaliacaoFutura(it)).length;if(sem)extra.agendou={txt:sem+' sem consulta futura no Clinicorp',det:'Etapa Agendou, mas nenhuma consulta marcada nos próximos 90 dias',alerta:true};}
       const m0=_kbMetricasLeads(cols,todos);return Object.assign(m0,extra);
     },
     _metr:(cols,todos)=>{

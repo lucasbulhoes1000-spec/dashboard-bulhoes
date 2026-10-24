@@ -683,7 +683,7 @@ export async function handler(req: Request): Promise<Response> {
         // Kanban do Fluxo avisar quem está em tratamento sem nada marcado
         const sub: Record<string, string> = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
         const agora = Date.now();
-        const mapa = new Map<string, { data: string; hora: string; categoria: string; nome: string }>();
+        const todas: { tel: string; data: string; hora: string; categoria: string; nome: string }[] = [];
         for (let ini = 0; ini < 90; ini += 30) {
           const ag = await clinicorp("/appointment/list", { ...sub, from: diaLocal(agora, ini), to: diaLocal(agora, ini + 29) }).catch(() => []);
           for (const x of Array.isArray(ag) ? ag : []) {
@@ -696,11 +696,11 @@ export async function handler(req: Request): Promise<Response> {
             if (t === "nome:") continue;
             const hm = /^(\d{1,2}):(\d{2})/.exec(String(x?.fromTime ?? ""));
             const hora = hm ? `${hm[1].padStart(2, "0")}:${hm[2]}` : "";
-            const atual = mapa.get(t);
-            if (!atual || (d + hora) < (atual.data + atual.hora)) mapa.set(t, { data: d, hora, categoria: String(x?.CategoryDescription ?? ""), nome: String(x?.PatientName ?? "") });
+            // todas as consultas futuras (o CRM escolhe a primeira e a primeira avaliação)
+            todas.push({ tel: t, data: d, hora, categoria: String(x?.CategoryDescription ?? ""), nome: String(x?.PatientName ?? "") });
           }
         }
-        return json({ ok: true, agenda: [...mapa.entries()].map(([tel, v]) => ({ tel, ...v })) });
+        return json({ ok: true, agenda: todas });
       }
       case "agenda_passada": {
         // última consulta JÁ PASSADA de cada pessoa pedida (telefone ou nome completo),
