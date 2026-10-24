@@ -15835,11 +15835,12 @@ const _kbIcAgenda='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.
 function _kbDataAgendamento(it){
   // 1) próxima consulta no Clinicorp (qualquer categoria, com hora); 2) agenda de
   // avaliações já carregada na tela; 3) data da consulta salva no card
-  const prox=_kb.agenda&&it.ph&&_kb.agenda[it.ph];
+  // pelo telefone; se o cadastro do Clinicorp tiver outro número, pelo nome completo
+  const prox=(_kb.agenda&&it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&it.nome&&it.nome.trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
   const det=window._lastAgendamentosFuturosClinicorpDetalhe||[];
   const ag=det.filter(d=>normalizePhone(d.tel)===it.ph).map(d=>d.data).sort()[0];
   let d=null,temHora=false;
-  if(prox){d=new Date(prox.data+'T'+(prox.hora||'12:00'));temHora=!!prox.hora;}
+  if(prox){d=new Date(prox.data+'T'+(/^\d{2}:\d{2}$/.test(prox.hora||'')?prox.hora:'12:00'));temHora=/^\d{2}:\d{2}$/.test(prox.hora||'');}
   else if(ag)d=new Date(ag+'T12:00');
   else{
     const cc=ccDataLookup(it.ph)||{};
@@ -15852,13 +15853,21 @@ function _kbDataAgendamento(it){
   const quando=dias===0?' · hoje':(dias===1?' · amanhã':(dias<0?' · já passou':''));
   return txt+quando;
 }
+function _kbTemConsultaFutura(it){return !!((_kb.agenda&&it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&it.nome&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]));}
 async function _kbCarregarAgenda(){
   if(_kb.carregandoAgenda)return;
   _kb.carregandoAgenda=true;_kb.agendaTentativa=Date.now();
   try{
     const r=await _agAcao({acao:'agenda_futura'});
-    const m={};(r.agenda||[]).forEach(a=>{const t=normalizePhone(a.tel);if(t&&(!m[t]||(a.data+a.hora)<(m[t].data+m[t].hora)))m[t]=a;});
-    _kb.agenda=m;
+    // o Clinicorp manda "9:00" sem o zero; vira "09:00" para a data e a ordem saírem certas
+    const hh=h=>{const x=/^(\d{1,2}):(\d{2})/.exec(String(h||''));return x?x[1].padStart(2,'0')+':'+x[2]:'';};
+    const m={},porNome={};
+    const nn=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+    (r.agenda||[]).forEach(a0=>{const a={...a0,hora:hh(a0.hora)};
+      const t=String(a.tel||'').startsWith('nome:')?'':normalizePhone(a.tel);
+      if(t&&(!m[t]||(a.data+a.hora)<(m[t].data+m[t].hora)))m[t]=a;
+      const k=nn(a.nome);if(k&&(!porNome[k]||(a.data+a.hora)<(porNome[k].data+porNome[k].hora)))porNome[k]=a;});
+    _kb.agenda=m;_kb.agendaNome=porNome;_kb.nn=nn;
   }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
   finally{_kb.carregandoAgenda=false;}
   if(_kb.agenda){['fluxo','leads'].forEach(q=>{if(_kb.modo[q]==='kanban'&&document.getElementById('page-'+(q==='fluxo'?'fluxo':'leads'))?.classList.contains('active'))kbRender(q);});}
@@ -15955,7 +15964,7 @@ const KB_QUADROS={
     });},
     coluna:(it)=>{
       const s=it.stage;
-      const futuro=it.ph&&((window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph))||(_kb.agenda&&_kb.agenda[it.ph]));
+      const futuro=it.ph&&((window._lastAgendamentosFuturosClinicorp&&window._lastAgendamentosFuturosClinicorp.has(it.ph))||_kbTemConsultaFutura(it));
       if(futuro||s.includes('agendou'))return 'agendou';
       if(s.includes('faltou')||s.includes('desmarcou')){
         if(!it.tEv)return 'faltou';
@@ -15972,7 +15981,7 @@ const KB_QUADROS={
     },
     metricas:(cols,todos,porCol)=>{
       const extra={};
-      if(_kb.agenda){const sem=(porCol.agendou||[]).filter(it=>!_kbDataAgendamento(it)).length;if(sem)extra.agendou={txt:sem+' sem consulta futura no Clinicorp',det:'Etapa Agendou, mas nenhuma consulta marcada nos próximos 90 dias',alerta:true};}
+      if(_kb.agenda){const sem=(porCol.agendou||[]).filter(it=>!_kbTemConsultaFutura(it)).length;if(sem)extra.agendou={txt:sem+' sem consulta futura no Clinicorp',det:'Etapa Agendou, mas nenhuma consulta marcada nos próximos 90 dias',alerta:true};}
       const m0=_kbMetricasLeads(cols,todos);return Object.assign(m0,extra);
     },
     _metr:(cols,todos)=>{
@@ -16121,7 +16130,7 @@ const KB_QUADROS={
     },
     metricas:(cols,todos,porCol)=>{
       if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:{txt:'agenda do Clinicorp indisponível agora',fraco:true}};
-      const sem=(porCol.tratamento||[]).filter(it=>it.ph&&!_kb.agenda[it.ph]).length;
+      const sem=(porCol.tratamento||[]).filter(it=>!_kbTemConsultaFutura(it)).length;
       return {tratamento:sem?{txt:sem+' sem consulta marcada',det:'Sem nenhuma consulta nos próximos 90 dias no Clinicorp',alerta:true}:{txt:'todos com consulta marcada'}};
     },
     card:(it,col)=>{
@@ -16130,7 +16139,7 @@ const KB_QUADROS={
       let ag='';
       if(col==='tratamento'||col==='boasvindas'){
         if(_kb.agenda){
-          const a=it.ph&&_kb.agenda[it.ph];
+          const a=(it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
           ag=a?'<div class="kb-agenda">'+_kbIcAgenda+new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(a.hora?' '+a.hora:'')+'</div>'
              :'<span class="kb-tag atraso">sem consulta marcada</span>';
         }
