@@ -678,6 +678,28 @@ export async function handler(req: Request): Promise<Response> {
           amostra_profissional: JSON.stringify(lista(profs)?.[0] ?? null).slice(0, 300), amostra_categoria: JSON.stringify(lista(cats)?.[0] ?? null).slice(0, 300),
         });
       }
+      case "agenda_futura": {
+        // próximas consultas de qualquer categoria (90 dias), por telefone, para o
+        // Kanban do Fluxo avisar quem está em tratamento sem nada marcado
+        const sub: Record<string, string> = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
+        const agora = Date.now();
+        const mapa = new Map<string, { data: string; hora: string; categoria: string }>();
+        for (let ini = 0; ini < 90; ini += 30) {
+          const ag = await clinicorp("/appointment/list", { ...sub, from: diaLocal(agora, ini), to: diaLocal(agora, ini + 29) }).catch(() => []);
+          for (const x of Array.isArray(ag) ? ag : []) {
+            if (String(x?.Canceled ?? "").toUpperCase() === "X" || String(x?.Deleted ?? "").toUpperCase() === "X") continue;
+            if (String(x?.ItemType ?? "APPOINTMENT") !== "APPOINTMENT") continue;
+            let t = String(x?.MobilePhone ?? "").replace(/\D/g, "");
+            if (t.startsWith("55") && t.length >= 12) t = t.slice(2);
+            if (t.length < 10) continue;
+            const d = dataDoItem(x); if (!d) continue;
+            const hora = String(x?.fromTime ?? "").slice(0, 5);
+            const atual = mapa.get(t);
+            if (!atual || (d + hora) < (atual.data + atual.hora)) mapa.set(t, { data: d, hora, categoria: String(x?.CategoryDescription ?? "") });
+          }
+        }
+        return json({ ok: true, agenda: [...mapa.entries()].map(([tel, v]) => ({ tel, ...v })) });
+      }
       case "horarios": {
         const { a } = await carregarAgente();
         const cfg = { ...(a?.agendamento ?? {}), ...(dados.rascunho ?? {}) };

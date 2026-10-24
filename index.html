@@ -907,6 +907,29 @@ body{letter-spacing:-.1px;}
 .btn-top{display:inline-flex !important;align-items:center;gap:6px;font-weight:600;}
 .btn-top .ic{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 
+
+.kb-chaves{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;}
+.kb-chave{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);background:rgba(255,255,255,.02);color:var(--txt2);font-size:12px;font-weight:600;padding:6px 12px 6px 8px;border-radius:999px;cursor:pointer;}
+.kb-chave i{position:relative;width:28px;height:16px;border-radius:16px;background:#2A3D66;transition:background .2s;flex-shrink:0;}
+.kb-chave i:after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#E8ECF4;transition:transform .2s;}
+.kb-chave.on{border-color:var(--gold-soft);color:#fff;}
+.kb-chave.on i{background:linear-gradient(90deg,#B08A3E,#E2BE6A);}
+.kb-chave.on i:after{transform:translateX(12px);}
+.kb-chave b{font-size:11px;color:var(--gold-strong);}
+.kb-tit .kb-exp{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-left:-4px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;}
+.kb-exp svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.kb-exp:hover{color:var(--gold-strong);border-color:var(--gold-soft);background:rgba(212,175,90,.08);}
+.kb-resumo{flex-basis:240px;width:240px;background:rgba(13,26,51,.45);border-style:dashed;}
+.kb-abrir{margin-top:8px;border:1px solid var(--gold-soft);background:rgba(212,175,90,.08);color:var(--gold-strong);font-size:11.5px;font-weight:600;border-radius:999px;padding:5px 12px;cursor:pointer;}
+.kb-res-linha{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,.025);border:1px solid rgba(42,61,102,.6);}
+.kb-res-linha div{flex:1;min-width:0;display:flex;flex-direction:column;}
+.kb-res-linha b{font-size:12px;color:var(--txt);}
+.kb-res-linha small{font-size:10.5px;color:#9BE3B5;font-weight:600;margin-top:2px;}
+.kb-res-linha span{font-size:12px;font-weight:700;color:var(--gold-strong);}
+.kb-res-linha .kb-exp{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;}
+.kb-agenda{display:inline-flex;align-items:center;gap:6px;margin:3px 0 2px;padding:4px 9px;border-radius:8px;background:rgba(111,168,224,.12);color:#A9CBEF;font-size:11.5px;font-weight:700;}
+.kb-agenda svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.kb-met.alerta{color:#F2A79C;}
 /* ===== KANBAN ===== */
 .kb-modo{display:inline-flex;gap:4px;padding:4px;margin:0 0 12px;border:1px solid var(--line2);border-radius:999px;background:rgba(255,255,255,.02);}
 .kb-modo button{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:600;padding:6px 14px;border-radius:999px;cursor:pointer;}
@@ -1469,7 +1492,7 @@ body{letter-spacing:-.1px;}
 
       <div style="display:flex;gap:8px;margin-bottom:16px;">
         <button class="fluxo-sub-tab active" id="fluxo-sub-tratamentos" onclick="mudarFluxoSubView('tratamentos')" style="background:#B08A3E;color:#FFFFFF;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🔄 Tratamentos</button>
-        <button class="fluxo-sub-tab" id="fluxo-sub-ortodontia" onclick="mudarFluxoSubView('ortodontia')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🦷 Ortodontia (manutenção mensal)</button>
+        <button class="fluxo-sub-tab" id="fluxo-sub-ortodontia" onclick="mudarFluxoSubView('ortodontia')" style="display:none;background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">🦷 Ortodontia (manutenção mensal)</button>
         <button class="fluxo-sub-tab" id="fluxo-sub-concluidos" onclick="mudarFluxoSubView('concluidos')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">✅ Concluídos</button>
       </div>
 
@@ -7090,7 +7113,7 @@ function setTipoOrcamentoClientes(tipo){
   _clientesPage=1;
   const lblTotal=document.getElementById('cc-total-clientes-label');
   const lblAbertos=document.getElementById('cc-total-abertos-label');
-  if(lblTotal)lblTotal.textContent=_clientesTipoOrcamento==='recompra'?'orçamentos de recompra':'orçamentos de novos pacientes';
+  if(lblTotal)lblTotal.textContent=_clientesTipoOrcamento==='recompra'?'maior orçamento de cada recompra':'maior orçamento de cada paciente';
   if(lblAbertos)lblAbertos.textContent=_clientesTipoOrcamento==='recompra'?'recompras em aberto':'novos pacientes em aberto';
 
   filterClientesTable();
@@ -7224,8 +7247,10 @@ function renderClientesPage(){
   const totalA=totalC-totalF;
   // Valor orçado: SOMENTE orçamentos abertos dentro do período filtrado.
   let totalOrcado=0;
+  // Vários orçamentos da mesma pessoa costumam ser opções de tratamento:
+  // a oportunidade dela é o orçamento de maior valor, não a soma (24/10/2026).
   filtered.forEach(r=>{
-    (r._orcamentosPeriodo||[]).forEach(o=>totalOrcado+=Number(o.valor||0));
+    totalOrcado+=(r._orcamentosPeriodo||[]).reduce((m,o)=>Math.max(m,Number(o.valor||0)),0);
   });
   // Valor fechado: orçamentos aprovados de quem é fechado (stage Ganho ou orç aprovado)
   let valorF=0;
@@ -15798,12 +15823,64 @@ const KB_CAD_FALTA=[
 ];
 const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Sem resposta','Agendou retorno','Avaliação comercial','Aguardando entrada','Fechou','Pós venda'];
 const KB_LIMITE=40;
-const _kb={modo:{},limite:{},resp:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{}};
+const _kb={modo:{},limite:{},resp:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
+try{const g=JSON.parse(localStorage.getItem('kb_grupos')||'{}');if(g&&typeof g==='object')_kb.grupos=g;}catch(e){}
 try{const m=JSON.parse(localStorage.getItem('kb_modo')||'{}');if(m&&typeof m==='object')_kb.modo=m;}catch(e){}
 
 function _kbEsc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function _kbDias(d){if(!d)return null;const t=d instanceof Date?d.getTime():new Date(d).getTime();if(isNaN(t))return null;return Math.floor((Date.now()-t)/86400000);}
 function _kbTempo(d){const n=_kbDias(d);if(n==null)return '';if(n<=0)return 'hoje';if(n===1)return 'há 1 dia';if(n<60)return 'há '+n+' dias';const m=Math.floor(n/30);return m<24?'há '+m+' meses':'há '+Math.floor(m/12)+' anos';}
+const _kbIcAgenda='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>';
+function _kbDataAgendamento(it){
+  // 1) agenda do Clinicorp (consultas futuras de avaliação); 2) data da consulta salva no card
+  const det=window._lastAgendamentosFuturosClinicorpDetalhe||[];
+  const ag=det.filter(d=>normalizePhone(d.tel)===it.ph).map(d=>d.data).sort()[0];
+  let d=null,temHora=false;
+  if(ag)d=new Date(ag+'T12:00');
+  else{
+    const cc=ccDataLookup(it.ph)||{};
+    const ts=cc.consultaTimestamp||cc.agendTimestamp;
+    if(ts){d=new Date(ts);temHora=/T\d{2}:\d{2}/.test(ts)&&!/T08:00/.test(ts);}
+  }
+  if(!d||isNaN(d))return '';
+  const txt=d.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(temHora?' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'');
+  const dias=Math.round((new Date(d.toDateString())-new Date(new Date().toDateString()))/86400000);
+  const quando=dias===0?' · hoje':(dias===1?' · amanhã':(dias<0?' · já passou':''));
+  return txt+quando;
+}
+async function _kbCarregarAgenda(){
+  if(_kb.carregandoAgenda)return;
+  _kb.carregandoAgenda=true;
+  try{
+    const r=await _agAcao({acao:'agenda_futura'});
+    const m={};(r.agenda||[]).forEach(a=>{const t=normalizePhone(a.tel);if(t&&(!m[t]||(a.data+a.hora)<(m[t].data+m[t].hora)))m[t]=a;});
+    _kb.agenda=m;
+  }catch(e){console.warn('[KANBAN] agenda',e);_kb.agenda=null;}
+  finally{_kb.carregandoAgenda=false;}
+  if(_kb.modo.fluxo==='kanban')kbRender('fluxo');
+}
+function kbGrupo(q,g){_kb.grupos[q+'|'+g]=!_kb.grupos[q+'|'+g];try{localStorage.setItem('kb_grupos',JSON.stringify(_kb.grupos));}catch(e){}kbRender(q);}
+// exporta a coluna no formato de importação do Cloudia (com tag da etapa) para disparo
+function kbExportar(q,colId,ev){
+  if(ev)ev.stopPropagation();
+  const cfg=KB_QUADROS[q];const info=(_kb.cols[q]||{})[colId];
+  if(!cfg||!info)return;
+  const l=info.itens;
+  const norm=t=>{let d=String(t||'').replace(/\D/g,'');if(d.startsWith('55')&&(d.length===12||d.length===13))d=d.slice(2);return d;};
+  const esc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const tag='kanban '+cfg.titulo.toLowerCase()+' - '+info.nome;
+  const vistos=new Set();const linhas=['"Nome","Email","Telefone","Cpf","DataNascimento","Etapa","Observação","Tags"'];
+  l.forEach(it=>{
+    const tel=norm(it.ph||(it.r&&(it.r.phone||it.r.telefone))||it.tel||(it.p&&it.p.tel));
+    if(!tel||vistos.has(tel))return;vistos.add(tel);
+    linhas.push([esc(it.nome),'""',esc(tel),'""','""','""',esc(cfg.titulo+': '+info.nome),esc(tag)].join(','));
+  });
+  if(linhas.length<=1){showToast('error','Nada para exportar','Essa coluna não tem contatos com telefone.');return;}
+  const nomeArq=('disparo-'+cfg.titulo+'-'+info.nome).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  _downloadBlob('\uFEFF'+linhas.join('\n'),nomeArq,'text/csv;charset=utf-8;');
+  showToast('success','Planilha exportada',(linhas.length-1)+' contatos de "'+info.nome+'", com a tag "'+tag+'". Importe no Cloudia e dispare para essa tag.');
+}
+const _kbIcExport='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
 function _kbPrimeiroNome(n){return String(n||'').trim().split(/\s+/)[0]||'';}
 function _kbIni(n){const p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+((p.length>1?p[p.length-1]:'')[0]||'')).toUpperCase();}
 
@@ -15853,14 +15930,15 @@ function _kbResposta(it){
 const KB_QUADROS={
   leads:{
     titulo:'Leads',
+    grupos:{fup:'Follow-ups (FUP 2h a 2 meses)',falt:'Faltantes 1 a 3'},
     lista:()=>{const tb=document.getElementById('leads-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('leads-pagination')];},
     colunas:()=>[
       {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
       {id:'atendimento',nome:'Em atendimento',dica:'Respondeu: as cadências param e a SDR conduz'},
-      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true})),
+      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
       {id:'agendou',nome:'Agendou',solta:true},
       {id:'faltou',nome:'Faltou/desmarcou',solta:true},
-      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true})),
+      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
       {id:'perdido',nome:'Perdido',solta:true,vazia:true,dica:'Solte aqui para marcar como perdido'}
     ],
     itens:()=>(_leadsFiltered||[]).map(r=>{
@@ -15919,9 +15997,15 @@ const KB_QUADROS={
         const env=_kbEnvios(it.t0,KB_CAD_LEAD);const k=env.findIndex(d=>d.getTime()>Date.now());
         if(k>=0)prox='<div class="kb-linha"><span>próximo: '+KB_CAD_LEAD[k].nome+' '+env[k].toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+env[k].toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
       }
+      let agend='';
+      if(col==='agendou'){
+        const a=_kbDataAgendamento(it);
+        agend='<div class="kb-agenda">'+(a?_kbIcAgenda+a:_kbIcAgenda+'data não informada')+'</div>';
+      }
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+        ${agend}
         <div class="kb-linha">${sub?'<span>'+sub+'</span>':''}<span>entrou ${_kbTempo(it.t0)||'—'}</span></div>
-        ${prox}${resp}`;
+        ${prox}${col==='agendou'?'':resp}`;
     },
     abrir:(it)=>{const i=leadsData.indexOf(it.r);if(i>=0)openLeadCard(i);},
     soltar:(it,col)=>{
@@ -15952,7 +16036,8 @@ const KB_QUADROS={
       const d=ccDataLookup(ph)||{};
       const orcs=r._orcamentosPeriodo||[];
       const fechou=orcs.some(o=>o.status==='Aprovado');
-      const aberto=orcs.filter(o=>o.status!=='Aprovado'&&o.status!=='Reprovado'&&o.status!=='Cancelado').reduce((s,o)=>s+Number(o.valor||0),0);
+      // vários orçamentos costumam ser opções de tratamento: vale o de maior valor
+      const aberto=orcs.filter(o=>o.status!=='Aprovado'&&o.status!=='Reprovado'&&o.status!=='Cancelado').reduce((m,o)=>Math.max(m,Number(o.valor||0)),0);
       const fechado=orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
       const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
       const atv=(d.atividades&&d.atividades[0])||null;
@@ -15990,21 +16075,21 @@ const KB_QUADROS={
       if(col===''){showToast('error','Escolha uma fase','Arraste para uma das fases do follow-up.');return false;}
       editarFaseAtivTabela(ccKey(it.r),col);return true;
     },
-    aviso:()=>'Arraste o card para mudar a fase do follow-up. O valor de cada coluna soma os orçamentos em aberto (ou fechados, na coluna Fechou) do período filtrado.'
+    aviso:()=>'Arraste o card para mudar a fase do follow-up. Cada pessoa conta uma vez, pelo orçamento de maior valor (orçamentos diferentes costumam ser opções de tratamento). Na coluna Fechou vale o valor fechado. Período: o mesmo filtro de datas da lista (data de criação do orçamento).'
   },
   fluxo:{
     titulo:'Em Fluxo',
     lista:()=>[document.getElementById('fluxo-cards')],
     colunas:()=>[
-      {id:'inicio',nome:'Início do tratamento',dica:'Nenhuma subetapa concluída ainda'},
-      {id:'tratamento',nome:'Em tratamento'},
-      {id:'clinico',nome:'Parte clínica finalizada',dica:'Falta NPS e pós-venda'},
-      {id:'nps',nome:'NPS enviado'},
-      {id:'posvenda',nome:'Pós-venda enviado',dica:'Falta confirmar a conclusão'}
+      {id:'boasvindas',nome:'Boas-vindas',dica:'Entrou no fluxo e ainda não concluiu nenhuma subetapa'},
+      {id:'tratamento',nome:'Em tratamento',dica:'Mostra quem está sem consulta marcada no Clinicorp'},
+      {id:'concluido',nome:'Concluído',dica:'Parte clínica finalizada; falta a mensagem de pós-venda'},
+      {id:'posvenda',nome:'Mensagem de pós-venda',dica:'Pós-venda enviado; falta confirmar a conclusão na lista'}
     ],
     itens:()=>{
       const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
       const procFil=document.getElementById('fluxo-procedimento-filter')?.value||'';
+      if(!_kb.agenda&&!_kb.carregandoAgenda)_kbCarregarAgenda();
       return (_fluxoPacientes||[]).filter(p=>{
         if(p.concluido)return false;
         if(busca){const dg=busca.replace(/\D/g,'');if(!(p.nome||'').toLowerCase().includes(busca)&&!(dg&&String(p.tel||'').replace(/\D/g,'').includes(dg)))return false;}
@@ -16013,28 +16098,40 @@ const KB_QUADROS={
       }).map(p=>{
         const tot=(p.procedimentos||[]).reduce((s,pr)=>s+(pr.subetapas||[]).length,0);
         const feitas=(p.procedimentos||[]).reduce((s,pr)=>s+(pr.subetapas||[]).filter(e=>e.ok).length,0);
-        return {p,tot,feitas,nome:p.nome||'—'};
+        const ph=normalizePhone(p.tel||'');
+        return {p,tot,feitas,ph,nome:p.nome||'—',tel:p.tel};
       });
     },
     coluna:(it)=>{
       const p=it.p;
-      if(typeof clinicoConcluido==='function'&&clinicoConcluido(p)){
-        if(p.npsEnviado&&p.posVendaEnviado)return 'posvenda';
-        if(p.npsEnviado||p.posVendaEnviado)return 'nps';
-        return 'clinico';
-      }
-      return it.feitas>0?'tratamento':'inicio';
+      const clin=typeof clinicoConcluido==='function'&&clinicoConcluido(p);
+      if(clin)return p.posVendaEnviado?'posvenda':'concluido';
+      return it.feitas>0?'tratamento':'boasvindas';
     },
-    card:(it)=>{
+    metricas:(cols,todos,porCol)=>{
+      if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:null};
+      const sem=(porCol.tratamento||[]).filter(it=>it.ph&&!_kb.agenda[it.ph]).length;
+      return {tratamento:sem?{txt:sem+' sem consulta marcada',det:'Sem nenhuma consulta nos próximos 90 dias no Clinicorp',alerta:true}:{txt:'todos com consulta marcada'}};
+    },
+    card:(it,col)=>{
       const pct=it.tot?Math.round(it.feitas/it.tot*100):0;
       const procs=(it.p.procedimentos||[]).map(pr=>pr.nome).filter(Boolean);
+      let ag='';
+      if(col==='tratamento'||col==='boasvindas'){
+        if(_kb.agenda){
+          const a=it.ph&&_kb.agenda[it.ph];
+          ag=a?'<div class="kb-agenda">'+_kbIcAgenda+new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(a.hora?' '+a.hora:'')+'</div>'
+             :'<span class="kb-tag atraso">sem consulta marcada</span>';
+        }
+      }
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         ${procs.length?'<div class="kb-linha"><span>'+_kbEsc(procs[0])+(procs.length>1?' +'+(procs.length-1):'')+'</span></div>':''}
         <div class="kb-barra"><i style="width:${pct}%"></i></div>
-        <div class="kb-linha"><span>${it.feitas}/${it.tot} subetapas</span><span>início ${it.p.dataInicio?new Date(it.p.dataInicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</span></div>`;
+        <div class="kb-linha"><span>${it.feitas}/${it.tot} subetapas</span><span>início ${it.p.dataInicio?new Date(it.p.dataInicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</span>${it.p.npsEnviado?'<span>NPS enviado</span>':''}</div>
+        ${ag}`;
     },
     abrir:(it)=>{kbModo('fluxo','lista');const s=document.getElementById('fluxo-search');if(s){s.value=it.nome;renderFluxoCards();}},
-    aviso:()=>'O card anda sozinho conforme as subetapas, o NPS e o pós-venda são marcados na lista. Clique no card para abrir o paciente na lista.'
+    aviso:()=>'O card anda sozinho conforme as subetapas e o pós-venda são marcados na lista. Em tratamento mostra quem não tem consulta marcada no Clinicorp nos próximos 90 dias. Clique no card para abrir o paciente na lista.'
   },
   pacientes:{
     titulo:'Pacientes',
@@ -16123,26 +16220,52 @@ function kbRender(q){
   itens.forEach((it,i)=>{it._i=i;let c;try{c=cfg.coluna(it);}catch(e){c=cols[0].id;}if(!(c in porCol))c=cols[0].id;porCol[c].push(it);});
   const met=cfg.metricas?cfg.metricas(cols,itens,porCol):{};
   const valorDe=cfg.valor||null;
+  _kb.cols[q]={};
+  cols.forEach(c=>{_kb.cols[q][c.id]={nome:c.nome,itens:porCol[c.id]||[]};});
+  const grupos=cfg.grupos||{};
+  const aberto=g=>!!_kb.grupos[q+'|'+g];
   const scroll=host.querySelector('.kb-trilho')?host.querySelector('.kb-trilho').scrollLeft:0;
-  host.innerHTML=`<div class="kb-aviso">${_kbEsc(cfg.aviso?cfg.aviso():'')}</div>
-    <div class="kb-trilho">${cols.map(c=>{
-      const l=porCol[c.id]||[];
-      const lim=_kb.limite[q+'|'+c.id]||KB_LIMITE;
-      const soma=valorDe?l.reduce((s,it)=>s+(Number(valorDe(it))||0),0):0;
-      const mm=met&&met[c.id];
-      return `<section class="kb-col${c.cad?' cad':''}${c.solta?' solta':''}" data-q="${q}" data-col="${_kbEsc(c.id)}"
-          ondragover="kbSobre(event)" ondragleave="kbSaiu(event)" ondrop="kbSoltou(event)">
-        <header class="kb-cab" title="${_kbEsc(c.dica||'')}">
-          <div class="kb-tit"><span>${_kbEsc(c.nome)}</span><b>${l.length}</b></div>
-          ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
-          ${mm?'<div class="kb-met'+(mm.fraco?' fraco':'')+'" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
-        </header>
-        <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card" draggable="true" data-q="${q}" data-i="${it._i}"
-            ondragstart="kbPegou(event)" ondragend="kbLargou(event)" onclick="kbAbrir('${q}',${it._i})">${cfg.card(it,c.id)}</article>`).join('')}
-          ${l.length>lim?`<button type="button" class="kb-mais" onclick="kbMais('${q}','${_kbEsc(c.id).replace(/'/g,"\\'")}')">mostrar mais ${Math.min(KB_LIMITE,l.length-lim)} de ${l.length-lim}</button>`:''}
-          ${!l.length?'<div class="kb-vazio">'+(c.vazia?'Solte um card aqui':'Nenhum card')+'</div>':''}
-        </div>
-      </section>`;}).join('')}</div>`;
+  const exp=(id,n)=>n?`<button type="button" class="kb-exp" title="Exportar planilha para disparo" aria-label="Exportar planilha para disparo" onclick="kbExportar('${q}','${_kbEsc(id).replace(/'/g,"\\'")}',event)">${_kbIcExport}</button>`:'';
+  const colHtml=c=>{
+    const l=porCol[c.id]||[];
+    const lim=_kb.limite[q+'|'+c.id]||KB_LIMITE;
+    const soma=valorDe?l.reduce((s,it)=>s+(Number(valorDe(it))||0),0):0;
+    const mm=met&&met[c.id];
+    return `<section class="kb-col${c.cad?' cad':''}${c.solta?' solta':''}" data-q="${q}" data-col="${_kbEsc(c.id)}"
+        ondragover="kbSobre(event)" ondragleave="kbSaiu(event)" ondrop="kbSoltou(event)">
+      <header class="kb-cab" title="${_kbEsc(c.dica||'')}">
+        <div class="kb-tit"><span>${_kbEsc(c.nome)}</span><b>${l.length}</b>${exp(c.id,l.length)}</div>
+        ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
+        ${mm?'<div class="kb-met'+(mm.fraco?' fraco':'')+(mm.alerta?' alerta':'')+'" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
+      </header>
+      <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card" draggable="true" data-q="${q}" data-i="${it._i}"
+          ondragstart="kbPegou(event)" ondragend="kbLargou(event)" onclick="kbAbrir('${q}',${it._i})">${cfg.card(it,c.id)}</article>`).join('')}
+        ${l.length>lim?`<button type="button" class="kb-mais" onclick="kbMais('${q}','${_kbEsc(c.id).replace(/'/g,"\\'")}')">mostrar mais ${Math.min(KB_LIMITE,l.length-lim)} de ${l.length-lim}</button>`:''}
+        ${!l.length?'<div class="kb-vazio">'+(c.vazia?'Solte um card aqui':'Nenhum card')+'</div>':''}
+      </div>
+    </section>`;
+  };
+  // grupo recolhido: uma coluna-resumo com cada cadência numa linha
+  const resumoHtml=(g,membros)=>{
+    const total=membros.reduce((s,c)=>s+(porCol[c.id]||[]).length,0);
+    return `<section class="kb-col kb-resumo" data-q="${q}" data-col="">
+      <header class="kb-cab"><div class="kb-tit"><span>${_kbEsc(grupos[g])}</span><b>${total}</b></div>
+        <button type="button" class="kb-abrir" onclick="kbGrupo('${q}','${g}')">Abrir colunas</button></header>
+      <div class="kb-cards">${membros.map(c=>{const n=(porCol[c.id]||[]).length;const mm=met&&met[c.id];
+        return `<div class="kb-res-linha"><div><b>${_kbEsc(c.nome)}</b>${mm&&!mm.fraco?'<small>'+_kbEsc(mm.txt)+'</small>':''}</div><span>${n}</span>${exp(c.id,n)}</div>`;}).join('')}</div>
+    </section>`;
+  };
+  let partes=[];const feitos=new Set();
+  cols.forEach(c=>{
+    if(c.grupo&&!aberto(c.grupo)){
+      if(feitos.has(c.grupo))return;feitos.add(c.grupo);
+      partes.push(resumoHtml(c.grupo,cols.filter(x=>x.grupo===c.grupo)));
+    }else partes.push(colHtml(c));
+  });
+  const chaves=Object.keys(grupos).map(g=>{const n=cols.filter(c=>c.grupo===g).reduce((s,c)=>s+(porCol[c.id]||[]).length,0);
+    return `<button type="button" class="kb-chave${aberto(g)?' on':''}" role="switch" aria-checked="${aberto(g)}" onclick="kbGrupo('${q}','${g}')"><i></i>${_kbEsc(grupos[g])} <b>${n}</b></button>`;}).join('');
+  host.innerHTML=`${chaves?'<div class="kb-chaves">'+chaves+'</div>':''}<div class="kb-aviso">${_kbEsc(cfg.aviso?cfg.aviso():'')}</div>
+    <div class="kb-trilho">${partes.join('')}</div>`;
   const tr=host.querySelector('.kb-trilho');if(tr&&scroll)tr.scrollLeft=scroll;
   // Leads: busca as respostas e redesenha uma vez quando chegarem
   if(q==='leads'&&!_kb.carregandoResp){
@@ -16167,7 +16290,7 @@ function kbSoltou(ev){
   ev.preventDefault();
   const col=ev.currentTarget;col.classList.remove('alvo');
   const a=_kb.arrastando;_kb.arrastando=null;
-  if(!a||col.dataset.q!==a.q)return;
+  if(!a||col.dataset.q!==a.q||col.classList.contains('kb-resumo'))return;
   const cfg=KB_QUADROS[a.q];const it=(_kb.itens[a.q]||[])[a.i];
   if(!cfg||!it)return;
   if(!cfg.soltar){showToast('error','Esse quadro anda sozinho','O card muda de coluna quando os dados mudam.');return;}
