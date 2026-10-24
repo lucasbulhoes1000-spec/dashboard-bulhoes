@@ -702,6 +702,39 @@ export async function handler(req: Request): Promise<Response> {
         }
         return json({ ok: true, agenda: [...mapa.entries()].map(([tel, v]) => ({ tel, ...v })) });
       }
+      case "agenda_passada": {
+        // última consulta JÁ PASSADA de cada pessoa pedida (telefone ou nome completo),
+        // com o status do Clinicorp, para limpar quem ficou em "Agendou" sem consulta futura
+        const sub: Record<string, string> = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
+        const nn = (v: unknown) => String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+        const itens: { tel: string; nome: string }[] = Array.isArray(dados.itens) ? dados.itens.slice(0, 500) : [];
+        const porTel = new Map<string, number>(), porNome = new Map<string, number>();
+        itens.forEach((it, i) => { const t = String(it.tel ?? "").replace(/\D/g, ""); if (t) porTel.set(t, i); const n = nn(it.nome); if (n.includes(" ")) porNome.set(n, i); });
+        const dias = Math.min(720, Math.max(30, Number(dados.dias ?? 400)));
+        const agora = Date.now();
+        const achados: any[] = itens.map(() => null);
+        let amostra: any = null;
+        for (let fim = -1; fim > -dias; fim -= 30) {
+          const ag = await clinicorp("/appointment/list", { ...sub, from: diaLocal(agora, Math.max(fim - 29, -dias)), to: diaLocal(agora, fim) }).catch(() => []);
+          for (const x of Array.isArray(ag) ? ag : []) {
+            if (String(x?.Deleted ?? "").toUpperCase() === "X") continue;
+            if (String(x?.ItemType ?? "APPOINTMENT") !== "APPOINTMENT") continue;
+            let t = String(x?.MobilePhone ?? "").replace(/\D/g, "");
+            if (t.startsWith("55") && t.length >= 12) t = t.slice(2);
+            const i = porTel.get(t) ?? porNome.get(nn(x?.PatientName));
+            if (i === undefined) continue;
+            const d = dataDoItem(x); if (!d) continue;
+            const hm = /^(\d{1,2}):(\d{2})/.exec(String(x?.fromTime ?? ""));
+            const hora = hm ? `${hm[1].padStart(2, "0")}:${hm[2]}` : "";
+            const st: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(x ?? {})) if (/status|confirm|arriv|attend|present|faltou|miss|check/i.test(k)) st[k] = v;
+            if (!amostra) amostra = Object.keys(x ?? {});
+            const atual = achados[i];
+            if (!atual || (d + hora) > (atual.data + atual.hora)) achados[i] = { data: d, hora, categoria: String(x?.CategoryDescription ?? ""), cancelado: String(x?.Canceled ?? "").toUpperCase() === "X", status: st };
+          }
+        }
+        return json({ ok: true, achados, campos: amostra });
+      }
       case "horarios": {
         const { a } = await carregarAgente();
         const cfg = { ...(a?.agendamento ?? {}), ...(dados.rascunho ?? {}) };
