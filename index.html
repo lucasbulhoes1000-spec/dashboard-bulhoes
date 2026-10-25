@@ -6104,7 +6104,9 @@ function atualizarCardRoasGeral(roas,vendas,spend,semAnuncio){
   const el=document.getElementById('t-roas-geral');
   const sub=document.getElementById('t-roas-geral-sub');
   if(el)el.textContent=spend>0?roas.toFixed(2).replace('.',',')+'x':'—';
-  if(sub)sub.textContent=spend>0?`${fmt(vendas)} em vendas de novos pacientes de tráfego pago`+(semAnuncio>0?` (${fmt(vendas-semAnuncio)} com anúncio identificado + ${fmt(semAnuncio)} sem anúncio)`:'')+` ÷ ${fmt(spend)} investidos`:'sem investimento no período';
+  // metas do processo comercial (25/10/2026): ROAS ideal 7,5x, mínimo 4x
+  if(el)el.style.setProperty('color',spend>0?(roas>=7.5?'#7FD3A0':(roas>=4?'#F0CB72':'#E08A7E')):'','important');
+  if(sub)sub.textContent=spend>0?(roas>=7.5?'na meta (7,5x) · ':(roas>=4?'abaixo da meta de 7,5x, acima do mínimo de 4x · ':'abaixo do mínimo de 4x · '))+`${fmt(vendas)} em vendas de novos pacientes de tráfego pago`+(semAnuncio>0?` (${fmt(vendas-semAnuncio)} com anúncio identificado + ${fmt(semAnuncio)} sem anúncio)`:'')+` ÷ ${fmt(spend)} investidos`:'sem investimento no período';
 }
 
 // ===== FILTER AD TABLE =====
@@ -6163,6 +6165,11 @@ function filterAdTable(){
   _setTxt('t-leads-sub',totLeads?'leads de anúncios no período':'sem leads de anúncio');
   _setTxt('t-cpl',totLeads>0&&totSpend>0?fmt(totCpl):'—');
   _setTxt('ad-kpi-cac',totFechou>0?fmt(totCpc):'—');
+  // metas do processo comercial (25/10/2026): CAC ideal R$ 800, máximo R$ 1.500
+  try{const e=document.getElementById('ad-kpi-cac'),sb=document.getElementById('ad-kpi-cac-sub');
+    if(e)e.style.setProperty('color',totFechou>0?(totCpc<=800?'#7FD3A0':(totCpc<=1500?'#F0CB72':'#E08A7E')):'','important');
+    if(sb)sb.textContent=totFechou>0?(totCpc<=800?'dentro da meta (até R$ 800)':(totCpc<=1500?'acima da meta de R$ 800, abaixo do máximo de R$ 1.500':'acima do máximo de R$ 1.500')):'gasto ÷ contratos novos · meta R$ 800';
+  }catch(e){}
   const semPerf=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&(d.spend||0)>0&&(d.leads||0)>0&&!(d.fechou>0)&&!(d.vendas>0));
   const gastoSemPerf=semPerf.reduce((s,[,d])=>s+(d.spend||0),0);
   _setTxt('ad-kpi-semperf',semPerf.length?fmt(gastoSemPerf):'R$ 0');
@@ -8436,9 +8443,9 @@ function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumF
 // Categorias de procedimento, intervalo de manutenção (meses) e rótulos.
 var _categoriasPacientes = {
   lentesResina:        {label:'Lentes em Resina',     intervalo:6,  unidadeRotulo:'meses'},
-  harmonizacao:        {label:'Harmonização (Preenchimento)', intervalo:12, unidadeRotulo:'meses'},
-  clareamento:         {label:'Clareamento',           intervalo:12, unidadeRotulo:'meses'},
-  clareamentoInferior: {label:'Clareamento Inferior',  intervalo:12, unidadeRotulo:'meses'},
+  harmonizacao:        {label:'Harmonização (Preenchimento)', intervalo:10, unidadeRotulo:'meses'},
+  clareamento:         {label:'Clareamento',           intervalo:10, unidadeRotulo:'meses'},
+  clareamentoInferior: {label:'Clareamento Inferior',  intervalo:10, unidadeRotulo:'meses'},
   lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'},
   implantes:           {label:'Implantes',             intervalo:null, unidadeRotulo:'sem dado'}
 };
@@ -16382,6 +16389,52 @@ const KB_CAD_FALTA=[
   {id:'falt3',nome:'Faltantes 3',min:4320}
 ];
 const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Sem resposta','Agendou retorno','Avaliação comercial','Aguardando entrada','Fechou','Pós venda'];
+// Recuperação de orçamentos em aberto (processo comercial de 25/10/2026). A Lívia
+// manda as mensagens e move o card; o CRM só controla o prazo de cada etapa,
+// contado da data da avaliação. "dia" = até quando aquela mensagem deve sair.
+const KB_ORC_ETAPAS=[
+  {id:'Retorno combinado (Pix)',dia:null,alias:['Agendou retorno','Aguardando entrada','Avaliação comercial'],dica:'Pediu para pensar: data de retorno combinada e Pix de compromisso de R$ 100'},
+  {id:'Aguardando 1° contato',dia:1,alias:['']},
+  {id:'1° contato - Vídeo de agradecimento',dia:1,alias:[]},
+  {id:'2° contato - Antes/Depois + lembrei de você',dia:3,alias:[]},
+  {id:'3° contato - Depoimento',dia:7,alias:[]},
+  {id:'Pergunta sincera',dia:10,alias:['Sem resposta']},
+  {id:'Nova proposta',dia:14,alias:[]},
+  {id:'Conseguiu ver?',dia:16,alias:[]},
+  {id:'Mensagem de despedida',dia:21,alias:[]},
+  {id:'Cadência mensal',dia:30,alias:[],dica:'Recebe um conteúdo por mês e as campanhas internas'},
+  {id:'Fechou',dia:null,alias:['Pós venda']}
+];
+function _kbOrcEtapa(fase){
+  const f=String(fase||'');
+  const e=KB_ORC_ETAPAS.find(x=>x.id===f||x.alias.includes(f));
+  return e?e.id:'__outras';
+}
+function _kbOrcBase(it){
+  // data da avaliação: a da consulta; se não tiver, a do orçamento de maior valor
+  const t=parseCloudiaDate(it.r&&it.r.timestamp);
+  if(t)return t;
+  const o=it.top&&(it.top.data||it.top.dataOrcamento);
+  return o?new Date(String(o).slice(0,10)+'T12:00'):null;
+}
+// próxima etapa e até quando (null se não houver prazo)
+function _kbOrcProxima(it,etapa){
+  const i=KB_ORC_ETAPAS.findIndex(x=>x.id===etapa);
+  if(i<0||etapa==='Fechou'||etapa==='Cadência mensal'||etapa==='Retorno combinado (Pix)')return null;
+  const prox=etapa==='Aguardando 1° contato'?KB_ORC_ETAPAS[2]:KB_ORC_ETAPAS[i+1];
+  if(!prox||prox.dia==null)return null;
+  const b=_kbOrcBase(it);if(!b)return null;
+  const ate=new Date(b.getFullYear(),b.getMonth(),b.getDate()+prox.dia);
+  return {nome:prox.id,ate};
+}
+function _kbGarantirFasesProcesso(){
+  try{
+    if(!_listas||!_listas.fases)return;
+    const at=_listas.fases.ativos||(_listas.fases.ativos=[]);let mudou=false;
+    KB_ORC_ETAPAS.forEach(e=>{if(!at.includes(e.id)){at.push(e.id);mudou=true;}});
+    if(mudou&&typeof salvarListasDebounced==='function')salvarListasDebounced();
+  }catch(e){}
+}
 const KB_LIMITE=40;
 const _kb={modo:{},limite:{},resp:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
 try{const g=JSON.parse(localStorage.getItem('kb_grupos')||'{}');if(g&&typeof g==='object')_kb.grupos=g;}catch(e){}
@@ -16619,17 +16672,16 @@ const KB_QUADROS={
       showToast('success','Confirme no card',(nova==='Perdido'?'Confira':'Preencha a data')+' e clique em Salvar.');
       return false;
     },
-    aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Quem respondeu sai das cadências. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
+    aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Quem respondeu aparece em Em atendimento; a sequência só para quando muda de etapa e não envia enquanto a conversa está ativa. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
   },
   clientes:{
     titulo:'Clientes',
     lista:()=>{const tb=document.getElementById('clientes-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('clientes-pagination')];},
     colunas:()=>{
-      const ativas=(_listas.fases&&_listas.fases.ativos)||[];
-      // ordem do processo; "N° contato" novos entram na sequência numérica
-      const chave=f=>{const i=KB_FASES_ORDEM.indexOf(f);if(i>=0)return i;const m=String(f).match(/^(\d+)\s*°/);if(m)return KB_FASES_ORDEM.indexOf('2° contato - Antes/Depois + lembrei de você')+(Number(m[1])-2)*0.1;return 99;};
-      const ordem=ativas.slice().sort((x,y)=>chave(x)-chave(y));
-      return [{id:'',nome:'Sem fase',dica:'Compareceu e ainda não tem fase de follow-up'},...ordem.map(f=>({id:f,nome:f,solta:true}))];
+      _kbGarantirFasesProcesso();
+      const cols=KB_ORC_ETAPAS.map(e=>({id:e.id,nome:e.id,solta:true,dica:e.dica||(e.dia!=null?'Mensagem até o dia '+e.dia+' depois da avaliação':'')}));
+      cols.push({id:'__outras',nome:'Outras fases',dica:'Fases antigas que não estão no processo: arraste para a etapa certa'});
+      return cols;
     },
     itens:()=>(_clientesFiltrados||[]).map(r=>{
       const ph=String(r.phone||'').replace(/\D/g,'');
@@ -16643,39 +16695,51 @@ const KB_QUADROS={
       const atv=(d.atividades&&d.atividades[0])||null;
       return {r,ph,d,fechou,aberto,fechado,top,atv,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
-    coluna:(it)=>{
-      if(it.fechou){const cols=(_listas.fases&&_listas.fases.ativos)||[];if(cols.includes('Fechou')&&!['Pós venda'].includes(it.fase))return 'Fechou';}
-      return it.fase||'';
-    },
+    coluna:(it)=>it.fechou?'Fechou':_kbOrcEtapa(it.fase),
     valor:(it)=>it.fechou?it.fechado:it.aberto,
     metricas:(cols,todos,porCol)=>{
-      const m={};const hoje=localDateStr(new Date());
+      const m={};const hoje=new Date(new Date().toDateString());
       cols.forEach(c=>{
         const l=porCol[c.id]||[];
-        const atras=l.filter(it=>it.atv&&it.atv.proximo&&it.atv.proximo<hoje).length;
-        const hj=l.filter(it=>it.atv&&it.atv.proximo===hoje).length;
+        let atras=0,hj=0;
+        l.forEach(it=>{
+          if(c.id==='Retorno combinado (Pix)'){const p=it.atv&&it.atv.proximo;if(p){const dd=new Date(p+'T00:00');if(dd<hoje)atras++;else if(+dd===+hoje)hj++;}return;}
+          const px=_kbOrcProxima(it,c.id);if(!px)return;
+          if(px.ate<hoje)atras++;else if(+px.ate===+hoje)hj++;
+        });
         const partes=[];if(hj)partes.push(hj+' para hoje');if(atras)partes.push(atras+' atrasado'+(atras>1?'s':''));
-        m[c.id]=partes.length?{txt:partes.join(' · '),det:'Próximo contato marcado na atividade'}:null;
+        m[c.id]=partes.length?{txt:partes.join(' · '),det:'Prazo da próxima mensagem, contado da data da avaliação',alerta:atras>0}:null;
       });
       return m;
     },
-    card:(it)=>{
-      const hoje=localDateStr(new Date());
-      const prox=it.atv&&it.atv.proximo?it.atv.proximo:'';
-      const proxTxt=prox?new Date(prox+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'';
-      const proxCls=prox&&prox<hoje?'atraso':(prox===hoje?'hoje':'');
+    card:(it,col)=>{
+      const hoje=new Date(new Date().toDateString());
       const trat=it.top&&it.top.tratamento?String(it.top.tratamento).split(',')[0].trim():'';
       const valor=it.fechou?it.fechado:it.aberto;
+      let prazo='';
+      if(col==='Retorno combinado (Pix)'){
+        const p=it.atv&&it.atv.proximo;
+        if(p){const dd=new Date(p+'T00:00');prazo='<span class="kb-tag '+(dd<hoje?'atraso':(+dd===+hoje?'hoje':''))+'">retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';}
+        else prazo='<span class="kb-tag atraso">sem data de retorno</span>';
+      }else{
+        const px=_kbOrcProxima(it,col);
+        if(px)prazo='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">'+_kbEsc(px.nome.replace(/ - .*/,''))+' até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
+      }
+      const base=_kbOrcBase(it);
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         ${trat?'<div class="kb-linha"><span>'+_kbEsc(trat)+'</span></div>':''}
-        <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${proxTxt?'<span class="kb-tag '+proxCls+'">contato '+proxTxt+'</span>':''}</div>`;
+        <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${base?'<span>avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':''}</div>
+        ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}`;
     },
     abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
     soltar:(it,col)=>{
-      if(col===''){showToast('error','Escolha uma fase','Arraste para uma das fases do follow-up.');return false;}
-      editarFaseAtivTabela(ccKey(it.r),col);return true;
+      if(col==='__outras'){showToast('error','Escolha uma etapa','Arraste para uma das etapas do follow-up.');return false;}
+      if(col==='Fechou'){showToast('error','Fechou anda sozinho','O card vai para Fechou quando o orçamento é aprovado.');return false;}
+      editarFaseAtivTabela(ccKey(it.r),col);
+      if(col==='Retorno combinado (Pix)')showToast('success','Marque a data do retorno','Abra o card e preencha o próximo contato com a data combinada.');
+      return true;
     },
-    aviso:()=>'Arraste o card para mudar a fase do follow-up. Cada pessoa conta uma vez, pelo orçamento de maior valor (orçamentos diferentes costumam ser opções de tratamento). Na coluna Fechou vale o valor fechado. Período: o mesmo filtro de datas da lista (data de criação do orçamento).'
+    aviso:()=>'Etapas do follow-up de orçamentos do processo comercial. A Lívia envia a mensagem e arrasta o card; o prazo de cada etapa conta da data da avaliação (1° contato até o dia 1, 2° até o 3, 3° até o 7, pergunta sincera até o 10, nova proposta até o 14, conseguiu ver até o 16, despedida até o 21 e cadência mensal a partir do 30). Cada pessoa conta uma vez, pelo orçamento de maior valor.'
   },
   fluxo:{
     titulo:'Em Fluxo',
@@ -16684,7 +16748,7 @@ const KB_QUADROS={
       {id:'boasvindas',nome:'Boas-vindas',dica:'Entrou no fluxo e ainda não concluiu nenhuma subetapa'},
       {id:'tratamento',nome:'Em tratamento',dica:'Mostra quem está sem consulta marcada no Clinicorp'},
       {id:'concluido',nome:'Concluído',dica:'Parte clínica finalizada; falta a mensagem de pós-venda'},
-      {id:'posvenda',nome:'Mensagem de pós-venda',dica:'Pós-venda enviado; falta confirmar a conclusão na lista'}
+      {id:'posvenda',nome:'Pós-venda e NPS',dica:'Pós-venda no dia seguinte ao fim do tratamento, junto com a pesquisa NPS'}
     ],
     itens:()=>{
       const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
@@ -16738,6 +16802,7 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('pacientes-tbody');return [tb&&tb.closest('.table-card')];},
     colunas:()=>[
       {id:'agendado',nome:'Manutenção agendada'},
+      {id:'vencendo',nome:'Hora de chamar',dica:'Em dia, mas o prazo vence em até 30 dias'},
       {id:'emdia',nome:'Em dia'},
       {id:'contato',nome:'Chamado sem retorno',dica:'Foi chamado há 30+ dias e não agendou'},
       {id:'atrasado6_12',nome:'Atrasado 6 a 12 meses'},
@@ -16753,7 +16818,15 @@ const KB_QUADROS={
       if(busca)regs=regs.filter(r=>String(r.nome||'').toLowerCase().includes(busca));
       return regs.map(r=>({r,nome:r.nome||'—'}));
     },
-    coluna:(it)=>it.r._precisaContato&&it.r._status!=='agendado'?'contato':it.r._status,
+    coluna:(it)=>{
+      if(it.r._precisaContato&&it.r._status!=='agendado')return 'contato';
+      if(it.r._status==='emdia'){
+        const cfg=_categoriasPacientes[_catAtivaPacientes]||{};
+        const b=it.r.dataBase&&new Date(it.r.dataBase+'T12:00');
+        if(b&&cfg.intervalo&&diffMeses(b,new Date())>=cfg.intervalo-1)return 'vencendo';
+      }
+      return it.r._status;
+    },
     card:(it)=>{
       const r=it.r;
       const base=r.dataBase||r.dataInstalacao;
@@ -16761,6 +16834,7 @@ const KB_QUADROS={
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         <div class="kb-linha"><span>${base?(r.dataBase?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span></div>
         ${r.agendado?'<div class="kb-linha"><span class="kb-tag ok">agendado '+new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':''}
+        ${(_catAtivaPacientes==='lentesResina'&&r.dataInstalacao&&diffMeses(new Date(r.dataInstalacao+'T12:00'),new Date())>=48)?'<div class="kb-linha"><span class="kb-tag hoje">4+ anos de lentes: renovar ou upgrade para porcelana</span></div>':''}
         ${wa?'<a class="kb-wa" href="'+wa+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Chamar no WhatsApp</a>':''}`;
     },
     aviso:()=>'A coluna vem da data da última manutenção e da agenda do Clinicorp: o card anda sozinho quando o paciente agenda ou faz a manutenção. Mostra a categoria escolhida nas abas acima.'
