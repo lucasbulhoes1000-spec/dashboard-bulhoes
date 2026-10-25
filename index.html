@@ -972,6 +972,7 @@ body{letter-spacing:-.1px;}
 @media (max-width:700px){.kb-col{flex-basis:82vw;}}
 </style>
 <script>try{if(localStorage.getItem('bulhoes_tema')==='claro'){document.documentElement.style.background='#FAFAFC';document.documentElement.setAttribute('data-tema','claro');}}catch(e){}</script>
+<style>.pac-cat-tab{background:#12213F!important;color:#E2BE6A!important;}.pac-cat-tab.active{background:#B08A3E!important;color:#FFFFFF!important;}</style>
 </head>
 <body>
 
@@ -12489,6 +12490,16 @@ async function fazerLogout(){
 }
 
 function iniciarApp(){
+  // volta para a tela em que a pessoa estava (ex.: depois de trocar o tema)
+  try{const v=JSON.parse(sessionStorage.getItem('bulhoes_voltar')||'null');sessionStorage.removeItem('bulhoes_voltar');
+    if(v&&v.pagina&&v.pagina!=='inicio')setTimeout(()=>{try{
+      if(v.catPac&&typeof _catAtivaPacientes!=='undefined')_catAtivaPacientes=v.catPac;
+      irParaPagina(v.pagina);
+      if(v.pagina==='pacientes'&&v.catPac)switchCatPacientes(v.catPac);
+      if(v.pagina==='social-selling'&&v.ssAba==='painel')ssAba('painel');
+      if(v.y)setTimeout(()=>window.scrollTo(0,v.y),800);
+    }catch(e){}},300);
+  }catch(e){}
   carregarCRMRemoto();
   loadTrafego();
   setTimeout(populateDynamicSelects, 1500); // garante que _listas já foi carregado
@@ -16415,6 +16426,7 @@ function trocarTema(){
   const novo=temaAtual()==='claro'?'escuro':'claro';
   try{localStorage.setItem(TEMA_CHAVE,novo);}catch(e){}
   if(typeof _crmPendente!=='undefined'&&_crmPendente){showToast('error','Espere salvar','Há uma alteração sendo salva; troque o tema em alguns segundos.');try{localStorage.setItem(TEMA_CHAVE,novo==='claro'?'escuro':'claro');}catch(e){}return;}
+  try{sessionStorage.setItem('bulhoes_voltar',JSON.stringify({pagina:typeof currentPage!=='undefined'?currentPage:'inicio',catPac:typeof _catAtivaPacientes!=='undefined'?_catAtivaPacientes:null,ssAba:typeof _ss!=='undefined'?_ss.aba:null,y:window.scrollY}));}catch(e){}
   location.reload();
 }
 const _TC=(function(){
@@ -17022,9 +17034,7 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('pacientes-tbody');return [tb&&tb.closest('.table-card')];},
     colunas:()=>[
       {id:'agendado',nome:'Manutenção agendada'},
-      {id:'vencendo',nome:'Hora de chamar',dica:'Em dia, mas o prazo vence em até 30 dias'},
       {id:'emdia',nome:'Em dia'},
-      {id:'contato',nome:'Chamado sem retorno',dica:'Foi chamado há 30+ dias e não agendou'},
       {id:'atrasado6_12',nome:'Atrasado 6 a 12 meses'},
       {id:'atrasado1_2anos',nome:'Atrasado 1 a 2 anos'},
       {id:'atrasadomais2anos',nome:'Atrasado +2 anos'},
@@ -17038,26 +17048,18 @@ const KB_QUADROS={
       if(busca)regs=regs.filter(r=>String(r.nome||'').toLowerCase().includes(busca));
       return regs.map(r=>({r,nome:r.nome||'—'}));
     },
-    coluna:(it)=>{
-      if(it.r._precisaContato&&it.r._status!=='agendado')return 'contato';
-      if(it.r._status==='emdia'){
-        const cfg=_categoriasPacientes[_catAtivaPacientes]||{};
-        const b=it.r.dataBase&&new Date(it.r.dataBase+'T12:00');
-        if(b&&cfg.intervalo&&diffMeses(b,new Date())>=cfg.intervalo-1)return 'vencendo';
-      }
-      return it.r._status;
-    },
+    coluna:(it)=>it.r._status,
     card:(it,col)=>{
       const r=it.r;
       const base=r.dataBase||r.dataInstalacao;
       const ROT={emdia:'em dia',atrasado6_12:'atrasado 6 a 12 meses',atrasado1_2anos:'atrasado 1 a 2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:'nunca fez manutenção',semdado:'sem dado',agendado:'agendado'};
       let aviso='';
-      if(col==='contato'){
+      if(r._precisaContato&&r._status!=='agendado'){
         const dc=r.ultimoContato?Math.floor((Date.now()-new Date(r.ultimoContato+'T12:00'))/86400000):null;
-        aviso='<div class="kb-linha"><span class="kb-tag '+(ehAtrasado(r._status)||r._status==='nuncafez'?'atraso':'')+'">'+ROT[r._status]+'</span>'+(dc!=null?'<span>chamado há '+dc+' dias</span>':'')+'</div>';
-      }else if(col==='vencendo'){
+        aviso='<div class="kb-linha"><span class="kb-tag atraso">chamado'+(dc!=null?' há '+dc+' dias':'')+' sem retorno</span></div>';
+      }else if(r._status==='emdia'){
         const cfg=_categoriasPacientes[_catAtivaPacientes]||{};
-        if(r.dataBase&&cfg.intervalo){const b=new Date(r.dataBase+'T12:00');const v=new Date(b.getFullYear(),b.getMonth()+cfg.intervalo,b.getDate());const dv=Math.ceil((v-new Date())/86400000);
+        if(r.dataBase&&cfg.intervalo&&diffMeses(new Date(r.dataBase+'T12:00'),new Date())>=cfg.intervalo-1){const b=new Date(r.dataBase+'T12:00');const v=new Date(b.getFullYear(),b.getMonth()+cfg.intervalo,b.getDate());const dv=Math.ceil((v-new Date())/86400000);
           aviso='<div class="kb-linha"><span class="kb-tag hoje">'+(dv>0?'vence em '+dv+' dias':'vence hoje')+' ('+v.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+')</span></div>';}
       }
       const wa=typeof linkWhatsapp==='function'?linkWhatsapp(r.telefone):'';
