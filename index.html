@@ -8480,6 +8480,19 @@ function _pacDoRJ(tel){let t=String(tel||'').replace(/\D/g,'');if(t.length>=12&&
 // Renovação: lentes em resina instaladas há 4 anos ou mais (renovar a técnica ou
 // upgrade para porcelana). Lentes inferiores: quem fez lentes (resina ou
 // porcelana) só em cima. A data da instalação pode ser corrigida no próprio paciente.
+// histórico do Clinicorp (configuracoes.lentes_historico): primeiro atendimento
+// de instalação de lentes por paciente, para quem não tem a data na base
+async function _pacCarregarHistLentes(){
+  if(window._pacHistLentes!==undefined)return;
+  window._pacHistLentes=null;
+  try{const r=await _waRest('configuracoes?chave=eq.lentes_historico&select=valor');window._pacHistLentes=(r&&r[0]&&r[0].valor&&r[0].valor.pacientes)||{};}catch(e){window._pacHistLentes={};}
+}
+function _pacInstHist(x){
+  const H=window._pacHistLentes;if(!H)return null;
+  const nn=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+  const o=(x.telefone&&H['t:'+normalizePhone(x.telefone)])||H['n:'+nn(x.nome)];
+  return o&&o.i?o.i:null;
+}
 function _pacVirtuais(cat){
   const S=window._seedPacientesPlanilha||{};
   const base=[];
@@ -8488,7 +8501,11 @@ function _pacVirtuais(cat){
     (S.lentesResina||[]).filter(x=>!x.temInferior).forEach(x=>base.push({...x,_orig:'Resina'}));
     (S.lentesPorcelana||[]).filter(x=>!x.possuiInferiores).forEach(x=>base.push({...x,_orig:'Porcelana'}));
   }
-  return base.map(x=>({...x,agendado:null,dataBase:x.dataInstalacao||null}));
+  return base.map(x=>{
+    const h=_pacInstHist(x);
+    const inst=[x.dataInstalacao,h].filter(Boolean).sort()[0]||null; // a mais antiga
+    return {...x,agendado:null,dataBase:inst,_instFonte:x.dataInstalacao?'base':(h?'Clinicorp':'')};
+  });
 }
 function statusPacienteCat(r,cat){
   const cfg=_categoriasPacientes[cat]||{};
@@ -8506,23 +8523,30 @@ function statusPacienteCat(r,cat){
   return statusPaciente(r,cfg.intervalo);
 }
 const PAC_STATUS_VIRTUAL={
-  renovacao:[['ren_renovar','4 anos ou mais: renovar ou upgrade'],['ren_proximo','3 a 4 anos'],['ren_recente','Menos de 3 anos'],['ren_semdata','Sem data de instalação']],
+  renovacao:[['ren_renovar','Instalou há 4 anos ou mais: renovar ou upgrade para porcelana']],
   inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação'],['inf_feito','Já fez as inferiores']]
 };
 function getRegistrosPaciente(cat){
   const cfgV=_categoriasPacientes[cat]||{};
   const seed = cfgV.virtual ? _pacVirtuais(cat) : ((window._seedPacientesPlanilha && window._seedPacientesPlanilha[cat]) || []);
-  return seed.map(s=>{
+  const lista = seed.map(s=>{
     const key = 'planilha::'+cat+'::'+normStr(s.nome);
     const override = _ccData[key] && _ccData[key].manutPlanilha;
-    const dataBase = override&&override.dataBase!==undefined ? override.dataBase : s.dataBase;
+    // nas listas de lentes (Renovação e Lentes inferiores) a data é a da instalação,
+    // compartilhada entre as duas abas
+    const keyInst = cfgV.virtual ? 'planilha::lentesinst::'+normStr(s.nome) : null;
+    const ovInst = keyInst && _ccData[keyInst] && _ccData[keyInst].manutPlanilha;
+    const dataBase = keyInst ? (ovInst&&ovInst.dataBase!==undefined&&ovInst.dataBase!==null ? ovInst.dataBase : s.dataBase)
+                             : (override&&override.dataBase!==undefined ? override.dataBase : s.dataBase);
     const agendado = override&&override.agendado!==undefined ? override.agendado : s.agendado;
     const ultimoContato = (override&&override.ultimoContato)||null;
     // Prioridade do telefone: edição manual no card > telefone do Clinicorp (sincronização) > base de leads do Cloudia
     const telefone = (override&&override.telefone)||s.telefone||getTelefonePorNome(s.nome);
     const inferiorFeito = !!(override&&override.inferiorFeito);
-    return {...s, dataBase, agendado, telefone, ultimoContato, inferiorFeito, _key:key};
+    return {...s, dataBase, agendado, telefone, ultimoContato, inferiorFeito, _key:key, _keyData:keyInst||key};
   }).filter(r=>!_pacDoRJ(r.telefone));
+  if(cat==='renovacao')return lista.filter(r=>r.dataBase&&diffMeses(new Date(r.dataBase+'T12:00'),new Date())>=48);
+  return lista;
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
 // Status detalhado por faixa de tempo, não apenas "atrasado".
@@ -8578,7 +8602,7 @@ async function renderPacientesPage(){
   if(wrap && !_seedPacientesCarregado){
     wrap.innerHTML='<div style="padding:24px;text-align:center;color:#8C98B1;font-size:13px;">Carregando base de pacientes...</div>';
   }
-  await fetchSeedPacientes();
+  await Promise.all([fetchSeedPacientes(),_pacCarregarHistLentes()]);
   atualizarBadgeUltimaSync();
   renderDiagnosticoPacientes();
   renderTabelaPacientes();
@@ -9051,7 +9075,7 @@ function renderTabelaPacientes(){
     }
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
-      <td><input type="date" value="${r.dataBase||''}" title="${cfg.virtual?'Data da instalação das lentes':'Última manutenção'}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${r._orig?`<div style="font-size:10px;color:#66738F;margin-top:2px;">${r._orig}</div>`:''}${cat==='inferiores'?`<div><button onclick="salvarOverridePaciente('${cat}','${r._key}','inferiorFeito',${r.inferiorFeito?'null':'true'})" style="background:none;border:none;color:#E2BE6A;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">${r.inferiorFeito?'Desfazer: ainda não fez':'Já fez as inferiores'}</button></div>`:''}${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
+      <td><input type="date" value="${r.dataBase||''}" title="${cfg.virtual?'Data da instalação das lentes':'Última manutenção'}" onchange="salvarOverridePaciente('${cat}','${r._keyData}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${r._orig?`<div style="font-size:10px;color:#66738F;margin-top:2px;">${r._orig}</div>`:''}${cat==='inferiores'?`<div><button onclick="salvarOverridePaciente('${cat}','${r._key}','inferiorFeito',${r.inferiorFeito?'null':'true'})" style="background:none;border:none;color:#E2BE6A;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">${r.inferiorFeito?'Desfazer: ainda não fez':'Já fez as inferiores'}</button></div>`:''}${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
       <td style="font-size:12px;color:#8C98B1;">${infoTempo}</td>
       <td style="font-size:12px;color:#8C98B1;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
@@ -9059,7 +9083,7 @@ function renderTabelaPacientes(){
       <td>${contatoCell}</td>
       <td>${waBtn}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#66738F;padding:20px;">Nenhum paciente encontrado.</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#66738F;padding:20px;">'+(cat==='renovacao'?'Ninguém com lentes instaladas há 4 anos ou mais na base. O Clinicorp só tem atendimentos desde 19/10/2022 (e o tipo do atendimento desde junho/2023): quem colocou lentes antes disso precisa da data de instalação preenchida (aba Manutenção ou Lentes inferiores). A lista cresce sozinha conforme os pacientes completam 4 anos.':'Nenhum paciente encontrado.')+'</td></tr>';
 }
 function definirTelefonePaciente(cat,key,nome){
   const tel=prompt('Telefone de '+nome+' (com DDD, ex: 13981234567):');
