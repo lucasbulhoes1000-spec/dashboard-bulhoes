@@ -16446,6 +16446,7 @@ const _TC=(function(){
     const {h,s,l}=hsl(c.r,c.g,c.b);
     if(papel==='bg'){
       if(l<.5){
+        if(s>.3&&l>=.3)return dourado(h,s)?'#3760FF':hx; // cor de botão: mantém (texto branco continua legível)
         if(s<.5||(h>=200&&h<=240)){return l<.07?'#FAFAFC':l<.13?'#FFFFFF':l<.2?'#F4F7FB':'#EDF2F7';}
         const [r,g,b]=deHsl(h,Math.min(s,.6),.94);return hex2(r,g,b);
       }
@@ -16503,7 +16504,7 @@ const _TC=(function(){
     const c=parse(m[0]);if(!c)return false;
     const novo=mapa('bg',c);
     if(forte(novo))return true;
-    const {s,l}=hsl(c.r,c.g,c.b);return s>.35&&l>.3&&l<.6; // verde/vermelho de botão
+    const {s,l}=hsl(c.r,c.g,c.b);return s>.3&&l>=.3&&l<.6; // verde/vermelho/azul de botão
   }
   function trocarBloco(st){
     if(!st||!st.length)return;
