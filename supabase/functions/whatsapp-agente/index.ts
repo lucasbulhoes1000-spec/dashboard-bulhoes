@@ -723,7 +723,19 @@ export async function handler(req: Request): Promise<Response> {
         const filtro = dados.filtro ? new RegExp(String(dados.filtro), "i") : null;
         const ini = Date.parse(de + "T12:00:00Z"), fim = Date.parse(ate + "T12:00:00Z");
         if (!(fim >= ini) || fim - ini > 93 * 86400000) return json({ ok: false, erro: "período de até 93 dias" }, 400);
-        const itens: { tel: string; nome: string; data: string; categoria: string; atendido: boolean }[] = [];
+        const itens: { tel: string; nome: string; data: string; categoria: string; atendido: boolean; proc: string; obs: string }[] = [];
+        // texto dos procedimentos do agendamento (o tipo/categoria só existe desde jun/2023;
+        // antes disso o que foi feito aparece só em "Procedimentos")
+        const textoProc = (x: any): string => {
+          const partes: string[] = [];
+          for (const [k, v] of Object.entries(x ?? {})) {
+            if (!/proced|treatment|service|descri/i.test(k) || /categor|patient|professional|dentist|clinic/i.test(k)) continue;
+            if (typeof v === "string") partes.push(v);
+            else if (Array.isArray(v)) v.forEach((y: any) => { if (typeof y === "string") partes.push(y); else if (y && typeof y === "object") Object.values(y).forEach((z) => { if (typeof z === "string" && z.length < 200) partes.push(z); }); });
+          }
+          return partes.join(" | ").slice(0, 400);
+        };
+        let chaves: string[] | null = null;
         for (let t0 = ini; t0 <= fim; t0 += 31 * 86400000) {
           const t1 = Math.min(fim, t0 + 30 * 86400000);
           const ag = await clinicorp("/appointment/list", { ...sub, from: new Date(t0).toISOString().slice(0, 10), to: new Date(t1).toISOString().slice(0, 10) }).catch(() => []);
@@ -731,14 +743,17 @@ export async function handler(req: Request): Promise<Response> {
             if (String(x?.Canceled ?? "").toUpperCase() === "X" || String(x?.Deleted ?? "").toUpperCase() === "X") continue;
             if (String(x?.ItemType ?? "APPOINTMENT") !== "APPOINTMENT") continue;
             const cat = String(x?.CategoryDescription ?? "");
-            if (filtro && !filtro.test(cat)) continue;
+            const proc = textoProc(x);
+            const obs = String(x?.Notes ?? x?.Observation ?? x?.Obs ?? "").slice(0, 300);
+            if (dados.chaves && !chaves) chaves = Object.keys(x ?? {});
+            if (filtro && !filtro.test(cat) && !filtro.test(proc)) continue;
             let t = String(x?.MobilePhone ?? "").replace(/\D/g, "");
             if (t.startsWith("55") && t.length >= 12) t = t.slice(2);
             itens.push({ tel: t, nome: String(x?.PatientName ?? ""), data: dataDoItem(x), categoria: cat,
-              atendido: !!(x?.CheckinTime || String(x?.StatusId ?? "") === "5329595793145856") });
+              atendido: !!(x?.CheckinTime || String(x?.StatusId ?? "") === "5329595793145856"), proc, obs });
           }
         }
-        return json({ ok: true, itens });
+        return json({ ok: true, itens, ...(chaves ? { chaves } : {}) });
       }
       case "agenda_passada": {
         // última consulta JÁ PASSADA de cada pessoa pedida (telefone ou nome completo),
