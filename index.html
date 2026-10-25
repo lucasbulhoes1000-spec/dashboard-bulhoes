@@ -18,7 +18,9 @@ body{background:#070E20;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .sidebar:hover{width:200px;box-shadow:4px 0 16px rgba(0,0,0,.08);}
 .sidebar-logo{padding:8px;border-bottom:0.5px solid #2A3D66;display:flex;align-items:center;justify-content:center;min-height:56px;overflow:hidden;}
 .sidebar-logo img{height:36px;width:auto;object-fit:contain;flex-shrink:0;}
-.sidebar-nav{flex:1;padding:12px 0;overflow:hidden;}
+.sidebar-nav{flex:1;padding:12px 0;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;}
+.sidebar-nav::-webkit-scrollbar{width:5px;}
+.sidebar-nav::-webkit-scrollbar-thumb{background:#2A3D66;border-radius:5px;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;color:#8C98B1;font-size:13px;transition:all .2s;border-left:2px solid transparent;white-space:nowrap;}
 .nav-item:hover{background:#12213F;color:#E2BE6A;}
 .nav-item.active{background:#12213F;color:#E2BE6A;border-left-color:#D4AF5A;font-weight:500;}
@@ -1788,7 +1790,6 @@ body{letter-spacing:-.1px;}
         <button class="pac-cat-tab" id="pac-cat-clareamento" onclick="switchCatPacientes('clareamento')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento</button>
         <button class="pac-cat-tab" id="pac-cat-clareamentoInferior" onclick="switchCatPacientes('clareamentoInferior')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento Inferior</button>
         <button class="pac-cat-tab" id="pac-cat-lentesPorcelana" onclick="switchCatPacientes('lentesPorcelana')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Porcelana</button>
-        <button class="pac-cat-tab" id="pac-cat-implantes" onclick="switchCatPacientes('implantes')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Implantes</button>
       </div>
       <style>.pac-cat-tab.active{background:#B08A3E!important;color:#FFFFFF!important;}.fluxo-sub-tab.active{background:#B08A3E!important;color:#FFFFFF!important;}</style>
 
@@ -8446,8 +8447,7 @@ var _categoriasPacientes = {
   harmonizacao:        {label:'Harmonização (Preenchimento)', intervalo:10, unidadeRotulo:'meses'},
   clareamento:         {label:'Clareamento',           intervalo:10, unidadeRotulo:'meses'},
   clareamentoInferior: {label:'Clareamento Inferior',  intervalo:10, unidadeRotulo:'meses'},
-  lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'},
-  implantes:           {label:'Implantes',             intervalo:null, unidadeRotulo:'sem dado'}
+  lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'}
 };
 var _catAtivaPacientes = 'lentesResina';
 
@@ -10864,10 +10864,48 @@ let _comissoesBaseSnapshot=[];
 // antigo (salvarCRMRemotoCompleto) automaticamente.
 // Salvamentos ficam em fila: nunca dois ao mesmo tempo pela mesma aba.
 let _crmSaveFila=Promise.resolve();
+// (25/10/2026) "não pode ter erro": se a gravação falhar, tenta de novo sozinho
+// (20 s, 1 min, 3 min, 5 min…); se alguém editou durante a gravação, grava de
+// novo; mostra no topo "Salvando… / Salvo / Não salvo" e avisa antes de fechar
+// a página com alteração pendente.
+let _crmPendente=false,_crmFalhas=0,_crmRetryTimer=null,_crmUltimoOk=null;
+function _crmTemDiff(){
+  try{
+    const m=_diffCRM(_crmBaseSnapshot||{},_ccData||{});
+    return Object.keys(m).length>0||JSON.stringify(_comissoesBaseSnapshot||[])!==JSON.stringify(_comissoes||[]);
+  }catch(e){return true;}
+}
+function _crmSelo(estado){
+  let el=document.getElementById('crm-save-status');
+  if(!el){const lu=document.getElementById('last-update');if(!lu||!lu.parentElement)return;el=document.createElement('span');el.id='crm-save-status';el.style.cssText='font-size:11px;margin-right:10px;white-space:nowrap;';lu.parentElement.insertBefore(el,lu);}
+  const h=d=>d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  if(estado==='salvando'){el.textContent='Salvando…';el.style.color='#C3CBDB';}
+  else if(estado==='ok'){el.textContent='✓ Salvo '+h(_crmUltimoOk||new Date());el.style.color='#7FD3A0';}
+  else if(estado==='erro'){el.textContent='⚠ Não salvo: tentando de novo';el.style.color='#E08A7E';el.title='Os dados estão guardados neste navegador e vão para o servidor assim que a conexão voltar.';}
+}
 function salvarCRMRemoto(){
-  _crmSaveFila=_crmSaveFila.then(_salvarCRMPorPatch,_salvarCRMPorPatch);
+  _crmPendente=true;_crmSelo('salvando');
+  _crmSaveFila=_crmSaveFila.then(_salvarCRMPorPatch,_salvarCRMPorPatch).then(ok=>{
+    if(ok===false){
+      _crmFalhas++;_crmSelo('erro');
+      clearTimeout(_crmRetryTimer);
+      const espera=[20,60,180,300][Math.min(_crmFalhas-1,3)]*1000;
+      _crmRetryTimer=setTimeout(()=>salvarCRMRemoto(),espera);
+    }else{
+      _crmFalhas=0;
+      if(_crmTemDiff()){clearTimeout(_crmRetryTimer);_crmRetryTimer=setTimeout(()=>salvarCRMRemoto(),1500);}
+      else{_crmPendente=false;_crmUltimoOk=new Date();_crmSelo('ok');}
+    }
+    return ok;
+  });
   return _crmSaveFila;
 }
+window.addEventListener('beforeunload',e=>{
+  if(!_crmPendente&&!_crmTemDiff())return;
+  // última tentativa de gravar e aviso de alteração pendente
+  try{clearTimeout(_crmSaveTimer);salvarCRMRemoto();}catch(x){}
+  e.preventDefault();e.returnValue='';
+});
 function _diffCRM(base,local){
   const mudancas={};
   const tem=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
@@ -10885,7 +10923,7 @@ async function _salvarCRMPorPatch(){
   const mudancas=_diffCRM(base,local);
   const chavesMudadas=Object.keys(mudancas);
   const temComissoes=JSON.stringify(_comissoesBaseSnapshot||[])!==JSON.stringify(_comissoes||[]);
-  if(!chavesMudadas.length&&!temComissoes)return; // nada mudou desde a última gravação confirmada
+  if(!chavesMudadas.length&&!temComissoes)return true; // nada mudou desde a última gravação confirmada
   // Guarda o que foi enviado, pra não sobrescrever uma edição feita
   // durante a gravação quando a resposta chegar.
   const enviado={};chavesMudadas.forEach(k=>{enviado[k]=JSON.stringify(mudancas[k].local);});
@@ -10922,7 +10960,7 @@ async function _salvarCRMPorPatch(){
       _ccDataNormIndex=null;
       try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
       console.log('[CRM] Salvo ✅',chavesMudadas.length,'cliente(s) alterado(s)'+(temComissoes?' + comissões':''));
-      return;
+      return true;
     }
     if(r&&r.status==='ok'){
       // Apps Script ainda sem a ação saveCRMPatch: usa o salvamento completo antigo.
@@ -10931,11 +10969,13 @@ async function _salvarCRMPorPatch(){
     }
     console.warn('[CRM] Backend recusou salvamento:',(r&&r.mensagem)||r);
     try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
-    if(typeof showToast==='function')showToast('error','CRM não foi salvo',(r&&r.mensagem)||'Tente atualizar a página e salvar novamente.');
+    if(typeof showToast==='function'&&_crmFalhas===0)showToast('error','CRM não foi salvo',((r&&r.mensagem)||'O servidor recusou.')+' Vou tentar de novo sozinho.');
+    return false;
   }catch(e){
     console.warn('[CRM] Erro ao salvar:',e);
     try{localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));}catch(eLs){}
-    if(typeof showToast==='function')showToast('error','CRM não foi salvo','Falha ao comunicar com o servidor. Os dados ficaram preservados neste navegador; tente novamente antes de fechar a página.');
+    if(typeof showToast==='function'&&_crmFalhas===0)showToast('error','CRM não foi salvo','Falha ao comunicar com o servidor. Os dados ficaram neste navegador e vou tentar de novo sozinho; não feche a página até aparecer "Salvo" no topo.');
+    return false;
   }
 }
 async function salvarCRMRemotoCompleto(){
@@ -10967,6 +11007,7 @@ async function salvarCRMRemotoCompleto(){
       localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
       localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
       console.log('[CRM] Salvo atomicamente ✅',Object.keys(_ccData).length,'clientes |',_comissoes.length,'comissões');
+      return true;
     }else{
       console.warn('[CRM] Backend recusou salvamento:',r.mensagem||r);
       // Mantém cópia local só como contingência; NÃO avança o snapshot-base,
@@ -10974,16 +11015,19 @@ async function salvarCRMRemotoCompleto(){
       localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
       localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
       showToast&&showToast('error','CRM não foi salvo',r.mensagem||'Tente atualizar a página e salvar novamente.');
+      return false;
     }
   }catch(e){
     console.warn('[CRM] Erro ao salvar atomicamente:',e);
     localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
     localStorage.setItem('bulhoes_comissoes',JSON.stringify(_comissoes));
     if(typeof showToast==='function')showToast('error','CRM não foi salvo','Falha ao comunicar com o servidor. Os dados ficaram preservados neste navegador; tente novamente antes de fechar a página.');
+    return false;
   }
 }
 
 function salvarCRMDebounced(){
+  _crmPendente=true;try{_crmSelo('salvando');}catch(e){}
   clearTimeout(_crmSaveTimer);
   _crmSaveTimer=setTimeout(()=>salvarCRMRemoto(),1500);
 }
@@ -16394,7 +16438,8 @@ const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradeci
 // contado da data da avaliação. "dia" = até quando aquela mensagem deve sair.
 const KB_ORC_ETAPAS=[
   {id:'Retorno combinado (Pix)',dia:null,alias:['Agendou retorno','Aguardando entrada','Avaliação comercial'],dica:'Pediu para pensar: data de retorno combinada e Pix de compromisso de R$ 100'},
-  {id:'Aguardando 1° contato',dia:1,alias:['']},
+  {id:'Compareceu - orçamento realizado',dia:null,alias:[''],dica:'Fez a avaliação e recebeu o orçamento. A Lívia arrasta para a próxima etapa'},
+  {id:'Aguardando 1° contato',dia:1,alias:[]},
   {id:'1° contato - Vídeo de agradecimento',dia:1,alias:[]},
   {id:'2° contato - Antes/Depois + lembrei de você',dia:3,alias:[]},
   {id:'3° contato - Depoimento',dia:7,alias:[]},
@@ -16421,7 +16466,8 @@ function _kbOrcBase(it){
 function _kbOrcProxima(it,etapa){
   const i=KB_ORC_ETAPAS.findIndex(x=>x.id===etapa);
   if(i<0||etapa==='Fechou'||etapa==='Cadência mensal'||etapa==='Retorno combinado (Pix)')return null;
-  const prox=etapa==='Aguardando 1° contato'?KB_ORC_ETAPAS[2]:KB_ORC_ETAPAS[i+1];
+  const ix1=KB_ORC_ETAPAS.findIndex(x=>x.id==='1° contato - Vídeo de agradecimento');
+  const prox=(etapa==='Aguardando 1° contato'||etapa==='Compareceu - orçamento realizado')?KB_ORC_ETAPAS[ix1]:KB_ORC_ETAPAS[i+1];
   if(!prox||prox.dia==null)return null;
   const b=_kbOrcBase(it);if(!b)return null;
   const ate=new Date(b.getFullYear(),b.getMonth(),b.getDate()+prox.dia);
@@ -16431,12 +16477,12 @@ function _kbGarantirFasesProcesso(){
   try{
     if(!_listas||!_listas.fases)return;
     const at=_listas.fases.ativos||(_listas.fases.ativos=[]);let mudou=false;
-    KB_ORC_ETAPAS.forEach(e=>{if(!at.includes(e.id)){at.push(e.id);mudou=true;}});
+    KB_ORC_ETAPAS.forEach(e=>{if(e.id!=='Compareceu - orçamento realizado'&&!at.includes(e.id)){at.push(e.id);mudou=true;}});
     if(mudou&&typeof salvarListasDebounced==='function')salvarListasDebounced();
   }catch(e){}
 }
 const KB_LIMITE=40;
-const _kb={modo:{},limite:{},resp:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
+const _kb={modo:{},limite:{},resp:{},env:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
 try{const g=JSON.parse(localStorage.getItem('kb_grupos')||'{}');if(g&&typeof g==='object')_kb.grupos=g;}catch(e){}
 try{const m=JSON.parse(localStorage.getItem('kb_modo')||'{}');if(m&&typeof m==='object')_kb.modo=m;}catch(e){}
 
@@ -16553,8 +16599,16 @@ async function _kbCarregarRespostas(itens){
       if(r===null)break;
       const mapa={};r.forEach(x=>{mapa[x.telefone]=x.primeira_resposta?new Date(x.primeira_resposta):null;});
       lote.forEach(x=>{_kb.resp[x.t+'|'+x.d]=mapa[x.t]===undefined?null:mapa[x.t];});
+      // primeira mensagem enviada pela equipe (SDR) depois da entrada
+      let e=[];
+      try{e=await _waRest('rpc/kanban_primeiros_envios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_itens:lote})})||[];}catch(err){e=null;}
+      if(e){const me={};e.forEach(x=>{me[x.telefone]=x.primeiro_envio?new Date(x.primeiro_envio):null;});lote.forEach(x=>{_kb.env[x.t+'|'+x.d]=me[x.t]===undefined?null:me[x.t];});}
     }
   }finally{_kb.carregandoResp=false;}
+}
+function _kbEnvioSDR(it){
+  if(!it.t0||!_kb.mensagensDesde||it.t0<_kb.mensagensDesde)return undefined;
+  return _kb.env[it.ph+'|'+it.t0.toISOString()];
 }
 function _kbResposta(it){
   if(!it.t0||!_kb.mensagensDesde||it.t0<_kb.mensagensDesde)return undefined; // sem histórico
@@ -16570,7 +16624,7 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('leads-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('leads-pagination')];},
     colunas:()=>[
       {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
-      {id:'atendimento',nome:'Em atendimento',dica:'Respondeu: as cadências param e a SDR conduz'},
+      {id:'atendimento',nome:'Em atendimento',dica:'A SDR já mandou mensagem pelo CRM'},
       ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
       {id:'agendou',nome:'Agendou',solta:true},
       {id:'faltou',nome:'Faltou/desmarcou',solta:true},
@@ -16605,8 +16659,9 @@ const KB_QUADROS={
         env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_FALTA[i].id;});
         return col;
       }
-      const resp=_kbResposta(it);
-      if(resp instanceof Date)return 'atendimento';
+      // Em atendimento = a SDR já mandou mensagem pelo CRM (resposta do lead sozinha não move)
+      const sdr=_kbEnvioSDR(it);
+      if(sdr instanceof Date)return 'atendimento';
       if(!it.t0)return 'novo';
       const env=_kbEnvios(it.t0,KB_CAD_LEAD);let col='novo';
       env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
@@ -16643,7 +16698,8 @@ const KB_QUADROS={
     card:(it,col)=>{
       const sub=it.e.origin?_kbEsc(String(it.e.origin).replace(/^#/,'')):'';
       const r=_kbResposta(it);
-      const resp=r instanceof Date?'<span class="kb-tag ok">respondeu '+_kbTempo(r)+'</span>':(r===undefined&&it.t0&&_kb.mensagensDesde&&it.t0>=_kb.mensagensDesde?'':'');
+      const sd=_kbEnvioSDR(it);
+      const resp=(r instanceof Date?'<span class="kb-tag ok">lead respondeu '+_kbTempo(r)+'</span>':'')+(sd instanceof Date?' <span class="kb-tag">SDR '+_kbTempo(sd)+'</span>':'');
       let prox='';
       if(!(r instanceof Date)&&it.t0&&(col==='novo'||KB_CAD_LEAD.some(c=>c.id===col))){
         const env=_kbEnvios(it.t0,KB_CAD_LEAD);const k=env.findIndex(d=>d.getTime()>Date.now());
@@ -16672,7 +16728,7 @@ const KB_QUADROS={
       showToast('success','Confirme no card',(nova==='Perdido'?'Confira':'Preencha a data')+' e clique em Salvar.');
       return false;
     },
-    aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Quem respondeu aparece em Em atendimento; a sequência só para quando muda de etapa e não envia enquanto a conversa está ativa. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
+    aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Vai para Em atendimento quando a SDR manda mensagem pelo CRM; a sequência só para quando muda de etapa e não envia enquanto a conversa está ativa. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
   },
   clientes:{
     titulo:'Clientes',
@@ -16734,6 +16790,7 @@ const KB_QUADROS={
     abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
     soltar:(it,col)=>{
       if(col==='__outras'){showToast('error','Escolha uma etapa','Arraste para uma das etapas do follow-up.');return false;}
+      if(col==='Compareceu - orçamento realizado'){showToast('error','Essa é a entrada','Quem acabou de fazer a avaliação entra aqui sozinho. Arraste para a etapa seguinte.');return false;}
       if(col==='Fechou'){showToast('error','Fechou anda sozinho','O card vai para Fechou quando o orçamento é aprovado.');return false;}
       editarFaseAtivTabela(ccKey(it.r),col);
       if(col==='Retorno combinado (Pix)')showToast('success','Marque a data do retorno','Abra o card e preencha o próximo contato com a data combinada.');
@@ -16747,8 +16804,8 @@ const KB_QUADROS={
     colunas:()=>[
       {id:'boasvindas',nome:'Boas-vindas',dica:'Entrou no fluxo e ainda não concluiu nenhuma subetapa'},
       {id:'tratamento',nome:'Em tratamento',dica:'Mostra quem está sem consulta marcada no Clinicorp'},
-      {id:'concluido',nome:'Concluído',dica:'Parte clínica finalizada; falta a mensagem de pós-venda'},
-      {id:'posvenda',nome:'Pós-venda e NPS',dica:'Pós-venda no dia seguinte ao fim do tratamento, junto com a pesquisa NPS'}
+      {id:'posvenda',nome:'Pós-venda e NPS',dica:'Terminou o tratamento: enviar o pós-venda e a pesquisa NPS no dia seguinte'},
+      {id:'concluido',nome:'Concluído',dica:'Pós-venda e NPS enviados'}
     ],
     itens:()=>{
       const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
@@ -16769,7 +16826,7 @@ const KB_QUADROS={
     coluna:(it)=>{
       const p=it.p;
       const clin=typeof clinicoConcluido==='function'&&clinicoConcluido(p);
-      if(clin)return p.posVendaEnviado?'posvenda':'concluido';
+      if(clin)return p.posVendaEnviado?'concluido':'posvenda';
       return it.feitas>0?'tratamento':'boasvindas';
     },
     metricas:(cols,todos,porCol)=>{
@@ -16827,12 +16884,23 @@ const KB_QUADROS={
       }
       return it.r._status;
     },
-    card:(it)=>{
+    card:(it,col)=>{
       const r=it.r;
       const base=r.dataBase||r.dataInstalacao;
+      const ROT={emdia:'em dia',atrasado6_12:'atrasado 6 a 12 meses',atrasado1_2anos:'atrasado 1 a 2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:'nunca fez manutenção',semdado:'sem dado',agendado:'agendado'};
+      let aviso='';
+      if(col==='contato'){
+        const dc=r.ultimoContato?Math.floor((Date.now()-new Date(r.ultimoContato+'T12:00'))/86400000):null;
+        aviso='<div class="kb-linha"><span class="kb-tag '+(ehAtrasado(r._status)||r._status==='nuncafez'?'atraso':'')+'">'+ROT[r._status]+'</span>'+(dc!=null?'<span>chamado há '+dc+' dias</span>':'')+'</div>';
+      }else if(col==='vencendo'){
+        const cfg=_categoriasPacientes[_catAtivaPacientes]||{};
+        if(r.dataBase&&cfg.intervalo){const b=new Date(r.dataBase+'T12:00');const v=new Date(b.getFullYear(),b.getMonth()+cfg.intervalo,b.getDate());const dv=Math.ceil((v-new Date())/86400000);
+          aviso='<div class="kb-linha"><span class="kb-tag hoje">'+(dv>0?'vence em '+dv+' dias':'vence hoje')+' ('+v.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+')</span></div>';}
+      }
       const wa=typeof linkWhatsapp==='function'?linkWhatsapp(r.telefone):'';
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         <div class="kb-linha"><span>${base?(r.dataBase?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span></div>
+        ${aviso}
         ${r.agendado?'<div class="kb-linha"><span class="kb-tag ok">agendado '+new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':''}
         ${(_catAtivaPacientes==='lentesResina'&&r.dataInstalacao&&diffMeses(new Date(r.dataInstalacao+'T12:00'),new Date())>=48)?'<div class="kb-linha"><span class="kb-tag hoje">4+ anos de lentes: renovar ou upgrade para porcelana</span></div>':''}
         ${wa?'<a class="kb-wa" href="'+wa+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Chamar no WhatsApp</a>':''}`;
