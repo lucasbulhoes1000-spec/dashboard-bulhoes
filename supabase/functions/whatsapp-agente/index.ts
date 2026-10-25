@@ -713,6 +713,33 @@ export async function handler(req: Request): Promise<Response> {
         }
         return json({ ok: true, agenda: todas, atendidos });
       }
+      case "historico_atendimentos": {
+        // (25/10/2026) histórico de atendimentos de um período (até 93 dias por
+        // chamada), para achar a data do primeiro atendimento de lentes de cada
+        // paciente (aba Renovação). Só leitura no Clinicorp.
+        const sub: Record<string, string> = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
+        const de = String(dados.de ?? ""), ate = String(dados.ate ?? "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate)) return json({ ok: false, erro: "datas inválidas" }, 400);
+        const filtro = dados.filtro ? new RegExp(String(dados.filtro), "i") : null;
+        const ini = Date.parse(de + "T12:00:00Z"), fim = Date.parse(ate + "T12:00:00Z");
+        if (!(fim >= ini) || fim - ini > 93 * 86400000) return json({ ok: false, erro: "período de até 93 dias" }, 400);
+        const itens: { tel: string; nome: string; data: string; categoria: string; atendido: boolean }[] = [];
+        for (let t0 = ini; t0 <= fim; t0 += 31 * 86400000) {
+          const t1 = Math.min(fim, t0 + 30 * 86400000);
+          const ag = await clinicorp("/appointment/list", { ...sub, from: new Date(t0).toISOString().slice(0, 10), to: new Date(t1).toISOString().slice(0, 10) }).catch(() => []);
+          for (const x of Array.isArray(ag) ? ag : []) {
+            if (String(x?.Canceled ?? "").toUpperCase() === "X" || String(x?.Deleted ?? "").toUpperCase() === "X") continue;
+            if (String(x?.ItemType ?? "APPOINTMENT") !== "APPOINTMENT") continue;
+            const cat = String(x?.CategoryDescription ?? "");
+            if (filtro && !filtro.test(cat)) continue;
+            let t = String(x?.MobilePhone ?? "").replace(/\D/g, "");
+            if (t.startsWith("55") && t.length >= 12) t = t.slice(2);
+            itens.push({ tel: t, nome: String(x?.PatientName ?? ""), data: dataDoItem(x), categoria: cat,
+              atendido: !!(x?.CheckinTime || String(x?.StatusId ?? "") === "5329595793145856") });
+          }
+        }
+        return json({ ok: true, itens });
+      }
       case "agenda_passada": {
         // última consulta JÁ PASSADA de cada pessoa pedida (telefone ou nome completo),
         // com o status do Clinicorp, para limpar quem ficou em "Agendou" sem consulta futura
