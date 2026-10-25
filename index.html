@@ -8523,7 +8523,7 @@ function statusPacienteCat(r,cat){
   return statusPaciente(r,cfg.intervalo);
 }
 const PAC_STATUS_VIRTUAL={
-  renovacao:[['ren_renovar','Instalou há 4 anos ou mais: renovar ou upgrade para porcelana']],
+  renovacao:[['ren_renovar','Instalou há 4 anos ou mais'],['ren_semdata','Sem data de instalação (provável 4+ anos)']],
   inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação'],['inf_feito','Já fez as inferiores']]
 };
 function getRegistrosPaciente(cat){
@@ -8545,7 +8545,8 @@ function getRegistrosPaciente(cat){
     const inferiorFeito = !!(override&&override.inferiorFeito);
     return {...s, dataBase, agendado, telefone, ultimoContato, inferiorFeito, _key:key, _keyData:keyInst||key};
   }).filter(r=>!_pacDoRJ(r.telefone));
-  if(cat==='renovacao')return lista.filter(r=>r.dataBase&&diffMeses(new Date(r.dataBase+'T12:00'),new Date())>=48);
+  // sem data de instalação = colocou antes do Clinicorp (out/2022), provavelmente há 4+ anos
+  if(cat==='renovacao')return lista.filter(r=>!r.dataBase||diffMeses(new Date(r.dataBase+'T12:00'),new Date())>=48);
   return lista;
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
