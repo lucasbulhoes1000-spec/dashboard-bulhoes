@@ -8457,6 +8457,16 @@ var _categoriasPacientes = {
   inferiores:          {label:'Lentes inferiores',     intervalo:null, unidadeRotulo:'—', virtual:true}
 };
 var _catAtivaPacientes = 'lentesResina';
+// (25/10/2026) só as lentes em resina têm manutenção; cada aba usa o nome do
+// retorno que aquele tratamento tem de fato
+const _PAC_TERMOS={
+  lentesResina:{ult:'última manutenção',ag:'Manutenção agendada',nunca:'Nunca fez manutenção',acao:'faz a manutenção'},
+  harmonizacao:{ult:'último preenchimento',ag:'Retoque agendado',nunca:'Sem data do preenchimento',acao:'faz o retoque'},
+  clareamento:{ult:'último clareamento',ag:'Clareamento agendado',nunca:'Sem data do clareamento',acao:'refaz o clareamento'},
+  clareamentoInferior:{ult:'último clareamento',ag:'Clareamento agendado',nunca:'Sem data do clareamento',acao:'refaz o clareamento'},
+  lentesPorcelana:{ult:'última revisão',ag:'Revisão agendada',nunca:'Nunca fez revisão',acao:'faz a revisão'}
+};
+function _pacTermo(cat){return _PAC_TERMOS[cat||_catAtivaPacientes]||{ult:'último procedimento',ag:'Agendado',nunca:'Sem data',acao:'volta'};}
 
 // Mescla o seed (carga única vinda da planilha) com edições feitas no dashboard (_ccData[key].manutPlanilha).
 // Edições do dashboard sempre vencem o seed original.
@@ -9046,7 +9056,7 @@ function renderTabelaPacientes(){
       if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=(cfg.virtual?'Instalou há ':'')+dm+' meses'+(cfg.virtual?'':' atrás');}
     }else if(r.dataInstalacao){
       const inst=new Date(r.dataInstalacao+'T12:00');
-      if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());infoTempo=`Instalado há ${dmInst} meses (nunca fez manutenção)`;}
+      if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());infoTempo=`Instalado há ${dmInst} meses (${_pacTermo(cat).nunca.toLowerCase()})`;}
     }
     const waLink=linkWhatsapp(r.telefone);
     const waBtn=waLink
@@ -9079,7 +9089,7 @@ function renderTabelaPacientes(){
     }
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
-      <td><input type="date" value="${r.dataBase||''}" title="${cfg.virtual?'Data da instalação das lentes':'Última manutenção'}" onchange="salvarOverridePaciente('${cat}','${r._keyData}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${r._orig?`<div style="font-size:10px;color:#66738F;margin-top:2px;">${r._orig}</div>`:''}${cat==='inferiores'?`<div><button onclick="salvarOverridePaciente('${cat}','${r._key}','inferiorFeito',${r.inferiorFeito?'null':'true'})" style="background:none;border:none;color:#E2BE6A;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">${r.inferiorFeito?'Desfazer: ainda não fez':'Já fez as inferiores'}</button></div>`:''}${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
+      <td><input type="date" value="${r.dataBase||''}" title="${cfg.virtual?'Data da instalação das lentes':_pacTermo(cat).ult.replace(/^./,c=>c.toUpperCase())}" onchange="salvarOverridePaciente('${cat}','${r._keyData}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${r._orig?`<div style="font-size:10px;color:#66738F;margin-top:2px;">${r._orig}</div>`:''}${cat==='inferiores'?`<div><button onclick="salvarOverridePaciente('${cat}','${r._key}','inferiorFeito',${r.inferiorFeito?'null':'true'})" style="background:none;border:none;color:#E2BE6A;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">${r.inferiorFeito?'Desfazer: ainda não fez':'Já fez as inferiores'}</button></div>`:''}${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
       <td style="font-size:12px;color:#8C98B1;">${infoTempo}</td>
       <td style="font-size:12px;color:#8C98B1;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
@@ -17115,12 +17125,12 @@ const KB_QUADROS={
     titulo:'Pacientes',
     lista:()=>{const tb=document.getElementById('pacientes-tbody');return [tb&&tb.closest('.table-card')];},
     colunas:()=>PAC_STATUS_VIRTUAL[_catAtivaPacientes]?PAC_STATUS_VIRTUAL[_catAtivaPacientes].map(([id,nome])=>({id,nome})):[
-      {id:'agendado',nome:'Manutenção agendada'},
+      {id:'agendado',nome:_pacTermo().ag},
       {id:'emdia',nome:'Em dia'},
       {id:'atrasado6_12',nome:'Atrasado 6 a 12 meses'},
       {id:'atrasado1_2anos',nome:'Atrasado 1 a 2 anos'},
       {id:'atrasadomais2anos',nome:'Atrasado +2 anos'},
-      {id:'nuncafez',nome:'Nunca fez manutenção'},
+      {id:'nuncafez',nome:_pacTermo().nunca},
       {id:'semdado',nome:'Sem dado'}
     ],
     itens:()=>{
@@ -17134,7 +17144,7 @@ const KB_QUADROS={
     card:(it,col)=>{
       const r=it.r;
       const base=r.dataBase||r.dataInstalacao;
-      const ROT={emdia:'em dia',atrasado6_12:'atrasado 6 a 12 meses',atrasado1_2anos:'atrasado 1 a 2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:'nunca fez manutenção',semdado:'sem dado',agendado:'agendado'};
+      const ROT={emdia:'em dia',atrasado6_12:'atrasado 6 a 12 meses',atrasado1_2anos:'atrasado 1 a 2 anos',atrasadomais2anos:'atrasado +2 anos',nuncafez:_pacTermo().nunca.toLowerCase(),semdado:'sem dado',agendado:'agendado'};
       let aviso='';
       if(r._precisaContato&&r._status!=='agendado'){
         const dc=r.ultimoContato?Math.floor((Date.now()-new Date(r.ultimoContato+'T12:00'))/86400000):null;
@@ -17146,13 +17156,13 @@ const KB_QUADROS={
       }
       const wa=typeof linkWhatsapp==='function'?linkWhatsapp(r.telefone):'';
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
-        <div class="kb-linha"><span>${base?((r.dataBase&&!(_categoriasPacientes[_catAtivaPacientes]||{}).virtual)?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span>${r._orig?'<span>'+r._orig+'</span>':''}</div>
+        <div class="kb-linha"><span>${base?((r.dataBase&&!(_categoriasPacientes[_catAtivaPacientes]||{}).virtual)?_pacTermo().ult+' ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span>${r._orig?'<span>'+r._orig+'</span>':''}</div>
         ${aviso}
         ${r.agendado?'<div class="kb-linha"><span class="kb-tag ok">agendado '+new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':''}
         ${(_catAtivaPacientes==='lentesResina'&&r.dataInstalacao&&diffMeses(new Date(r.dataInstalacao+'T12:00'),new Date())>=48)?'<div class="kb-linha"><span class="kb-tag hoje">4+ anos de lentes: renovar ou upgrade para porcelana</span></div>':''}
         ${wa?'<a class="kb-wa" href="'+wa+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">Chamar no WhatsApp</a>':''}`;
     },
-    aviso:()=>'A coluna vem da data da última manutenção e da agenda do Clinicorp: o card anda sozinho quando o paciente agenda ou faz a manutenção. Mostra a categoria escolhida nas abas acima.'
+    aviso:()=>{const t=_pacTermo();return 'A coluna vem da data d'+(/^última/.test(t.ult)?'a ':'o ')+t.ult+' e da agenda do Clinicorp: o card anda sozinho quando o paciente agenda ou '+t.acao+'. Mostra a categoria escolhida nas abas acima.';}
   }
 };
 
