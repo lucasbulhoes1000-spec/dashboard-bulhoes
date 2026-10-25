@@ -8491,7 +8491,7 @@ function _pacInstHist(x){
   const H=window._pacHistLentes;if(!H)return null;
   const nn=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
   const o=(x.telefone&&H['t:'+normalizePhone(x.telefone)])||H['n:'+nn(x.nome)];
-  return o&&o.i?o.i:null;
+  return o||null;
 }
 function _pacVirtuais(cat){
   const S=window._seedPacientesPlanilha||{};
@@ -8502,9 +8502,12 @@ function _pacVirtuais(cat){
     (S.lentesPorcelana||[]).filter(x=>!x.possuiInferiores).forEach(x=>base.push({...x,_orig:'Porcelana'}));
   }
   return base.map(x=>{
-    const h=_pacInstHist(x);
-    const inst=[x.dataInstalacao,h].filter(Boolean).sort()[0]||null; // a mais antiga
-    return {...x,agendado:null,dataBase:inst,_instFonte:x.dataInstalacao?'base':(h?'Clinicorp':'')};
+    // h.i = instalação achada no Clinicorp (categoria OU texto do procedimento,
+    // ex.: "Lentes em Resina Sup"); h.a = já tinha lentes nessa data (manutenção,
+    // ajuste, retorno) sem instalação registrada; h.f = fez inferiores
+    const h=_pacInstHist(x)||{};
+    const inst=[x.dataInstalacao,h.i].filter(Boolean).sort()[0]||null; // a mais antiga
+    return {...x,agendado:null,dataBase:inst,_instFonte:x.dataInstalacao?'base':(h.i?'Clinicorp':''),_antesDe:inst?null:(h.a||null),_infHist:h.f||null};
   });
 }
 function statusPacienteCat(r,cat){
@@ -8542,7 +8545,7 @@ function getRegistrosPaciente(cat){
     const ultimoContato = (override&&override.ultimoContato)||null;
     // Prioridade do telefone: edição manual no card > telefone do Clinicorp (sincronização) > base de leads do Cloudia
     const telefone = (override&&override.telefone)||s.telefone||getTelefonePorNome(s.nome);
-    const inferiorFeito = !!(override&&override.inferiorFeito);
+    const inferiorFeito = !!((override&&override.inferiorFeito)||s._infHist);
     return {...s, dataBase, agendado, telefone, ultimoContato, inferiorFeito, _key:key, _keyData:keyInst||key};
   }).filter(r=>!_pacDoRJ(r.telefone));
   // sem data de instalação = colocou antes do Clinicorp (out/2022), provavelmente há 4+ anos
