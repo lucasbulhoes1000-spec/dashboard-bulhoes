@@ -8500,8 +8500,13 @@ async function _pacCarregarHistLentes(){
 function _pacInstHist(x){
   const H=window._pacHistLentes;if(!H)return null;
   const nn=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
-  const o=(x.telefone&&H['t:'+normalizePhone(x.telefone)])||H['n:'+nn(x.nome)];
-  return o||null;
+  // junta o que achou pelo telefone e pelo nome (o Clinicorp nem sempre tem telefone)
+  const a=(x.telefone&&H['t:'+normalizePhone(x.telefone)])||null, b=H['n:'+nn(x.nome)]||null;
+  if(!a||!b)return a||b;
+  const min=(u,v)=>[u,v].filter(Boolean).sort()[0]||undefined;
+  const o={i:min(a.i,b.i),a:min(a.a,b.a),f:min(a.f,b.f),m:a.m||b.m};
+  if(o.i&&o.a&&o.a>=o.i)delete o.a;
+  return o;
 }
 function _pacVirtuais(cat){
   const S=window._seedPacientesPlanilha||{};
