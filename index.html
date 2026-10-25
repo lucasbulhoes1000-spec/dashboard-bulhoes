@@ -8461,7 +8461,7 @@ var _catAtivaPacientes = 'lentesResina';
 // retorno que aquele tratamento tem de fato
 const _PAC_TERMOS={
   lentesResina:{ult:'última manutenção',ag:'Manutenção agendada',nunca:'Nunca fez manutenção',acao:'faz a manutenção'},
-  harmonizacao:{ult:'último preenchimento',ag:'Retoque agendado',nunca:'Sem data do preenchimento',acao:'faz o retoque'},
+  harmonizacao:{ult:'último preenchimento',ag:'Harmonização agendada',nunca:'Sem data do preenchimento',acao:'refaz a harmonização'},
   clareamento:{ult:'último clareamento',ag:'Clareamento agendado',nunca:'Sem data do clareamento',acao:'refaz o clareamento'},
   clareamentoInferior:{ult:'último clareamento',ag:'Clareamento agendado',nunca:'Sem data do clareamento',acao:'refaz o clareamento'},
   lentesPorcelana:{ult:'última revisão',ag:'Revisão agendada',nunca:'Nunca fez revisão',acao:'faz a revisão'}
@@ -8537,7 +8537,7 @@ function statusPacienteCat(r,cat){
 }
 const PAC_STATUS_VIRTUAL={
   renovacao:[['ren_renovar','Instalou há 4 anos ou mais'],['ren_semdata','Sem data de instalação (provável 4+ anos)']],
-  inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação'],['inf_feito','Já fez as inferiores']]
+  inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação']]
 };
 function getRegistrosPaciente(cat){
   const cfgV=_categoriasPacientes[cat]||{};
@@ -8560,6 +8560,8 @@ function getRegistrosPaciente(cat){
   }).filter(r=>!_pacDoRJ(r.telefone));
   // sem data de instalação = colocou antes do Clinicorp (out/2022), provavelmente há 4+ anos
   if(cat==='renovacao')return lista.filter(r=>!r.dataBase||diffMeses(new Date(r.dataBase+'T12:00'),new Date())>=48);
+  // Lentes inferiores: só quem ainda NÃO tem (marcado na base, no Clinicorp ou à mão sai da lista)
+  if(cat==='inferiores')return lista.filter(r=>!r.inferiorFeito);
   return lista;
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
