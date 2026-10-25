@@ -1787,7 +1787,9 @@ body{letter-spacing:-.1px;}
       <div id="pac-diagnostico"></div>
 
       <div style="display:flex;gap:6px;margin:20px 0 12px;flex-wrap:wrap;">
-        <button class="pac-cat-tab active" id="pac-cat-lentesResina" onclick="switchCatPacientes('lentesResina')" style="background:#B08A3E;color:#FFFFFF;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes em Resina</button>
+        <button class="pac-cat-tab active" id="pac-cat-lentesResina" onclick="switchCatPacientes('lentesResina')" style="background:#B08A3E;color:#FFFFFF;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Manutenção</button>
+        <button class="pac-cat-tab" id="pac-cat-renovacao" onclick="switchCatPacientes('renovacao')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Renovação</button>
+        <button class="pac-cat-tab" id="pac-cat-inferiores" onclick="switchCatPacientes('inferiores')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Lentes inferiores</button>
         <button class="pac-cat-tab" id="pac-cat-harmonizacao" onclick="switchCatPacientes('harmonizacao')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Harmonização</button>
         <button class="pac-cat-tab" id="pac-cat-clareamento" onclick="switchCatPacientes('clareamento')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento</button>
         <button class="pac-cat-tab" id="pac-cat-clareamentoInferior" onclick="switchCatPacientes('clareamentoInferior')" style="background:#12213F;color:#E2BE6A;border:none;border-radius:20px;padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600;">Clareamento Inferior</button>
@@ -8445,11 +8447,14 @@ function fmtBRL(v){return'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumF
 // ===================== PACIENTES / MANUTENÇÃO =====================
 // Categorias de procedimento, intervalo de manutenção (meses) e rótulos.
 var _categoriasPacientes = {
-  lentesResina:        {label:'Lentes em Resina',     intervalo:6,  unidadeRotulo:'meses'},
+  lentesResina:        {label:'Manutenção',           intervalo:6,  unidadeRotulo:'meses'},
   harmonizacao:        {label:'Harmonização (Preenchimento)', intervalo:10, unidadeRotulo:'meses'},
   clareamento:         {label:'Clareamento',           intervalo:10, unidadeRotulo:'meses'},
   clareamentoInferior: {label:'Clareamento Inferior',  intervalo:10, unidadeRotulo:'meses'},
-  lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'}
+  lentesPorcelana:     {label:'Lentes em Porcelana',   intervalo:6,  unidadeRotulo:'meses (profilaxia)'},
+  // (25/10/2026) listas montadas a partir das lentes (não somam no total da base)
+  renovacao:           {label:'Renovação',             intervalo:48, unidadeRotulo:'meses (4 anos)', virtual:true},
+  inferiores:          {label:'Lentes inferiores',     intervalo:null, unidadeRotulo:'—', virtual:true}
 };
 var _catAtivaPacientes = 'lentesResina';
 
@@ -8470,8 +8475,43 @@ function getTelefonePorNome(nome){
   if(!_nomeParaTelefoneIndex)buildNomeParaTelefoneIndex();
   return _nomeParaTelefoneIndex[normStr(nome)]||'';
 }
+// (25/10/2026) pacientes com telefone do Rio de Janeiro (DDD 21, 22 e 24) ficam de fora
+function _pacDoRJ(tel){let t=String(tel||'').replace(/\D/g,'');if(t.length>=12&&t.startsWith('55'))t=t.slice(2);return t.length>=10&&['21','22','24'].includes(t.slice(0,2));}
+// Renovação: lentes em resina instaladas há 4 anos ou mais (renovar a técnica ou
+// upgrade para porcelana). Lentes inferiores: quem fez lentes (resina ou
+// porcelana) só em cima. A data da instalação pode ser corrigida no próprio paciente.
+function _pacVirtuais(cat){
+  const S=window._seedPacientesPlanilha||{};
+  const base=[];
+  if(cat==='renovacao'){(S.lentesResina||[]).forEach(x=>base.push({...x,_orig:'Resina'}));}
+  if(cat==='inferiores'){
+    (S.lentesResina||[]).filter(x=>!x.temInferior).forEach(x=>base.push({...x,_orig:'Resina'}));
+    (S.lentesPorcelana||[]).filter(x=>!x.possuiInferiores).forEach(x=>base.push({...x,_orig:'Porcelana'}));
+  }
+  return base.map(x=>({...x,agendado:null,dataBase:x.dataInstalacao||null}));
+}
+function statusPacienteCat(r,cat){
+  const cfg=_categoriasPacientes[cat]||{};
+  if(cat==='renovacao'){
+    if(r.dataBase==null||!r.dataBase)return 'ren_semdata';
+    const dm=diffMeses(new Date(r.dataBase+'T12:00'),new Date());
+    return dm>=48?'ren_renovar':(dm>=36?'ren_proximo':'ren_recente');
+  }
+  if(cat==='inferiores'){
+    if(r.inferiorFeito)return 'inf_feito';
+    if(!r.dataBase)return 'inf_semdata';
+    const dm=diffMeses(new Date(r.dataBase+'T12:00'),new Date());
+    return dm<6?'inf_0_6':(dm<12?'inf_6_12':(dm<24?'inf_1_2':'inf_mais2'));
+  }
+  return statusPaciente(r,cfg.intervalo);
+}
+const PAC_STATUS_VIRTUAL={
+  renovacao:[['ren_renovar','4 anos ou mais: renovar ou upgrade'],['ren_proximo','3 a 4 anos'],['ren_recente','Menos de 3 anos'],['ren_semdata','Sem data de instalação']],
+  inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação'],['inf_feito','Já fez as inferiores']]
+};
 function getRegistrosPaciente(cat){
-  const seed = (window._seedPacientesPlanilha && window._seedPacientesPlanilha[cat]) || [];
+  const cfgV=_categoriasPacientes[cat]||{};
+  const seed = cfgV.virtual ? _pacVirtuais(cat) : ((window._seedPacientesPlanilha && window._seedPacientesPlanilha[cat]) || []);
   return seed.map(s=>{
     const key = 'planilha::'+cat+'::'+normStr(s.nome);
     const override = _ccData[key] && _ccData[key].manutPlanilha;
@@ -8480,8 +8520,9 @@ function getRegistrosPaciente(cat){
     const ultimoContato = (override&&override.ultimoContato)||null;
     // Prioridade do telefone: edição manual no card > telefone do Clinicorp (sincronização) > base de leads do Cloudia
     const telefone = (override&&override.telefone)||s.telefone||getTelefonePorNome(s.nome);
-    return {...s, dataBase, agendado, telefone, ultimoContato, _key:key};
-  });
+    const inferiorFeito = !!(override&&override.inferiorFeito);
+    return {...s, dataBase, agendado, telefone, ultimoContato, inferiorFeito, _key:key};
+  }).filter(r=>!_pacDoRJ(r.telefone));
 }
 function diffMeses(d1,d2){return (d2.getFullYear()-d1.getFullYear())*12+(d2.getMonth()-d1.getMonth());}
 // Status detalhado por faixa de tempo, não apenas "atrasado".
@@ -8862,7 +8903,7 @@ async function aplicarImportacaoOrcamentos(){
   }
 }
 function renderDiagnosticoPacientes(){
-  const cats=Object.keys(_categoriasPacientes);
+  const cats=Object.keys(_categoriasPacientes).filter(c=>!_categoriasPacientes[c].virtual);
   let totalGeral=0,emDiaGeral=0,agendadoGeral=0,precisamContatoGeral=0,nuncaGeral=0;
   const porCategoria={};
   cats.forEach(cat=>{
@@ -8931,18 +8972,27 @@ function switchCatPacientes(cat){
   if(btn)btn.classList.add('active');
   renderTabelaPacientes();
 }
+function _pacAjustarFiltro(cat){
+  const sel=document.getElementById('pacientes-status-filter');if(!sel||sel.dataset.cat===cat)return;
+  const v=PAC_STATUS_VIRTUAL[cat];
+  if(!sel.dataset.padrao)sel.dataset.padrao=sel.innerHTML;
+  sel.innerHTML=v?'<option value="">Todos</option>'+v.map(([id,n])=>'<option value="'+id+'">'+n+'</option>').join('')+'<option value="precisaNovoContato">⚠️ Chamado sem retorno (30+ dias)</option>':sel.dataset.padrao;
+  sel.value='';sel.dataset.cat=cat;
+}
 function renderTabelaPacientes(){
   const cat=_catAtivaPacientes;
   const cfg=_categoriasPacientes[cat];
   const busca=(document.getElementById('pacientes-search')?.value||'').toLowerCase();
   const statusFiltro=document.getElementById('pacientes-status-filter')?.value||'';
   let regs=getRegistrosPaciente(cat);
-  regs=regs.map(r=>({...r,_status:statusPaciente(r,cfg.intervalo),_precisaContato:precisaNovoContato(r)}));
+  regs=regs.map(r=>({...r,_status:statusPacienteCat(r,cat),_precisaContato:precisaNovoContato(r)}));
+  _pacAjustarFiltro(cat);
   if(busca)regs=regs.filter(r=>r.nome.toLowerCase().includes(busca));
   if(statusFiltro==='precisaNovoContato')regs=regs.filter(r=>r._precisaContato);
   else if(statusFiltro)regs=regs.filter(r=>r._status===statusFiltro);
   const rank={atrasadomais2anos:0,atrasado1_2anos:1,atrasado6_12:2,nuncafez:3,semdado:4,emdia:5,agendado:6};
-  regs.sort((a,b)=>(rank[a._status]-rank[b._status])||a.nome.localeCompare(b.nome));
+  (PAC_STATUS_VIRTUAL[cat]||[]).forEach(([id],i)=>rank[id]=i);
+  regs.sort((a,b)=>((rank[a._status]??9)-(rank[b._status]??9))||a.nome.localeCompare(b.nome));
 
   document.getElementById('pacientes-count').textContent=regs.length+' paciente'+(regs.length!==1?'s':'');
 
@@ -8955,13 +9005,17 @@ function renderTabelaPacientes(){
     agendado:'<span style="background:#1A2B32;color:#7EABC9;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">📅 Agendado</span>',
     semdado:'<span style="background:#12213F;color:#8C98B1;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">— Sem dado</span>'
   };
+  (PAC_STATUS_VIRTUAL[cat]||[]).forEach(([id,nome])=>{
+    const forte=/renovar|mais2|1_2/.test(id),ok=/feito|recente/.test(id);
+    statusBadge[id]='<span style="background:'+(forte?'#371B15':ok?'#1A321A':'#12213F')+';color:'+(forte?'#D17E76':ok?'#8DBA8D':'#E2BE6A')+';font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;">'+nome+'</span>';
+  });
 
   document.getElementById('pacientes-tbody').innerHTML=regs.map(r=>{
     const meses=cfg.intervalo;
     let infoTempo='—';
     if(r.dataBase){
       const base=new Date(r.dataBase+'T12:00');
-      if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=dm+' meses atrás';}
+      if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=(cfg.virtual?'Instalou há ':'')+dm+' meses'+(cfg.virtual?'':' atrás');}
     }else if(r.dataInstalacao){
       const inst=new Date(r.dataInstalacao+'T12:00');
       if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());infoTempo=`Instalado há ${dmInst} meses (nunca fez manutenção)`;}
@@ -8997,7 +9051,7 @@ function renderTabelaPacientes(){
     }
     return `<tr>
       <td style="font-weight:600;">${r.nome}</td>
-      <td><input type="date" value="${r.dataBase||''}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
+      <td><input type="date" value="${r.dataBase||''}" title="${cfg.virtual?'Data da instalação das lentes':'Última manutenção'}" onchange="salvarOverridePaciente('${cat}','${r._key}','dataBase',this.value)" style="font-size:12px;border:0.5px solid #2A3D66;border-radius:6px;padding:4px 6px;">${r._orig?`<div style="font-size:10px;color:#66738F;margin-top:2px;">${r._orig}</div>`:''}${cat==='inferiores'?`<div><button onclick="salvarOverridePaciente('${cat}','${r._key}','inferiorFeito',${r.inferiorFeito?'null':'true'})" style="background:none;border:none;color:#E2BE6A;font-size:10px;text-decoration:underline;cursor:pointer;padding:0;">${r.inferiorFeito?'Desfazer: ainda não fez':'Já fez as inferiores'}</button></div>`:''}${(!r.dataBase&&r.dataInstalacao)?`<div style="font-size:10px;color:#66738F;margin-top:2px;">Instalação: ${fmtDateOnly(r.dataInstalacao)}</div>`:''}</td>
       <td style="font-size:12px;color:#8C98B1;">${infoTempo}</td>
       <td style="font-size:12px;color:#8C98B1;">${meses?meses+' meses':'—'}</td>
       <td>${statusBadge[r._status]}</td>
@@ -17032,7 +17086,7 @@ const KB_QUADROS={
   pacientes:{
     titulo:'Pacientes',
     lista:()=>{const tb=document.getElementById('pacientes-tbody');return [tb&&tb.closest('.table-card')];},
-    colunas:()=>[
+    colunas:()=>PAC_STATUS_VIRTUAL[_catAtivaPacientes]?PAC_STATUS_VIRTUAL[_catAtivaPacientes].map(([id,nome])=>({id,nome})):[
       {id:'agendado',nome:'Manutenção agendada'},
       {id:'emdia',nome:'Em dia'},
       {id:'atrasado6_12',nome:'Atrasado 6 a 12 meses'},
@@ -17044,7 +17098,7 @@ const KB_QUADROS={
     itens:()=>{
       const cat=_catAtivaPacientes;const cfg=_categoriasPacientes[cat]||{};
       const busca=(document.getElementById('pacientes-search')?.value||'').toLowerCase();
-      let regs=getRegistrosPaciente(cat).map(r=>({...r,_status:statusPaciente(r,cfg.intervalo),_precisaContato:precisaNovoContato(r)}));
+      let regs=getRegistrosPaciente(cat).map(r=>({...r,_status:statusPacienteCat(r,cat),_precisaContato:precisaNovoContato(r)}));
       if(busca)regs=regs.filter(r=>String(r.nome||'').toLowerCase().includes(busca));
       return regs.map(r=>({r,nome:r.nome||'—'}));
     },
@@ -17064,7 +17118,7 @@ const KB_QUADROS={
       }
       const wa=typeof linkWhatsapp==='function'?linkWhatsapp(r.telefone):'';
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
-        <div class="kb-linha"><span>${base?(r.dataBase?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span></div>
+        <div class="kb-linha"><span>${base?((r.dataBase&&!(_categoriasPacientes[_catAtivaPacientes]||{}).virtual)?'última manutenção ':'instalou ')+_kbTempo(base+'T12:00'):'sem data'}</span>${r._orig?'<span>'+r._orig+'</span>':''}</div>
         ${aviso}
         ${r.agendado?'<div class="kb-linha"><span class="kb-tag ok">agendado '+new Date(r.agendado+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':''}
         ${(_catAtivaPacientes==='lentesResina'&&r.dataInstalacao&&diffMeses(new Date(r.dataInstalacao+'T12:00'),new Date())>=48)?'<div class="kb-linha"><span class="kb-tag hoje">4+ anos de lentes: renovar ou upgrade para porcelana</span></div>':''}
