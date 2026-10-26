@@ -344,6 +344,31 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             const ult = k.c?.ultima_recebida_em ? Date.parse(k.c.ultima_recebida_em) : 0;
             v = !ult || agora() - ult >= Math.max(1, Number(cond.minutos) || 0) * 60_000;
           }
+          else if (cond.tipo === "sem_resposta") {
+            // (26/10/2026) follow-up de verdade: a equipe falou e o lead não respondeu
+            // há N minutos (contados da última mensagem da equipe). Se ninguém da
+            // equipe respondeu o lead ainda, ou se o lead respondeu depois, espera
+            // (não termina a sequência): confere de novo mais tarde.
+            const min = Math.max(1, Number(cond.minutos) || 0);
+            let volta = i; while (volta > 0 && passos[volta - 1]?.tipo === "se") volta--; // reconfere a etapa também
+            const ultLead = k.c?.ultima_recebida_em ? Date.parse(k.c.ultima_recebida_em) : 0;
+            if (x.contexto?.virada) {
+              // veio do Cloudia na virada: as mensagens da equipe ficaram no Cloudia
+              v = !ultLead || agora() - ultLead >= Math.min(min, 1440) * 60_000;
+            } else {
+              const eq = k.c ? (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${k.c.id}&direcao=eq.enviada&autor_email=like.*%40*&status=neq.falhou&select=enviada_em&order=enviada_em.desc&limit=1`).catch(() => []))?.[0] : null;
+              const ultEquipe = eq?.enviada_em ? Date.parse(eq.enviada_em) : 0;
+              if (ultEquipe && ultEquipe > ultLead) {
+                const vence = ultEquipe + min * 60_000;
+                if (agora() >= vence) v = true;
+                else { await avancar(x, i, null, "aguardando", null, volta, vence + 30_000, "ativa", k.c?.id ?? null); return "esperando"; }
+              } else {
+                // a equipe ainda não respondeu (ou o lead falou por último): confere em 30 min
+                await avancar(x, i, null, "aguardando", null, volta, agora() + 30 * 60_000, "ativa", k.c?.id ?? null);
+                return "esperando";
+              }
+            }
+          }
           if (v) { await avancar(x, i, "se", "ok", "sim", i + 1, null, "ativa", k.c?.id ?? null); i++; continue; }
           if (p.senao === "fim" || p.senao == null) {
             await avancar(x, i, "se", "ok", "não: terminou", i, null, "concluida", k.c?.id ?? null);
