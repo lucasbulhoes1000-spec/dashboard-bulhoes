@@ -516,7 +516,7 @@ async function agendaClinicorp(de: string, ate: string): Promise<any[]> {
   return Array.isArray(j) ? j : (j?.appointments ?? j?.data ?? []);
 }
 
-async function enviarLembrete(c: Consulta, tipo: "vespera" | "dia", cfg: any, agora: number): Promise<string> {
+async function enviarLembrete(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number, modeloTipo?: any): Promise<string> {
   const res = await rpc("lembrete_reservar", { p_data: c.data, p_tipo: tipo, p_tel: c.telefone, p_nome: c.nome, p_hora: c.hora, p_cid: c.id });
   if (!res) return "ja_enviado";
   const marcar = (st: string, erro: string | null, wa: string | null, conv: string | null) =>
@@ -526,11 +526,11 @@ async function enviarLembrete(c: Consulta, tipo: "vespera" | "dia", cfg: any, ag
     const convId = await rpc("automacao_conversa", { p_numero: numero, p_telefone: res.telefone });
     const conv = (await bancoJson(`/rest/v1/conversas?id=eq.${convId}&select=*`))?.[0];
     const p = (await bancoJson(`/rest/v1/pacientes?telefone=eq.${res.telefone}&select=nome`))?.[0];
-    const dados = { nome: c.nome || p?.nome || conv?.nome_contato || conv?.nome_perfil || "", telefone: res.telefone, extra: variaveisDaConsulta(c, tipo, agora) };
-    const modelo = cfg[tipo].modelo;
+    const dados = { nome: c.nome || p?.nome || conv?.nome_contato || conv?.nome_perfil || "", telefone: res.telefone, extra: variaveisDaConsulta(c, baseLembrete(tipo), agora) };
+    const modelo = modeloTipo ?? cfg[tipo].modelo;
     const corpo = corpoModelo(modelo, dados);
     const registro = modelo?.texto_preview ? preencher(String(modelo.texto_preview), dados) : `[modelo ${modelo?.nome}]`;
-    const autor = tipo === "dia" ? "Lembrete do dia" : "Lembrete de véspera";
+    const autor = tipo === "dia" ? "Lembrete do dia" : "Lembrete de véspera" + (tipo === "vespera" ? "" : tipo === "vespera2" ? " (2ª)" : " (3ª)");
     const r = await meta(`/${conv.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: conv.wa_id, ...corpo }, await tokenDoNumero(conv.numero_clinica_id));
     if (!r.ok) {
       const erro = erroMeta(r.j);
@@ -548,6 +548,29 @@ async function enviarLembrete(c: Consulta, tipo: "vespera" | "dia", cfg: any, ag
   }
 }
 
+// (25/10/2026) véspera em até 3 horários (vespera, vespera2, vespera3) + no dia.
+// A 2ª e a 3ª confirmação só saem para quem ainda não confirmou nem respondeu
+// depois da anterior. No sábado (véspera de segunda) a 1ª usa "modelo_sabado"
+// (ex.: confirmarsegunda) e a 2ª e a 3ª não saem, porque o texto diz "amanhã".
+type TipoLembrete = "dia" | "vespera" | "vespera2" | "vespera3";
+const baseLembrete = (t: TipoLembrete): "vespera" | "dia" => (t === "dia" ? "dia" : "vespera");
+const HORA_PADRAO: Record<TipoLembrete, number> = { dia: 8 * 60 + 30, vespera: 10 * 60 + 30, vespera2: 13 * 60, vespera3: 15 * 60 };
+const telCurto = (t: string) => { let x = String(t ?? "").replace(/\D/g, ""); if (x.length >= 12 && x.startsWith("55")) x = x.slice(2); return x; };
+
+/** 2ª/3ª confirmação: já confirmou, pediu para cancelar ou respondeu depois da anterior? */
+async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete): Promise<boolean> {
+  if (tipo !== "vespera2" && tipo !== "vespera3") return false;
+  const ant = tipo === "vespera3" ? "vespera,vespera2" : "vespera";
+  const ls: any[] = (await bancoJson(`/rest/v1/lembretes_consulta?data=eq.${c.data}&telefone=eq.${telCurto(c.telefone)}&tipo=in.(${ant})&status=eq.enviado&select=enviado_em,resposta,conversa_id`).catch(() => [])) ?? [];
+  if (!ls.length) return false; // não recebeu a anterior (ex.: agendou depois): manda
+  if (ls.some((l) => l.resposta)) return true;
+  const primeiro = Math.min(...ls.map((l) => Date.parse(l.enviado_em) || Infinity));
+  const conv = ls.find((l) => l.conversa_id)?.conversa_id;
+  if (!conv || !isFinite(primeiro)) return false;
+  const cv = (await bancoJson(`/rest/v1/conversas?id=eq.${conv}&select=ultima_recebida_em`).catch(() => []))?.[0];
+  return !!cv?.ultima_recebida_em && Date.parse(cv.ultima_recebida_em) > primeiro;
+}
+
 export async function rodarLembretes(inicio: number, cont: Record<string, number>, agora = Date.now()) {
   const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor;
   if (!cfg?.ligado) return;
@@ -557,14 +580,22 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
   const minutos = local.getUTCHours() * 60 + local.getUTCMinutes();
   const teste = cfg.modo_teste !== false;
   const telsTeste = new Set((Array.isArray(cfg.telefones_teste) ? cfg.telefones_teste : []).map((t: unknown) => String(t).replace(/\D/g, "").slice(-9)).filter(Boolean));
-  for (const tipo of ["dia", "vespera"] as const) {
+  const sabado = local.getUTCDay() === 6;
+  for (const tipo of ["dia", "vespera", "vespera2", "vespera3"] as const) {
     const c = cfg[tipo];
     if (!c?.modelo?.nome) continue;
-    const h = hm(c.hora, tipo === "dia" ? 8 * 60 + 30 : 10 * 60 + 30);
-    if (minutos < h || minutos > h + 180) continue; // roda nas 3 h depois do horário (se o motor atrasar, ainda manda)
+    const base = baseLembrete(tipo);
+    if (sabado && (tipo === "vespera2" || tipo === "vespera3") && c.no_sabado !== true) continue;
+    const modeloTipo = sabado && base === "vespera" && c.modelo_sabado?.nome ? c.modelo_sabado : c.modelo;
+    const h = hm(c.hora, HORA_PADRAO[tipo]);
+    // roda nas horas depois do horário (se o motor atrasar, ainda manda), sem encostar na próxima confirmação
+    const folga = Number(c.janela_min) || (tipo === "vespera" || tipo === "vespera2" ? 120 : 180);
+    if (minutos < h || minutos > h + folga) continue;
     const rod = (await bancoJson(`/rest/v1/lembretes_rodadas?dia=eq.${hoje}&tipo=eq.${tipo}&select=status`).catch(() => null))?.[0];
     if (rod?.status === "concluida") continue;
-    const dias = diasDoLembrete(tipo, agora);
+    let dias = diasDoLembrete(base, agora);
+    const fake = teste && cfg.consulta_teste?.telefone ? cfg.consulta_teste : null;
+    if (!dias.length && fake && base === "vespera") dias = [ymd(new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1)))];
     if (!dias.length) { await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "concluida", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: null }); continue; }
     if (!CLINICORP_USUARIO || !CLINICORP_TOKEN) {
       await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: "faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN na Supabase" });
@@ -572,16 +603,21 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     }
     let lista: Consulta[];
     try {
-      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, tipo, agora, cfg.categorias ?? "avaliação");
+      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, base, agora, cfg.categorias ?? "avaliação");
     } catch (e) {
       await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: String((e as Error)?.message ?? e).slice(0, 300) });
       continue;
     }
     if (teste) lista = lista.filter((x) => telsTeste.has(x.telefone.slice(-9)));
+    // teste sem consulta de verdade: uma consulta de mentira para o telefone de teste
+    if (fake && !lista.some((x) => x.telefone.slice(-9) === String(fake.telefone).replace(/\D/g, "").slice(-9))) {
+      lista.push({ id: "teste", data: dias[0], hora: base === "dia" ? "23:59" : String(fake.hora || "10:00"), nome: String(fake.nome || "Teste"), telefone: String(fake.telefone).replace(/\D/g, "") });
+    }
     let enviados = 0, falhas = 0, completo = true;
     for (const x of lista) {
       if (Date.now() - inicio > TEMPO_MAX_MS) { completo = false; break; }
-      const r = await enviarLembrete(x, tipo, cfg, agora);
+      if (await jaRespondeuVespera(x, tipo)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
+      const r = await enviarLembrete(x, tipo, cfg, agora, modeloTipo);
       if (r === "enviado") enviados++;
       if (r === "falhou") falhas++;
       cont["lembrete_" + r] = (cont["lembrete_" + r] ?? 0) + 1;
@@ -621,7 +657,7 @@ export async function rodarRespostasLembrete(cont: Record<string, number>) {
     try {
       const c = (await bancoJson(`/rest/v1/conversas?id=eq.${x.conversa_id}&select=*`))?.[0];
       if (x.acao === "confirmar") {
-        if (cfg.confirmar_no_clinicorp !== false && x.clinicorp_id) {
+        if (cfg.confirmar_no_clinicorp !== false && x.clinicorp_id && x.clinicorp_id !== "teste") {
           try { await confirmarNoClinicorp(String(x.clinicorp_id)); confirmado = true; }
           catch (e) { confirmado = false; erro = "não confirmou no Clinicorp: " + String((e as Error)?.message ?? e).slice(0, 200); }
         }
