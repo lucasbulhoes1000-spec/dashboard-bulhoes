@@ -571,6 +571,9 @@ tbody tr:hover td{background:#0D1A33;}
 .cl-pill.fila{background:#12213F;color:#E2BE6A;}
 .cl-pill.chatbot{background:#1E1537;color:#9186C1;}
 .cl-pill.concluido{background:#12213F;color:#C3CBDB;}
+.cl-item-seta{display:none;background:none;border:none;color:#8C98B1;cursor:pointer;padding:0 2px;margin-left:4px;line-height:1;font-size:15px;}
+.wa-item:hover .cl-item-seta,.cl-item-seta.aberta{display:inline-block;}
+.cl-item-seta:hover{color:#EEF1F7;}
 .cl-dot-nl{background:#B08A3E;color:#FFFFFF;border-radius:9px;font-size:9.5px;font-weight:700;min-width:17px;height:17px;line-height:17px;text-align:center;padding:0 4px;}
 .cl-tick{width:15px;height:15px;color:#8C98B1;flex-shrink:0;}
 .cl-tick.lida{color:#7DA8CA;}
@@ -13858,6 +13861,24 @@ async function waMudarStatus(s){
   }
   catch(e){c.status=antes;waRenderCabecalho();waRenderLista();showToast('error','Não foi possível mudar a situação',e.message);}
 }
+// (25/10/2026) seta no item da lista, como no Cloudia: marcar como lida / não lida
+function waMenuItem(ev,id){
+  ev.stopPropagation();_clFecharPop();
+  const c=(_wa.conversas||[]).find(x=>x.id===id);if(!c)return;
+  const m=document.createElement('div');m.className='cl-menu';
+  m.innerHTML=c.nao_lidas>0
+    ?'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',false)">'+_clIc('check')+' Marcar como lida</button>'
+    :'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',true)">'+_clIc('chat')+' Marcar como não lida</button>';
+  _clPosicionar(m,ev.currentTarget,true);
+}
+async function waMarcarLidaItem(id,naoLida){
+  const c=(_wa.conversas||[]).find(x=>x.id===id);if(!c)return;
+  if(naoLida&&_wa.atual&&_wa.atual.id===id)return waMarcarNaoLida();
+  const novo=naoLida?Math.max(1,c.nao_lidas||0):0,antes=c.nao_lidas;
+  c.nao_lidas=novo;waAtualizarBadge();waRenderLista();
+  try{await _waRest('conversas?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({nao_lidas:novo})});}
+  catch(e){c.nao_lidas=antes;waAtualizarBadge();waRenderLista();showToast('error','Não foi possível marcar',e.message);}
+}
 async function waMarcarNaoLida(){
   const c=_wa.atual;if(!c)return;
   try{
@@ -15780,7 +15801,7 @@ function waRenderLista(){
     return '<div class="wa-item'+(c.nao_lidas>0?' nao-lida':'')+(_wa.atual&&_wa.atual.id===c.id?' ativo':'')+'" onclick="waAbrir(\''+c.id+'\')" title="'+_waEsc(c.ultima_mensagem_texto||'')+'">'+
       _clAvatar(c,nome)+
       '<div class="wa-item-meio"><div class="wa-item-linha"><span class="cl-item-nome">'+_waEsc(nome)+'</span><span class="wa-item-hora">'+_waHora(c.ultima_mensagem_em)+'</span></div>'+
-      '<div class="wa-item-linha"><span class="cl-item-prev">'+(enviadaPorUltimo?'<svg class="cl-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_CL_IC.tick+'</svg>':'')+'<span>'+_waEsc(c.ultima_mensagem_texto||'')+'</span></span>'+(c.nao_lidas>0?'<span class="cl-dot-nl">'+c.nao_lidas+'</span>':'')+'</div>'+
+      '<div class="wa-item-linha"><span class="cl-item-prev">'+(enviadaPorUltimo?'<svg class="cl-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_CL_IC.tick+'</svg>':'')+'<span>'+_waEsc(c.ultima_mensagem_texto||'')+'</span></span>'+(c.nao_lidas>0?'<span class="cl-dot-nl">'+c.nao_lidas+'</span>':'')+'<button class="cl-item-seta" type="button" title="Mais opções" onclick="waMenuItem(event,\''+c.id+'\')">&#8964;</button></div>'+
       '<div class="cl-item-baixo">'+resp+tags+num+'<span class="cl-pill '+est+'">'+_CL_ESTADO_ROT[est]+'</span></div></div></div>';
   }).join('');
 }
