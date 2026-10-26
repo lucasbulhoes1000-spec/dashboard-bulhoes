@@ -772,6 +772,14 @@ export async function handler(req: Request): Promise<Response> {
       case "clinicorp_buscar_paciente": {
         // só leitura: confere como o agente acharia o cadastro desse telefone
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
+        if (dados.caminho) {
+          // diagnóstico (só leitura): GET em /patient/... com os parâmetros dados
+          const cam = String(dados.caminho);
+          if (!/^\/patient\/[a-z_]+$/i.test(cam)) return json({ ok: false, erro: "só /patient/..." }, 400);
+          const r = await clinicorp(cam, { subscriber_id: assinante(), ...(dados.params ?? {}) }).catch((e) => ({ erro: String(e?.message ?? e) }));
+          const lista = Array.isArray(r) ? r : [r];
+          return json({ ok: true, n: lista.length, amostra: lista.slice(0, 3).map((x: any) => x && typeof x === "object" ? Object.fromEntries(Object.entries(x).filter(([k]) => /id$|name|phone|status|deleted|erro/i.test(k))) : x) });
+        }
         return json({ ok: true, achado: await buscarPacienteClinicorp(String(dados.telefone ?? "")) });
       }
       case "clinicorp_opcoes": {
