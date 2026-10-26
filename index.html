@@ -2593,7 +2593,26 @@ function _gsAgendarRender(){
       headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify({chave,texto,atualizado_em:new Date().toISOString()})}).catch(()=>{});
   }
+  // (25/10/2026) leituras já migradas para a função crm-dados (sem Apps Script).
+  // Se a função falhar, cai no Apps Script como antes.
+  const GS_DIRETO={analyticsAgendaClinicorp:'agenda'};
+  async function buscarDireto(url){
+    let u;try{u=new URL(url);}catch(e){return null;}
+    const acao=GS_DIRETO[u.searchParams.get('action')];
+    if(!acao||typeof _sbAccessToken==='undefined'||!_sbAccessToken)return null;
+    try{
+      const r=await _fetchComToken(SUPABASE_URL+'/functions/v1/crm-dados',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+_sbAccessToken},
+        body:JSON.stringify({acao,from:u.searchParams.get('from')||'',to:u.searchParams.get('to')||''})});
+      const texto=await r.text();
+      const j=JSON.parse(texto);
+      if(r.ok&&j&&j.status==='ok')return{texto,status:200};
+      console.warn('[crm-dados] resposta não ok, usando o Apps Script:',j&&j.mensagem);
+    }catch(e){console.warn('[crm-dados] falhou, usando o Apps Script:',e);}
+    return null;
+  }
   async function buscarNovo(url,chave,init){
+    const d=await buscarDireto(url);
+    if(d){gravarCache(chave,d.texto);return{texto:d.texto,ok:true,status:200};}
     const resp=await _fetchComToken(url,init);
     const texto=await resp.text();
     let ok=false;try{const j=JSON.parse(texto);ok=!!(j&&j.status==='ok');}catch(e){}
