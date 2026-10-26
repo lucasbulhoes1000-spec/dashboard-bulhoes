@@ -94,6 +94,17 @@ async function enviarMeta(c: any, corpo: any) {
   const e = j?.error ?? {};
   return { ok: r.ok, id: j?.messages?.[0]?.id ?? null, erro: r.ok ? null : ([e.message, e.error_data?.details].filter(Boolean).join(" — ") || "erro da Meta"), j };
 }
+// A Meta às vezes devolve um erro passageiro (#131000 "Something went wrong", 5xx, rede):
+// tenta mais uma vez depois de 2,5 s antes de dar como falha.
+async function enviarMetaTentando(c: any, corpo: any) {
+  let r = await enviarMeta(c, corpo).catch((e) => ({ ok: false, id: null, erro: String(e?.message ?? e), j: {} as any }));
+  const passageiro = (x: any) => !x.ok && (/131000|something went wrong|temporar|timeout|fetch/i.test(String(x.erro)) || Number(x.j?.error?.code) === 131000 || Number(x.j?.error?.code) === 2);
+  if (passageiro(r)) {
+    await new Promise((ok) => setTimeout(ok, 2500));
+    r = await enviarMeta(c, corpo).catch((e) => ({ ok: false, id: null, erro: String(e?.message ?? e), j: {} as any }));
+  }
+  return r;
+}
 async function registrarEnviada(c: any, waId: string | null, tipo: string, texto: string, autor: string, erro: string | null, bruto: unknown) {
   await rpc("wa_registrar_enviada", {
     p_conversa: c.id, p_wa_message_id: waId, p_tipo: tipo, p_texto: texto, p_autor: autor,
@@ -427,6 +438,8 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
   const msgs: any[] = historico.map((h) => ({ role: h.role, content: h.content }));
   const uso: Uso = { entrada: 0, saida: 0 };
   let blocos = 0, transferiu = false;
+  const bruto: string[] = [];
+  let parada = "";
   const max = Number(a.max_blocos ?? 4);
   for (let volta = 0; volta < 6; volta++) {
     const j = await chamarClaude(a.modelo, sistema, msgs, tools, a.criatividade);
@@ -438,10 +451,11 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
     const resultados: any[] = [];
     for (const b of j?.content ?? []) {
       if (b.type === "text") {
+        bruto.push(String(b.text ?? ""));
         for (const t of dividirBlocos(b.text, max - blocos)) {
           if (blocos >= max) break;
           blocos++;
-          if (!(await executar({ tipo: "texto", texto: t }))) return { uso, transferiu, parou: true };
+          if (!(await executar({ tipo: "texto", texto: t }))) return { uso, transferiu, parou: true, bruto, parada };
         }
       } else if (b.type === "tool_use") {
         if (b.name === "transferir_para_humano") {
@@ -466,11 +480,12 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
         }
       }
     }
+    parada = String(j?.stop_reason ?? "");
     if (transferiu || j?.stop_reason !== "tool_use" || !resultados.length) break;
     msgs.push({ role: "assistant", content: j.content });
     msgs.push({ role: "user", content: resultados });
   }
-  return { uso, transferiu, parou: false };
+  return { uso, transferiu, parou: false, bruto, parada };
 }
 
 // ---------- ferramentas de agenda ----------
@@ -549,13 +564,13 @@ export async function responder(conversaId: string, versao: number, pausa = espe
         await pausa(Math.min(4000, 1200 + (x.tipo === "texto" ? x.texto.length * 15 : 1500)));
       }
       if (x.tipo === "texto") {
-        const r = await enviarMeta(c, { type: "text", text: { body: x.texto.slice(0, 4096), preview_url: true } });
+        const r = await enviarMetaTentando(c, { type: "text", text: { body: x.texto.slice(0, 4096), preview_url: true } });
         await registrarEnviada(c, r.id, "text", x.texto, autor, r.erro, r.j);
         enviados.push(x.texto);
         return r.ok;
       }
       if (x.tipo === "imagem") {
-        const r = await enviarMeta(c, { type: "image", image: { link: x.link } });
+        const r = await enviarMetaTentando(c, { type: "image", image: { link: x.link } });
         await registrarEnviada(c, r.id, "image", "📷 " + x.nome, autor, r.erro, { ...r.j, link: x.link });
         enviados.push("[imagem: " + x.nome + "]");
         return r.ok;
@@ -625,7 +640,7 @@ async function testar(dados: any) {
   const res = await gerarResposta(a, imagens, montarSistema(a, imagens, { nome: dados?.nome || "" }), hist, async (x) => { acoes.push(x); return true; },
     a.agendamento?.ligado ? agendaReal(a, { telefone: "" }, {}, null, true) : undefined);
   await registro({ tipo: "teste", detalhe: acoes.map((x) => x.tipo === "texto" ? x.texto : x.tipo === "imagem" ? "[imagem: " + x.nome + "]" : "[transferiu: " + x.motivo + "]").join("\n\n").slice(0, 2000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: dados?._autor });
-  return { acoes, uso: res.uso };
+  return { acoes, uso: res.uso, bruto: res.bruto, parada: res.parada };
 }
 
 async function sugerir(conversaId: string, autor: string) {
