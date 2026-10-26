@@ -558,8 +558,15 @@ const HORA_PADRAO: Record<TipoLembrete, number> = { dia: 8 * 60 + 30, vespera: 1
 const telCurto = (t: string) => { let x = String(t ?? "").replace(/\D/g, ""); if (x.length >= 12 && x.startsWith("55")) x = x.slice(2); return x; };
 
 /** 2ª/3ª confirmação: já confirmou, pediu para cancelar ou respondeu depois da anterior? */
-async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete): Promise<boolean> {
+async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number): Promise<boolean> {
   if (tipo !== "vespera2" && tipo !== "vespera3") return false;
+  // a 1ª confirmação pode ter saído por fora (ex.: Cloudia, enquanto não é desligado):
+  // quem mandou mensagem hoje depois do horário da 1ª também não recebe a próxima
+  const local = new Date(agora + FUSO_MIN * 60_000);
+  const h1 = hm(cfg?.vespera?.hora, HORA_PADRAO.vespera);
+  const ref1 = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) + h1 * 60_000 - FUSO_MIN * 60_000;
+  const cvs: any[] = (await bancoJson(`/rest/v1/conversas?telefone=like.*${telCurto(c.telefone).slice(-9)}&select=ultima_recebida_em`).catch(() => [])) ?? [];
+  if (cvs.some((x) => x.ultima_recebida_em && Date.parse(x.ultima_recebida_em) > ref1 && ref1 < agora)) return true;
   const ant = tipo === "vespera3" ? "vespera,vespera2" : "vespera";
   const ls: any[] = (await bancoJson(`/rest/v1/lembretes_consulta?data=eq.${c.data}&telefone=eq.${telCurto(c.telefone)}&tipo=in.(${ant})&status=eq.enviado&select=enviado_em,resposta,conversa_id`).catch(() => [])) ?? [];
   if (!ls.length) return false; // não recebeu a anterior (ex.: agendou depois): manda
@@ -583,7 +590,7 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
   const sabado = local.getUTCDay() === 6;
   for (const tipo of ["dia", "vespera", "vespera2", "vespera3"] as const) {
     const c = cfg[tipo];
-    if (!c?.modelo?.nome) continue;
+    if (!c?.modelo?.nome || c.pausado === true) continue;
     const base = baseLembrete(tipo);
     if (sabado && (tipo === "vespera2" || tipo === "vespera3") && c.no_sabado !== true) continue;
     const modeloTipo = sabado && base === "vespera" && c.modelo_sabado?.nome ? c.modelo_sabado : c.modelo;
@@ -616,7 +623,7 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     let enviados = 0, falhas = 0, completo = true;
     for (const x of lista) {
       if (Date.now() - inicio > TEMPO_MAX_MS) { completo = false; break; }
-      if (await jaRespondeuVespera(x, tipo)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
+      if (await jaRespondeuVespera(x, tipo, cfg, agora)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
       const r = await enviarLembrete(x, tipo, cfg, agora, modeloTipo);
       if (r === "enviado") enviados++;
       if (r === "falhou") falhas++;
