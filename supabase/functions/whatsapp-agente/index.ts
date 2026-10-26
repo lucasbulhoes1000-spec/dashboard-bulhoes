@@ -95,12 +95,14 @@ async function enviarMeta(c: any, corpo: any) {
   return { ok: r.ok, id: j?.messages?.[0]?.id ?? null, erro: r.ok ? null : ([e.message, e.error_data?.details].filter(Boolean).join(" — ") || "erro da Meta"), j };
 }
 // A Meta às vezes devolve um erro passageiro (#131000 "Something went wrong", 5xx, rede):
-// tenta mais uma vez depois de 2,5 s antes de dar como falha.
+// tenta de novo algumas vezes antes de dar como falha.
 async function enviarMetaTentando(c: any, corpo: any) {
   let r = await enviarMeta(c, corpo).catch((e) => ({ ok: false, id: null, erro: String(e?.message ?? e), j: {} as any }));
   const passageiro = (x: any) => !x.ok && (/131000|something went wrong|temporar|timeout|fetch/i.test(String(x.erro)) || Number(x.j?.error?.code) === 131000 || Number(x.j?.error?.code) === 2);
-  if (passageiro(r)) {
-    await new Promise((ok) => setTimeout(ok, 2500));
+  // até 3 tentativas a mais (2,5 s, 6 s e 12 s): o #131000 às vezes dura alguns segundos
+  for (const ms of [2500, 6000, 12000]) {
+    if (!passageiro(r)) break;
+    await new Promise((ok) => setTimeout(ok, ms));
     r = await enviarMeta(c, corpo).catch((e) => ({ ok: false, id: null, erro: String(e?.message ?? e), j: {} as any }));
   }
   return r;
