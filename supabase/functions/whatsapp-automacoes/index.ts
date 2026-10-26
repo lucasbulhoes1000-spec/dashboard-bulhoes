@@ -213,7 +213,12 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
         case "modelo": {
           const quando = p.ignorar_horario ? agora() : proximoHorario(agora(), regras);
           if (quando > agora() + 30_000) {
-            await avancar(x, i, null, "adiado", null, i, quando); // sem log: só reagenda
+            // (25/10/2026) volta para as condições ("se") logo antes da mensagem: elas
+            // são conferidas de novo na hora em que a mensagem sai de fato (ex.: quem
+            // agendou de manhã não recebe às 11h o follow-up de lead)
+            let volta = i;
+            while (volta > 0 && passos[volta - 1]?.tipo === "se") volta--;
+            await avancar(x, i, null, "adiado", null, volta, quando); // sem log: só reagenda
             return "fora_do_horario";
           }
           const k = await garantir();
