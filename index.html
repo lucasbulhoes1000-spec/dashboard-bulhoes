@@ -4900,7 +4900,20 @@ async function _anexarEventosProprios(raw){
     if(!desde)return raw;
     const ev=await _lerTabelaBaseNova('eventos_proprios_planilha?select='+COLUNAS_PLANILHA_CLOUDIA.join(',')+'&ocorrido_em=gte.'+encodeURIComponent(desde)+'&order=id');
     const h=raw[0];
-    ev.forEach(r=>raw.push(h.map(k=>Object.prototype.hasOwnProperty.call(r,k)&&r[k]!=null?r[k]:'')));
+    // (25/10/2026) a partir da data, o funil lê SÓ o CRM: as linhas do Cloudia
+    // dessa data em diante saem (senão o mesmo lead conta duas vezes)
+    const corte=Date.parse(desde);const ti=h.indexOf('timestamp');
+    if(ti>=0&&!isNaN(corte)){
+      for(let i=raw.length-1;i>=1;i--){const d=parseCloudiaDate(raw[i][ti]);if(d&&d.getTime()>=corte)raw.splice(i,1);}
+    }
+    ev.forEach(r=>{
+      raw.push(h.map(k=>Object.prototype.hasOwnProperty.call(r,k)&&r[k]!=null?r[k]:''));
+      // contato antigo que volta por um anúncio conta como lead do anúncio (como o Cloudia fazia)
+      if(r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'&&String(r.ad_id||'').trim()){
+        const c=Object.assign({},r,{type:'CUSTOMER_CREATED',created_at:r.timestamp});
+        raw.push(h.map(k=>Object.prototype.hasOwnProperty.call(c,k)&&c[k]!=null?c[k]:''));
+      }
+    });
   }catch(e){console.warn('[FUNIL CRM] eventos do CRM indisponíveis, usando só a planilha:',e);}
   return raw;
 }
