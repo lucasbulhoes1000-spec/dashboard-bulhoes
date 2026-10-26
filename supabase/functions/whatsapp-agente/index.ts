@@ -229,16 +229,75 @@ async function agendaDaProfissional(cfg: any, agora: number) {
 
 const telefoneBonito = (t: string) => { const d = String(t).replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : d; };
 
-async function pacienteClinicorp(nome: string, telefone: string): Promise<number | null> {
-  try {
-    const r = await clinicorp("/patient/get", { subscriber_id: assinante(), Phone: telefone });
-    // cadastro excluído ou inativo no Clinicorp não serve: cria de novo
-    const p = (Array.isArray(r) ? r : [r]).find((x: any) => x?.PatientId && !/DELETED|INACTIVE/i.test(String(x?.Status ?? "")));
-    if (p?.PatientId) return Number(p.PatientId);
-  } catch (_) { /* não achou: cria */ }
-  const novo = await clinicorp("/patient/create", {}, "POST", { subscriber_id: assinante(), Name: nome, MobilePhone: Number(String(telefone).replace(/\D/g, "")), IgnoreSameName: "X" });
-  const id = novo?.PatientId ?? novo?.id ?? (Array.isArray(novo) ? novo[0]?.PatientId ?? novo[0]?.id : null);
-  return id ? Number(id) : null;
+// ---------- paciente no Clinicorp (sem duplicar) ----------
+const digitosTel = (t: unknown) => { let d = String(t ?? "").replace(/\D/g, ""); if (d.startsWith("55") && d.length >= 12) d = d.slice(2); return d; };
+/** Mesmo telefone: mesmo DDD e mesmos 8 últimos dígitos (aceita com ou sem o 9 e com ou sem 55). */
+export function mesmoTelefone(a: unknown, b: unknown): boolean {
+  const x = digitosTel(a), y = digitosTel(b);
+  if (x.length < 10 || y.length < 10) return false;
+  return x.slice(0, 2) === y.slice(0, 2) && x.slice(-8) === y.slice(-8);
+}
+const telefonesDoCadastro = (x: any): string[] =>
+  Object.entries(x ?? {}).filter(([k, v]) => /phone|fone|celular|tel/i.test(k) && (typeof v === "string" || typeof v === "number")).map(([, v]) => String(v));
+const ativo = (x: any) => x?.PatientId && !/DELETED|INACTIVE/i.test(String(x?.Status ?? "")) && String(x?.Deleted ?? "").toUpperCase() !== "X";
+
+/**
+ * Procura o cadastro do paciente pelo telefone antes de criar um novo.
+ * 1) CRM (pacientes.clinicorp_paciente_id), conferindo no Clinicorp se o cadastro ainda existe;
+ * 2) /patient/get pelo telefone em vários formatos — só aceita o cadastro se o telefone dele bater de verdade;
+ * 3) agendamentos dos últimos 12 meses com esse telefone.
+ */
+export async function buscarPacienteClinicorp(telefone: string): Promise<{ id: number; nome: string; como: string } | null> {
+  const d = digitosTel(telefone);
+  if (d.length < 10) return null;
+  const sub = assinante();
+  const conferir = async (pid: unknown) => {
+    const r = await clinicorp("/patient/get", { subscriber_id: sub, PatientId: String(pid) }).catch(() => null);
+    const x = Array.isArray(r) ? r[0] : r;
+    return ativo(x) ? x : null;
+  };
+  // 1) o CRM já sabe o id
+  const crm = await bancoJson(`/rest/v1/pacientes?telefone=eq.${d}&select=clinicorp_paciente_id&clinicorp_paciente_id=not.is.null&limit=1`).catch(() => []);
+  if (crm?.[0]?.clinicorp_paciente_id) {
+    const x = await conferir(crm[0].clinicorp_paciente_id);
+    if (x) return { id: Number(x.PatientId), nome: String(x.Name ?? x.PatientName ?? ""), como: "crm" };
+  }
+  // 2) busca pelo telefone
+  const formatos = [...new Set([d, "55" + d, telefoneBonito(d), d.length === 11 ? d.slice(0, 2) + d.slice(3) : d])];
+  for (const campo of ["Phone", "MobilePhone"]) {
+    for (const f of formatos) {
+      const r = await clinicorp("/patient/get", { subscriber_id: sub, [campo]: f }).catch(() => null);
+      const lista = (Array.isArray(r) ? r : r ? [r] : []).filter(ativo);
+      const x = lista.find((y: any) => telefonesDoCadastro(y).some((t) => mesmoTelefone(t, d)));
+      if (x) return { id: Number(x.PatientId), nome: String(x.Name ?? x.PatientName ?? ""), como: `${campo}=${f}` };
+    }
+  }
+  // 3) agendamentos recentes com esse telefone
+  const p: Record<string, string> = { subscriber_id: sub };
+  for (let k = 0; k < 4; k++) {
+    const ate = new Date(Date.now() + 60 * 86400000 - k * 93 * 86400000), de = new Date(ate.getTime() - 92 * 86400000);
+    const ag = await clinicorp("/appointment/list", { ...p, from: de.toISOString().slice(0, 10), to: ate.toISOString().slice(0, 10) }).catch(() => []);
+    const x = (Array.isArray(ag) ? ag : []).find((y: any) => y?.Patient_PersonId && String(y?.Deleted ?? "").toUpperCase() !== "X" && mesmoTelefone(y?.MobilePhone, d));
+    if (x) {
+      const c = await conferir(x.Patient_PersonId);
+      if (c) return { id: Number(c.PatientId), nome: String(c.Name ?? c.PatientName ?? x.PatientName ?? ""), como: "agendamento" };
+    }
+  }
+  return null;
+}
+
+async function pacienteClinicorp(nome: string, telefone: string): Promise<{ id: number | null; existente: boolean; como: string }> {
+  const d = digitosTel(telefone);
+  const achado = await buscarPacienteClinicorp(d).catch(() => null);
+  let id: number | null = achado?.id ?? null;
+  if (!id) {
+    const novo = await clinicorp("/patient/create", {}, "POST", { subscriber_id: assinante(), Name: nome, MobilePhone: Number(d), IgnoreSameName: "X" });
+    const v = novo?.PatientId ?? novo?.id ?? (Array.isArray(novo) ? novo[0]?.PatientId ?? novo[0]?.id : null);
+    id = v ? Number(v) : null;
+  }
+  // guarda no CRM para a próxima vez achar direto
+  if (id && d) await banco(`/rest/v1/pacientes?telefone=eq.${d}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ clinicorp_paciente_id: String(id) }) }).catch(() => {});
+  return { id, existente: !!achado, como: achado?.como ?? "novo" };
 }
 
 /** Marca de verdade no Clinicorp (confere de novo se o horário ainda está livre). */
@@ -246,7 +305,8 @@ export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: strin
   const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
   const escolhido = livres.find((x) => x.data === h.data && x.hora === h.hora);
   if (!escolhido) return { ok: false, motivo: "esse horário não está mais livre" };
-  const pacienteId = await pacienteClinicorp(nome, telefone);
+  const pac = await pacienteClinicorp(nome, telefone);
+  const pacienteId = pac.id;
   const corpo: any = {
     PatientName: nome, MobilePhone: telefoneBonito(telefone),
     fromTime: escolhido.hora, toTime: escolhido.fim, date: `${escolhido.data}T03:00:00.000Z`,
@@ -261,7 +321,7 @@ export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: strin
   const r = await clinicorp("/appointment/create_appointment_by_api", CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {}, "POST", corpo);
   const item = Array.isArray(r) ? r[0] : r;
   if (!item?.id) return { ok: false, motivo: "o Clinicorp não confirmou: " + JSON.stringify(r).slice(0, 150) };
-  return { ok: true, id: String(item.id), horario: escolhido, pacienteId };
+  return { ok: true, id: String(item.id), horario: escolhido, pacienteId, cadastro: pac.existente ? "já existia (" + pac.como + ")" : "novo" };
 }
 
 // ---------- montagem do pedido ao Claude ----------
@@ -516,7 +576,7 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
         await banco(`/rest/v1/pacientes?on_conflict=telefone`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({ telefone: conv.telefone, nome: nome, etapa: "Agendou", etapa_alterada_em: agoraIso }) }).catch(() => {});
       }
-      await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${cfg.procedimento || "Avaliação"} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}.`, autor: "agente" });
+      await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${cfg.procedimento || "Avaliação"} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}. Cadastro do paciente: ${r.cadastro ?? "?"}.`, autor: "agente" });
       return `Marcado no Clinicorp: ${descreverHorario(r.horario!, Date.now())}, até ${r.horario!.fim}. Confirme ao paciente.`;
     },
   };
@@ -709,6 +769,11 @@ export async function handler(req: Request): Promise<Response> {
       case "testar":
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão testa o agente" }, 403);
         return json({ ok: true, ...(await testar({ ...dados, _autor: u.email })) });
+      case "clinicorp_buscar_paciente": {
+        // só leitura: confere como o agente acharia o cadastro desse telefone
+        if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
+        return json({ ok: true, achado: await buscarPacienteClinicorp(String(dados.telefone ?? "")) });
+      }
       case "clinicorp_opcoes": {
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
         const sub = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};
