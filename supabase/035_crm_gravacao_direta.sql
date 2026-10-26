@@ -130,11 +130,14 @@ begin
   if new.crm_json is not distinct from old.crm_json then return new; end if;
   if not exists (select 1 from public.crm_patch_log where em > now() - interval '15 minutes') then return new; end if;
   begin novo := new.crm_json::jsonb; velho := old.crm_json::jsonb; exception when others then return new; end;
-  for x in select distinct on (chave) chave, antes, depois from public.crm_patch_log
+  for x in select distinct on (chave) chave, depois from public.crm_patch_log
             where em > now() - interval '15 minutes' order by chave, id desc loop
-    -- a rotina devolveu o cliente como era antes da gravação da equipe → fica a da equipe
-    if (novo->x.chave) is not distinct from x.antes and (velho->x.chave) is not distinct from x.depois
-       and (novo->x.chave) is distinct from (velho->x.chave) then
+    -- a rotina devolveu o cliente numa versão de ANTES de alguma gravação da equipe
+    -- dos últimos 15 min (cópia velha) → fica a versão atual da equipe
+    if (velho->x.chave) is not distinct from x.depois
+       and (novo->x.chave) is distinct from (velho->x.chave)
+       and exists (select 1 from public.crm_patch_log y where y.chave = x.chave and y.em > now() - interval '15 minutes'
+                    and (novo->x.chave) is not distinct from y.antes) then
       if velho ? x.chave then novo := novo || jsonb_build_object(x.chave, velho->x.chave); else novo := novo - x.chave; end if;
       mexeu := true;
     end if;
