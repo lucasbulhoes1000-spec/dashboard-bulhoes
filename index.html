@@ -13592,6 +13592,8 @@ function _waTelFormatado(t){
 }
 function _waNome(c){
   const p=c&&c.pacientes;
+  // (26/10/2026) o nome editado pela equipe no CRM vem primeiro
+  try{const ph=c&&c.telefone&&normalizePhone(c.telefone);const d=ph&&typeof ccDataLookup==='function'?ccDataLookup(ph):null;if(d&&d.nomeAtual)return String(d.nomeAtual);}catch(e){}
   return (p&&p.nome)||(c&&c.nome_contato)||(c&&c.nome_perfil)||_waTelFormatado(c&&c.telefone)||'Contato';
 }
 function _waIniciais(n){
@@ -13963,6 +13965,30 @@ function _definirEtapaDireto(ph,nova){
   d.statusAtual=nova;d.statusAtualEditedAt=new Date().toISOString();d.editadoManualmente=true;
   allCloudiaRows.forEach(row=>{if(normalizePhone(row.phone)===ph)row.stage=nova;});
   salvarCRMDebounced();
+}
+// (26/10/2026) edita o nome ali mesmo no perfil da conversa, como no Cloudia
+function waEditarNome(){
+  const c=_wa.atual;const el=document.getElementById('wa-nome-perfil');if(!c||!el)return;
+  const atual=_waNome(c);
+  el.innerHTML='<input class="wa-var" id="wa-nome-input" style="width:100%;text-align:center" value="'+_waEsc(atual)+'">';
+  const inp=document.getElementById('wa-nome-input');inp.focus();inp.select();
+  let feito=false;
+  const salvar=()=>{if(feito)return;feito=true;
+    const novo=inp.value.trim().replace(/\s+/g,' ');
+    if(novo&&novo!==atual){
+      const ph=normalizePhone(c.telefone);
+      const d=_ccData[ph]||(_ccData[ph]={anotacoes:[]});
+      d.nomeAtual=novo;d.editadoManualmente=true;
+      allCloudiaRows.forEach(row=>{if(normalizePhone(row.phone)===ph)row.name=novo;});
+      if(c.pacientes)c.pacientes.nome=novo;
+      _ccDataNormIndex=null;
+      salvarCRMDebounced();
+      showToast('success','Nome salvo');
+    }
+    waRenderPainel();waRenderCabecalho();waRenderLista();
+  };
+  inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();salvar();}if(e.key==='Escape'){feito=true;waRenderPainel();}};
+  inp.onblur=salvar;
 }
 function waMudarEtapa(nova){
   const c=_wa.atual;if(!c||!nova)return;
@@ -16174,8 +16200,8 @@ function waRenderPainel(){
     const tags=_wa.tags.filter(t=>ids&&ids.has(t.id)).map(t=>'<span class="cl-tag" style="background:'+_waEsc(t.cor)+'26;border-color:'+_waEsc(t.cor)+';color:#EEF1F7">'+_clIc('tag')+'<span>'+_waEsc(t.nome)+'</span><b class="x" title="Tirar tag" onclick="waTirarTag('+t.id+')">×</b></span>').join('');
     corpo=
       '<div class="cl-perfil">'+_clAvatar(c,nome).replace('<span class="selo"','<span style="display:none" class="selo"')+
-        '<button class="cl-ib editar" title="Abrir card no CRM" onclick="waAbrirCard()">'+_clIc('edit')+'</button>'+
-        '<div style="font-size:13px;color:#EEF1F7;margin-top:4px">'+_waEsc(nome)+'</div>'+
+        '<button class="cl-ib editar" title="Editar o nome" onclick="waEditarNome()">'+_clIc('edit')+'</button>'+
+        '<div id="wa-nome-perfil" style="font-size:13px;color:#EEF1F7;margin-top:4px">'+_waEsc(nome)+'</div>'+
         '<div style="font-size:12px;color:#EEF1F7">'+_waEsc('55'+c.telefone)+'</div>'+
         '<span class="cl-selo-criado">'+(L.existe?'Lead'+(L.criadoEm?' desde '+new Date(L.criadoEm).toLocaleDateString('pt-BR'):''):'Criado via mensagem recebida')+'</span>'+
         (L.existe?'<button class="cl-link" onclick="waAbrirCard()">Detalhes do contato</button>':'<button class="cl-link" onclick="waCadastrarLead()">Cadastrar como lead no CRM</button>')+
