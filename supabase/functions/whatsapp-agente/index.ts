@@ -365,10 +365,39 @@ export function dividirBlocos(texto: string, max: number): string[] {
 }
 
 // ---------- Claude ----------
-type Uso = { entrada: number; saida: number };
+type Uso = { entrada: number; saida: number; cache_lido?: number; cache_gravado?: number };
+
+// Cache de prompt da Anthropic: o começo fixo (ferramentas + instruções + base + imagens) fica guardado
+// por 5 min e é cobrado a 10% quando se repete. A parte que muda a cada conversa ("# Sobre esta conversa"
+// em diante: horário, nome, etapa) vai depois do ponto de cache, então a IA sempre recebe esses dados novos.
+const MARCA_CONVERSA = "\n\n# Sobre esta conversa";
+export function sistemaComCache(sistema: string): any[] {
+  const i = sistema.indexOf(MARCA_CONVERSA);
+  if (i <= 0) return [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }];
+  return [
+    { type: "text", text: sistema.slice(0, i), cache_control: { type: "ephemeral" } },
+    { type: "text", text: sistema.slice(i + 2) },
+  ];
+}
+// segundo ponto de cache no fim do histórico: as voltas seguintes (ferramentas) e a próxima resposta da
+// mesma conversa reaproveitam tudo o que já foi lido
+export function mensagensComCache(msgs: any[]): any[] {
+  if (!msgs.length) return msgs;
+  const out = msgs.slice();
+  const u = out[out.length - 1];
+  if (typeof u.content === "string") {
+    if (!u.content) return out;
+    out[out.length - 1] = { ...u, content: [{ type: "text", text: u.content, cache_control: { type: "ephemeral" } }] };
+  } else if (Array.isArray(u.content) && u.content.length) {
+    const c = u.content.slice();
+    c[c.length - 1] = { ...c[c.length - 1], cache_control: { type: "ephemeral" } };
+    out[out.length - 1] = { ...u, content: c };
+  }
+  return out;
+}
 async function chamarClaude(modelo: string, sistema: string, mensagens: any[], tools: any[], criatividade: number, maxTokens = 1024) {
   if (!ANTHROPIC_API_KEY) throw new Error("falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)");
-  const corpo: any = { model: modelo, max_tokens: maxTokens, system: sistema, messages: mensagens, temperature: Math.max(0, Math.min(1, Number(criatividade))) };
+  const corpo: any = { model: modelo, max_tokens: maxTokens, system: sistemaComCache(sistema), messages: mensagensComCache(mensagens), temperature: Math.max(0, Math.min(1, Number(criatividade))) };
   if (tools.length) corpo.tools = tools;
   const pedir = async (c: any) => {
     const r = await fetch(ANTHROPIC_URL, {
@@ -401,8 +430,11 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
   const max = Number(a.max_blocos ?? 4);
   for (let volta = 0; volta < 6; volta++) {
     const j = await chamarClaude(a.modelo, sistema, msgs, tools, a.criatividade);
-    uso.entrada += Number(j?.usage?.input_tokens ?? 0);
+    const lido = Number(j?.usage?.cache_read_input_tokens ?? 0), gravado = Number(j?.usage?.cache_creation_input_tokens ?? 0);
+    uso.entrada += Number(j?.usage?.input_tokens ?? 0) + lido + gravado;
     uso.saida += Number(j?.usage?.output_tokens ?? 0);
+    uso.cache_lido = (uso.cache_lido ?? 0) + lido;
+    uso.cache_gravado = (uso.cache_gravado ?? 0) + gravado;
     const resultados: any[] = [];
     for (const b of j?.content ?? []) {
       if (b.type === "text") {
