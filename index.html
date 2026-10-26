@@ -4904,7 +4904,7 @@ async function _anexarEventosProprios(raw){
     // dessa data em diante saem (senão o mesmo lead conta duas vezes)
     const corte=Date.parse(desde);const ti=h.indexOf('timestamp');
     if(ti>=0&&!isNaN(corte)){
-      for(let i=raw.length-1;i>=1;i--){const d=parseCloudiaDate(raw[i][ti]);if(d&&d.getTime()>=corte)raw.splice(i,1);}
+      for(let i=raw.length-1;i>=1;i--){let t=Date.parse(raw[i][ti]);if(isNaN(t)){const d=parseCloudiaDate(raw[i][ti]);t=d?d.getTime():NaN;}if(t>=corte)raw.splice(i,1);}
     }
     ev.forEach(r=>{
       raw.push(h.map(k=>Object.prototype.hasOwnProperty.call(r,k)&&r[k]!=null?r[k]:''));
