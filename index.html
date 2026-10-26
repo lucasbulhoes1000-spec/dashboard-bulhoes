@@ -9970,12 +9970,19 @@ async function salvarAnotacao(){
   if(statusEl){statusEl.textContent='Gravando no sistema...';statusEl.style.color='#C3CBDB';}
 
   try{
-    const res=await fetch(CRM_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'saveClientAnnotationAtomic',clientKey:key,annotation:note})
-    });
-    const saved=await res.json();
+    let saved=null;
+    if(typeof _sbAccessToken!=='undefined'&&_sbAccessToken){
+      try{saved=await _waRest('rpc/crm_anotar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_chave:key,p_nota:note})});}
+      catch(eDireto){console.warn('[ANOTAÇÃO] Banco não respondeu; usando o Apps Script:',eDireto);saved=null;}
+    }
+    if(!saved){
+      const res=await fetch(CRM_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'saveClientAnnotationAtomic',clientKey:key,annotation:note})
+      });
+      saved=await res.json();
+    }
     if(!saved||saved.status!=='ok'||saved.verified!==true){
       throw new Error((saved&&saved.mensagem)||'O servidor não confirmou a gravação.');
     }
@@ -11046,18 +11053,30 @@ async function _salvarCRMPorPatch(){
   const enviado={};chavesMudadas.forEach(k=>{enviado[k]=JSON.stringify(mudancas[k].local);});
   const comissoesEnviadas=temComissoes?JSON.parse(JSON.stringify(_comissoes||[])):null;
   try{
-    const res=await fetch(CRM_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({
-        action:'saveCRMPatch',
-        mudancas,
-        temComissoes,
-        baseComissoes:temComissoes?(_comissoesBaseSnapshot||[]):[],
-        localComissoes:temComissoes?comissoesEnviadas:[]
-      })
-    });
-    const r=await res.json();
+    // (25/10/2026) grava direto no banco (crm_salvar_patch: mesmas regras do
+    // Apps Script). Se o banco não responder (rede), usa o Apps Script de reserva.
+    let r=null;
+    if(typeof _sbAccessToken!=='undefined'&&_sbAccessToken){
+      try{
+        r=await _waRest('rpc/crm_salvar_patch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          p_mudancas:mudancas,p_tem_comissoes:!!temComissoes,
+          p_base_comissoes:temComissoes?(_comissoesBaseSnapshot||[]):[],p_local_comissoes:temComissoes?comissoesEnviadas:[]})});
+      }catch(eDireto){console.warn('[CRM] Banco não respondeu; gravando pelo Apps Script:',eDireto);r=null;}
+    }
+    if(!r){
+      const res=await fetch(CRM_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({
+          action:'saveCRMPatch',
+          mudancas,
+          temComissoes,
+          baseComissoes:temComissoes?(_comissoesBaseSnapshot||[]):[],
+          localComissoes:temComissoes?comissoesEnviadas:[]
+        })
+      });
+      r=await res.json();
+    }
     if(r&&r.status==='ok'&&r.modo==='patch'&&r.crm&&typeof r.crm==='object'){
       Object.keys(r.crm).forEach(k=>{
         const fin=r.crm[k];
