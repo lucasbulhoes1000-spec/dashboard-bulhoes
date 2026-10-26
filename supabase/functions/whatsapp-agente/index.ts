@@ -247,7 +247,29 @@ const ativo = (x: any) => x?.PatientId && !/DELETED|INACTIVE/i.test(String(x?.St
  * 2) /patient/get pelo telefone em vários formatos — só aceita o cadastro se o telefone dele bater de verdade;
  * 3) agendamentos dos últimos 12 meses com esse telefone.
  */
-export async function buscarPacienteClinicorp(telefone: string): Promise<{ id: number; nome: string; como: string } | null> {
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+/** Variações do nome para a busca do Clinicorp (que só acha o nome inteiro): completo, primeiro + último, dois primeiros. */
+export function variacoesNome(nomes: string[]): string[] {
+  const out: string[] = [];
+  for (const n of nomes) {
+    const t = semAcento(String(n ?? "")).split(" ").filter((x) => x.length > 1 && !/^\d+$/.test(x));
+    if (t.length < 2) continue;
+    out.push(t.join(" "), `${t[0]} ${t[t.length - 1]}`, `${t[0]} ${t[1]}`);
+    const sem = t.filter((x) => !/^(de|da|do|dos|das|e)$/i.test(x));
+    if (sem.length >= 2) out.push(`${sem[0]} ${sem[1]}`, `${sem[0]} ${sem[sem.length - 1]}`);
+  }
+  return [...new Set(out)].slice(0, 8);
+}
+
+/**
+ * Procura o cadastro do paciente antes de criar um novo, e só aceita se o TELEFONE do cadastro bater.
+ * (A busca por telefone do Clinicorp não acha todos os cadastros, por isso também busca pelo nome.)
+ * 1) CRM (pacientes.clinicorp_paciente_id), conferindo se o cadastro ainda está ativo;
+ * 2) /patient/get pelo telefone;
+ * 3) /patient/get pelos nomes (o informado e o do WhatsApp/CRM), em algumas variações;
+ * 4) agendamentos dos últimos 3 meses com esse telefone.
+ */
+export async function buscarPacienteClinicorp(telefone: string, nomes: string[] = []): Promise<{ id: number; nome: string; como: string } | null> {
   const d = digitosTel(telefone);
   if (d.length < 10) return null;
   const sub = assinante();
@@ -256,39 +278,38 @@ export async function buscarPacienteClinicorp(telefone: string): Promise<{ id: n
     const x = Array.isArray(r) ? r[0] : r;
     return ativo(x) ? x : null;
   };
+  const doTelefone = (r: any) => (Array.isArray(r) ? r : r ? [r] : []).filter(ativo).find((y: any) => telefonesDoCadastro(y).some((t) => mesmoTelefone(t, d)));
+  const res = (x: any, como: string) => ({ id: Number(x.PatientId), nome: String(x.Name ?? x.PatientName ?? ""), como });
   // 1) o CRM já sabe o id
-  const crm = await bancoJson(`/rest/v1/pacientes?telefone=eq.${d}&select=clinicorp_paciente_id&clinicorp_paciente_id=not.is.null&limit=1`).catch(() => []);
+  const crm = await bancoJson(`/rest/v1/pacientes?telefone=eq.${d}&select=nome,clinicorp_paciente_id&limit=1`).catch(() => []);
   if (crm?.[0]?.clinicorp_paciente_id) {
     const x = await conferir(crm[0].clinicorp_paciente_id);
-    if (x) return { id: Number(x.PatientId), nome: String(x.Name ?? x.PatientName ?? ""), como: "crm" };
+    if (x) return res(x, "crm");
   }
-  // 2) busca pelo telefone
-  const formatos = [...new Set([d, "55" + d, telefoneBonito(d), d.length === 11 ? d.slice(0, 2) + d.slice(3) : d])];
-  for (const campo of ["Phone", "MobilePhone"]) {
-    for (const f of formatos) {
-      const r = await clinicorp("/patient/get", { subscriber_id: sub, [campo]: f }).catch(() => null);
-      const lista = (Array.isArray(r) ? r : r ? [r] : []).filter(ativo);
-      const x = lista.find((y: any) => telefonesDoCadastro(y).some((t) => mesmoTelefone(t, d)));
-      if (x) return { id: Number(x.PatientId), nome: String(x.Name ?? x.PatientName ?? ""), como: `${campo}=${f}` };
-    }
+  // 2) telefone
+  const t = doTelefone(await clinicorp("/patient/get", { subscriber_id: sub, Phone: d }).catch(() => null));
+  if (t) return res(t, "telefone");
+  // 3) nome (conferindo o telefone)
+  for (const n of variacoesNome([...nomes, crm?.[0]?.nome ?? ""])) {
+    const x = doTelefone(await clinicorp("/patient/get", { subscriber_id: sub, Name: n }).catch(() => null));
+    if (x) return res(x, "nome: " + n);
   }
-  // 3) agendamentos recentes com esse telefone
-  const p: Record<string, string> = { subscriber_id: sub };
-  for (let k = 0; k < 4; k++) {
-    const ate = new Date(Date.now() + 60 * 86400000 - k * 93 * 86400000), de = new Date(ate.getTime() - 92 * 86400000);
-    const ag = await clinicorp("/appointment/list", { ...p, from: de.toISOString().slice(0, 10), to: ate.toISOString().slice(0, 10) }).catch(() => []);
+  // 4) agendamentos recentes com esse telefone
+  for (let k = 0; k < 3; k++) {
+    const ate = new Date(Date.now() + 30 * 86400000 - k * 31 * 86400000), de = new Date(ate.getTime() - 30 * 86400000);
+    const ag = await clinicorp("/appointment/list", { subscriber_id: sub, from: de.toISOString().slice(0, 10), to: ate.toISOString().slice(0, 10) }).catch(() => []);
     const x = (Array.isArray(ag) ? ag : []).find((y: any) => y?.Patient_PersonId && String(y?.Deleted ?? "").toUpperCase() !== "X" && mesmoTelefone(y?.MobilePhone, d));
     if (x) {
       const c = await conferir(x.Patient_PersonId);
-      if (c) return { id: Number(c.PatientId), nome: String(c.Name ?? c.PatientName ?? x.PatientName ?? ""), como: "agendamento" };
+      if (c) return res(c, "agendamento");
     }
   }
   return null;
 }
 
-async function pacienteClinicorp(nome: string, telefone: string): Promise<{ id: number | null; existente: boolean; como: string }> {
+async function pacienteClinicorp(nome: string, telefone: string, outrosNomes: string[] = []): Promise<{ id: number | null; existente: boolean; como: string }> {
   const d = digitosTel(telefone);
-  const achado = await buscarPacienteClinicorp(d).catch(() => null);
+  const achado = await buscarPacienteClinicorp(d, [nome, ...outrosNomes]).catch(() => null);
   let id: number | null = achado?.id ?? null;
   if (!id) {
     const novo = await clinicorp("/patient/create", {}, "POST", { subscriber_id: assinante(), Name: nome, MobilePhone: Number(d), IgnoreSameName: "X" });
@@ -301,11 +322,11 @@ async function pacienteClinicorp(nome: string, telefone: string): Promise<{ id: 
 }
 
 /** Marca de verdade no Clinicorp (confere de novo se o horário ainda está livre). */
-export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: string }, nome: string, telefone: string, observacoes: string, agora = Date.now()) {
+export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: string }, nome: string, telefone: string, observacoes: string, agora = Date.now(), outrosNomes: string[] = []) {
   const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
   const escolhido = livres.find((x) => x.data === h.data && x.hora === h.hora);
   if (!escolhido) return { ok: false, motivo: "esse horário não está mais livre" };
-  const pac = await pacienteClinicorp(nome, telefone);
+  const pac = await pacienteClinicorp(nome, telefone, outrosNomes);
   const pacienteId = pac.id;
   const corpo: any = {
     PatientName: nome, MobilePhone: telefoneBonito(telefone),
@@ -568,7 +589,7 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
         const ja = await bancoJson(`/rest/v1/agente_registros?conversa_id=eq.${conversaId}&tipo=eq.agendamento&criado_em=gte.${new Date(Date.now() - 30 * 86_400_000).toISOString()}&select=id&limit=1`).catch(() => []);
         if (ja?.length) return "Esta conversa já tem uma avaliação marcada pelo agente. Para remarcar ou marcar outra, passe para a equipe.";
       }
-      const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", String(x.observacoes ?? ""));
+      const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", String(x.observacoes ?? ""), Date.now(), [ctx?.nome, conv?.nome_contato, conv?.nome_perfil].filter(Boolean).map(String));
       if (!r.ok) return `Não foi possível marcar: ${r.motivo}. Consulte ver_horarios de novo e ofereça outras opções.`;
       // CRM: etapa "Agendou"
       const agoraIso = new Date().toISOString();
@@ -780,7 +801,7 @@ export async function handler(req: Request): Promise<Response> {
           const lista = Array.isArray(r) ? r : [r];
           return json({ ok: true, n: lista.length, amostra: lista.slice(0, 3).map((x: any) => x && typeof x === "object" ? Object.fromEntries(Object.entries(x).filter(([k]) => /id$|name|phone|status|deleted|erro/i.test(k))) : x) });
         }
-        return json({ ok: true, achado: await buscarPacienteClinicorp(String(dados.telefone ?? "")) });
+        return json({ ok: true, achado: await buscarPacienteClinicorp(String(dados.telefone ?? ""), [String(dados.nome ?? "")]) });
       }
       case "clinicorp_opcoes": {
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
