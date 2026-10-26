@@ -13957,10 +13957,18 @@ async function waCarregarAnuncio(c){
   if(m&&m.origem_anuncio){_wa.anuncios[c.id]=Object.assign({_em:m.enviada_em},m.origem_anuncio);if(_wa.atual&&_wa.atual.id===c.id)waRenderPainel();}
 }
 // Etapa e origem: mesma regra do card do lead do CRM
+// muda a etapa do lead no CRM (sem pedir data nem valor: vêm do Clinicorp)
+function _definirEtapaDireto(ph,nova){
+  const d=_ccData[ph]||(_ccData[ph]={anotacoes:[]});
+  d.statusAtual=nova;d.statusAtualEditedAt=new Date().toISOString();d.editadoManualmente=true;
+  allCloudiaRows.forEach(row=>{if(normalizePhone(row.phone)===ph)row.stage=nova;});
+  salvarCRMDebounced();
+}
 function waMudarEtapa(nova){
   const c=_wa.atual;if(!c||!nova)return;
   const L=_waLead(c);
-  if(['Agendou','Faltou/desmarcou','Compareceu','Ganho'].includes(nova)){
+  // (26/10/2026) data e valor vêm do Clinicorp: a etapa muda direto, sem abrir o card
+  if(false&&['Agendou','Faltou/desmarcou','Compareceu','Ganho'].includes(nova)){
     // essas etapas pedem data (e valor): abre o card do CRM já com a etapa escolhida
     try{
       if(!leadsData.length)renderLeadsTable();
@@ -13974,10 +13982,7 @@ function waMudarEtapa(nova){
     setTimeout(waRenderPainel,300);
     return;
   }
-  const d=_ccData[L.ph]||(_ccData[L.ph]={anotacoes:[]});
-  d.statusAtual=nova;d.statusAtualEditedAt=new Date().toISOString();d.editadoManualmente=true;
-  allCloudiaRows.forEach(row=>{if(normalizePhone(row.phone)===L.ph)row.stage=nova;});
-  salvarCRMDebounced();
+  _definirEtapaDireto(L.ph,nova);
   showToast('success','Etapa alterada para '+(WA_ETAPA_ROTULO[nova]||nova));
   waRenderPainel();waRenderCabecalho();waRenderLista();
 }
@@ -17079,12 +17084,12 @@ const KB_QUADROS={
       const mapa={agendou:'Agendou',faltou:'Faltou/desmarcou',perdido:'Perdido'};
       const nova=mapa[col];
       if(!nova){showToast('error','Essa coluna anda sozinha','As cadências mudam quando o follow-up é enviado. Arraste só para Agendou, Faltou ou Perdido.');return false;}
-      const i=leadsData.indexOf(it.r);if(i<0)return false;
-      openLeadCard(i);
-      const st=document.getElementById('lc-status');
-      if(st){st.value=nova;if(typeof lcOnStatusChange==='function')lcOnStatusChange(nova);}
-      showToast('success','Confirme no card',(nova==='Perdido'?'Confira':'Preencha a data')+' e clique em Salvar.');
-      return false;
+      const ph=normalizePhone(it.r&&it.r.phone);if(!ph)return false;
+      _definirEtapaDireto(ph,nova);
+      if(it.r)it.r.stage=nova;
+      showToast('success','Etapa alterada para '+nova,'Data e valor vêm do Clinicorp.');
+      try{if(typeof filterLeadsTable==='function')filterLeadsTable();}catch(e){}
+      return true;
     },
     aviso:()=>'Posição nas cadências calculada pelo horário de entrada e pelas regras das sequências (dias úteis, das 11h às 17h). Vai para Em atendimento quando a SDR manda mensagem pelo CRM; a sequência só para quando muda de etapa e não envia enquanto a conversa está ativa. A taxa de resposta usa as mensagens gravadas no CRM'+(_kb.mensagensDesde?' desde '+_kb.mensagensDesde.toLocaleDateString('pt-BR'):'')+'.'
   },
