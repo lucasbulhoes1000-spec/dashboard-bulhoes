@@ -13699,7 +13699,7 @@ async function waCarregarTags(){
   if(currentPage==='conversas'){waRenderLista();waRenderPainel();}
 }
 async function waCarregarRapidas(){
-  try{_wa.rapidas=(await _waRest('respostas_rapidas?select=id,atalho,texto&order=atalho'))||[];}catch(e){_wa.rapidas=[];}
+  try{_wa.rapidas=(await _waRest('respostas_rapidas?select=id,atalho,texto,partes&order=atalho'))||[];}catch(e){_wa.rapidas=[];}
 }
 function waAtualizarBadge(){
   const total=_wa.conversas.reduce((s,c)=>s+(c.nao_lidas>0?1:0),0);
@@ -14056,17 +14056,72 @@ function waMostrarRapidas(filtro,fixo){
   const lista=_wa.rapidas.filter(r=>!f||r.atalho.includes(f)||r.texto.toLowerCase().includes(f));
   _waRapidaSel=0;
   if(fixo)p.dataset.fixo='1';else delete p.dataset.fixo;
-  p.innerHTML=(lista.length?lista.map((r,i)=>'<div class="wa-rapida'+(i===0?' sel':'')+'" data-i="'+i+'" onclick="waUsarRapida('+r.id+')"><b>/'+_waEsc(r.atalho)+'</b><div>'+_waEsc(r.texto)+'</div></div>').join('')
+  p.innerHTML=(lista.length?lista.map((r,i)=>'<div class="wa-rapida'+(i===0?' sel':'')+'" data-i="'+i+'" onclick="waUsarRapida('+r.id+')"><b>/'+_waEsc(r.atalho)+'</b>'+(_waRapidaEhGrupo(r)?' <span style="font-size:10px;color:#8C98B1">· grupo de '+r.partes.length+' mensagens</span>':'')+'<div>'+_waEsc(r.texto)+'</div></div>').join('')
     :'<div class="wa-rapida" style="cursor:default"><div>Nenhuma resposta rápida'+(f?' com "'+_waEsc(f)+'"':'')+'.</div></div>')+
     '<div class="wa-rapida" onclick="waGerenciarRapidas()" style="text-align:center"><b>⚙ Criar ou editar respostas rápidas</b></div>';
   p.style.display='block';
   p._lista=lista;
 }
+// (26/10/2026) {nome} = primeiro nome mais recente: o editado no CRM (card/perfil),
+// depois o do paciente, depois o do WhatsApp
+function _waPrimeiroNomeRapida(c){
+  let nome='';
+  try{const ph=normalizePhone(c&&c.telefone);const d=ph&&(typeof ccDataLookup==='function'?ccDataLookup(ph):_ccData[ph]);if(d&&d.nomeAtual)nome=String(d.nomeAtual);}catch(e){}
+  if(!nome)nome=_waNome(c);
+  const p=(String(nome).trim().split(/\s+/)[0]||'').replace(/[()0-9-]/g,'');
+  return p?p.charAt(0).toUpperCase()+p.slice(1).toLowerCase():'';
+}
+function _waRapidaEhGrupo(r){return !!(r&&Array.isArray(r.partes)&&(r.partes.length>1||r.partes.some(x=>x.tipo!=='texto')));}
 function waUsarRapida(id){
   const r=_wa.rapidas.find(x=>x.id===id);const t=document.getElementById('wa-texto');if(!r||!t)return;
-  const primeiro=(_waNome(_wa.atual).split(' ')[0]||'').replace(/[()0-9-]/g,'');
-  t.value=r.texto.replace(/\{nome\}/gi,primeiro);waAjustarTexto(t);t.focus();
+  const primeiro=_waPrimeiroNomeRapida(_wa.atual);
   const p=document.getElementById('wa-rapidas');if(p){p.style.display='none';delete p.dataset.fixo;}
+  if(_waRapidaEhGrupo(r))return waAbrirGrupo(r,primeiro);
+  t.value=r.texto.replace(/\{nome\}/gi,primeiro);waAjustarTexto(t);t.focus();
+}
+// resposta em grupo: confere e envia as mensagens uma depois da outra (como no Cloudia)
+function waAbrirGrupo(r,primeiro){
+  const c=_wa.atual;if(!c)return;
+  waFecharModal();
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  const partes=r.partes.map(x=>x.tipo==='texto'?{...x,texto:String(x.texto||'').replace(/\{nome\}/gi,primeiro)}:{...x});
+  _wa.grupoEnvio=partes;
+  const html=partes.map((x,i)=>'<div style="border:0.5px solid #2A3D66;border-radius:8px;padding:8px"><div style="font-size:10.5px;color:#8C98B1;margin-bottom:4px">Mensagem '+(i+1)+(x.tipo==='texto'?'':' · '+(x.tipo==='imagem'?'foto':'vídeo'))+'</div>'+
+    (x.tipo==='texto'?'<textarea class="wa-textarea" data-gi="'+i+'" style="min-height:60px">'+_waEsc(x.texto)+'</textarea>':
+     x.tipo==='imagem'?'<img src="'+_waEsc(x.url)+'" style="max-width:100%;max-height:220px;border-radius:6px">':'<video src="'+_waEsc(x.url)+'" controls style="max-width:100%;max-height:220px"></video>')+'</div>').join('');
+  fundo.innerHTML='<div class="wa-modal"><div class="wa-modal-cab">/'+_waEsc(r.atalho)+' · '+partes.length+' mensagens para '+_waEsc(_waNome(c))+'<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" style="display:flex;flex-direction:column;gap:8px">'+html+
+    '<div style="font-size:11px;color:#E2BE6A">Saem nesta ordem, uma depois da outra. Dá para ajustar o texto antes de enviar.</div>'+
+    '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="wa-btn" onclick="waFecharModal()">Cancelar</button><button class="wa-btn primario" id="wa-enviar-grupo" onclick="waEnviarGrupo()">Enviar as '+partes.length+' mensagens</button></div></div></div>';
+  document.body.appendChild(fundo);
+}
+async function waEnviarGrupo(){
+  const c=_wa.atual;const partes=_wa.grupoEnvio;if(!c||!partes)return;
+  if(!_waJanela(c).aberta){waFecharModal();showToast('error','Janela de 24 h fechada','Respostas rápidas só saem com a janela aberta. Envie um modelo.');waAbrirModelos();return;}
+  document.querySelectorAll('#wa-modal textarea[data-gi]').forEach(t=>{const i=Number(t.dataset.gi);if(partes[i])partes[i].texto=t.value;});
+  const b=document.getElementById('wa-enviar-grupo');if(b){b.disabled=true;b.textContent='Enviando…';}
+  let enviadas=0;
+  try{
+    for(const x of partes){
+      if(x.tipo==='texto'){const t=String(x.texto||'').trim();if(!t)continue;await _waAcao({acao:'enviar_texto',conversa_id:c.id,texto:t});}
+      else{
+        const blob=await (await fetch(x.url)).blob();
+        const ext=(x.tipo==='imagem'?'jpg':'mp4');const mime=blob.type||x.mime||(x.tipo==='imagem'?'image/jpeg':'video/mp4');
+        const caminho='envios/'+c.id+'/'+Date.now()+'-resposta.'+ext;
+        const up=await _sb.storage.from('whatsapp-midia').upload(caminho,blob,{contentType:mime,upsert:false});
+        if(up.error)throw up.error;
+        await _waAcao({acao:'enviar_midia',conversa_id:c.id,caminho,mime,nome:'resposta.'+ext,legenda:''});
+      }
+      enviadas++;
+      await new Promise(r=>setTimeout(r,700)); // mantém a ordem no WhatsApp
+    }
+    waFecharModal();
+    if(!_wa.tempoReal)waRecarregarMsgsAtual();
+  }catch(e){
+    if(b){b.disabled=false;b.textContent='Tentar de novo';}
+    showToast('error','Parou na mensagem '+(enviadas+1),(enviadas?enviadas+' já foram. ':'')+(e.message||String(e)));
+    _wa.grupoEnvio=partes.slice(enviadas);
+  }
 }
 function waGerenciarRapidas(){
   const p=document.getElementById('wa-rapidas');if(p){p.style.display='none';delete p.dataset.fixo;}
@@ -14083,17 +14138,25 @@ function waRenderGerenciarRapidas(editId){
   const ed=editId?_wa.rapidas.find(r=>r.id===editId):null;
   corpo.innerHTML='<div style="font-size:12px;color:#E2BE6A">Use no chat digitando <b>/atalho</b>. Escreva <b>{nome}</b> no texto para entrar o primeiro nome do paciente.</div>'+
     '<input class="wa-var" id="wa-r-atalho" placeholder="atalho (ex.: endereco)" value="'+_waEsc(ed?ed.atalho:'')+'">'+
-    '<textarea class="wa-textarea" id="wa-r-texto" style="min-height:90px" placeholder="Texto da resposta">'+_waEsc(ed?ed.texto:'')+'</textarea>'+
+    (ed&&_waRapidaEhGrupo(ed)
+      ?'<div style="font-size:11px;color:#E2BE6A">Resposta em grupo: cada caixa é uma mensagem separada.</div>'+ed.partes.map((x,i)=>x.tipo==='texto'?'<textarea class="wa-textarea wa-r-parte" data-i="'+i+'" style="min-height:60px">'+_waEsc(x.texto)+'</textarea>':'<div style="font-size:11px;color:#8C98B1">Mensagem '+(i+1)+': '+(x.tipo==='imagem'?'foto':'vídeo')+' (fica como está)</div>').join('')
+      :'<textarea class="wa-textarea" id="wa-r-texto" style="min-height:90px" placeholder="Texto da resposta">'+_waEsc(ed?ed.texto:'')+'</textarea>')+
     '<div style="display:flex;gap:8px;justify-content:flex-end">'+(ed?'<button class="wa-btn" onclick="waRenderGerenciarRapidas()">Cancelar</button>':'')+'<button class="wa-btn primario" onclick="waSalvarRapida('+(ed?ed.id:'null')+')">'+(ed?'Salvar alteração':'Adicionar')+'</button></div>'+
-    '<div style="border-top:0.5px solid #2A3D66;padding-top:8px">'+(_wa.rapidas.map(r=>'<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid #1D2D4E"><div style="flex:1;min-width:0"><b style="font-size:12px;color:#D4AF5A">/'+_waEsc(r.atalho)+'</b><div style="font-size:12px;color:#EEF1F7;white-space:pre-wrap">'+_waEsc(r.texto)+'</div></div><button class="wa-btn" onclick="waRenderGerenciarRapidas('+r.id+')">Editar</button><button class="wa-btn" onclick="waApagarRapida('+r.id+')">Apagar</button></div>').join('')||'<div style="font-size:12px;color:#66738F">Nenhuma resposta rápida ainda.</div>')+'</div>';
+    '<div style="border-top:0.5px solid #2A3D66;padding-top:8px">'+(_wa.rapidas.map(r=>'<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid #1D2D4E"><div style="flex:1;min-width:0"><b style="font-size:12px;color:#D4AF5A">/'+_waEsc(r.atalho)+'</b>'+(_waRapidaEhGrupo(r)?'<span style="font-size:10.5px;color:#8C98B1"> · grupo de '+r.partes.length+' mensagens</span>':'')+'<div style="font-size:12px;color:#EEF1F7;white-space:pre-wrap">'+_waEsc(r.texto)+'</div></div><button class="wa-btn" onclick="waRenderGerenciarRapidas('+r.id+')">Editar</button><button class="wa-btn" onclick="waApagarRapida('+r.id+')">Apagar</button></div>').join('')||'<div style="font-size:12px;color:#66738F">Nenhuma resposta rápida ainda.</div>')+'</div>';
 }
 async function waSalvarRapida(id){
   const atalho=(document.getElementById('wa-r-atalho').value||'').trim().toLowerCase().replace(/^\//,'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'-');
-  const texto=(document.getElementById('wa-r-texto').value||'').trim();
+  const ed=id?_wa.rapidas.find(r=>r.id===id):null;let partes;
+  if(ed&&_waRapidaEhGrupo(ed)){
+    partes=ed.partes.map(x=>({...x}));
+    document.querySelectorAll('.wa-r-parte').forEach(t=>{const i=Number(t.dataset.i);if(partes[i])partes[i].texto=t.value;});
+    partes=partes.filter(x=>x.tipo!=='texto'||String(x.texto||'').trim());
+  }
+  const texto=partes?(partes.filter(x=>x.tipo==='texto').map(x=>x.texto.trim()).join('\n\n')||'(vídeo)'):(document.getElementById('wa-r-texto').value||'').trim();
   if(!/^[a-z0-9_-]{2,30}$/.test(atalho)){showToast('error','Atalho inválido','Use de 2 a 30 letras, números, - ou _ (sem espaço).');return;}
   if(!texto){showToast('error','Escreva o texto da resposta');return;}
   try{
-    if(id)await _waRest('respostas_rapidas?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({atalho,texto,atualizada_em:new Date().toISOString()})});
+    if(id)await _waRest('respostas_rapidas?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(partes?{atalho,texto,partes,atualizada_em:new Date().toISOString()}:{atalho,texto,atualizada_em:new Date().toISOString()})});
     else await _waRest('respostas_rapidas',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({atalho,texto})});
     await waCarregarRapidas();waRenderGerenciarRapidas();
   }catch(e){showToast('error','Não foi possível salvar',/duplicate|unique/i.test(e.message)?'Já existe esse atalho.':e.message);}
