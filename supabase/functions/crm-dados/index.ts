@@ -3,6 +3,8 @@
 // 25/10/2026
 //
 // Ações (POST {acao, ...}), só para a equipe logada (token do CRM):
+//   • vendas {from, to}: analyticsVendasReaisClinicorp (lançamentos de receita, Novo × Recompra).
+//   • futuros: analyticsAgendamentosFuturosClinicorp (avaliações marcadas daqui para frente).
 //   • agenda {from, to}: igual ao analyticsAgendaClinicorp do Apps Script
 //     (agenda de avaliações do Clinicorp: leads na agenda, comparecimentos e
 //     atos de agendar no período). Porte linha a linha, mesmas regras.
@@ -276,6 +278,146 @@ async function agenda(fromParam?: string, toParam?: string) {
   };
 }
 
+
+// ---------- vendas reais (analyticsVendasReaisClinicorp) ----------
+async function vendasBruto(fromParam?: string, toParam?: string) {
+  const cred = await supabaseGet("api_credentials?servico=eq.clinicorp&select=username,token");
+  if (!cred || cred.length === 0) return { status: "erro", mensagem: "Credencial clinicorp não encontrada" };
+  const username = cred[0].username, token = cred[0].token;
+  const authHeader = "Basic " + btoa(username + ":" + token);
+  const hoje = new Date();
+  const [ay, am] = formatarDataISO(hoje).split("-").map(Number);
+  const from = fromParam || `${ay}-${String(am).padStart(2, "0")}-01`;
+  const to = toParam || formatarDataISO(hoje);
+  const url = "https://api.clinicorp.com/rest/v1/financial/list_summary?subscriber_id=" + encodeURIComponent(username) + "&from=" + from + "&to=" + to;
+  const resp = await fetch(url, { headers: { accept: "application/json", Authorization: authHeader } });
+  const corpoTxt = await resp.text();
+  if (resp.status !== 200) return { status: "erro", mensagem: "Clinicorp (financial/list_summary) retornou " + resp.status, corpo: corpoTxt.substring(0, 500) };
+  const data = JSON.parse(corpoTxt);
+  let revenue: any[] = (data.values || []).filter((v: any) => v.PostType === "REVENUE");
+  let totalExcluidoPixHonra = 0, qtdExcluidaPixHonra = 0;
+  revenue = revenue.filter((v) => {
+    const desc = String(v.Description || "").toLowerCase();
+    if (desc.indexOf("honra") !== -1) { totalExcluidoPixHonra += Number(v.Amount || 0); qtdExcluidaPixHonra++; return false; }
+    return true;
+  });
+  const crmRows = await supabaseGet("crm_sessions?email_clinica=eq.bulhoes-clinica-crm&select=crm_json");
+  const ccData: Record<string, any> = (crmRows && crmRows[0] && crmRows[0].crm_json) ? JSON.parse(crmRows[0].crm_json) : {};
+  const telefonePorPersonId: Record<string, string | null> = {};
+  const registros: any[] = [];
+  let total = 0, chamadasPatientGet = 0, qtdSemDataLancamento = 0;
+  revenue = revenue.filter((v) => {
+    const dl = String(v.Date || "").substring(0, 10);
+    if (!dl) { qtdSemDataLancamento++; return true; }
+    return dl >= from && dl <= to;
+  });
+  const CACHE_KEY = "clinicorp_phone_by_personid_v1";
+  const cacheTelefones: Record<string, string | null> = (await cacheLer(CACHE_KEY)) ?? {};
+  const unicos: string[] = [];
+  const vistos: Record<string, boolean> = {};
+  revenue.forEach((v) => { const pid = v.PersonId; if (!pid || pid === -1 || vistos[pid]) return; vistos[pid] = true; unicos.push(String(pid)); });
+  const faltando = unicos.filter((pid) => { if (tem(cacheTelefones, pid)) { telefonePorPersonId[pid] = cacheTelefones[pid]; return false; } return true; });
+  if (faltando.length > 0) {
+    try {
+      const resps = await Promise.all(faltando.map((pid) =>
+        fetch("https://api.clinicorp.com/rest/v1/patient/get?subscriber_id=" + encodeURIComponent(username) + "&PatientId=" + pid,
+          { headers: { accept: "application/json", Authorization: authHeader } })
+          .then(async (r) => ({ ok: r.status === 200, t: await r.text() })).catch(() => ({ ok: false, t: "" }))));
+      chamadasPatientGet += resps.length;
+      resps.forEach((r, idx) => {
+        const pid = faltando[idx];
+        let tel: string | null = null;
+        if (r.ok) { try { tel = normalizarTelefoneClinicorp(JSON.parse(r.t).Phone); } catch (_e) { /* segue */ } }
+        telefonePorPersonId[pid] = tel;
+        if (tel) cacheTelefones[pid] = tel;
+      });
+      await cacheGravar(CACHE_KEY, cacheTelefones, 21600);
+    } catch (_e) { faltando.forEach((pid) => { telefonePorPersonId[pid] = null; }); }
+  }
+  const palavrasRecompra = ["manutenç", "manutenc", "ajuste", "avaliaç", "avaliac", "profilaxia", "pix"];
+  for (const v of revenue) {
+    const valor = Number(v.Amount || 0);
+    total += valor;
+    const personId = v.PersonId;
+    const tel = (personId && personId !== -1 && tem(telefonePorPersonId, String(personId))) ? telefonePorPersonId[String(personId)] : null;
+    const descLower = String(v.Description || "").toLowerCase();
+    const ehClaramenteRecompra = palavrasRecompra.some((p) => descLower.indexOf(p) !== -1);
+    let classe = "Recompra";
+    let descricaoFinal = v.Description || "";
+    let entradaCc = tel ? ccData[tel] : ccData[String(tel)];
+    if (tel && !entradaCc) {
+      const vt = [tel, "55" + tel];
+      if (tel.length === 11) vt.push(tel.substring(0, 2) + tel.substring(3), "55" + tel.substring(0, 2) + tel.substring(3));
+      else if (tel.length === 10) vt.push(tel.substring(0, 2) + "9" + tel.substring(2), "55" + tel.substring(0, 2) + "9" + tel.substring(2));
+      for (const x of vt) { if (ccData[x]) { entradaCc = ccData[x]; break; } }
+    }
+    const manual = entradaCc && entradaCc.orcamentos && entradaCc.orcamentos.find((o: any) => {
+      if (o.status !== "Aprovado" || !o.entradaManual) return false;
+      return Math.abs(Number(o.fechValor || o.valor || 0) - valor) < 0.01;
+    });
+    if (manual) {
+      classe = manual.pacienteAntigo ? "Recompra" : "Novo";
+      if (manual.tratamento) descricaoFinal = manual.tratamento;
+    } else if (!ehClaramenteRecompra && tel) {
+      const batido = entradaCc && entradaCc.orcamentos && entradaCc.orcamentos.find((o: any) => {
+        if (o.status !== "Aprovado" || o.pacienteAntigo) return false;
+        return Math.abs(Number(o.fechValor || o.valor || 0) - valor) < 0.01;
+      });
+      if (batido) { classe = "Novo"; if (batido.tratamento) descricaoFinal = batido.tratamento; }
+    }
+    registros.push({ nome: limparNomeClinicorp(v.PatientName) || "(sem nome)", telefone: tel || "", valor, data: (v.Date || "").substring(0, 10), descricao: descricaoFinal, classe });
+  }
+  const totalNovo = registros.filter((r) => r.classe === "Novo").reduce((s, r) => s + r.valor, 0);
+  return {
+    status: "ok", periodo: { from, to }, total, totalNovo, totalRecompra: total - totalNovo, totalRegistros: registros.length,
+    chamadasPatientGet, totalExcluidoPixHonra, qtdExcluidaPixHonra, qtdSemDataLancamento, registros,
+  };
+}
+async function vendas(fromParam?: string, toParam?: string) {
+  const hoje = new Date();
+  const [ay, am] = formatarDataISO(hoje).split("-").map(Number);
+  const f0 = fromParam || `${ay}-${String(am).padStart(2, "0")}-01`;
+  const t0 = toParam || formatarDataISO(hoje);
+  const kStale = "vr_s_" + f0 + "_" + t0;
+  let out: any;
+  try { out = await vendasBruto(fromParam, toParam); } catch (e) { out = { status: "erro", mensagem: String((e as Error)?.message ?? e) }; }
+  if (out && out.status === "ok") { await cacheGravar(kStale, out, 21600); return out; }
+  const velho = await cacheLer(kStale);
+  if (velho) { velho.emCache = true; velho.aviso = "Clinicorp indisponível agora — mostrando o último resultado real calculado."; return velho; }
+  return out;
+}
+
+
+// ---------- agendamentos futuros (analyticsAgendamentosFuturosClinicorp) ----------
+async function futuros() {
+  const cred = await supabaseGet("api_credentials?servico=eq.clinicorp&select=username,token");
+  if (!cred || cred.length === 0) return { status: "erro", mensagem: "Credencial clinicorp não encontrada em api_credentials" };
+  const username = cred[0].username, token = cred[0].token;
+  const authHeader = "Basic " + btoa(username + ":" + token);
+  const hoje = formatarDataISO(new Date());
+  const umAno = formatarDataISO(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
+  const url = "https://api.clinicorp.com/rest/v1/appointment/list?subscriber_id=" + encodeURIComponent(username) + "&from=" + hoje + "&to=" + umAno + "&businessId=" + BUSINESS_ID_CLINICORP;
+  const resp = await fetch(url, { headers: { accept: "application/json", Authorization: authHeader } });
+  const txt = await resp.text();
+  if (resp.status === 401) return { status: "erro", mensagem: "Clinicorp retornou 401 — ID de acesso ou Token API incorretos/revogados." };
+  if (resp.status !== 200) return { status: "erro", mensagem: "Clinicorp retornou " + resp.status, corpo: txt.substring(0, 500) };
+  const ags: any[] = JSON.parse(txt);
+  const porTelefone: Record<string, any> = {};
+  for (const ag of ags) {
+    if (ag.Deleted === "X") continue;
+    const categoria = String(ag.CategoryDescription || "").trim().toLowerCase();
+    if (categoria.indexOf("avalia") === -1 || categoria.indexOf("parceria") !== -1) continue;
+    const tel = normalizarTelefoneClinicorp(ag.MobilePhone);
+    if (!tel) continue;
+    const dataConsulta = ag.date ? String(ag.date).substring(0, 10) : null;
+    if (!dataConsulta || dataConsulta < hoje) continue;
+    if (!porTelefone[tel] || dataConsulta < porTelefone[tel].data) {
+      porTelefone[tel] = { tel, nome: limparNomeClinicorp(ag.PatientName || ag.Name || ""), data: dataConsulta, categoria: ag.CategoryDescription || "" };
+    }
+  }
+  return { status: "ok", fonte: "clinicorp-ao-vivo", periodo: { from: hoje, to: umAno }, total: Object.keys(porTelefone).length, agendamentos: Object.keys(porTelefone).map((t) => porTelefone[t]) };
+}
+
 // ---------- entrada ----------
 async function ehEquipe(req: Request): Promise<boolean> {
   const auth = req.headers.get("Authorization") ?? "";
@@ -294,6 +436,8 @@ Deno.serve(async (req) => {
   const p = await req.json().catch(() => ({}));
   try {
     if (p.acao === "agenda") return json(await agenda(p.from, p.to));
+    if (p.acao === "vendas") return json(await vendas(p.from, p.to));
+    if (p.acao === "futuros") return json(await futuros());
     return json({ status: "erro", mensagem: "ação desconhecida" }, 400);
   } catch (e) {
     return json({ status: "erro", mensagem: String((e as Error)?.message ?? e) });
