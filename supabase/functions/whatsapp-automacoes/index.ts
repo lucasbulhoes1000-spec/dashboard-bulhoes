@@ -218,11 +218,29 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             // agendou de manhã não recebe às 11h o follow-up de lead)
             let volta = i;
             while (volta > 0 && passos[volta - 1]?.tipo === "se") volta--;
-            await avancar(x, i, null, "adiado", null, volta, quando); // sem log: só reagenda
+            // (26/10/2026) várias guardadas para o mesmo horário saem na ordem da
+            // sequência (a de espera menor primeiro)
+            const esperaSeq = Number(passos.find((q: any) => q?.tipo === "esperar")?.minutos) || 0;
+            const ordem = Math.min(1800, Math.round(esperaSeq / 2)) * 1000;
+            await avancar(x, i, null, "adiado", null, volta, quando + ordem); // sem log: só reagenda
             return "fora_do_horario";
           }
           const k = await garantir();
           if (!k.c) throw new Error("não achei a conversa do contato");
+          // (26/10/2026) no máximo um follow-up automático por hora para a mesma pessoa
+          // (ex.: o de 2 h e o de 4 h guardados da madrugada não saem colados às 11h)
+          const espaco = regras.espaco_min === 0 ? 0 : Number(regras.espaco_min ?? 60);
+          if (espaco > 0 && !p.ignorar_horario) {
+            const desde = new Date(agora() - espaco * 60_000).toISOString();
+            const rec = await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${k.c.id}&direcao=eq.enviada&autor_email=like.automa*&status=neq.falhou&enviada_em=gte.${encodeURIComponent(desde)}&select=enviada_em&order=enviada_em.desc&limit=1`).catch(() => []);
+            if (rec && rec.length) {
+              let volta = i;
+              while (volta > 0 && passos[volta - 1]?.tipo === "se") volta--;
+              const depois = proximoHorario(Date.parse(rec[0].enviada_em) + espaco * 60_000, regras);
+              await avancar(x, i, null, "adiado", null, volta, Math.max(depois, agora() + 60_000));
+              return "fora_do_horario";
+            }
+          }
           const dados = { nome: k.nome, telefone: x.telefone };
           let corpo: any, registro: string, tipo: string;
           if (p.tipo === "texto" || p.tipo === "midia") {
