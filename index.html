@@ -2595,7 +2595,7 @@ function _gsAgendarRender(){
   }
   // (25/10/2026) leituras já migradas para a função crm-dados (sem Apps Script).
   // Se a função falhar, cai no Apps Script como antes.
-  const GS_DIRETO={analyticsAgendaClinicorp:'agenda'};
+  const GS_DIRETO={analyticsAgendaClinicorp:'agenda',analyticsVendasReaisClinicorp:'vendas',analyticsAgendamentosFuturosClinicorp:'futuros'};
   async function buscarDireto(url){
     let u;try{u=new URL(url);}catch(e){return null;}
     const acao=GS_DIRETO[u.searchParams.get('action')];
@@ -2630,7 +2630,14 @@ function _gsAgendarRender(){
   const json=(t,st)=>new Response(t,{status:st||200,headers:{'Content-Type':'application/json'}});
   window.fetch=function(input,init){
     const chave=(!init||!init.method||String(init.method).toUpperCase()==='GET')?chaveDe(input):null;
-    if(!chave)return _fetchComToken.call(this,input,init);
+    if(!chave){
+      // leitura migrada que não passa pelo retrato (ex.: agendamentos futuros)
+      if(typeof input==='string'&&input.indexOf(CLOUDIA_URL)===0&&(!init||!init.method||String(init.method).toUpperCase()==='GET')){
+        let a=null;try{a=new URL(input).searchParams.get('action');}catch(e){}
+        if(a&&GS_DIRETO[a]){const self=this;return buscarDireto(input).then(d=>d?json(d.texto,200):_fetchComToken.call(self,input,init));}
+      }
+      return _fetchComToken.call(this,input,init);
+    }
     const forcar=_gsCache.forcar;
     return(async()=>{
       const c=forcar?null:await lerCache(chave);
