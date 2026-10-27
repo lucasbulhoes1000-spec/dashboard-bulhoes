@@ -14354,7 +14354,7 @@ async function waAbrirMetricas(dias){
     '<b style="font-size:12.5px">Agendamento conforme a demora</b>'+tb(['Primeira resposta','Leads','Agendaram'],(r.agendamento_por_demora||[]).map(f=>[_waEsc(f.faixa),f.leads,f.agendaram+' ('+pc(f.agendaram,f.leads)+')']))+
     '<div style="height:10px"></div><b style="font-size:12.5px">Quem respondeu primeiro</b>'+tb(['Quem','Leads','Mediana','Até 5 min'],(r.por_quem||[]).map(q=>[nome(q.quem),q.leads,fm(q.mediana_min),pc(q.ate_5_min,q.leads)]))+
     '<div style="height:10px"></div><b style="font-size:12.5px">Por dia</b>'+tb(['Dia','Leads','Mediana','Até 5 min','Sem resposta','Agendaram'],(r.por_dia||[]).map(d=>[new Date(d.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}),d.leads,fm(d.mediana_min),pc(d.ate_5_min,d.leads),d.sem_resposta,d.agendaram]))+
-    '<div style="font-size:11px;color:#8C98B1;margin-top:8px">Conta os leads novos do WhatsApp desde 26/10 (quando o CRM passou a registrar). "Automática" = mensagem automática de 5 min; "Agendaram" = etapa atual Agendou ou depois.</div>';
+    '<div style="font-size:11px;color:#8C98B1;margin-top:8px">Conta os leads novos do WhatsApp desde 27/10. Conta como resposta: equipe, IA, celular e a 1ª mensagem automática (5 min); "Agendaram" = etapa atual Agendou ou depois.</div>';
 }
 function waFecharModal(){const m=document.getElementById('wa-modal');if(m)m.remove();}
 function waRenderModelos(sel){
