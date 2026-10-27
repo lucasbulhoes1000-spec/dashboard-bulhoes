@@ -40,7 +40,7 @@ begin
     select e.telefone, e.conversa_id, e.ocorrido_em
       from public.eventos_proprios e
      where e.tipo = 'CUSTOMER_CREATED' and e.conversa_id is not null
-       and e.ocorrido_em >= now() - make_interval(days => greatest(1, least(p_dias, 365)))
+       and e.ocorrido_em >= greatest(now() - make_interval(days => greatest(1, least(p_dias, 365))), timestamptz '2026-10-27 03:00+00')
   ), base as (
     select l.*, (l.ocorrido_em at time zone 'America/Sao_Paulo')::date as dia,
            (select m.enviada_em from public.mensagens m where m.conversa_id = l.conversa_id and m.direcao = 'recebida'
@@ -51,11 +51,14 @@ begin
         select m.enviada_em, m.autor_email from public.mensagens m
          where m.conversa_id = l.conversa_id and m.direcao = 'enviada' and m.status <> 'falhou'
            and m.enviada_em >= l.ocorrido_em - interval '1 minute'
+           -- conta como resposta: equipe, IA, celular e a 1ª mensagem automática (não lembretes nem follow-ups)
+           and (m.autor_email like '%@%' or m.autor_email ilike 'IA:%' or m.canal = 'celular'
+                or m.autor_email ilike 'automação: Primeira mensagem%')
          order by m.enviada_em limit 1) r1 on true
   ), calc as (
     select b.*, extract(epoch from (b.respondeu_em - coalesce(b.chegou, b.ocorrido_em))) / 60.0 as minutos,
            case when b.quem is null then 'sem resposta' when b.quem like '%@%' then 'equipe'
-                when b.quem ilike 'IA:%' then 'IA' else 'automática' end as tipo_resp,
+                when b.quem ilike 'IA:%' then 'IA' else '1ª mensagem automática' end as tipo_resp,
            exists (select 1 from public.pacientes p where p.telefone = b.telefone
                     and lower(coalesce(p.etapa, '')) in ('agendou', 'compareceu', 'ganho', 'faltou/desmarcou', 'paciente')) as agendou
       from base b
