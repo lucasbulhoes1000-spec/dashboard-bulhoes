@@ -14996,7 +14996,7 @@ async function auFunilComparar(){
     '</tbody></table></div></div>';
   document.body.appendChild(fundo);
 }
-const AU_LEMB_TIPOS={vespera:{nome:'Véspera (1ª)',dica:'Consultas do dia seguinte. Sábado avisa as de segunda (com o modelo de sábado); domingo não manda.'},vespera2:{nome:'Véspera (2ª)',dica:'Só para quem não confirmou nem respondeu a 1ª. Não sai no sábado.'},vespera3:{nome:'Véspera (3ª)',dica:'Só para quem não confirmou nem respondeu a 1ª e a 2ª. Não sai no sábado.'},dia:{nome:'No dia',dica:'Consultas do próprio dia que ainda não começaram.'}};
+const AU_LEMB_TIPOS={vespera:{nome:'Véspera (1ª)',dica:'Consultas do dia seguinte. Sábado avisa as de segunda (com o modelo de sábado); domingo não manda.'},vespera2:{nome:'Véspera (2ª)',dica:'Só para quem não confirmou nem respondeu a 1ª. Não sai no sábado.'},vespera3:{nome:'Véspera (3ª)',dica:'Só para quem não confirmou nem respondeu a 1ª e a 2ª. Não sai no sábado.'},dia:{nome:'No dia',dica:'Consultas do próprio dia que ainda não começaram.'},aquecimento:{nome:'Aquecimento (2 dias antes)',dica:'Vídeo de desejo 2 dias antes da consulta (sexta avisa as de segunda, sábado as de terça). Quem agendar depois disso ganha o vídeo na 1ª confirmação.'}};
 function _auLembHtml(){
   const L=_au.lemb;if(!L)return '';
   const g=_waEhGestao();const E=_au.lembEd||L;
@@ -15032,8 +15032,10 @@ function _auLembHtml(){
       '<div style="font-size:11.5px;color:#E2BE6A">Nas variáveis do modelo: <b>{primeiro_nome}</b>, <b>{nome}</b>, <b>{data}</b> (26/10), <b>{hora}</b> (09:30), <b>{dia_semana}</b> (segunda-feira), <b>{quando}</b> (hoje / amanhã / segunda-feira).</div>'+
       '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Categorias do Clinicorp que recebem (contém): <input class="wa-var" style="flex:1;min-width:200px" value="'+_auEsc(E.categorias==null?'avaliação':E.categorias)+'" placeholder="avaliação" oninput="_au.lembEd.categorias=this.value"></label>'+
       '<div style="font-size:11px;color:#E2BE6A;margin-top:-6px">Separe por vírgula. “avaliação” pega Avaliação e Avaliação Paciente/Parceria.</div>'+
-      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('vespera2')+tipo('vespera3')+tipo('dia')+'</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('vespera2')+tipo('vespera3')+tipo('dia')+tipo('aquecimento')+'</div>'+
       '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Modelo da 1ª no sábado (consultas de segunda): <select class="wa-sel" style="height:30px" onchange="auLembSabado(this.value)"><option value="">o mesmo da 1ª</option>'+(_au.modelos||[]).map(x=>'<option value="'+_auEsc(x.nome)+'"'+(E.vespera&&E.vespera.modelo_sabado&&E.vespera.modelo_sabado.nome===x.nome?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+(E.vespera&&E.vespera.modelo_sabado&&!(_au.modelos||[]).some(x=>x.nome===E.vespera.modelo_sabado.nome)?'<option selected>'+_auEsc(E.vespera.modelo_sabado.nome)+'</option>':'')+'</select></label>'+
+      '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Modelo da 1ª com vídeo (quem agendou em cima da hora e não recebeu o aquecimento): <select class="wa-sel" style="height:30px" onchange="auLembVideo(this.value)"><option value="">nenhum (todos recebem a 1ª normal)</option>'+(_au.modelos||[]).map(x=>'<option value="'+_auEsc(x.nome)+'"'+(E.vespera&&E.vespera.modelo_video&&E.vespera.modelo_video.nome===x.nome?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+(E.vespera&&E.vespera.modelo_video&&!(_au.modelos||[]).some(x=>x.nome===E.vespera.modelo_video.nome)?'<option selected>'+_auEsc(E.vespera.modelo_video.nome)+'</option>':'')+'</select></label>'+
+      (E.vespera&&E.vespera.modelo_video&&E.vespera.modelo_video.cabecalho?'<input class="wa-var" placeholder="Link público do vídeo (https://…)" value="'+_auEsc(E.vespera.modelo_video.cabecalho.link||'')+'" oninput="_au.lembEd.vespera.modelo_video.cabecalho.link=this.value">':'')+
       '<div style="border-top:0.5px solid #2A3D66;padding-top:10px;display:flex;flex-direction:column;gap:6px"><b style="font-size:12.5px">Quando o paciente responde</b>'+
         '<div style="font-size:11px;color:#E2BE6A">Botão do modelo ou resposta curta (“sim”, “confirmo”) confirma. “Cancelar”, “remarcar”, “não vou conseguir” põe a tag e manda para a fila da equipe remarcar (nada é desmarcado sozinho).</div>'+
         '<label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" '+(E.confirmar_no_clinicorp!==false?'checked':'')+' onchange="_au.lembEd.confirmar_no_clinicorp=this.checked"> Confirmar a consulta no Clinicorp</label>'+
@@ -15061,11 +15063,19 @@ function auLembModelo(t,nome){
 }
 function auLembSabado(nome){
   const m=(_au.modelos||[]).find(x=>x.nome===nome);const E=_au.lembEd;E.vespera=E.vespera||{};
-  E.vespera.modelo_sabado=m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,variaveis:[],cabecalho:null}:null;
+  E.vespera.modelo_sabado=m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,variaveis:Array.from({length:m.variaveis||0},(_,k)=>['{primeiro_nome}','{quando}','{hora}'][k]||''),cabecalho:null}:null;
+}
+// (27/10/2026) 1ª confirmação com vídeo para quem não recebeu o aquecimento
+function auLembVideo(nome){
+  const m=(_au.modelos||[]).find(x=>x.nome===nome);const E=_au.lembEd;E.vespera=E.vespera||{};
+  E.vespera.modelo_video=m?{nome:m.nome,idioma:m.idioma,categoria:m.categoria,formato:m.formato,campos:m.campos||[],texto_preview:m.texto,
+    variaveis:Array.from({length:m.variaveis||0},(_,k)=>['{primeiro_nome}','{quando}','{hora}'][k]||''),
+    cabecalho:m.cabecalho&&['IMAGE','VIDEO','DOCUMENT'].includes(m.cabecalho.formato)?{formato:m.cabecalho.formato,link:m.cabecalho.exemplo||''}:null}:null;
+  auRenderExtras();
 }
 async function auLembSalvar(){
   const E=_au.lembEd;if(!E)return;
-  for(const t of ['vespera','vespera2','vespera3','dia']){
+  for(const t of ['vespera','vespera2','vespera3','dia','aquecimento']){
     const c=E[t]||{};
     if(c.modelo&&!/^\d{2}:\d{2}$/.test(c.hora||'')){showToast('error','Falta o horário',AU_LEMB_TIPOS[t].nome+': escolha a hora do envio.');return;}
     if(c.modelo&&c.modelo.cabecalho&&!/^https:\/\//.test(c.modelo.cabecalho.link||'')){showToast('error','Falta o link do cabeçalho',AU_LEMB_TIPOS[t].nome+': o modelo tem mídia, coloque o link https://');return;}

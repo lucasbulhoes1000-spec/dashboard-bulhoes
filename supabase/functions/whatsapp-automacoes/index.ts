@@ -506,6 +506,17 @@ export function diasDoLembrete(tipo: "vespera" | "dia", agora: number): string[]
   return [dia(1)];
 }
 
+/** (27/10/2026) Aquecimento: consultas que recebem o vídeo de desejo hoje (2 dias antes,
+ *  sem cair no mesmo dia da véspera). Seg→qua, ter→qui, qua→sex, qui→sáb, sex→seg, sáb→ter, dom nada. */
+export function diasDoAquecimento(agora: number): string[] {
+  const local = new Date(agora + FUSO_MIN * 60_000);
+  const base = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+  const sem = local.getUTCDay();
+  if (sem === 0) return [];
+  const n = sem === 5 || sem === 6 ? 3 : 2;
+  return [ymd(new Date(base + n * 86_400_000))];
+}
+
 export type Consulta = { id: string; data: string; hora: string; nome: string; telefone: string };
 /** Agendamentos válidos do Clinicorp: paciente, com celular, não desmarcado/excluído, no dia pedido. Um por telefone e dia (o mais cedo). */
 const semAcento = (t: unknown) => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -573,7 +584,7 @@ async function enviarLembrete(c: Consulta, tipo: TipoLembrete, cfg: any, agora: 
     const modelo = modeloTipo ?? cfg[tipo].modelo;
     const corpo = corpoModelo(modelo, dados);
     const registro = modelo?.texto_preview ? preencher(String(modelo.texto_preview), dados) : `[modelo ${modelo?.nome}]`;
-    const autor = tipo === "dia" ? "Lembrete do dia" : "Lembrete de véspera" + (tipo === "vespera" ? "" : tipo === "vespera2" ? " (2ª)" : " (3ª)");
+    const autor = tipo === "dia" ? "Lembrete do dia" : tipo === "aquecimento" ? "Aquecimento (2 dias antes)" : "Lembrete de véspera" + (tipo === "vespera" ? "" : tipo === "vespera2" ? " (2ª)" : " (3ª)");
     const r = await meta(`/${conv.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: conv.wa_id, ...corpo }, await tokenDoNumero(conv.numero_clinica_id));
     if (!r.ok) {
       const erro = erroMeta(r.j);
@@ -595,9 +606,15 @@ async function enviarLembrete(c: Consulta, tipo: TipoLembrete, cfg: any, agora: 
 // A 2ª e a 3ª confirmação só saem para quem ainda não confirmou nem respondeu
 // depois da anterior. No sábado (véspera de segunda) a 1ª usa "modelo_sabado"
 // (ex.: confirmarsegunda) e a 2ª e a 3ª não saem, porque o texto diz "amanhã".
-type TipoLembrete = "dia" | "vespera" | "vespera2" | "vespera3";
+// (27/10/2026) "aquecimento": vídeo de desejo 2 dias antes (modelo com vídeo). Na 1ª confirmação,
+// quem NÃO recebeu o aquecimento (agendou em cima da hora) recebe "modelo_video" no lugar do modelo normal.
+type TipoLembrete = "dia" | "vespera" | "vespera2" | "vespera3" | "aquecimento";
 const baseLembrete = (t: TipoLembrete): "vespera" | "dia" => (t === "dia" ? "dia" : "vespera");
-const HORA_PADRAO: Record<TipoLembrete, number> = { dia: 8 * 60 + 30, vespera: 10 * 60 + 30, vespera2: 13 * 60, vespera3: 15 * 60 };
+const HORA_PADRAO: Record<TipoLembrete, number> = { dia: 8 * 60 + 30, vespera: 10 * 60 + 30, vespera2: 13 * 60, vespera3: 15 * 60, aquecimento: 11 * 60 + 30 };
+async function recebeuAquecimento(c: Consulta): Promise<boolean> {
+  const ls: any[] = (await bancoJson(`/rest/v1/lembretes_consulta?data=eq.${c.data}&telefone=eq.${telCurto(c.telefone)}&tipo=eq.aquecimento&status=eq.enviado&select=id&limit=1`).catch(() => [])) ?? [];
+  return ls.length > 0;
+}
 const telCurto = (t: string) => { let x = String(t ?? "").replace(/\D/g, ""); if (x.length >= 12 && x.startsWith("55")) x = x.slice(2); return x; };
 
 /** 2ª/3ª confirmação: já confirmou, pediu para cancelar ou respondeu depois da anterior? */
@@ -631,7 +648,7 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
   const teste = cfg.modo_teste !== false;
   const telsTeste = new Set((Array.isArray(cfg.telefones_teste) ? cfg.telefones_teste : []).map((t: unknown) => String(t).replace(/\D/g, "").slice(-9)).filter(Boolean));
   const sabado = local.getUTCDay() === 6;
-  for (const tipo of ["dia", "vespera", "vespera2", "vespera3"] as const) {
+  for (const tipo of ["dia", "vespera", "vespera2", "vespera3", "aquecimento"] as const) {
     const c = cfg[tipo];
     if (!c?.modelo?.nome || c.pausado === true) continue;
     const base = baseLembrete(tipo);
@@ -643,7 +660,7 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     if (minutos < h || minutos > h + folga) continue;
     const rod = (await bancoJson(`/rest/v1/lembretes_rodadas?dia=eq.${hoje}&tipo=eq.${tipo}&select=status`).catch(() => null))?.[0];
     if (rod?.status === "concluida") continue;
-    let dias = diasDoLembrete(base, agora);
+    let dias = tipo === "aquecimento" ? diasDoAquecimento(agora) : diasDoLembrete(base, agora);
     const fake = teste && cfg.consulta_teste?.telefone ? cfg.consulta_teste : null;
     if (!dias.length && fake && base === "vespera") dias = [ymd(new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1)))];
     if (!dias.length) { await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "concluida", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: null }); continue; }
@@ -667,7 +684,10 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     for (const x of lista) {
       if (Date.now() - inicio > TEMPO_MAX_MS) { completo = false; break; }
       if (await jaRespondeuVespera(x, tipo, cfg, agora)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
-      const r = await enviarLembrete(x, tipo, cfg, agora, modeloTipo);
+      // 1ª confirmação com vídeo para quem não recebeu o aquecimento (agendou em cima da hora)
+      let modeloX = modeloTipo;
+      if (tipo === "vespera" && c.modelo_video?.nome && c.video_pausado !== true && !(await recebeuAquecimento(x))) modeloX = c.modelo_video;
+      const r = await enviarLembrete(x, tipo, cfg, agora, modeloX);
       if (r === "enviado") enviados++;
       if (r === "falhou") falhas++;
       cont["lembrete_" + r] = (cont["lembrete_" + r] ?? 0) + 1;
