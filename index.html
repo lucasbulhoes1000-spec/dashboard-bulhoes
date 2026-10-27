@@ -13593,8 +13593,8 @@ function _waTelFormatado(t){
 function _waNome(c){
   const p=c&&c.pacientes;
   // (26/10/2026) o nome editado pela equipe no CRM vem primeiro
-  try{const ph=c&&c.telefone&&normalizePhone(c.telefone);const d=ph&&typeof ccDataLookup==='function'?ccDataLookup(ph):null;if(d&&d.nomeAtual)return String(d.nomeAtual);}catch(e){}
-  return (p&&p.nome)||(c&&c.nome_contato)||(c&&c.nome_perfil)||_waTelFormatado(c&&c.telefone)||'Contato';
+  try{const ph=c&&c.telefone&&!String(c.telefone).startsWith('ig:')&&normalizePhone(c.telefone);const d=ph&&typeof ccDataLookup==='function'?ccDataLookup(ph):null;if(d&&d.nomeAtual)return String(d.nomeAtual);}catch(e){}
+  return (p&&p.nome)||(c&&c.nome_contato)||(c&&c.nome_perfil)||(c&&c.ig_usuario?'@'+c.ig_usuario:'')||(c&&c.canal==='instagram'?'Instagram':_waTelFormatado(c&&c.telefone))||'Contato';
 }
 function _waIniciais(n){
   const partes=String(n||'').replace(/[()0-9-]/g,'').trim().split(/\s+/).filter(Boolean);
@@ -13619,7 +13619,7 @@ function _waDiaRotulo(iso){
 function _waJanela(c){
   const agora=Date.now();
   const ult=c&&c.ultima_recebida_em?Date.parse(c.ultima_recebida_em):0;
-  const gratis=c&&c.janela_gratis_ate?Date.parse(c.janela_gratis_ate):0;
+  const gratis=c&&c.canal!=='instagram'&&c.janela_gratis_ate?Date.parse(c.janela_gratis_ate):0;
   const fim=Math.max(ult?ult+WA_JANELA_MS:0,gratis||0);
   return {aberta:fim>agora,fim,gratis:gratis>agora};
 }
@@ -13740,12 +13740,15 @@ function _waChipsTags(c,removivel){
 const WA_APP_ID='2152669228663129';
 function _waEhGestao(){return ACESSO_TOTAL_LOGINS.includes(usuarioAtualEmail());}
 function _waApelidoNumero(id){
+  const ig=(_wa.igContas||[]).find(x=>x.ig_id===id);
+  if(ig)return 'Instagram '+(ig.apelido||('@'+(ig.usuario||'')));
   const n=_wa.numeros.find(x=>x.phone_number_id===id);
   return n?(n.apelido||n.numero_exibicao||id):'outro número';
 }
 async function waCarregarNumeros(){
   try{_wa.numeros=(await _waRest('whatsapp_numeros?select=phone_number_id,waba_id,numero_exibicao,apelido,coexistencia,conectado_em,historico_progresso,historico_erro,ativo&ativo=is.true&order=conectado_em'))||[];}
   catch(e){_wa.numeros=[];} // tabela ainda não criada
+  try{_wa.igContas=(await _waRest('instagram_contas?select=ig_id,usuario,apelido&ativo=is.true&order=apelido'))||[];}catch(e){_wa.igContas=[];}
   waPreencherFiltros();
   const b=document.getElementById('wa-btn-numeros');if(b)b.style.display=_waEhGestao()?'inline-block':'none';
   if(document.getElementById('wa-numeros-lista'))waRenderNumeros();
@@ -15812,7 +15815,7 @@ const _CL_IC={
 function _clIc(n,cls){return '<svg class="cl-ic'+(cls?' '+cls:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(_CL_IC[n]||'')+'</svg>';}
 const _CL_CORES=['#A18B6C','#8C6E4F','#6C9A8B','#7FA7C9','#B48EAD','#C97B63','#5A8A6A','#9a7b4f','#6b7fa8','#a0687a','#7d8f5a','#b08b5a','#4f7f8c','#8a6c9a'];
 function _clCor(seed){let h=0;const s=String(seed||'');for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return _CL_CORES[h%_CL_CORES.length];}
-function _clAvatar(c,nome){return '<div class="cl-av" style="background:'+_clCor(c&&c.telefone||nome)+'">'+_waEsc(_waIniciais(nome))+'<span class="selo" title="WhatsApp">'+'<svg viewBox="0 0 24 24">'+_CL_IC.wpp+'</svg></span></div>';}
+function _clAvatar(c,nome){const ig=c&&c.canal==='instagram';return '<div class="cl-av" style="background:'+_clCor(c&&c.telefone||nome)+'">'+_waEsc(_waIniciais(nome))+(ig?'<span class="selo" title="Instagram" style="background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17" cy="7" r=".6" fill="#fff"/></svg></span>':'<span class="selo" title="WhatsApp">'+'<svg viewBox="0 0 24 24">'+_CL_IC.wpp+'</svg></span>')+'</div>';}
 function _clEstado(c){
   if(c.status==='encerrada')return 'concluido';
   if(c.robo_ligado)return 'chatbot';
@@ -15897,7 +15900,8 @@ function _clRenderFiltrosAtivos(){
 }
 function waPreencherFiltros(){
   const sel=document.getElementById('wa-filtro-numero');
-  if(sel)sel.innerHTML='<option value="">Todas</option>'+(_wa.numeros||[]).map(n=>'<option value="'+_waEsc(n.phone_number_id)+'"'+(_wa.numeroFiltro===n.phone_number_id?' selected':'')+'>'+_waEsc(n.apelido||n.numero_exibicao)+'</option>').join('');
+  if(sel)sel.innerHTML='<option value="">Todas</option>'+(_wa.numeros||[]).map(n=>'<option value="'+_waEsc(n.phone_number_id)+'"'+(_wa.numeroFiltro===n.phone_number_id?' selected':'')+'>'+_waEsc(n.apelido||n.numero_exibicao)+'</option>').join('')+
+    ((_wa.igContas||[]).length?'<option value="_ig"'+(_wa.numeroFiltro==='_ig'?' selected':'')+'>Instagram (todos)</option>'+(_wa.igContas||[]).map(n=>'<option value="'+_waEsc(n.ig_id)+'"'+(_wa.numeroFiltro===n.ig_id?' selected':'')+'>Instagram '+_waEsc(n.apelido||'@'+n.usuario)+'</option>').join(''):'');
   _clRenderFiltrosAtivos();
 }
 function waMenuGerencia(ev){
@@ -15920,7 +15924,7 @@ function waRenderLista(){
   const f=_wa.f;
   _clRenderFiltrosAtivos();
   const base=_wa.conversas.filter(c=>{
-    if(_wa.numeroFiltro&&c.numero_clinica_id!==_wa.numeroFiltro)return false;
+    if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
     if(busca){
       const nome=_waNome(c).toLowerCase();
       if(!(nome.includes(busca)||(buscaNum.length>=3&&String(c.telefone).includes(buscaNum))))return false;
@@ -15954,7 +15958,7 @@ function waRenderLista(){
     const tags=ids&&ids.size?'<span class="cl-mini-tags" title="'+_waEsc(_wa.tags.filter(t=>ids.has(t.id)).map(t=>t.nome).join(', '))+'">'+_wa.tags.filter(t=>ids.has(t.id)).slice(0,4).map(t=>'<i style="background:'+_waEsc(t.cor)+'"></i>').join('')+'</span>':'';
     const resp=c.atribuida_a?'<span class="cl-resp" title="'+_waEsc(_waNomeEquipe(c.atribuida_a))+'">'+_waEsc(_waIniciais(_waNomeEquipe(c.atribuida_a)))+'</span>':'';
     const enviadaPorUltimo=c.ultima_mensagem_em&&(!c.ultima_recebida_em||Date.parse(c.ultima_mensagem_em)>Date.parse(c.ultima_recebida_em)+1000);
-    const num=_wa.numeros.length>1&&!_wa.numeroFiltro?'<span style="font-size:9px;color:#8C98B1">📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</span>':'';
+    const num=c.canal==='instagram'?'<span style="font-size:9px;color:#DD2A7B">'+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</span>':_wa.numeros.length>1&&!_wa.numeroFiltro?'<span style="font-size:9px;color:#8C98B1">📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</span>':'';
     return '<div class="wa-item'+(c.nao_lidas>0?' nao-lida':'')+(_wa.atual&&_wa.atual.id===c.id?' ativo':'')+'" onclick="waAbrir(\''+c.id+'\')" title="'+_waEsc(c.ultima_mensagem_texto||'')+'">'+
       _clAvatar(c,nome)+
       '<div class="wa-item-meio"><div class="wa-item-linha"><span class="cl-item-nome">'+_waEsc(nome)+'</span><span class="wa-item-hora">'+_waHora(c.ultima_mensagem_em)+'</span></div>'+
@@ -16005,11 +16009,11 @@ function waRenderCabecalho(){
   cab.innerHTML=
     '<button class="wa-btn wa-voltar" onclick="waVoltarLista()">←</button>'+
     '<div onclick="waAlternarPainel(true)">'+_clAvatar(c,nome).replace('<span class="selo"','<span style="display:none" class="selo"')+'</div>'+
-    '<div class="wa-cab-info" style="min-width:0"><div class="wa-cab-nome" onclick="waAlternarPainel(true)">'+_waEsc(nome)+'</div><div class="wa-cab-sub">'+_waTelFormatado(c.telefone)+(_wa.numeros.length>1?' · 📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id)):'')+'</div></div>'+
+    '<div class="wa-cab-info" style="min-width:0"><div class="wa-cab-nome" onclick="waAlternarPainel(true)">'+_waEsc(nome)+'</div><div class="wa-cab-sub">'+(c.canal==='instagram'?(c.ig_usuario?'<a href="https://www.instagram.com/'+encodeURIComponent(c.ig_usuario)+'/" target="_blank" rel="noopener" style="color:inherit">@'+_waEsc(c.ig_usuario)+'</a> · ':'')+_waEsc(_waApelidoNumero(c.numero_clinica_id)):_waTelFormatado(c.telefone)+(_wa.numeros.length>1?' · 📱 '+_waEsc(_waApelidoNumero(c.numero_clinica_id)):''))+'</div></div>'+
     '<div class="wa-cab-acoes">'+
       '<button class="cl-ib sem-borda" title="'+(concluida?'Reabrir conversa':'Concluir atendimento')+'" onclick="waMudarStatus(\''+(concluida?'aberta':'encerrada')+'\')">'+_clIc(concluida?'sort':'check')+'</button>'+
       '<button class="cl-ib sem-borda" title="Atribuir a…" onclick="waMenuAtribuir(event)">'+_clIc('users')+'</button>'+
-      '<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="'+(c.robo_ligado?'Robô (Agente de IA) ligado nesta conversa: clique para desligar':'Robô (Agente de IA) desligado nesta conversa: clique para ligar')+'" onclick="waRoboAlternar()"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>'+
+      (c.canal==='instagram'?'':'<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="'+(c.robo_ligado?'Robô (Agente de IA) ligado nesta conversa: clique para desligar':'Robô (Agente de IA) desligado nesta conversa: clique para ligar')+'" onclick="waRoboAlternar()"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>')+
       '<button class="cl-primario" title="Estado da conversa" onclick="waMenuEstado(event)">'+_clIc('chat')+_clIc('down')+'</button>'+
       '<button class="cl-ib sem-borda" title="Mais opções" onclick="waMenuMais(event)">'+_clIc('more')+'</button>'+
     '</div>';
@@ -16056,11 +16060,12 @@ function waRenderJanela(){
     el.title='Dá para responder com texto livre até a janela fechar.';
   }else{
     el.className='cl-janela fechada';
-    el.textContent=c.ultima_recebida_em?'Janela de 24 h fechada: envie um modelo':'Sem mensagem do paciente: envie um modelo';
-    el.title='A Meta só permite modelo aprovado fora da janela de 24 h.';
+    el.textContent=c.canal==='instagram'?'Janela de 24 h fechada: só dá para responder quando a pessoa escrever':(c.ultima_recebida_em?'Janela de 24 h fechada: envie um modelo':'Sem mensagem do paciente: envie um modelo');
+    el.title=c.canal==='instagram'?'No Instagram a Meta só permite responder até 24 h depois da última mensagem da pessoa.':'A Meta só permite modelo aprovado fora da janela de 24 h.';
   }
   const t=document.getElementById('wa-texto'),b=document.getElementById('wa-enviar'),a=document.getElementById('wa-btn-anexo');
-  if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado';}
+  if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':(c.canal==='instagram'?'Janela fechada: aguarde a pessoa escrever no Instagram':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado');}
+  const bm=document.querySelector('#wa-comp .cl-comp-barra .cl-ib');if(bm)bm.style.display=c.canal==='instagram'?'none':'';
   if(b)b.disabled=!j.aberta||_wa.enviando;
   if(a)a.disabled=!j.aberta;
   const mic=document.getElementById('wa-btn-mic');if(mic)mic.disabled=!j.aberta;
@@ -16181,7 +16186,16 @@ function waRenderPainel(){
   const nome=_waNome(c);
   const opt=(v,t,sel)=>'<option value="'+_waEsc(v)+'"'+(v===sel?' selected':'')+'>'+_waEsc(t)+'</option>';
   let corpo='';
-  if(aba==='geral'){
+  if(aba==='geral'&&c.canal==='instagram'){
+    const atendOptsIg='<option value="">Sem atendente</option>'+_wa.equipeLista.map(p=>opt(p.email,p.nome,c.atribuida_a||'')).join('');
+    corpo='<div class="cl-perfil">'+_clAvatar(c,nome).replace('<span class="selo"','<span style="display:none" class="selo"')+
+      '<div style="font-size:13px;color:#EEF1F7;margin-top:4px">'+_waEsc(nome)+'</div>'+
+      (c.ig_usuario?'<a class="cl-link" href="https://www.instagram.com/'+encodeURIComponent(c.ig_usuario)+'/" target="_blank" rel="noopener">@'+_waEsc(c.ig_usuario)+' no Instagram</a>':'')+
+      '<span class="cl-selo-criado">Direct do '+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</span></div>'+
+      '<button class="cl-link" style="align-self:center;display:flex;gap:5px;align-items:center;color:#EEF1F7" onclick="waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
+      '<div class="cl-campo">'+_clIc('pessoa')+'<span>Atribuído a:</span><select onchange="waAtribuir(this.value||null)">'+atendOptsIg+'</select></div>'+
+      '<div style="font-size:11px;color:#8C98B1;padding:6px 2px">Conversa do Instagram: sem etapa, sequências nem Agente de IA. Quando a pessoa passar o WhatsApp, registre como lead pelo social selling.</div>';
+  }else if(aba==='geral'){
     const origens=_waOrigens();if(L.origem&&!origens.includes(L.origem))origens.unshift(L.origem);
     const atendOpts='<option value="">Sem atendente</option>'+_wa.equipeLista.map(p=>opt(p.email,p.nome,c.atribuida_a||'')).join('')+
       (c.atribuida_a&&!_wa.equipeLista.some(p=>p.email===c.atribuida_a)?opt(c.atribuida_a,_waNomeEquipe(c.atribuida_a),c.atribuida_a):'');

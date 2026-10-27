@@ -9,6 +9,11 @@
 //   privada "whatsapp-midia". Se a mensagem entrou na fila do Agente de IA,
 //   chama a função whatsapp-agente em seguida.
 //
+// Instagram (27/10/2026): o mesmo endereço recebe os avisos do Direct
+// (object = "instagram"): grava com ig_processar, baixa as mídias pelo link e
+// busca o nome e o @ da pessoa (segredo IG_TOKEN, chave do usuário do sistema
+// com acesso às Páginas e aos Instagrams da clínica).
+//
 // Segredos (Supabase → Edge Functions → Secrets):
 //   WA_TOKEN         chave permanente do usuário do sistema (crmmaluco)
 //   WA_APP_SECRET    "Chave secreta do app" (app Bulhões CRM → Configurações → Básico)
@@ -23,6 +28,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const WA_TOKEN = Deno.env.get("WA_TOKEN") ?? "";
 const WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") ?? "";
 const WA_VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
+const IG_TOKEN = Deno.env.get("IG_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 
 const enc = new TextEncoder();
@@ -109,6 +115,76 @@ export async function baixarMidia(m: Midia): Promise<void> {
   }
 }
 
+// ---------- Instagram ----------
+type MidiaIg = { mensagem_id: string; conversa_id: string; url: string; tipo: string };
+
+export async function baixarMidiaIg(m: MidiaIg): Promise<void> {
+  try {
+    const arquivo = await fetch(m.url);
+    if (!arquivo.ok) throw new Error("Instagram (download) " + arquivo.status);
+    const mime = (arquivo.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+    const ext = EXTENSOES[mime] ?? ({ image: "jpg", video: "mp4", audio: "m4a" } as Record<string, string>)[m.tipo] ?? "bin";
+    const caminho = `${m.conversa_id}/${m.mensagem_id}.${ext}`;
+    const up = await banco(`/storage/v1/object/whatsapp-midia/${caminho}`, {
+      method: "POST", headers: { "Content-Type": mime, "x-upsert": "true" }, body: await arquivo.arrayBuffer(),
+    });
+    if (!up.ok) throw new Error("Storage " + up.status + " " + (await up.text()).slice(0, 200));
+    await banco(`/rest/v1/mensagens?id=eq.${m.mensagem_id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ midia_caminho: caminho, midia_tipo: mime, atualizada_em: new Date().toISOString() }),
+    });
+  } catch (e) {
+    console.error("[whatsapp-webhook] mídia do Instagram", String(e));
+    await banco(`/rest/v1/mensagens?id=eq.${m.mensagem_id}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ erro: "Não foi possível baixar a mídia: " + String(e).slice(0, 200) }),
+    }).catch(() => {});
+  }
+}
+
+// chave da Página ligada à conta do Instagram (vem da chave do usuário do sistema)
+const _paginas = new Map<string, string>();
+export async function tokenDaPaginaIg(igId: string): Promise<string> {
+  if (_paginas.has(igId)) return _paginas.get(igId)!;
+  const c = await (await banco(`/rest/v1/instagram_contas?ig_id=eq.${encodeURIComponent(igId)}&select=page_id`)).json();
+  const page = c?.[0]?.page_id;
+  if (!page || !IG_TOKEN) return "";
+  const r = await fetch(`${GRAPH}/${page}?fields=access_token`, { headers: { Authorization: "Bearer " + IG_TOKEN } });
+  const t = r.ok ? String((await r.json())?.access_token ?? "") : "";
+  if (t) _paginas.set(igId, t);
+  return t;
+}
+
+// nome e @ de quem escreveu (só para conversas que ainda não têm)
+export async function completarPerfisIg(corpo: any): Promise<void> {
+  try {
+    const pares = new Set<string>();
+    for (const e of corpo?.entry ?? []) {
+      for (const ev of e?.messaging ?? []) {
+        const eco = !!ev?.message?.is_echo;
+        const pessoa = eco ? ev?.recipient?.id : ev?.sender?.id;
+        if (pessoa && pessoa !== e.id) pares.add(`${e.id}|${pessoa}`);
+      }
+    }
+    for (const par of pares) {
+      const [conta, pessoa] = par.split("|");
+      const c = await (await banco(`/rest/v1/conversas?numero_clinica_id=eq.${conta}&telefone=eq.ig:${pessoa}&select=id,nome_perfil,ig_usuario`)).json();
+      if (!c?.[0] || (c[0].nome_perfil && c[0].ig_usuario)) continue;
+      const tk = await tokenDaPaginaIg(conta);
+      if (!tk) continue;
+      const r = await fetch(`${GRAPH}/${pessoa}?fields=name,username`, { headers: { Authorization: "Bearer " + tk } });
+      if (!r.ok) continue;
+      const p = await r.json();
+      await banco(`/rest/v1/conversas?id=eq.${c[0].id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ nome_perfil: p?.name || (p?.username ? "@" + p.username : null), ig_usuario: p?.username ?? null }),
+      });
+    }
+  } catch (e) {
+    console.error("[whatsapp-webhook] perfil do Instagram", String(e));
+  }
+}
+
 function emSegundoPlano(p: Promise<unknown>) {
   // deno-lint-ignore no-explicit-any
   const rt = (globalThis as any).EdgeRuntime;
@@ -156,6 +232,20 @@ export async function handler(req: Request): Promise<Response> {
   await banco("/rest/v1/whatsapp_eventos_brutos", {
     method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ corpo }),
   }).catch((e) => console.error("[whatsapp-webhook] bruto", String(e)));
+
+  // Direct do Instagram
+  if ((corpo as any)?.object === "instagram") {
+    const ri = await banco("/rest/v1/rpc/ig_processar", { method: "POST", body: JSON.stringify({ corpo }) });
+    if (!ri.ok) {
+      console.error("[whatsapp-webhook] banco (instagram)", ri.status, (await ri.text()).slice(0, 500));
+      return new Response("erro ao gravar", { status: 500 });
+    }
+    const res = await ri.json();
+    const mi: MidiaIg[] = Array.isArray(res?.midias) ? res.midias : [];
+    if (mi.length) emSegundoPlano(Promise.allSettled(mi.map(baixarMidiaIg)));
+    emSegundoPlano(completarPerfisIg(corpo));
+    return new Response("ok", { status: 200 });
+  }
 
   const r = await banco("/rest/v1/rpc/wa_processar", { method: "POST", body: JSON.stringify({ corpo }) });
   if (!r.ok) {

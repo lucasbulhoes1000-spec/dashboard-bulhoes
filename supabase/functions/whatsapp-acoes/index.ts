@@ -10,6 +10,12 @@
 //   marcar_lida    { conversa_id } → avisa a Meta (dois tiques azuis) e zera não lidas
 //   configurar     {}  → (gestão) liga o app à conta e lista os números
 //   conectar_numero { code, waba_id, phone_number_id?, apelido? } → (gestão) coexistência
+//   instagram_configurar {} → (gestão) acha as contas do Instagram das Páginas, cadastra e assina os avisos
+//
+// Conversas do Instagram (canal = 'instagram') usam a mesma tela: texto e arquivo
+// saem pela API de mensagens do Instagram (chave da Página, tirada do IG_TOKEN).
+// Não existe modelo no Instagram: fora das 24 h só dá para responder quando a
+// pessoa escrever de novo.
 //
 // Regra da Meta: texto livre só até 24 h depois da última mensagem do paciente
 // (ou na janela grátis de anúncio). Fora disso, só modelo aprovado.
@@ -25,6 +31,7 @@ const WA_PHONE_NUMBER_ID = Deno.env.get("WA_PHONE_NUMBER_ID") ?? "";
 const WA_WABA_ID = Deno.env.get("WA_WABA_ID") ?? "";
 const WA_APP_ID = Deno.env.get("WA_APP_ID") ?? "2152669228663129";
 const WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") ?? "";
+const IG_TOKEN = Deno.env.get("IG_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 const ORIGENS = (Deno.env.get("CRM_ORIGENS") ?? "https://dashboard-bulhoes.vercel.app").split(",").map((s) => s.trim());
 
@@ -82,6 +89,37 @@ async function tokenDoNumero(phoneNumberId: string): Promise<string> {
   _tokens.set(phoneNumberId, t);
   return t;
 }
+
+// ---------- Instagram ----------
+const _paginas = new Map<string, string>();
+async function tokenDaPaginaIg(igId: string): Promise<string> {
+  if (_paginas.has(igId)) return _paginas.get(igId)!;
+  if (!IG_TOKEN) throw new Error("falta o segredo IG_TOKEN (chave do Instagram)");
+  const c = await bancoJson(`/rest/v1/instagram_contas?ig_id=eq.${encodeURIComponent(igId)}&select=page_id`);
+  const page = c?.[0]?.page_id;
+  if (!page) throw new Error("conta do Instagram sem Página cadastrada (rode instagram_configurar)");
+  const r = await meta(`/${page}?fields=access_token`, undefined, IG_TOKEN);
+  const t = r.ok ? String(r.j?.access_token ?? "") : "";
+  if (!t) throw new Error("não consegui a chave da Página: " + erroMeta(r.j));
+  _paginas.set(igId, t);
+  return t;
+}
+async function enviarIg(req: Request, quem: { email: string }, c: any, message: any, tipo: string, textoRegistro: string, extra?: { caminho: string; mime: string; nome: string }) {
+  const tk = await tokenDaPaginaIg(c.numero_clinica_id);
+  const r = await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, message }, tk);
+  const reg = (status: string, mid: string | null, erro: string | null, bruto: unknown) => extra
+    ? bancoJson("/rest/v1/rpc/wa_registrar_enviada_midia", { method: "POST", body: JSON.stringify({ p_conversa: c.id, p_wa_message_id: mid, p_tipo: tipo, p_texto: textoRegistro, p_autor: quem.email, p_status: status, p_erro: erro, p_bruto: bruto, p_caminho: extra.caminho, p_mime: extra.mime, p_nome: extra.nome }) })
+    : registrar(c, mid, tipo, textoRegistro, quem.email, status, erro, bruto);
+  if (!r.ok) {
+    const erro = erroMeta(r.j);
+    await reg("falhou", null, erro, r.j);
+    return resposta(req, { ok: false, erro }, 502);
+  }
+  const mid = r.j?.message_id ?? null;
+  const id = await reg("enviada", mid, null, r.j);
+  return resposta(req, { ok: true, mensagem_id: id, wa_message_id: mid });
+}
+const JANELA_IG = "Passaram mais de 24 h desde a última mensagem dessa pessoa no Instagram. Pela regra da Meta, só dá para responder quando ela escrever de novo.";
 
 function erroMeta(j: any): string {
   const e = j?.error ?? {};
@@ -169,6 +207,11 @@ export async function handler(req: Request): Promise<Response> {
         if (!texto) return resposta(req, { ok: false, erro: "mensagem vazia" }, 400);
         if (texto.length > 4096) return resposta(req, { ok: false, erro: "mensagem acima de 4.096 caracteres" }, 400);
         const c = await conversa(dados);
+        if (c.canal === "instagram") {
+          if (!janelaAberta({ ultima_recebida_em: c.ultima_recebida_em })) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
+          if (texto.length > 1000) return resposta(req, { ok: false, erro: "no Instagram o limite é 1.000 caracteres por mensagem" }, 400);
+          return await enviarIg(req, quem, c, { text: texto }, "text", texto);
+        }
         if (!janelaAberta(c)) {
           return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente. Use um modelo aprovado." }, 409);
         }
@@ -180,6 +223,18 @@ export async function handler(req: Request): Promise<Response> {
         const c = await conversa(dados);
         const caminho = String(dados.caminho ?? "");
         if (!caminho.startsWith(`envios/${c.id}/`)) return resposta(req, { ok: false, erro: "arquivo inválido" }, 400);
+        if (c.canal === "instagram") {
+          if (!janelaAberta({ ultima_recebida_em: c.ultima_recebida_em })) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
+          // o Instagram busca o arquivo por um link: link assinado do Storage, válido por 1 h
+          const sg = await bancoJson(`/storage/v1/object/sign/whatsapp-midia/${caminho.split("/").map(encodeURIComponent).join("/")}`, { method: "POST", body: JSON.stringify({ expiresIn: 3600 }) });
+          if (!sg?.signedURL) return resposta(req, { ok: false, erro: "não encontrei o arquivo enviado" }, 400);
+          const link = SUPABASE_URL + "/storage/v1" + sg.signedURL;
+          const mimeIg = String(dados.mime || "application/octet-stream").split(";")[0].trim();
+          const t = /^image\//.test(mimeIg) ? "image" : /^video\//.test(mimeIg) ? "video" : /^audio\//.test(mimeIg) ? "audio" : "file";
+          const nomeIg = String(dados.nome || caminho.split("/").pop() || "arquivo");
+          const txt = ({ image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", file: "📄 " + nomeIg } as Record<string, string>)[t];
+          return await enviarIg(req, quem, c, { attachment: { type: t, payload: { url: link } } }, t === "file" ? "document" : t, txt, { caminho, mime: mimeIg, nome: nomeIg });
+        }
         if (!janelaAberta(c)) {
           return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente. Use um modelo aprovado." }, 409);
         }
@@ -226,6 +281,7 @@ export async function handler(req: Request): Promise<Response> {
         const campos: string[] = Array.isArray(dados.campos) ? dados.campos.map(String) : [];
         const nomeado = dados.formato === "NAMED";
         const c = await conversa(dados);
+        if (c.canal === "instagram") return resposta(req, { ok: false, erro: "Modelos são só do WhatsApp. No Instagram, responda quando a pessoa escrever." }, 400);
         const template: any = { name: nome, language: { code: String(dados.idioma ?? "pt_BR") } };
         const components: any[] = [];
         // cabeçalho com foto, vídeo ou documento: a Meta exige mandar a mídia junto
@@ -268,9 +324,37 @@ export async function handler(req: Request): Promise<Response> {
         const c = await conversa(dados);
         const ult = await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.recebida&select=wa_message_id&order=enviada_em.desc&limit=1`);
         const wamid = ult?.[0]?.wa_message_id;
-        if (wamid) await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", status: "read", message_id: wamid }, await tokenDoNumero(c.numero_clinica_id));
+        if (c.canal === "instagram") {
+          try { await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, sender_action: "mark_seen" }, await tokenDaPaginaIg(c.numero_clinica_id)); } catch (_) { /* segue */ }
+        } else if (wamid) await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", status: "read", message_id: wamid }, await tokenDoNumero(c.numero_clinica_id));
         await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nao_lidas: 0 }) });
         return resposta(req, { ok: true });
+      }
+      case "instagram_configurar": {
+        // Só gestão: lê as Páginas que o usuário do sistema enxerga, acha o Instagram de cada uma,
+        // cadastra em instagram_contas (atendente padrão: dados.atribuir_a) e assina os avisos de mensagens.
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão configura o Instagram" }, 403);
+        if (!IG_TOKEN) return resposta(req, { ok: false, erro: "falta o segredo IG_TOKEN" }, 500);
+        const pgs = await meta(`/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=50`, undefined, IG_TOKEN);
+        if (!pgs.ok) return resposta(req, { ok: false, erro: erroMeta(pgs.j) }, 502);
+        const contas: any[] = [];
+        for (const pg of pgs.j?.data ?? []) {
+          const ig = pg.instagram_business_account;
+          if (!ig?.id) { contas.push({ pagina: pg.name, instagram: null }); continue; }
+          const apelido = /dra|lari/i.test(ig.username ?? "") ? "Dra. Larissa" : /bulhoesodonto/i.test(ig.username ?? "") ? "Clínica" : (ig.username ?? pg.name);
+          await bancoJson("/rest/v1/instagram_contas?on_conflict=ig_id", {
+            method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+            body: JSON.stringify({ ig_id: ig.id, page_id: pg.id, usuario: ig.username ?? null, apelido, ...(dados.atribuir_a ? { atribuir_a: String(dados.atribuir_a).toLowerCase() } : {}) }),
+          });
+          let assinatura: unknown = true;
+          for (const campos of ["messages,messaging_postbacks,message_reactions,messaging_seen", "messages"]) {
+            const a = await meta(`/${pg.id}/subscribed_apps?subscribed_fields=${campos}`, {}, pg.access_token);
+            assinatura = a.ok ? campos : erroMeta(a.j);
+            if (a.ok) break;
+          }
+          contas.push({ pagina: pg.name, page_id: pg.id, instagram: ig.username, ig_id: ig.id, apelido, assinatura });
+        }
+        return resposta(req, { ok: true, contas });
       }
       case "configurar": {
         // Só gestão: liga o app à conta do WhatsApp e mostra os números (com o ID de cada um).
