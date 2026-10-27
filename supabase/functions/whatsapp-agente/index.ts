@@ -294,6 +294,16 @@ export async function buscarPacienteClinicorp(telefone: string, nomes: string[] 
     const x = doTelefone(await clinicorp("/patient/get", { subscriber_id: sub, Name: n }).catch(() => null));
     if (x) return res(x, "nome: " + n);
   }
+  // 3b) mesmo nome completo, telefone diferente (paciente trocou de número): usa o cadastro
+  //     se houver exatamente UM cadastro ativo com o nome idêntico (evita homônimos)
+  const norm = (x: unknown) => String(x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const completo = norm(nomes[0]);
+  if (completo.split(" ").length >= 2) {
+    const r = await clinicorp("/patient/get", { subscriber_id: sub, Name: String(nomes[0]).trim() }).catch(() => null);
+    const iguais = (Array.isArray(r) ? r : r ? [r] : []).filter(ativo).filter((y: any) => norm(y.Name ?? y.PatientName) === completo);
+    const unicos = [...new Map(iguais.map((y: any) => [String(y.PatientId), y])).values()];
+    if (unicos.length === 1) return res(unicos[0], "nome completo igual (telefone diferente)");
+  }
   // 4) agendamentos recentes com esse telefone
   for (let k = 0; k < 3; k++) {
     const ate = new Date(Date.now() + 30 * 86400000 - k * 31 * 86400000), de = new Date(ate.getTime() - 30 * 86400000);
@@ -333,7 +343,7 @@ export async function marcarNoClinicorp(cfg: any, h: { data: string; hora: strin
     fromTime: escolhido.hora, toTime: escolhido.fim, date: `${escolhido.data}T03:00:00.000Z`,
     Dentist_PersonId: Number(cfg.profissional_id),
     Procedures: cfg.procedimento || "Avaliação",
-    Notes: observacoes || "",
+    Notes: (/telefone diferente/.test(pac.como) ? `ATENÇÃO: cadastro achado pelo nome, telefone novo ${telefoneBonito(telefone)} (atualizar no cadastro). ` : "") + (observacoes || ""),
   };
   if (pacienteId) corpo.Patient_PersonId = pacienteId;
   if (cfg.clinica_id) corpo.Clinic_BusinessId = Number(cfg.clinica_id);
@@ -896,7 +906,7 @@ export async function handler(req: Request): Promise<Response> {
         const corpo: any = {
           PatientName: nome, MobilePhone: telefoneBonito(tel), fromTime: ini, toTime: fim, date: `${data}T03:00:00.000Z`,
           Dentist_PersonId: Number(prof), Procedures: String(dados.procedimento || "Avaliação"),
-          Notes: (obs ? obs + "\n" : "") + `Agendado pelo CRM (${u.email}).`,
+          Notes: (/telefone diferente/.test(pac.como) ? `ATENÇÃO: cadastro achado pelo nome, telefone novo ${telefoneBonito(tel)} (atualizar no cadastro).\n` : "") + (obs ? obs + "\n" : "") + `Agendado pelo CRM (${u.email}).`,
         };
         if (pac.id) corpo.Patient_PersonId = pac.id;
         if (cfg.clinica_id) corpo.Clinic_BusinessId = Number(cfg.clinica_id);
@@ -905,7 +915,7 @@ export async function handler(req: Request): Promise<Response> {
         const item = Array.isArray(r) ? r[0] : r;
         if (!item?.id) return json({ ok: false, erro: "o Clinicorp não confirmou: " + JSON.stringify(r).slice(0, 200) }, 502);
         await registro({ conversa_id: c?.id ?? null, tipo: "agendamento", detalhe: `Agendado pela Central (${u.email}): ${data} ${ini}–${fim} (${nome}). Agendamento ${item.id}. Cadastro: ${pac.existente ? "já existia (" + pac.como + ")" : "novo"}.`, autor: u.email });
-        return json({ ok: true, id: String(item.id), cadastro: pac.existente ? "existente" : "novo" });
+        return json({ ok: true, id: String(item.id), cadastro: pac.existente ? "existente" : "novo", como: pac.como });
       }
       case "clinicorp_opcoes": {
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
