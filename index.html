@@ -1556,7 +1556,8 @@ body{letter-spacing:-.1px;}
           <input type="text" id="fluxo-search" placeholder="Buscar por nome ou telefone..." oninput="renderFluxoCards()" style="border:0.5px solid #2A3D66;border-radius:8px;padding:7px 12px;font-size:12px;background:#0D1A33;outline:none;width:200px;">
           <select id="fluxo-status-filter" onchange="renderFluxoCards()" style="border:0.5px solid #2A3D66;border-radius:8px;padding:7px 12px;font-size:12px;background:#0D1A33;outline:none;">
             <option value="">Todos os status</option>
-            <option value="em_andamento">Em andamento</option>
+            <option value="em_andamento">Em andamento (sem os parados)</option>
+            <option value="parado">Parados (sem retorno)</option>
           </select>
           <select id="fluxo-semana-filter" onchange="renderFluxoCards()" style="border:0.5px solid #2A3D66;border-radius:8px;padding:7px 12px;font-size:12px;background:#0D1A33;outline:none;" title="Filtra pela data de início do tratamento">
             <option value="">Todas as datas de início</option>
@@ -11457,7 +11458,8 @@ function renderFluxoCards() {
       const telMatch = buscaDigits.length > 0 && String(p.tel || '').replace(/\D/g, '').includes(buscaDigits);
       if (!nomeMatch && !telMatch) return false;
     }
-    if (statusFil === 'em_andamento' && p.concluido) return false;
+    if (statusFil === 'em_andamento' && (p.concluido || p.parado)) return false;
+    if (statusFil === 'parado' && !p.parado) return false;
     // Filtro por semana — quanto tempo se passou desde a data de início do tratamento
     if (semanaFil && p.dataInicio) {
       const dias = Math.floor((Date.now() - new Date(p.dataInicio + 'T12:00').getTime()) / 86400000);
@@ -11476,8 +11478,8 @@ function renderFluxoCards() {
   }).sort((a, b) => {
     // Prioridade: 1) terminou a parte clínica mas aguarda NPS/pós-venda (sobe pro topo)
     // 2) ainda em tratamento clínico, por data de início 3) já concluído, por último
-    const pa = a.concluido ? 2 : (clinicoConcluido(a) ? 0 : 1);
-    const pb = b.concluido ? 2 : (clinicoConcluido(b) ? 0 : 1);
+    const pa = a.concluido ? 3 : (a.parado ? 2 : (clinicoConcluido(a) ? 0 : 1));
+    const pb = b.concluido ? 3 : (b.parado ? 2 : (clinicoConcluido(b) ? 0 : 1));
     if (pa !== pb) return pa - pb;
     return a.dataInicio.localeCompare(b.dataInicio);
   });
@@ -11522,9 +11524,14 @@ function renderFluxoCards() {
     }).join('');
 
     const aguardandoPosVenda = !p.concluido && clinicoConcluido(p);
+    const faixaParado = p.parado && !p.concluido ? `
+      <div style="background:#2A1F12;border:1px solid #6B5326;border-radius:10px;padding:9px 14px;margin-bottom:12px;font-size:12px;color:#E2BE6A;">
+        ⏸ <b>Parado (sem retorno)</b> desde ${new Date(p.parado.desde+'T12:00').toLocaleDateString('pt-BR')}${p.parado.motivo ? ' · ' + String(p.parado.motivo).replace(/</g,'&lt;') : ''}
+      </div>` : '';
 
     return `
     <div style="background:${p.concluido ? '#16371D' : (aguardandoPosVenda ? '#12213F' : '#0D1A33')};border-radius:12px;border:1px solid ${p.concluido ? '#8FCF9F' : (aguardandoPosVenda ? '#2A3D66' : '#2A3D66')};padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+      ${faixaParado}
       ${p.concluido ? `
       <div style="background:#153721;border:1px solid #8FCF9F;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="font-size:12px;color:#6ADC96;font-weight:600;">🎉 Tratamento concluído — NPS e pós-venda já enviados.</div>
@@ -11553,6 +11560,9 @@ function renderFluxoCards() {
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
+          ${!p.concluido ? (p.parado
+            ? `<button onclick="retomarFluxo(${pIdx})" title="O paciente voltou: volta para Em tratamento" style="background:#153721;border:0.5px solid #2A3D66;border-radius:6px;color:#6ADC96;font-size:11px;padding:4px 10px;cursor:pointer;">▶ Retomou</button>`
+            : `<button onclick="marcarParadoFluxo(${pIdx})" title="Não voltou para o retorno ou não responde: tira de Em tratamento" style="background:#12213F;border:0.5px solid #2A3D66;border-radius:6px;color:#C3CBDB;font-size:11px;padding:4px 10px;cursor:pointer;">⏸ Parou</button>`) : ''}
           <button onclick="abrirAdicionarFluxo(${pIdx})" style="background:#12213F;border:0.5px solid #2A3D66;border-radius:6px;color:#E2BE6A;font-size:11px;padding:4px 10px;cursor:pointer;">✏️ Editar</button>
           ${p.concluido
             ? `<span style="background:#153721;color:#6ADC96;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;">✓ Concluído</span>`
@@ -11634,6 +11644,28 @@ function toggleSubetapaFluxo(pIdx, prIdx, subIdx, checked) {
   atualizarConclusaoFluxo(p);
   salvarFluxoRemoto();
   renderFluxoCards();
+}
+
+// (27/10/2026) paciente que parou de vir (não voltou para o retorno e não responde):
+// sai de "Em tratamento" e fica em "Parado (sem retorno)" até retomar. Só manual.
+function marcarParadoFluxo(idx) {
+  const p = _fluxoPacientes[idx];
+  if (!p) return;
+  const motivo = prompt('Parou o tratamento: anote o motivo (opcional)\nEx.: não voltou para o retorno, não responde as mensagens', '');
+  if (motivo === null) return;
+  p.parado = { desde: new Date().toISOString().slice(0, 10), motivo: String(motivo || '').trim(), por: (typeof usuarioAtualEmail === 'function' ? usuarioAtualEmail() : '') };
+  salvarFluxoRemoto();
+  renderFluxoCards();
+  showToast('success', 'Marcado como parado', (p.nome || 'Paciente') + ' saiu de Em tratamento.');
+}
+function retomarFluxo(idx) {
+  const p = _fluxoPacientes[idx];
+  if (!p || !p.parado) return;
+  p.retomadas = (p.retomadas || []).concat([{ parado: p.parado, retomou: new Date().toISOString().slice(0, 10) }]);
+  delete p.parado;
+  salvarFluxoRemoto();
+  renderFluxoCards();
+  showToast('success', 'Tratamento retomado', (p.nome || 'Paciente') + ' voltou para Em tratamento.');
 }
 
 function toggleNpsFluxo(idx, checked) {
@@ -17615,6 +17647,7 @@ const KB_QUADROS={
     colunas:()=>[
       {id:'boasvindas',nome:'Boas-vindas',dica:'Entrou no fluxo e ainda não concluiu nenhuma subetapa'},
       {id:'tratamento',nome:'Em tratamento',dica:'Mostra quem está sem consulta marcada no Clinicorp'},
+      {id:'parado',nome:'Parado (sem retorno)',dica:'Não voltou para o retorno ou não responde. Arraste para cá (ou use ⏸ Parou na lista); arraste de volta quando retomar'},
       {id:'posvenda',nome:'Pós-venda e NPS',dica:'Terminou o tratamento: enviar o pós-venda e a pesquisa NPS no dia seguinte'},
       {id:'concluido',nome:'Concluído',dica:'Pós-venda e NPS enviados'}
     ],
@@ -17638,7 +17671,14 @@ const KB_QUADROS={
       const p=it.p;
       const clin=typeof clinicoConcluido==='function'&&clinicoConcluido(p);
       if(clin)return p.posVendaEnviado?'concluido':'posvenda';
+      if(p.parado)return 'parado';
       return it.feitas>0?'tratamento':'boasvindas';
+    },
+    soltar:(it,col)=>{
+      const idx=_fluxoPacientes.indexOf(it.p);if(idx<0)return false;
+      if(col==='parado'){if(it.p.parado)return false;marcarParadoFluxo(idx);return !!it.p.parado;}
+      if((col==='tratamento'||col==='boasvindas')&&it.p.parado){retomarFluxo(idx);return true;}
+      showToast('error','Esse card anda sozinho','Só dá para arrastar para Parado (sem retorno) e de volta. O resto muda pelas subetapas e pelo pós-venda.');return false;
     },
     metricas:(cols,todos,porCol)=>{
       if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:{txt:'agenda do Clinicorp indisponível agora',fraco:true}};
@@ -17649,6 +17689,9 @@ const KB_QUADROS={
       const pct=it.tot?Math.round(it.feitas/it.tot*100):0;
       const procs=(it.p.procedimentos||[]).map(pr=>pr.nome).filter(Boolean);
       let ag='';
+      if(col==='parado'&&it.p.parado){
+        ag='<div class="kb-linha"><span class="kb-tag atraso">parado desde '+new Date(it.p.parado.desde+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>'+(it.p.parado.motivo?'<div class="kb-linha"><span>'+_kbEsc(it.p.parado.motivo)+'</span></div>':'');
+      }
       if(col==='tratamento'||col==='boasvindas'){
         if(_kb.agenda){
           const a=(it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
@@ -17663,7 +17706,7 @@ const KB_QUADROS={
         ${ag}`;
     },
     abrir:(it)=>{kbModo('fluxo','lista');const s=document.getElementById('fluxo-search');if(s){s.value=it.nome;renderFluxoCards();}},
-    aviso:()=>'O card anda sozinho conforme as subetapas e o pós-venda são marcados na lista. Em tratamento mostra quem não tem consulta marcada no Clinicorp nos próximos 90 dias. Clique no card para abrir o paciente na lista.'
+    aviso:()=>'O card anda sozinho conforme as subetapas e o pós-venda são marcados na lista. Em tratamento mostra quem não tem consulta marcada no Clinicorp nos próximos 90 dias. Quem não voltou para o retorno ou não responde vai para Parado (sem retorno): arraste o card para lá ou use ⏸ Parou na lista; quando voltar, arraste de volta. Clique no card para abrir o paciente na lista.'
   },
   pacientes:{
     titulo:'Pacientes',
