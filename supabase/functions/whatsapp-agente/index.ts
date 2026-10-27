@@ -595,7 +595,9 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
       if (nome.split(/\s+/).length < 2) return "Falta o nome completo (nome e sobrenome). Peça ao paciente antes de marcar.";
       if (simular) return `Simulação: marcaria ${x.data} às ${x.hora} para ${nome}. Nada foi marcado de verdade (teste).`;
       if (conversaId) {
-        const ja = await bancoJson(`/rest/v1/agente_registros?conversa_id=eq.${conversaId}&tipo=eq.agendamento&criado_em=gte.${new Date(Date.now() - 30 * 86_400_000).toISOString()}&select=id&limit=1`).catch(() => []);
+        // só conta o que foi marcado depois do último "reiniciar conversa" (ia_desde)
+        const desde = Math.max(Date.now() - 30 * 86_400_000, conv?.ia_desde ? Date.parse(conv.ia_desde) : 0);
+        const ja = await bancoJson(`/rest/v1/agente_registros?conversa_id=eq.${conversaId}&tipo=eq.agendamento&criado_em=gte.${new Date(desde).toISOString()}&select=id&limit=1`).catch(() => []);
         if (ja?.length) return "Esta conversa já tem uma avaliação marcada pelo agente. Para remarcar ou marcar outra, passe para a equipe.";
       }
       const online = x.online === true || String(x.online) === "true";
@@ -649,7 +651,7 @@ export async function responder(conversaId: string, versao: number, pausa = espe
     if (!hist.length || msgs[msgs.length - 1]?.direcao !== "recebida") { await concluir(); return "nada"; }
     if (!janelaAberta(c)) { await concluir(); return "sem_janela"; }
     const autor = "IA: " + (a.nome || "Agente");
-    let primeira = true, enviados: string[] = [];
+    let primeira = true, encerrou = false, enviados: string[] = [];
     const executar = async (x: Acao) => {
       if (primeira) primeira = false;
       else await pausa(Math.min(4000, 1200 + (x.tipo === "texto" ? x.texto.length * 15 : 1500)));
@@ -672,6 +674,7 @@ export async function responder(conversaId: string, versao: number, pausa = espe
         return r.ok;
       }
       if (x.tipo === "perdido") {
+        encerrou = true;
         // CRM: etapa Perdido e robô desligado nesta conversa (ninguém precisa assumir)
         if (c.telefone) await banco(`/rest/v1/pacientes?on_conflict=telefone`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({ telefone: c.telefone, etapa: "Perdido", etapa_alterada_em: new Date().toISOString() }) }).catch(() => {});
@@ -683,6 +686,13 @@ export async function responder(conversaId: string, versao: number, pausa = espe
       return true;
     };
     const res = await gerarResposta(a, imagens, montarSistema(a, imagens, ctx), hist, executar, a.agendamento?.ligado ? agendaReal(a, c, ctx, conversaId) : undefined);
+    // passou para a equipe sem dizer nada: avisa o paciente (nunca deixar sem resposta)
+    if (res.transferiu && !encerrou && !enviados.length && !res.parou) {
+      const aviso = "Vou passar sua mensagem para a nossa equipe te orientar certinho, tá bom? 💙";
+      const r = await enviarMetaTentando(c, { type: "text", text: { body: aviso, preview_url: false } });
+      await registrarEnviada(c, r.id, "text", aviso, autor, r.erro, r.j);
+      enviados.push(aviso);
+    }
     if (res.parou && !enviados.length) { await concluir(); return "refazer"; }
     await registro({ conversa_id: conversaId, tipo: "resposta", detalhe: enviados.join("\n\n").slice(0, 4000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: "agente" });
     await concluir();
