@@ -14335,6 +14335,27 @@ async function waAbrirModelos(){
     document.getElementById('wa-modal-corpo').innerHTML='<div class="wa-vazio">Não foi possível buscar os modelos.<br><span style="font-size:11px">'+_waEsc(e.message)+'</span></div>';
   }
 }
+// (27/10/2026) tempo da primeira resposta aos leads novos
+async function waAbrirMetricas(dias){
+  waFecharModal();
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal" style="max-width:760px"><div class="wa-modal-cab">Tempo da primeira resposta<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" id="wa-met">Carregando…</div></div>';
+  document.body.appendChild(fundo);
+  let r;try{r=await _waRest('rpc/metricas_primeira_resposta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_dias:dias})});}
+  catch(e){document.getElementById('wa-met').textContent='Não foi possível carregar: '+e.message;return;}
+  const fm=v=>v==null?'-':(v>=60?(v/60).toFixed(1).replace('.',',')+' h':Math.round(v)+' min');
+  const pc=(a,b)=>b?Math.round(100*a/b)+'%':'-';
+  const tb=(cab,linhas)=>'<table class="dp-tabela" style="width:100%;font-size:12px;border-collapse:collapse"><tr>'+cab.map(c=>'<th style="text-align:left;padding:4px 6px;color:#E2BE6A">'+c+'</th>').join('')+'</tr>'+linhas.map(l=>'<tr>'+l.map(c=>'<td style="padding:4px 6px;border-top:0.5px solid #2A3D66">'+c+'</td>').join('')+'</tr>').join('')+'</table>';
+  const nome=q=>/@/.test(q)?_waEsc(_waNomeEquipe(q)):_waEsc(q);
+  document.getElementById('wa-met').innerHTML=
+    '<div style="display:flex;gap:8px;align-items:center;font-size:12px">Período: '+[7,30,90].map(d=>'<button class="wa-btn'+(d===dias?' primario':'')+'" onclick="waAbrirMetricas('+d+')">'+d+' dias</button>').join('')+'</div>'+
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:10px 0;font-size:13px"><div><b style="font-size:20px">'+(r.total||0)+'</b><br>leads novos</div><div><b style="font-size:20px">'+fm(r.mediana_min)+'</b><br>mediana da 1ª resposta</div><div><b style="font-size:20px">'+pc(r.ate_5_min||0,r.total||0)+'</b><br>respondidos em até 5 min</div></div>'+
+    '<b style="font-size:12.5px">Agendamento conforme a demora</b>'+tb(['Primeira resposta','Leads','Agendaram'],(r.agendamento_por_demora||[]).map(f=>[_waEsc(f.faixa),f.leads,f.agendaram+' ('+pc(f.agendaram,f.leads)+')']))+
+    '<div style="height:10px"></div><b style="font-size:12.5px">Quem respondeu primeiro</b>'+tb(['Quem','Leads','Mediana','Até 5 min'],(r.por_quem||[]).map(q=>[nome(q.quem),q.leads,fm(q.mediana_min),pc(q.ate_5_min,q.leads)]))+
+    '<div style="height:10px"></div><b style="font-size:12.5px">Por dia</b>'+tb(['Dia','Leads','Mediana','Até 5 min','Sem resposta','Agendaram'],(r.por_dia||[]).map(d=>[new Date(d.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}),d.leads,fm(d.mediana_min),pc(d.ate_5_min,d.leads),d.sem_resposta,d.agendaram]))+
+    '<div style="font-size:11px;color:#8C98B1;margin-top:8px">Conta os leads novos do WhatsApp desde 26/10 (quando o CRM passou a registrar). "Automática" = mensagem automática de 5 min; "Agendaram" = etapa atual Agendou ou depois.</div>';
+}
 function waFecharModal(){const m=document.getElementById('wa-modal');if(m)m.remove();}
 function waRenderModelos(sel){
   const corpo=document.getElementById('wa-modal-corpo');if(!corpo)return;
@@ -14811,6 +14832,8 @@ function _auResumoCond(c){
   if(c.tipo==='nao_tem_tag'){const t=_auTag(c.tag_id);return 'não tem a tag <b>'+_auEsc(t?t.nome:'?')+'</b>';}
   if(c.tipo==='etapa')return 'a etapa é <b>'+_auEsc(WA_ETAPA_ROTULO[c.etapa]||c.etapa||'?')+'</b>';
   if(c.tipo==='respondeu')return 'o paciente respondeu';
+  if(c.tipo==='ninguem_respondeu')return 'ninguém respondeu o lead ainda (equipe, IA ou celular)';
+  if(c.tipo==='sem_resposta'){const m=Number(c.minutos)||0;return 'a equipe falou e o lead não responde há <b>'+(m>=1440?Math.round(m/1440)+' dia(s)':m>=60?Math.round(m/60)+' h':m+' min')+'</b>';}
   if(c.tipo==='janela_aberta')return 'a janela de 24 h está aberta';
   if(c.tipo==='calado_ha'){const m=Number(c.minutos)||0;return 'o paciente está sem mandar mensagem há <b>'+(m>=1440?Math.round(m/1440)+' dia(s)':m>=60?Math.round(m/60)+' h':m+' min')+'</b>';}
   return '?';
@@ -15209,6 +15232,7 @@ function _sqTituloPasso(p){
   if(p.tipo==='esperar')return ['⏱','Tempo de espera em minutos','cinza'];
   if(p.tipo==='acao')return ['⚡','Ação','amarelo'];
   if(p.tipo==='texto')return ['📄','Mensagem de texto','azul'];
+  if(p.tipo==='ia')return ['✨','Mensagem escrita pela IA','azul'];
   if(p.tipo==='midia'){const m=SQ_MIDIA[p.formato]||SQ_MIDIA.document;return [m.icone,m.nome,'rosa'];}
   if(p.tipo==='modelo')return ['📋','Template WhatsApp Oficial','verde'];
   if(p.tipo==='novo')return ['⊕','Selecione um novo passo','roxo'];
@@ -15224,9 +15248,9 @@ function _sqHtmlPasso(p,i){
     corpo='<div class="sq-chips">'+SQ_PASSOS_NOVOS.map(([t,n,e])=>'<button class="sq-chip" onclick="sqTipoPasso('+i+',\''+t+'\')">'+e+' '+n+'</button>').join('')+'</div>';
   }else if(p.tipo==='esperar'){
     corpo='<div class="sq-lab">Adicione o tempo de espera em minutos abaixo:</div><div class="sq-espera"><input class="dp-in" type="number" min="1" value="'+(Number(p.minutos)||'')+'" oninput="'+k+'.minutos=Math.max(0,Math.round(Number(this.value)||0));_sqSujo();this.parentNode.querySelector(\'b\').textContent=_sqHoras('+k+'.minutos)"><span>=</span><b>'+_sqHoras(p.minutos)+'</b></div>';
-  }else if(p.tipo==='texto'){
+  }else if(p.tipo==='texto'||p.tipo==='ia'){
     const n=String(p.texto||'').length;
-    corpo='<div class="sq-lab">Digite a mensagem abaixo:</div><div class="sq-cont-car" id="sq-car-'+i+'">('+n+'/2000)</div>'+
+    corpo='<div class="sq-lab">'+(p.tipo==='ia'?'A IA lê a conversa e escreve uma mensagem que retoma de onde o lead parou. Se ela falhar, sai este texto:':'Digite a mensagem abaixo:')+'</div><div class="sq-cont-car" id="sq-car-'+i+'">('+n+'/2000)</div>'+
       '<div class="sq-ta-wrap"><textarea class="dp-in sq-ta" maxlength="2000" id="sq-txt-'+i+'" oninput="'+k+'.texto=this.value;_sqSujo();document.getElementById(\'sq-car-'+i+'\').textContent=\'(\'+this.value.length+\'/2000)\'">'+_auEsc(p.texto||'')+'</textarea>'+
       '<div class="sq-ta-ic"><button title="Emoji" onclick="sqEmoji(event,'+i+')">😊</button><button title="Variáveis" onclick="sqVars(event,'+i+')"><i>(x)</i></button></div></div>';
     av=_sqAvMsg(p,i,true);
@@ -15379,7 +15403,7 @@ function _auValidar(a){
     const p=a.passos[i];const n='Passo '+(i+1)+': ';
     if(p.tipo==='novo')return n+'escolha o tipo do passo.';
     if(p.tipo==='esperar'&&!(p.minutos>0))return n+'informe o tempo de espera.';
-    if(p.tipo==='texto'&&!String(p.texto||'').trim())return n+'escreva a mensagem.';
+    if((p.tipo==='texto'||p.tipo==='ia')&&!String(p.texto||'').trim())return n+'escreva a mensagem'+(p.tipo==='ia'?' de reserva (se a IA falhar)':'')+'.';
     if(p.tipo==='midia'&&!p.link)return n+'envie o arquivo.';
     if(p.tipo==='modelo'&&!p.nome)return n+'escolha o template.';
     if(p.tipo==='modelo'&&p.cabecalho&&!/^https:\/\//.test(p.cabecalho.link||''))return n+'o template tem mídia no cabeçalho: coloque o link (https://…).';
@@ -15924,6 +15948,7 @@ function waMenuGerencia(ev){
   const m=document.createElement('div');m.className='cl-menu';
   m.innerHTML=(_waEhGestao()?'<button onclick="_clFecharPop();waAbrirNumeros()">'+_clIc('gear')+' Números de WhatsApp</button>':'')+
     '<button onclick="_clFecharPop();waGerenciarRapidas()">'+_clIc('zap')+' Respostas rápidas</button>'+
+    '<button onclick="_clFecharPop();waAbrirMetricas(7)">'+_clIc('clock')+' Tempo de resposta</button>'+
     '<button onclick="_clFecharPop();switchPage(\'automacoes\',[...document.querySelectorAll(\'.nav-item\')].find(n=>n.textContent.includes(\'Automações\')))">'+_clIc('play')+' Sequências e automações</button>'+
     '<button onclick="_clFecharPop();switchPage(\'disparos\',[...document.querySelectorAll(\'.nav-item\')].find(n=>n.textContent.includes(\'Mensagens em Massa\')))">'+_clIc('mega')+' Mensagens em massa</button>'+
     '<div class="sep"></div><button onclick="_clFecharPop();waCarregarConversas()">'+_clIc('sort')+' Atualizar lista</button>';

@@ -146,6 +146,38 @@ export function corpoModelo(p: any, ctx: { nome?: string | null; telefone?: stri
   return { type: "template", template };
 }
 
+// ---------- follow-up escrito pela IA (27/10/2026) ----------
+// A IA lê a conversa e escreve UMA mensagem que retoma do ponto em que o lead parou.
+// Usa o modelo e a base de conhecimento da tela "Agente de IA". Se falhar, o passo
+// manda o texto fixo dele (p.texto).
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+export async function textoDaIA(c: any, nome?: string | null): Promise<string> {
+  if (!ANTHROPIC_API_KEY || !c?.id) return "";
+  const ag = (await bancoJson(`/rest/v1/agente_ia?id=eq.1&select=modelo,base_conhecimento`).catch(() => []))?.[0] ?? {};
+  const msgs: any[] = ((await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&select=direcao,texto,tipo,enviada_em&order=enviada_em.desc&limit=30`).catch(() => [])) ?? []).reverse();
+  const hist = msgs.filter((m) => String(m.texto ?? "").trim()).map((m) => (m.direcao === "recebida" ? "LEAD: " : "CLÍNICA: ") + String(m.texto).trim().slice(0, 600)).join("\n");
+  if (!hist) return "";
+  const sistema =
+    "Você é a Raffa, do atendimento da Bulhões Odontologia (lentes de contato dental em Santos). " +
+    "O lead parou de responder. Escreva UMA mensagem curta de follow-up (no máximo 300 caracteres) que retome a conversa exatamente do ponto em que parou.\n" +
+    "Regras: se o lead fez uma pergunta que ficou sem resposta, responda primeiro, usando só a base de conhecimento. " +
+    "Termine com uma pergunta simples que leve ao próximo passo (contar a queixa, escolher manhã ou tarde, confirmar). " +
+    "Não invente horários, valores, condições, prêmios ou números que não estejam na base. Não repita uma mensagem que a clínica já mandou. " +
+    "Tom da Raffa: próximo, carinhoso, natural (pode usar \"Oiii\", no máximo um emoji). Nunca use hífen nem travessão. Não diga que é IA nem cite há quanto tempo a pessoa não responde. " +
+    "Responda só com o texto da mensagem." +
+    (String(ag.base_conhecimento ?? "").trim() ? "\n\n# Base de conhecimento\n" + String(ag.base_conhecimento).trim() : "") +
+    (nome ? `\n\nNome do lead: ${nome}.` : "");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model: ag.modelo || "claude-sonnet-5-5", max_tokens: 400, system: [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: "Conversa até agora:\n" + hist + "\n\nEscreva a mensagem de follow-up." }] }),
+  });
+  if (!r.ok) throw new Error("Anthropic " + r.status + " " + (await r.text()).slice(0, 200));
+  const j = await r.json();
+  const t = (j?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+  return t.replace(/\s*[—–]\s*/g, ", ").slice(0, 700);
+}
+
 // ---------- execução ----------
 type Exec = { id: number; automacao_id: number; telefone: string; conversa_id: string | null; passo: number; entrou_em: string; contexto: any };
 
@@ -209,6 +241,7 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           return "esperando";
         }
         case "texto":
+        case "ia":
         case "midia":
         case "modelo": {
           const quando = p.ignorar_horario ? agora() : proximoHorario(agora(), regras);
@@ -243,7 +276,7 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
           }
           const dados = { nome: k.nome, telefone: x.telefone };
           let corpo: any, registro: string, tipo: string;
-          if (p.tipo === "texto" || p.tipo === "midia") {
+          if (p.tipo === "texto" || p.tipo === "ia" || p.tipo === "midia") {
             if (!janelaAberta(k.c, agora())) {
               if (p.sem_janela === "parar") {
                 await avancar(x, i, p.tipo, "pulado", "janela de 24 h fechada: saiu da automação", i, null, "saiu", k.c.id);
@@ -263,8 +296,10 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             corpo = { type: fmt, [fmt]: conteudo };
             registro = legenda || ({ image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 " + (p.nome || "Arquivo") }[fmt]!);
             tipo = fmt;
-          } else if (p.tipo === "texto") {
-            registro = preencher(p.texto, dados).trim();
+          } else if (p.tipo === "texto" || p.tipo === "ia") {
+            registro = "";
+            if (p.tipo === "ia") registro = (await textoDaIA(k.c, k.nome).catch((e) => { console.error("[automacoes] ia", String(e)); return ""; })).trim();
+            if (!registro) registro = preencher(p.texto, dados).trim();
             if (!registro) { await avancar(x, i, "texto", "pulado", "texto vazio", i + 1, null, "ativa", k.c.id); i++; continue; }
             corpo = { type: "text", text: { body: registro.slice(0, 4096), preview_url: true } };
             tipo = "text";
@@ -343,6 +378,13 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             // (conversa parada): só então o follow-up sai; se falou há pouco, pula
             const ult = k.c?.ultima_recebida_em ? Date.parse(k.c.ultima_recebida_em) : 0;
             v = !ult || agora() - ult >= Math.max(1, Number(cond.minutos) || 0) * 60_000;
+          }
+          else if (cond.tipo === "ninguem_respondeu") {
+            // (27/10/2026) primeira mensagem automática: ninguém (equipe, IA ou celular)
+            // mandou nada para o lead desde que ele chegou, e o robô não está cuidando
+            const desde = new Date(Date.parse(x.entrou_em) - 10 * 60_000).toISOString();
+            const env: any[] = k.c ? ((await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${k.c.id}&direcao=eq.enviada&status=neq.falhou&enviada_em=gte.${encodeURIComponent(desde)}&select=autor_email&limit=50`).catch(() => [])) ?? []) : [];
+            v = !!k.c && !k.c.robo_ligado && !env.some((m) => !/^automa/i.test(String(m.autor_email ?? "")));
           }
           else if (cond.tipo === "sem_resposta") {
             // (26/10/2026) follow-up de verdade: a equipe falou e o lead não respondeu
