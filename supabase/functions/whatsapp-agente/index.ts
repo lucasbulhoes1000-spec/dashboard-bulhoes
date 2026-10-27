@@ -391,6 +391,10 @@ export function ferramentas(imagens: any[], agendamento = false) {
     name: "transferir_para_humano",
     description: "Passa a conversa para a equipe da clínica e para de responder automaticamente. Use quando as instruções pedirem ou quando não souber responder com segurança.",
     input_schema: { type: "object", properties: { motivo: { type: "string", description: "Por que está passando (ex.: pediu horários, dor forte, reclamação)" } }, required: ["motivo"] },
+  }, {
+    name: "encerrar_sem_interesse",
+    description: "Marca o lead como Perdido e para de responder. Use só quando as instruções mandarem (ex.: mora fora da Baixada Santista e não pode vir a Santos fazer o tratamento). Agradeça antes de usar.",
+    input_schema: { type: "object", properties: { motivo: { type: "string", description: "Por que o lead foi encerrado (ex.: mora em outra cidade e não pode vir a Santos)" } }, required: ["motivo"] },
   }];
   if (agendamento) {
     t.push({
@@ -409,6 +413,7 @@ export function ferramentas(imagens: any[], agendamento = false) {
         hora: { type: "string", description: "HH:MM" },
         nome_completo: { type: "string", description: "Nome completo do paciente" },
         observacoes: { type: "string", description: "Resumo para a agenda: queixa, o que procura, procedimentos de interesse, como conheceu a clínica" },
+        online: { type: "boolean", description: "true quando for avaliação online pelo Google Meet (paciente de fora da Baixada Santista que pode vir a Santos fazer o tratamento)" },
       }, required: ["data", "hora", "nome_completo", "observacoes"] },
     });
   }
@@ -509,7 +514,7 @@ async function chamarClaude(modelo: string, sistema: string, mensagens: any[], t
   return r.j;
 }
 
-export type Acao = { tipo: "texto"; texto: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string };
+export type Acao = { tipo: "texto"; texto: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string } | { tipo: "perdido"; motivo: string };
 export type Agenda = { ver: (periodo: string, data?: string) => Promise<string>; marcar: (x: any) => Promise<string> };
 
 /**
@@ -545,6 +550,10 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
           transferiu = true;
           await executar({ tipo: "transferir", motivo: String(b.input?.motivo ?? "") });
           resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Conversa passada para a equipe. Não escreva mais nada." });
+        } else if (b.name === "encerrar_sem_interesse") {
+          transferiu = true;
+          await executar({ tipo: "perdido", motivo: String(b.input?.motivo ?? "") });
+          resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Lead encerrado como Perdido. Não escreva mais nada." });
         } else if (b.name === "enviar_imagem") {
           const img = imagens.find((i) => i.nome === b.input?.nome);
           if (img && (await executar({ tipo: "imagem", nome: img.nome, link: img.link }))) {
@@ -589,7 +598,9 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
         const ja = await bancoJson(`/rest/v1/agente_registros?conversa_id=eq.${conversaId}&tipo=eq.agendamento&criado_em=gte.${new Date(Date.now() - 30 * 86_400_000).toISOString()}&select=id&limit=1`).catch(() => []);
         if (ja?.length) return "Esta conversa já tem uma avaliação marcada pelo agente. Para remarcar ou marcar outra, passe para a equipe.";
       }
-      const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", String(x.observacoes ?? ""), Date.now(), [ctx?.nome, conv?.nome_contato, conv?.nome_perfil].filter(Boolean).map(String));
+      const online = x.online === true || String(x.online) === "true";
+      const obs = (online ? "AVALIAÇÃO ONLINE (Google Meet): enviar o link ao paciente. " : "") + String(x.observacoes ?? "");
+      const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", obs, Date.now(), [ctx?.nome, conv?.nome_contato, conv?.nome_perfil].filter(Boolean).map(String));
       if (!r.ok) return `Não foi possível marcar: ${r.motivo}. Consulte ver_horarios de novo e ofereça outras opções.`;
       // CRM: etapa "Agendou"
       const agoraIso = new Date().toISOString();
@@ -597,8 +608,9 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
         await banco(`/rest/v1/pacientes?on_conflict=telefone`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({ telefone: conv.telefone, nome: nome, etapa: "Agendou", etapa_alterada_em: agoraIso }) }).catch(() => {});
       }
-      await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${cfg.procedimento || "Avaliação"} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}. Cadastro do paciente: ${r.cadastro ?? "?"}.`, autor: "agente" });
-      return `Marcado no Clinicorp: ${descreverHorario(r.horario!, Date.now())}, até ${r.horario!.fim}. Confirme ao paciente.`;
+      await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${online ? "Avaliação ONLINE (Google Meet)" : (cfg.procedimento || "Avaliação")} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}. Cadastro do paciente: ${r.cadastro ?? "?"}.`, autor: "agente" });
+      return `Marcado no Clinicorp: ${descreverHorario(r.horario!, Date.now())}, até ${r.horario!.fim}.` +
+        (online ? " É avaliação ONLINE: confirme sem o endereço e diga que a equipe envia o link do Google Meet antes do horário." : " Confirme ao paciente.");
     },
   };
 }
@@ -642,7 +654,7 @@ export async function responder(conversaId: string, versao: number, pausa = espe
       else await pausa(Math.min(4000, 1200 + (x.tipo === "texto" ? x.texto.length * 15 : 1500)));
       // o paciente mandou mais alguma coisa enquanto o agente pensava ou digitava? para aqui e
       // responde de novo com tudo (antes só conferia na 1ª mensagem e atropelava o paciente)
-      if (x.tipo !== "transferir") {
+      if (x.tipo === "texto" || x.tipo === "imagem") {
         const v = await rpc("agente_versao", { p_conversa: conversaId }).catch(() => versao);
         if (v !== versao) return false;
       }
@@ -657,6 +669,14 @@ export async function responder(conversaId: string, versao: number, pausa = espe
         await registrarEnviada(c, r.id, "image", "📷 " + x.nome, autor, r.erro, { ...r.j, link: x.link });
         enviados.push("[imagem: " + x.nome + "]");
         return r.ok;
+      }
+      if (x.tipo === "perdido") {
+        // CRM: etapa Perdido e robô desligado nesta conversa (ninguém precisa assumir)
+        if (c.telefone) await banco(`/rest/v1/pacientes?on_conflict=telefone`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({ telefone: c.telefone, etapa: "Perdido", etapa_alterada_em: new Date().toISOString() }) }).catch(() => {});
+        await banco(`/rest/v1/conversas?id=eq.${conversaId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ robo_ligado: false }) }).catch(() => {});
+        await registro({ conversa_id: conversaId, tipo: "perdido", detalhe: "Encerrado como Perdido: " + x.motivo, autor: "agente" });
+        return true;
       }
       await rpc("agente_transferir", { p_conversa: conversaId, p_motivo: x.motivo });
       return true;
