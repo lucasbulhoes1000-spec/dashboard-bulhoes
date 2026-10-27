@@ -14307,7 +14307,7 @@ async function waEnviarTexto(){
   _wa.enviando=true;
   const temp={id:'tmp-'+Date.now(),conversa_id:c.id,direcao:'enviada',tipo:'text',texto,status:'enviando',autor_email:usuarioAtualEmail(),enviada_em:new Date().toISOString()};
   _wa.msgs.push(temp);waRenderMsgs(true);
-  t.value='';waAjustarTexto(t);try{waContar(t);}catch(e){}waRenderJanela();
+  t.value='';if(_wa.rascunhos&&t.dataset.conv)delete _wa.rascunhos[t.dataset.conv];waAjustarTexto(t);try{waContar(t);}catch(e){}waRenderJanela();
   try{
     const r=await _waAcao({acao:'enviar_texto',conversa_id:c.id,texto});
     const ja=_wa.msgs.find(m=>m.id===r.mensagem_id);
@@ -14422,7 +14422,7 @@ async function waAgdSalvar(forcar){
     const dt=new Date(_agd.data+'T12:00:00').toLocaleDateString('pt-BR');
     const conf=_agd.nome.trim()+', sua avaliação está confirmada com exclusividade aqui na Bulhões Odontologia 💙\n\n📆 Data: '+dt+'\n⏰ Horário: '+_agd.ini+'\n📍 Av. Senador Feijó, 686, sala 923, Vila Mathias, Santos (Edifício The Blue Officemall)\n\nA consulta dura de 50 minutos a 1 hora. Um dia antes te mando uma mensagem para confirmar, tá bom?';
     waFecharModal();
-    const t=document.getElementById('wa-texto');if(t&&!t.disabled){t.value=conf;if(typeof waAjustarTexto==='function')waAjustarTexto(t);t.focus();}
+    const t=document.getElementById('wa-texto');if(t&&!t.disabled){t.value=conf;_wa.rascunhos=_wa.rascunhos||{};if(t.dataset.conv)_wa.rascunhos[t.dataset.conv]=conf;if(typeof waAjustarTexto==='function')waAjustarTexto(t);t.focus();}
     showToast('success','Agendado no Clinicorp',dt+' às '+_agd.ini+(j.cadastro==='novo'?' · cadastro novo':' · cadastro já existia'));
     try{waRenderPainel();waRenderLista();}catch(e){}
   }catch(e){_agd.salvando=false;_agdRender();showToast('error','Não foi possível agendar',e.message);}
@@ -14538,7 +14538,7 @@ function waLigarTempoReal(){
       .subscribe(st=>{
         const antes=_wa.tempoReal;
         _wa.tempoReal=st==='SUBSCRIBED';
-        if(_wa.tempoReal&&!antes){waCarregarConversas(true);if(_wa.atual&&currentPage==='conversas')waAbrir(_wa.atual.id);}
+        if(_wa.tempoReal&&!antes){waCarregarConversas(true);if(_wa.atual&&currentPage==='conversas')waRecarregarMsgsAtual();}
         if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){
           // tenta de novo em 15 s; enquanto isso, a checagem periódica cobre
           setTimeout(()=>{try{_sb.removeChannel(_wa.canal);}catch(e){}_wa.canal=null;waLigarTempoReal();},15000);
@@ -16080,7 +16080,16 @@ function waRenderLista(){
 }
 
 // ---------- conversa aberta ----------
+// (27/10/2026) rascunho por conversa: redesenhar a tela não apaga o que está sendo digitado
+function _waGuardarRascunho(){const t=document.getElementById('wa-texto');if(t&&t.dataset.conv){_wa.rascunhos=_wa.rascunhos||{};_wa.rascunhos[t.dataset.conv]=t.value;}}
+function _waRestaurarRascunho(){
+  const t=document.getElementById('wa-texto');const c=_wa.atual;if(!t||!c)return;
+  t.dataset.conv=c.id;const v=(_wa.rascunhos||{})[c.id];
+  if(v){t.value=v;try{waAjustarTexto(t);waContar(t);}catch(e){}}
+}
 function waRenderChatBase(){
+  const focado=document.activeElement&&document.activeElement.id==='wa-texto';
+  _waGuardarRascunho();
   const el=document.getElementById('wa-chat');
   el.innerHTML=
     '<div class="wa-cab" id="wa-cab"></div>'+
@@ -16098,7 +16107,7 @@ function waRenderChatBase(){
         '<div class="dir"><button class="cl-chip-seq" title="Sequências ativas" onclick="waSeqAbrir()">'+_clIc('play')+'<b id="wa-seq-n">0</b> | SEQUÊNCIAS ATIVAS '+_clIc('up')+'</button>'+
         '<button class="cl-chip-seq" title="Mensagens agendadas" onclick="waAgAbrir()">'+_clIc('clock')+'<b id="wa-ag-n">0</b> | MENSAGENS AGENDADAS '+_clIc('up')+'</button></div>'+
       '</div>'+
-      '<textarea id="wa-texto" class="cl-texto" rows="1" placeholder="Digite uma mensagem..." oninput="waAjustarTexto(this);waDigitando(this);waContar(this)" onkeydown="waTeclaTexto(event)"></textarea>'+
+      '<textarea id="wa-texto" class="cl-texto" rows="1" placeholder="Digite uma mensagem..." oninput="waAjustarTexto(this);waDigitando(this);waContar(this);_wa.rascunhos=_wa.rascunhos||{};if(this.dataset.conv)_wa.rascunhos[this.dataset.conv]=this.value" onkeydown="waTeclaTexto(event)"></textarea>'+
       '<div class="cl-comp-rodape">'+
         '<button class="cl-ib" title="Emoji" onclick="waEmojis(event)">'+_clIc('smile')+'</button>'+
         '<button class="cl-ib" id="wa-btn-mic" title="Gravar áudio" onclick="waGravarAudio()">'+_clIc('mic')+'</button>'+
@@ -16112,6 +16121,8 @@ function waRenderChatBase(){
   waRenderPainel();
   waSeqContar();
   waAgContar();
+  _waRestaurarRascunho();
+  if(focado){const t=document.getElementById('wa-texto');if(t){t.focus();t.selectionStart=t.selectionEnd=t.value.length;}}
 }
 function waContar(t){const el=document.getElementById('wa-cont');if(el)el.textContent=t.value.length+' caracteres';}
 function waRenderCabecalho(){
