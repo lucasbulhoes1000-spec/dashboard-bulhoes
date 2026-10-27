@@ -628,7 +628,8 @@ async function carregarConversa(id: string) {
   if (!c) return null;
   const [p, msgs] = await Promise.all([
     bancoJson(`/rest/v1/pacientes?telefone=eq.${c.telefone}&select=nome,etapa,origem`).catch(() => []),
-    bancoJson(`/rest/v1/mensagens?conversa_id=eq.${id}&select=direcao,tipo,texto,autor_email,enviada_em&order=enviada_em.desc&limit=40`),
+    // ia_desde: "reiniciar conversa" para o agente (ele só lê o que veio depois)
+    bancoJson(`/rest/v1/mensagens?conversa_id=eq.${id}${c.ia_desde ? `&enviada_em=gte.${encodeURIComponent(c.ia_desde)}` : ""}&select=direcao,tipo,texto,autor_email,enviada_em&order=enviada_em.desc&limit=40`),
   ]);
   const pac = p?.[0];
   return { c, ctx: { nome: pac?.nome || c.nome_contato || c.nome_perfil || "", etapa: pac?.etapa ?? null, origem: pac?.origem ?? null }, msgs: (msgs ?? []).reverse() };
