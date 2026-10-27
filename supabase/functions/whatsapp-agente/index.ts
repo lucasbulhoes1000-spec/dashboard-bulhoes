@@ -803,6 +803,79 @@ export async function handler(req: Request): Promise<Response> {
         }
         return json({ ok: true, achado: await buscarPacienteClinicorp(String(dados.telefone ?? ""), [String(dados.nome ?? "")]) });
       }
+      // ---------- (27/10/2026) agendar pela Central de mensagens ----------
+      case "agenda_opcoes": {
+        const [profs, cats, cfgA] = await Promise.all([
+          clinicorp("/professional/list_all_professionals", { subscriber_id: assinante() }).catch(() => []),
+          clinicorp("/appointment/list_categories", { subscriber_id: assinante() }).catch(() => []),
+          bancoJson(`/rest/v1/agente_ia?id=eq.1&select=agendamento`).catch(() => []),
+        ]);
+        const lista = (x: any) => Array.isArray(x) ? x : (x?.data ?? x?.professionals ?? x?.categories ?? []);
+        const g = cfgA?.[0]?.agendamento ?? {};
+        return json({
+          ok: true,
+          profissionais: lista(profs).map((p: any) => ({ id: String(p.id ?? p.PersonId ?? ""), nome: p.Name ?? p.name ?? "" })).filter((p: any) => p.id && p.nome)
+            .sort((a: any, b: any) => a.nome.localeCompare(b.nome)),
+          categorias: lista(cats).map((c: any) => ({ id: String(c.id ?? c.CategoryId ?? ""), nome: c.Description ?? c.description ?? c.Name ?? "" })).filter((c: any) => c.id && c.nome)
+            .sort((a: any, b: any) => a.nome.localeCompare(b.nome)),
+          padrao: { profissional_id: g.profissional_id ?? null, categoria_id: g.categoria_id ?? null, duracao_min: Number(g.duracao_min ?? 60) },
+        });
+      }
+      case "agenda_dia": {
+        const data = String(dados.data ?? "");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return json({ ok: false, erro: "data inválida" }, 400);
+        const prof = String(dados.profissional_id ?? "");
+        const p: Record<string, string> = { from: data, to: data, includeAssigns: "X" };
+        if (CLINICORP_SUBSCRIBER_ID) p.subscriber_id = CLINICORP_SUBSCRIBER_ID;
+        const ag = await clinicorp("/appointment/list", p);
+        const itens = (Array.isArray(ag) ? ag : (ag?.appointments ?? ag?.data ?? [])).filter((a: any) =>
+          String(a?.Canceled ?? "").toUpperCase() !== "X" && String(a?.Deleted ?? "").toUpperCase() !== "X" && dataDoItem(a) === data &&
+          (!prof || !a?.Dentist_PersonId || String(a.Dentist_PersonId) === prof));
+        const hm = (t: unknown) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(t ?? "")); return m ? `${m[1].padStart(2, "0")}:${m[2]}` : ""; };
+        return json({ ok: true, itens: itens.map((a: any) => ({
+          inicio: hm(a.fromTime), fim: hm(a.toTime), dia_inteiro: String(a?.AllDay ?? "").toUpperCase() === "X",
+          paciente: String(a.PatientName ?? a.Name ?? "").trim(), categoria: String(a.CategoryDescription ?? ""),
+          tipo: String(a.ItemType ?? "APPOINTMENT"), de_outro: !a?.Dentist_PersonId,
+        })).sort((x: any, y: any) => x.inicio.localeCompare(y.inicio)) });
+      }
+      case "agendar_manual": {
+        const c = dados.conversa_id ? (await bancoJson(`/rest/v1/conversas?id=eq.${String(dados.conversa_id)}&select=id,telefone,canal`))?.[0] : null;
+        const tel = String(c?.telefone ?? dados.telefone ?? "").replace(/\D/g, "");
+        if (!tel || tel.length < 10) return json({ ok: false, erro: "contato sem telefone" }, 400);
+        const data = String(dados.data ?? ""), ini = String(dados.inicio ?? ""), fim = String(dados.fim ?? "");
+        const nome = String(dados.nome ?? "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(ini) || !/^\d{2}:\d{2}$/.test(fim) || fim <= ini) return json({ ok: false, erro: "data ou horário inválido" }, 400);
+        if (nome.split(/\s+/).length < 2) return json({ ok: false, erro: "coloque o nome completo" }, 400);
+        const prof = String(dados.profissional_id ?? "");
+        if (!prof) return json({ ok: false, erro: "escolha a profissional" }, 400);
+        // conflito com outro agendamento da mesma profissional
+        if (!dados.forcar) {
+          const p: Record<string, string> = { from: data, to: data, includeAssigns: "X" };
+          if (CLINICORP_SUBSCRIBER_ID) p.subscriber_id = CLINICORP_SUBSCRIBER_ID;
+          const ag = await clinicorp("/appointment/list", p).catch(() => []);
+          const a0 = minutos(ini), f0 = minutos(fim);
+          const choque = (Array.isArray(ag) ? ag : []).filter((a: any) => String(a?.Canceled ?? "").toUpperCase() !== "X" && String(a?.Deleted ?? "").toUpperCase() !== "X"
+            && dataDoItem(a) === data && (String(a?.Dentist_PersonId ?? "") === prof || (!a?.Dentist_PersonId && String(a?.ItemType ?? "") !== "APPOINTMENT"))
+            && (String(a?.AllDay ?? "").toUpperCase() === "X" || (minutos(a?.fromTime) < f0 && minutos(a?.toTime) > a0)));
+          if (choque.length) return json({ ok: false, conflito: choque.map((a: any) => `${String(a.fromTime ?? "").slice(0, 5)} ${String(a.PatientName ?? a.Name ?? a.CategoryDescription ?? "compromisso").trim()}`) }, 409);
+        }
+        const pac = await pacienteClinicorp(nome, tel, [String(dados.nome_perfil ?? "")].filter(Boolean));
+        const cfg = (await bancoJson(`/rest/v1/agente_ia?id=eq.1&select=agendamento`).catch(() => []))?.[0]?.agendamento ?? {};
+        const obs = String(dados.observacoes ?? "").trim();
+        const corpo: any = {
+          PatientName: nome, MobilePhone: telefoneBonito(tel), fromTime: ini, toTime: fim, date: `${data}T03:00:00.000Z`,
+          Dentist_PersonId: Number(prof), Procedures: String(dados.procedimento || "Avaliação"),
+          Notes: (obs ? obs + "\n" : "") + `Agendado pelo CRM (${u.email}).`,
+        };
+        if (pac.id) corpo.Patient_PersonId = pac.id;
+        if (cfg.clinica_id) corpo.Clinic_BusinessId = Number(cfg.clinica_id);
+        if (dados.categoria_id) corpo.CategoryId = Number(dados.categoria_id);
+        const r = await clinicorp("/appointment/create_appointment_by_api", CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {}, "POST", corpo);
+        const item = Array.isArray(r) ? r[0] : r;
+        if (!item?.id) return json({ ok: false, erro: "o Clinicorp não confirmou: " + JSON.stringify(r).slice(0, 200) }, 502);
+        await registro({ conversa_id: c?.id ?? null, tipo: "agendamento", detalhe: `Agendado pela Central (${u.email}): ${data} ${ini}–${fim} (${nome}). Agendamento ${item.id}. Cadastro: ${pac.existente ? "já existia (" + pac.como + ")" : "novo"}.`, autor: u.email });
+        return json({ ok: true, id: String(item.id), cadastro: pac.existente ? "existente" : "novo" });
+      }
       case "clinicorp_opcoes": {
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão" }, 403);
         const sub = CLINICORP_SUBSCRIBER_ID ? { subscriber_id: CLINICORP_SUBSCRIBER_ID } : {};

@@ -14356,6 +14356,77 @@ async function waAbrirMetricas(dias){
     '<div style="height:10px"></div><b style="font-size:12.5px">Por dia</b>'+tb(['Dia','Leads','Mediana','Até 5 min','Sem resposta','Agendaram'],(r.por_dia||[]).map(d=>[new Date(d.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}),d.leads,fm(d.mediana_min),pc(d.ate_5_min,d.leads),d.sem_resposta,d.agendaram]))+
     '<div style="font-size:11px;color:#8C98B1;margin-top:8px">Conta os leads novos do WhatsApp desde 27/10. Conta como resposta: equipe, IA, celular e a 1ª mensagem automática (5 min); "Agendaram" = etapa atual Agendou ou depois.</div>';
 }
+// ---------- (27/10/2026) agendar no Clinicorp pela Central ----------
+const _agd={op:null};
+function _agdHoras(){const o=[];for(let m=7*60;m<=21*60;m+=15)o.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));return o;}
+function _agdSoma(h,min){const [a,b]=h.split(':').map(Number);const t=a*60+b+min;return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}
+async function waAbrirAgendar(){
+  const c=_wa.atual;if(!c)return;
+  if(c.canal==='instagram'){showToast('error','Só para WhatsApp','Peça o WhatsApp da pessoa para agendar.');return;}
+  waFecharModal();
+  const hoje=new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
+  Object.assign(_agd,{conv:c.id,data:hoje,ini:'',fim:'',nome:(_waNome(c)||'').replace(/^\(?\d.*/,''),obs:'',itens:null,salvando:false});
+  const fundo=document.createElement('div');fundo.className='wa-modal-fundo';fundo.id='wa-modal';
+  fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
+  fundo.innerHTML='<div class="wa-modal" style="max-width:860px;width:96vw"><div class="wa-modal-cab">Agendar no Clinicorp<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" id="agd-corpo">Carregando…</div></div>';
+  document.body.appendChild(fundo);
+  if(!_agd.op){try{_agd.op=await _agAcao({acao:'agenda_opcoes'});}catch(e){document.getElementById('agd-corpo').textContent='Não foi possível carregar o Clinicorp: '+e.message;return;}}
+  _agd.prof=_agd.prof||String(_agd.op.padrao.profissional_id||'');
+  _agd.cat=_agd.cat||String(_agd.op.padrao.categoria_id||'');
+  _agdRender();_agdCarregarDia();
+}
+function _agdRender(){
+  const el=document.getElementById('agd-corpo');if(!el)return;const o=_agd.op||{profissionais:[],categorias:[]};
+  const sel=(id,lista,v,on)=>'<select class="wa-sel" id="'+id+'" style="width:100%;height:32px" onchange="'+on+'">'+lista.map(x=>'<option value="'+_waEsc(x.id)+'"'+(String(x.id)===String(v)?' selected':'')+'>'+_waEsc(x.nome)+'</option>').join('')+'</select>';
+  const horas=_agdHoras();
+  const it=_agd.itens;
+  const agenda=it==null?'<div style="color:#8C98B1;font-size:12px">Carregando agenda…</div>':!it.length?'<div style="color:#8C98B1;font-size:12px">Nenhum agendamento nesse dia.</div>':
+    it.map(a=>'<div style="border-left:3px solid '+(a.tipo==='APPOINTMENT'?'#E2BE6A':'#8C98B1')+';background:#1B2A4A;border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12px"><b>'+(a.dia_inteiro?'Dia inteiro':_waEsc(a.inicio+' – '+a.fim))+'</b><br>'+_waEsc(a.paciente||(a.tipo==='APPOINTMENT'?'Paciente':'Compromisso'))+(a.categoria?' · <span style="color:#E2BE6A">'+_waEsc(a.categoria)+'</span>':'')+'</div>').join('');
+  el.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:8px;font-size:12px">'+
+      '<label>Profissional'+sel('agd-prof',o.profissionais,_agd.prof,'_agd.prof=this.value;_agdCarregarDia()')+'</label>'+
+      '<label>Tipo de agendamento'+sel('agd-cat',o.categorias,_agd.cat,'_agd.cat=this.value')+'</label>'+
+      '<label>Dia<input class="wa-var" type="date" style="width:100%" value="'+_agd.data+'" onchange="_agd.data=this.value;_agdCarregarDia()"></label>'+
+      '<div style="display:flex;gap:8px"><label style="flex:1">Início<select class="wa-sel" style="width:100%;height:32px" onchange="_agd.ini=this.value;_agd.fim=this.value?_agdSoma(this.value,Number((_agd.op.padrao||{}).duracao_min||60)):\'\';_agdRender()"><option value="">Escolha</option>'+horas.map(h=>'<option'+(h===_agd.ini?' selected':'')+'>'+h+'</option>').join('')+'</select></label>'+
+      '<label style="flex:1">Fim<select class="wa-sel" style="width:100%;height:32px" onchange="_agd.fim=this.value"><option value="">Escolha</option>'+horas.map(h=>'<option'+(h===_agd.fim?' selected':'')+'>'+h+'</option>').join('')+'</select></label></div>'+
+      '<label>Nome completo do paciente<input class="wa-var" style="width:100%" value="'+_waEsc(_agd.nome)+'" oninput="_agd.nome=this.value" placeholder="Nome e sobrenome"></label>'+
+      '<label>Observações (vão para a agenda)<textarea class="wa-var" style="width:100%;min-height:70px" oninput="_agd.obs=this.value" placeholder="Queixa, o que procura, como conheceu a clínica…">'+_waEsc(_agd.obs)+'</textarea></label>'+
+      '<div style="display:flex;justify-content:flex-end;gap:8px"><button class="wa-btn" onclick="waFecharModal()">Cancelar</button><button class="wa-btn primario" id="agd-salvar" onclick="waAgdSalvar(false)">'+(_agd.salvando?'Agendando…':'Agendar')+'</button></div>'+
+    '</div>'+
+    '<div style="flex:1;min-width:240px"><div style="font-size:12.5px;font-weight:600;margin-bottom:6px">Agenda do dia ('+_waEsc(new Date(_agd.data+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'}))+')</div><div style="max-height:380px;overflow:auto">'+agenda+'</div></div>'+
+  '</div>';
+}
+async function _agdCarregarDia(){
+  _agd.itens=null;_agdRender();
+  const pedido=_agd.prof+'|'+_agd.data;_agd.pedido=pedido;
+  try{const r=await _agAcao({acao:'agenda_dia',data:_agd.data,profissional_id:_agd.prof});if(_agd.pedido===pedido){_agd.itens=r.itens||[];_agdRender();}}
+  catch(e){if(_agd.pedido===pedido){_agd.itens=[];_agdRender();showToast('error','Não foi possível ler a agenda',e.message);}}
+}
+async function waAgdSalvar(forcar){
+  if(_agd.salvando)return;
+  if(!_agd.prof||!_agd.data||!_agd.ini||!_agd.fim){showToast('error','Falta informação','Escolha profissional, dia, início e fim.');return;}
+  if(_agd.fim<=_agd.ini){showToast('error','Horário inválido','O fim precisa ser depois do início.');return;}
+  if(String(_agd.nome||'').trim().split(/\s+/).length<2){showToast('error','Nome completo','Coloque nome e sobrenome do paciente.');return;}
+  const c=_wa.atual;_agd.salvando=true;_agdRender();
+  try{
+    const r=await fetch(AG_FUNCAO,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+_sbAccessToken},
+      body:JSON.stringify({acao:'agendar_manual',conversa_id:_agd.conv,profissional_id:_agd.prof,categoria_id:_agd.cat,data:_agd.data,inicio:_agd.ini,fim:_agd.fim,nome:_agd.nome.trim(),observacoes:_agd.obs,nome_perfil:c&&c.nome_perfil,forcar:!!forcar})});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===409&&j.conflito){_agd.salvando=false;_agdRender();
+      if(confirm('Já tem agendamento nesse horário:\n\n'+j.conflito.join('\n')+'\n\nAgendar mesmo assim (encaixe)?'))return waAgdSalvar(true);return;}
+    if(!r.ok||!j.ok)throw new Error(j.erro||('erro '+r.status));
+    _agd.salvando=false;
+    // etapa vira Agendou (para os follow-ups e dispara as boas-vindas)
+    try{if(c){const L=_waLead(c);if(L&&L.ph&&String(L.etapa||'').toLowerCase()!=='agendou')_definirEtapaDireto(L.ph,'Agendou');}}catch(e){}
+    // confirmação pronta na caixa de mensagem (a Raffa revisa e envia)
+    const dt=new Date(_agd.data+'T12:00:00').toLocaleDateString('pt-BR');
+    const conf=_agd.nome.trim()+', sua avaliação está confirmada com exclusividade aqui na Bulhões Odontologia 💙\n\n📆 Data: '+dt+'\n⏰ Horário: '+_agd.ini+'\n📍 Av. Senador Feijó, 686, sala 923, Vila Mathias, Santos (Edifício The Blue Officemall)\n\nA consulta dura de 50 minutos a 1 hora. Um dia antes te mando uma mensagem para confirmar, tá bom?';
+    waFecharModal();
+    const t=document.getElementById('wa-texto');if(t&&!t.disabled){t.value=conf;if(typeof waAjustarTexto==='function')waAjustarTexto(t);t.focus();}
+    showToast('success','Agendado no Clinicorp',dt+' às '+_agd.ini+(j.cadastro==='novo'?' · cadastro novo':' · cadastro já existia'));
+    try{waRenderPainel();waRenderLista();}catch(e){}
+  }catch(e){_agd.salvando=false;_agdRender();showToast('error','Não foi possível agendar',e.message);}
+}
 function waFecharModal(){const m=document.getElementById('wa-modal');if(m)m.remove();}
 function waRenderModelos(sel){
   const corpo=document.getElementById('wa-modal-corpo');if(!corpo)return;
@@ -16088,6 +16159,7 @@ function waMenuMais(ev){
     (igc?'<button onclick="_clFecharPop();waIgIgnorar()">'+_clIc('x')+' Ignorar contato (não entra mais no CRM)</button>':'')+
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
     '<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
+    (_wa.atual&&_wa.atual.canal!=='instagram'?'<button onclick="_clFecharPop();waAbrirAgendar()">'+_clIc('clock')+' Agendar no Clinicorp</button>':'')+
     '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
     '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
     (_wa.agente&&_wa.agente.resumos?'<button onclick="_clFecharPop();waResumirIA()">'+_clIc('bot')+' Resumir com IA</button>':'')+
@@ -16278,6 +16350,7 @@ function waRenderPainel(){
       '<button class="cl-link" style="align-self:center;display:flex;gap:5px;align-items:center;color:#EEF1F7" onclick="waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
       _waBlocoResumo(c)+
       '<div class="cl-campo">'+_clIc('pessoa')+'<span>Atribuído a:</span><select onchange="waAtribuir(this.value||null)">'+atendOpts+'</select></div>'+
+      '<button class="wa-btn primario" style="align-self:stretch;margin:2px 0 6px" onclick="waAbrirAgendar()">📅 Agendar no Clinicorp</button>'+
       (L.existe
         ?'<div class="cl-campo">'+_clIc('mega')+'<span>Origem:</span><select onchange="waMudarOrigem(this.value)">'+opt('','Selecione…',L.origem)+origens.map(o=>opt(o,o,L.origem)).join('')+'</select></div>'+
          '<div class="cl-campo">'+_clIc('funil')+'<span>Etapa do contato:</span><select onchange="waMudarEtapa(this.value)">'+(etapaAtual&&!WA_ETAPAS.includes(etapaAtual)?opt(etapaAtual,etapaAtual,etapaAtual):'')+WA_ETAPAS.map(x=>opt(x,WA_ETAPA_ROTULO[x],etapaAtual)).join('')+'</select></div>'
