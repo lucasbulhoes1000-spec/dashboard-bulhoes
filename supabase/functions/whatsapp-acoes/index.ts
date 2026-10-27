@@ -335,6 +335,32 @@ export async function handler(req: Request): Promise<Response> {
         await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nao_lidas: 0 }) });
         return resposta(req, { ok: true });
       }
+      case "criar_modelo": {
+        // Só gestão: cria um modelo na Meta (vai para a análise dela).
+        // { nome, categoria: "UTILITY"|"MARKETING", corpo, exemplos: [], rodape?, botoes?: ["Confirmar avaliação"] }
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão cria modelos" }, 403);
+        const nome = String(dados.nome ?? "").trim().toLowerCase();
+        const corpo = String(dados.corpo ?? "").trim();
+        if (!/^[a-z0-9_]{1,512}$/.test(nome) || !corpo) return resposta(req, { ok: false, erro: "nome (só letras minúsculas, números e _) e corpo são obrigatórios" }, 400);
+        const exemplos: string[] = Array.isArray(dados.exemplos) ? dados.exemplos.map(String) : [];
+        const components: any[] = [{ type: "BODY", text: corpo, ...(exemplos.length ? { example: { body_text: [exemplos] } } : {}) }];
+        if (dados.rodape) components.push({ type: "FOOTER", text: String(dados.rodape).slice(0, 60) });
+        const botoes: string[] = Array.isArray(dados.botoes) ? dados.botoes.map(String).filter(Boolean) : [];
+        if (botoes.length) components.push({ type: "BUTTONS", buttons: botoes.map((t) => ({ type: "QUICK_REPLY", text: t.slice(0, 25) })) });
+        const r = await meta(`/${WA_WABA_ID}/message_templates`, {
+          name: nome, language: String(dados.idioma ?? "pt_BR"), category: String(dados.categoria ?? "UTILITY").toUpperCase(), components,
+        });
+        if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
+        return resposta(req, { ok: true, id: r.j?.id, status: r.j?.status, categoria: r.j?.category });
+      }
+      case "status_modelos": {
+        // situação de alguns modelos (aprovado, em análise, recusado e o motivo)
+        const nomes: string[] = Array.isArray(dados.nomes) ? dados.nomes.map(String) : [];
+        const r = await meta(`/${WA_WABA_ID}/message_templates?limit=200&fields=name,status,category,rejected_reason,language`);
+        if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
+        const lista = (r.j?.data ?? []).filter((t: any) => !nomes.length || nomes.includes(t.name));
+        return resposta(req, { ok: true, modelos: lista });
+      }
       case "instagram_configurar": {
         // Só gestão: lê as Páginas que o usuário do sistema enxerga, acha o Instagram de cada uma,
         // cadastra em instagram_contas (atendente padrão: dados.atribuir_a) e assina os avisos de mensagens.
