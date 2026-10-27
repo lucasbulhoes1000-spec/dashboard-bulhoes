@@ -610,7 +610,7 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
       }
       await registro({ conversa_id: conversaId, tipo: "agendamento", detalhe: `${online ? "Avaliação ONLINE (Google Meet)" : (cfg.procedimento || "Avaliação")} marcada no Clinicorp: ${r.horario!.data} ${r.horario!.hora}–${r.horario!.fim} (${nome}). Agendamento ${r.id}. Cadastro do paciente: ${r.cadastro ?? "?"}.`, autor: "agente" });
       return `Marcado no Clinicorp: ${descreverHorario(r.horario!, Date.now())}, até ${r.horario!.fim}.` +
-        (online ? " É avaliação ONLINE: confirme sem o endereço e diga que a equipe envia o link do Google Meet antes do horário." : " Confirme ao paciente.");
+        (online ? " É avaliação ONLINE: confirme sem o endereço e diga que no dia da avaliação a pessoa recebe o link do Google Meet por aqui." : " Confirme ao paciente.");
     },
   };
 }
