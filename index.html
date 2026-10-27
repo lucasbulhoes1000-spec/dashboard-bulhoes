@@ -13734,7 +13734,7 @@ async function _waAcao(dados){
 // colunas das mensagens (canal só existe depois do SQL 012; sem ela, segue sem)
 let _waTemCanal=true;
 function _waMsgs(resto){
-  const cols='id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,responde_a,'+(_waTemCanal?'canal,':'')+'enviada_em';
+  const cols='id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,responde_a,midia_url,'+(_waTemCanal?'canal,':'')+'enviada_em';
   return _waRest('mensagens?select='+cols+'&conversa_id=eq.'+resto).catch(e=>{
     if(_waTemCanal&&/canal/.test(e.message)){_waTemCanal=false;return _waMsgs(resto);}
     throw e;
@@ -14409,6 +14409,12 @@ async function galEnviar(){
 function _waMidiaHtml(m){
   const tipo=m.tipo;
   if(!['image','sticker','audio','voice','video','document'].includes(tipo))return '';
+  if(!m.midia_caminho&&m.midia_url&&m.direcao==='enviada'&&/^https:\/\//.test(m.midia_url)){
+    const u=_waEsc(m.midia_url);
+    if(tipo==='image')return '<div class="wa-midia"><img src="'+u+'" alt="Foto" onclick="waAbrirMidia(this)"></div>';
+    if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" src="'+u+'"></video></div>';
+    if(tipo==='document')return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" href="'+u+'">📄 '+_waEsc(m.midia_nome||'Documento')+'</a></div>';
+  }
   if(!m.midia_caminho){
     if(m.erro)return '';
     if(m.midia_id)return '<div class="wa-midia-carregando">Baixando '+({image:'foto',sticker:'figurinha',audio:'áudio',voice:'áudio',video:'vídeo',document:'documento'}[tipo])+'…</div>';
@@ -16425,7 +16431,7 @@ function _clRemetente(m){
 }
 function _waBolha(m){
   const tx=String(m.texto||'').trim();
-  const textoMidia=!!m.midia_caminho&&(['📷 Foto','🎥 Vídeo','🎤 Áudio','Figurinha'].includes(tx)||(m.tipo==='document'&&tx.indexOf('📄 ')===0));
+  const textoMidia=(!!m.midia_caminho&&(['📷 Foto','🎥 Vídeo','🎤 Áudio','Figurinha'].includes(tx)||(m.tipo==='document'&&tx.indexOf('📄 ')===0)))||(!m.midia_caminho&&!!m.midia_url&&m.direcao==='enviada'&&/^(📷|🎥|📄) /.test(tx));
   const texto=m.texto&&!textoMidia?'<div>'+_waFormatarTexto(m.texto)+'</div>':'';
   const anuncio=m.origem_anuncio?'<div class="wa-anuncio">📣 Veio de anúncio'+(m.origem_anuncio.headline?': '+_waEsc(m.origem_anuncio.headline):'')+'</div>':'';
   const remet=m.direcao==='enviada'?'<div class="cl-remet">'+_waEsc(_clRemetente(m))+'</div>':(m.canal==='historico'?'<div class="cl-remet" style="font-weight:400;font-size:10px">histórico importado</div>':'');
