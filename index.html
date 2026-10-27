@@ -13620,6 +13620,10 @@ function _waJanela(c){
   const agora=Date.now();
   const ult=c&&c.ultima_recebida_em?Date.parse(c.ultima_recebida_em):0;
   const gratis=c&&c.canal!=='instagram'&&c.janela_gratis_ate?Date.parse(c.janela_gratis_ate):0;
+  if(c&&c.canal==='instagram'){
+    const fim24=ult?ult+WA_JANELA_MS:0,fim7=ult?ult+7*WA_JANELA_MS:0;
+    return {aberta:fim7>agora,fim:fim24>agora?fim24:fim7,gratis:false,humano:fim24<=agora&&fim7>agora};
+  }
   const fim=Math.max(ult?ult+WA_JANELA_MS:0,gratis||0);
   return {aberta:fim>agora,fim,gratis:gratis>agora};
 }
@@ -13932,6 +13936,7 @@ function waMenuItem(ev,id){
   m.innerHTML=c.nao_lidas>0
     ?'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',false)">'+_clIc('check')+' Marcar como lida</button>'
     :'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',true)">'+_clIc('chat')+' Marcar como não lida</button>';
+  if(c.canal==='instagram')m.innerHTML+='<button onclick="_clFecharPop();waIgIgnorar(\''+id+'\')">'+_clIc('x')+' Ignorar contato</button>';
   _clPosicionar(m,ev.currentTarget,true);
 }
 async function waMarcarLidaItem(id,naoLida){
@@ -15924,6 +15929,7 @@ function waRenderLista(){
   const f=_wa.f;
   _clRenderFiltrosAtivos();
   const base=_wa.conversas.filter(c=>{
+    if(c.canal==='instagram'&&!c.ultima_recebida_em)return false; // abordagem sem resposta não entra
     if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
     if(busca){
       const nome=_waNome(c).toLowerCase();
@@ -16042,7 +16048,9 @@ function waMenuEstado(ev){
 function waMenuMais(ev){
   ev.stopPropagation();_clFecharPop();
   const m=document.createElement('div');m.className='cl-menu';
+  const igc=_wa.atual&&_wa.atual.canal==='instagram';
   m.innerHTML='<button onclick="_clFecharPop();waMarcarNaoLida()">'+_clIc('chat')+' Marcar como não lida</button>'+
+    (igc?'<button onclick="_clFecharPop();waIgIgnorar()">'+_clIc('x')+' Ignorar contato (não entra mais no CRM)</button>':'')+
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
     '<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
     '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
@@ -16051,20 +16059,31 @@ function waMenuMais(ev){
     (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':'');
   _clPosicionar(m,ev.currentTarget,true);
 }
+async function waIgIgnorar(id){
+  const c=id?_wa.conversas.find(x=>x.id===id):_wa.atual;if(!c||c.canal!=='instagram')return;
+  if(!confirm('Ignorar '+_waNome(c)+'?\n\nA conversa sai do CRM e as próximas mensagens dessa pessoa no Instagram não entram mais.'))return;
+  try{
+    const r=await _waRest('rpc/ig_ignorar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_conversa:c.id})});
+    if(r&&r.ok===false)throw new Error(r.erro||'não foi possível');
+    _wa.conversas=_wa.conversas.filter(x=>x.id!==c.id);
+    if(_wa.atual&&_wa.atual.id===c.id){_wa.atual=null;if(typeof waVoltarLista==='function')waVoltarLista();}
+    waRenderLista();showToast('success','Contato ignorado',_waNome(c));
+  }catch(e){showToast('error','Não foi possível ignorar',e.message);}
+}
 function waRenderJanela(){
   const c=_wa.atual;const el=document.getElementById('wa-janela');if(!c||!el)return;
   const j=_waJanela(c);
   if(j.aberta){
     el.className='cl-janela aberta';
-    el.textContent=(j.gratis?'Janela de anúncio: livre por ':'Janela aberta: ')+_waDuracao(j.fim-Date.now());
+    el.textContent=(j.humano?'Instagram (atendimento humano): ':j.gratis?'Janela de anúncio: livre por ':'Janela aberta: ')+_waDuracao(j.fim-Date.now());
     el.title='Dá para responder com texto livre até a janela fechar.';
   }else{
     el.className='cl-janela fechada';
-    el.textContent=c.canal==='instagram'?'Janela de 24 h fechada: só dá para responder quando a pessoa escrever':(c.ultima_recebida_em?'Janela de 24 h fechada: envie um modelo':'Sem mensagem do paciente: envie um modelo');
-    el.title=c.canal==='instagram'?'No Instagram a Meta só permite responder até 24 h depois da última mensagem da pessoa.':'A Meta só permite modelo aprovado fora da janela de 24 h.';
+    el.textContent=c.canal==='instagram'?'Mais de 7 dias sem resposta: chame pelo app do Instagram':(c.ultima_recebida_em?'Janela de 24 h fechada: envie um modelo':'Sem mensagem do paciente: envie um modelo');
+    el.title=c.canal==='instagram'?'Pelo CRM (API da Meta) dá para responder até 7 dias depois da última mensagem da pessoa. Depois disso, mande pelo app do Instagram: a mensagem aparece aqui também.':'A Meta só permite modelo aprovado fora da janela de 24 h.';
   }
   const t=document.getElementById('wa-texto'),b=document.getElementById('wa-enviar'),a=document.getElementById('wa-btn-anexo');
-  if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':(c.canal==='instagram'?'Janela fechada: aguarde a pessoa escrever no Instagram':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado');}
+  if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':(c.canal==='instagram'?'Mais de 7 dias: mande pelo app do Instagram (aparece aqui também)':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado');}
   const bm=document.querySelector('#wa-comp .cl-comp-barra .cl-ib');if(bm)bm.style.display=c.canal==='instagram'?'none':'';
   if(b)b.disabled=!j.aberta||_wa.enviando;
   if(a)a.disabled=!j.aberta;

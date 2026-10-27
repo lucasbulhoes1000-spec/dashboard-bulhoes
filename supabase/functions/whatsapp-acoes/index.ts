@@ -14,8 +14,9 @@
 //
 // Conversas do Instagram (canal = 'instagram') usam a mesma tela: texto e arquivo
 // saem pela API de mensagens do Instagram (chave da Página, tirada do IG_TOKEN).
-// Não existe modelo no Instagram: fora das 24 h só dá para responder quando a
-// pessoa escrever de novo.
+// Não existe modelo no Instagram: até 24 h depois da última mensagem da pessoa sai
+// normal; de 24 h a 7 dias sai com a etiqueta HUMAN_AGENT (atendimento humano, precisa
+// da permissão aprovada pela Meta); depois disso só pelo app do Instagram.
 //
 // Regra da Meta: texto livre só até 24 h depois da última mensagem do paciente
 // (ou na janela grátis de anúncio). Fora disso, só modelo aprovado.
@@ -106,7 +107,10 @@ async function tokenDaPaginaIg(igId: string): Promise<string> {
 }
 async function enviarIg(req: Request, quem: { email: string }, c: any, message: any, tipo: string, textoRegistro: string, extra?: { caminho: string; mime: string; nome: string }) {
   const tk = await tokenDaPaginaIg(c.numero_clinica_id);
-  const r = await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, message }, tk);
+  // depois de 24 h (até 7 dias) a resposta sai com a etiqueta de atendimento humano
+  const ult = c.ultima_recebida_em ? Date.parse(c.ultima_recebida_em) : 0;
+  const humano = Date.now() - ult >= JANELA_MS;
+  const r = await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, message, ...(humano ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}) }, tk);
   const reg = (status: string, mid: string | null, erro: string | null, bruto: unknown) => extra
     ? bancoJson("/rest/v1/rpc/wa_registrar_enviada_midia", { method: "POST", body: JSON.stringify({ p_conversa: c.id, p_wa_message_id: mid, p_tipo: tipo, p_texto: textoRegistro, p_autor: quem.email, p_status: status, p_erro: erro, p_bruto: bruto, p_caminho: extra.caminho, p_mime: extra.mime, p_nome: extra.nome }) })
     : registrar(c, mid, tipo, textoRegistro, quem.email, status, erro, bruto);
@@ -119,7 +123,8 @@ async function enviarIg(req: Request, quem: { email: string }, c: any, message: 
   const id = await reg("enviada", mid, null, r.j);
   return resposta(req, { ok: true, mensagem_id: id, wa_message_id: mid });
 }
-const JANELA_IG = "Passaram mais de 24 h desde a última mensagem dessa pessoa no Instagram. Pela regra da Meta, só dá para responder quando ela escrever de novo.";
+const JANELA_IG = "Passaram mais de 7 dias desde a última mensagem dessa pessoa. Pela API da Meta o CRM não consegue mandar: chame pelo app do Instagram (a mensagem aparece no CRM também).";
+const janelaIg = (c: any) => !!c.ultima_recebida_em && Date.now() - Date.parse(c.ultima_recebida_em) < 7 * JANELA_MS;
 
 function erroMeta(j: any): string {
   const e = j?.error ?? {};
@@ -208,7 +213,7 @@ export async function handler(req: Request): Promise<Response> {
         if (texto.length > 4096) return resposta(req, { ok: false, erro: "mensagem acima de 4.096 caracteres" }, 400);
         const c = await conversa(dados);
         if (c.canal === "instagram") {
-          if (!janelaAberta({ ultima_recebida_em: c.ultima_recebida_em })) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
+          if (!janelaIg(c)) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
           if (texto.length > 1000) return resposta(req, { ok: false, erro: "no Instagram o limite é 1.000 caracteres por mensagem" }, 400);
           return await enviarIg(req, quem, c, { text: texto }, "text", texto);
         }
@@ -224,7 +229,7 @@ export async function handler(req: Request): Promise<Response> {
         const caminho = String(dados.caminho ?? "");
         if (!caminho.startsWith(`envios/${c.id}/`)) return resposta(req, { ok: false, erro: "arquivo inválido" }, 400);
         if (c.canal === "instagram") {
-          if (!janelaAberta({ ultima_recebida_em: c.ultima_recebida_em })) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
+          if (!janelaIg(c)) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
           // o Instagram busca o arquivo por um link: link assinado do Storage, válido por 1 h
           const sg = await bancoJson(`/storage/v1/object/sign/whatsapp-midia/${caminho.split("/").map(encodeURIComponent).join("/")}`, { method: "POST", body: JSON.stringify({ expiresIn: 3600 }) });
           if (!sg?.signedURL) return resposta(req, { ok: false, erro: "não encontrei o arquivo enviado" }, 400);
