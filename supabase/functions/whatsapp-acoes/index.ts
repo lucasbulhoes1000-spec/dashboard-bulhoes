@@ -182,7 +182,13 @@ async function registrar(c: any, waId: string | null, tipo: string, texto: strin
   });
 }
 
-async function enviar(req: Request, quem: { email: string }, c: any, corpoMeta: any, tipo: string, textoRegistro: string) {
+// responder citando uma mensagem (context) e guardar a citação no CRM
+async function marcarResposta(id: unknown, respondeA: string | null | undefined) {
+  if (!id || !respondeA) return;
+  await banco(`/rest/v1/mensagens?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal", "Content-Type": "application/json" }, body: JSON.stringify({ responde_a: respondeA }) }).catch(() => {});
+}
+async function enviar(req: Request, quem: { email: string }, c: any, corpoMeta: any, tipo: string, textoRegistro: string, respondeA?: string | null) {
+  if (respondeA) corpoMeta = { ...corpoMeta, context: { message_id: respondeA } };
   const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, ...corpoMeta }, await tokenDoNumero(c.numero_clinica_id));
   if (!r.ok) {
     const erro = erroMeta(r.j);
@@ -191,6 +197,7 @@ async function enviar(req: Request, quem: { email: string }, c: any, corpoMeta: 
   }
   const waId = r.j?.messages?.[0]?.id ?? null;
   const id = await registrar(c, waId, tipo, textoRegistro, quem.email, "enviada", null, r.j);
+  await marcarResposta(id, respondeA);
   return resposta(req, { ok: true, mensagem_id: id, wa_message_id: waId });
 }
 
@@ -220,14 +227,24 @@ export async function handler(req: Request): Promise<Response> {
         if (!janelaAberta(c)) {
           return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente. Use um modelo aprovado." }, 409);
         }
-        return await enviar(req, quem, c, { type: "text", text: { body: texto, preview_url: true } }, "text", texto);
+        return await enviar(req, quem, c, { type: "text", text: { body: texto, preview_url: true } }, "text", texto, dados.responde_a ? String(dados.responde_a) : null);
+      }
+      case "reagir": {
+        // reação com emoji a uma mensagem (emoji vazio tira a reação)
+        const c = await conversa(dados);
+        if (c.canal === "instagram") return resposta(req, { ok: false, erro: "Reação pelo CRM só no WhatsApp por enquanto." }, 400);
+        const alvo = String(dados.wa_message_id ?? "");
+        if (!alvo) return resposta(req, { ok: false, erro: "mensagem sem id do WhatsApp" }, 400);
+        if (!janelaAberta(c)) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: "Passaram mais de 24 h desde a última mensagem do paciente: a Meta não deixa reagir." }, 409);
+        const emoji = String(dados.emoji ?? "").slice(0, 8);
+        return await enviar(req, quem, c, { type: "reaction", reaction: { message_id: alvo, emoji } }, "reaction", emoji ? "Reagiu " + emoji : "Tirou a reação", alvo);
       }
       case "enviar_midia": {
         // A equipe já subiu o arquivo em whatsapp-midia/envios/<conversa>/...; aqui ele vai
         // para a Meta (upload de mídia) e sai como mensagem.
         const c = await conversa(dados);
         const caminho = String(dados.caminho ?? "");
-        if (!caminho.startsWith(`envios/${c.id}/`)) return resposta(req, { ok: false, erro: "arquivo inválido" }, 400);
+        if (!caminho.startsWith(`envios/${c.id}/`) && !/^galeria\/[^/]+$/.test(caminho)) return resposta(req, { ok: false, erro: "arquivo inválido" }, 400);
         if (c.canal === "instagram") {
           if (!janelaIg(c)) return resposta(req, { ok: false, erro: "janela_fechada", detalhe: JANELA_IG }, 409);
           // o Instagram busca o arquivo por um link: link assinado do Storage, válido por 1 h
@@ -261,9 +278,10 @@ export async function handler(req: Request): Promise<Response> {
         if (!up.ok || !uj.id) return resposta(req, { ok: false, erro: "A Meta recusou o arquivo: " + erroMeta(uj) }, 502);
         const legenda = String(dados.legenda ?? "").trim().slice(0, 1024);
         const conteudo: any = { id: uj.id };
+        const respondeMidia = dados.responde_a ? String(dados.responde_a) : null;
         if (legenda && tipo !== "audio") conteudo.caption = legenda;
         if (tipo === "document") conteudo.filename = nome;
-        const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, type: tipo, [tipo]: conteudo }, token);
+        const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, type: tipo, [tipo]: conteudo, ...(respondeMidia ? { context: { message_id: respondeMidia } } : {}) }, token);
         const texto = legenda || ({ image: "📷 Foto", video: "🎥 Vídeo", audio: "🎤 Áudio", document: "📄 " + nome }[tipo]!);
         const reg = (status: string, waId: string | null, erro: string | null, bruto: unknown) => bancoJson("/rest/v1/rpc/wa_registrar_enviada_midia", {
           method: "POST",
@@ -277,6 +295,7 @@ export async function handler(req: Request): Promise<Response> {
         }
         const waId = r.j?.messages?.[0]?.id ?? null;
         const id = await reg("enviada", waId, null, r.j);
+        await marcarResposta(id, respondeMidia);
         return resposta(req, { ok: true, mensagem_id: id, wa_message_id: waId });
       }
       case "enviar_modelo": {
