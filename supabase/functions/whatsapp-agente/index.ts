@@ -489,7 +489,7 @@ export function mensagensComCache(msgs: any[]): any[] {
   }
   return out;
 }
-async function chamarClaude(modelo: string, sistema: string, mensagens: any[], tools: any[], criatividade: number, maxTokens = 1024) {
+async function chamarClaude(modelo: string, sistema: string, mensagens: any[], tools: any[], criatividade: number, maxTokens = 2000) {
   if (!ANTHROPIC_API_KEY) throw new Error("falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)");
   const corpo: any = { model: modelo, max_tokens: maxTokens, system: sistemaComCache(sistema), messages: mensagensComCache(mensagens), temperature: Math.max(0, Math.min(1, Number(criatividade))) };
   if (tools.length) corpo.tools = tools;
@@ -638,13 +638,13 @@ export async function responder(conversaId: string, versao: number, pausa = espe
     const autor = "IA: " + (a.nome || "Agente");
     let primeira = true, enviados: string[] = [];
     const executar = async (x: Acao) => {
-      if (primeira) {
-        primeira = false;
-        // o paciente mandou mais alguma coisa enquanto o agente pensava? responde de novo com tudo
+      if (primeira) primeira = false;
+      else await pausa(Math.min(4000, 1200 + (x.tipo === "texto" ? x.texto.length * 15 : 1500)));
+      // o paciente mandou mais alguma coisa enquanto o agente pensava ou digitava? para aqui e
+      // responde de novo com tudo (antes só conferia na 1ª mensagem e atropelava o paciente)
+      if (x.tipo !== "transferir") {
         const v = await rpc("agente_versao", { p_conversa: conversaId }).catch(() => versao);
         if (v !== versao) return false;
-      } else {
-        await pausa(Math.min(4000, 1200 + (x.tipo === "texto" ? x.texto.length * 15 : 1500)));
       }
       if (x.tipo === "texto") {
         const r = await enviarMetaTentando(c, { type: "text", text: { body: x.texto.slice(0, 4096), preview_url: true } });
