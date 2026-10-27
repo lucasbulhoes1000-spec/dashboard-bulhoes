@@ -162,7 +162,7 @@ export async function textoDaIA(c: any, nome?: string | null): Promise<string> {
     "O lead parou de responder. Escreva UMA mensagem curta de follow-up (no máximo 300 caracteres) que retome a conversa exatamente do ponto em que parou.\n" +
     "Regras: se o lead fez uma pergunta que ficou sem resposta, responda primeiro, usando só a base de conhecimento. " +
     "Termine com uma pergunta simples que leve ao próximo passo (contar a queixa, escolher manhã ou tarde, confirmar). " +
-    "Não invente horários, valores, condições, prêmios ou números que não estejam na base. Não repita uma mensagem que a clínica já mandou. " +
+    "Não invente horários, valores, condições, prêmios ou números que não estejam na base. Nunca ofereça dia ou horário específico (você não vê a agenda): se a conversa parou na escolha de horário, pergunte qual dia e período ficam melhores. Não repita uma mensagem que a clínica já mandou. " +
     "Tom da Raffa: próximo, carinhoso, natural (pode usar \"Oiii\", no máximo um emoji). Nunca use hífen nem travessão. Não diga que é IA nem cite há quanto tempo a pessoa não responde. " +
     "Responda só com o texto da mensagem." +
     (String(ag.base_conhecimento ?? "").trim() ? "\n\n# Base de conhecimento\n" + String(ag.base_conhecimento).trim() : "") +
@@ -170,10 +170,12 @@ export async function textoDaIA(c: any, nome?: string | null): Promise<string> {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: ag.modelo || "claude-sonnet-5-5", max_tokens: 400, system: [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: "Conversa até agora:\n" + hist + "\n\nEscreva a mensagem de follow-up." }] }),
+    body: JSON.stringify({ model: ag.modelo || "claude-sonnet-5-5", max_tokens: 2000, system: [{ type: "text", text: sistema, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: "Conversa até agora:\n" + hist + "\n\nEscreva a mensagem de follow-up." }] }),
   });
   if (!r.ok) throw new Error("Anthropic " + r.status + " " + (await r.text()).slice(0, 200));
   const j = await r.json();
+  // nunca mandar texto cortado: se a resposta parou no limite, usa o texto de reserva do passo
+  if (j?.stop_reason !== "end_turn") { console.error("[automacoes] ia parou:", j?.stop_reason, JSON.stringify(j?.usage ?? {})); return ""; }
   const t = (j?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
   return t.replace(/\s*[—–]\s*/g, ", ").slice(0, 700);
 }
