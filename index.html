@@ -14759,7 +14759,7 @@ async function waRecarregarMsgsAtual(){
 const AG_FUNCAO=SUPABASE_URL+'/functions/v1/whatsapp-agente';
 const AG_MODELOS={'claude-haiku-5-5':'Claude Haiku 5.5 (rápido e econômico)','claude-sonnet-5-5':'Claude Sonnet 5.5 (equilibrado)','claude-opus-5-5':'Claude Opus 5.5 (mais inteligente)'};
 const AG_PERSONALIDADES=['Empático','Profissional','Descontraído','Objetivo','Formal'];
-const _ag={a:null,ed:null,imagens:[],versoes:[],registros:[],status:null,teste:[],testando:false,carregando:false,erro:null,aba:'config'};
+const _ag={a:null,ed:null,imagens:[],versoes:[],registros:[],status:null,teste:[],testando:false,carregando:false,erro:null,aba:'resultados'};
 async function _agAcao(dados){
   if(!_sbAccessToken)throw new Error('Entre no CRM de novo.');
   const r=await fetch(AG_FUNCAO,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+_sbAccessToken},body:JSON.stringify(dados)});
@@ -14798,7 +14798,7 @@ function agRender(){
   const E=_ag.ed,pode=_waEhGestao(),dis=pode?'':' disabled';
   const st=_ag.status;
   const chave=!st?'<span class="ag-chip">Conferindo a chave…</span>':st.erro?'<span class="ag-chip erro">'+_auEsc(st.erro)+'</span>':st.chave?'<span class="ag-chip ok">● Chave da Anthropic configurada</span>':'<span class="ag-chip erro">● Falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)</span>';
-  const abas=[['config','Configurações'],['instrucoes','Instruções'],['base','Base de conhecimento'],['imagens','Imagens ('+_ag.imagens.length+')'],['agenda','Agendamento'],['testar','Testar agente'],['atividade','Atividade']].concat(pode?[['versoes','Versões']]:[]);
+  const abas=[['resultados','📊 Resultados'],['config','Configurações'],['instrucoes','Instruções'],['base','Base de conhecimento'],['imagens','Imagens ('+_ag.imagens.length+')'],['agenda','Agendamento'],['testar','Testar agente'],['atividade','Atividade']].concat(pode?[['versoes','Versões']]:[]);
   let corpo='';
   if(_ag.aba==='config'){
     corpo='<div class="ag-grid">'+
@@ -14854,8 +14854,10 @@ function agRender(){
       '<div class="ag-chat" id="ag-chat">'+(bal||'<div class="au-vazio" style="padding:18px">Escreva a primeira mensagem do paciente.</div>')+(_ag.testando?'<div class="ag-b ag" style="opacity:.6">digitando…</div>':'')+'</div>'+
       '<div class="ag-nova"><input class="wa-var" id="ag-teste-txt" placeholder="Mensagem do paciente…" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();agTestar();}"'+(pode&&!_ag.testando?'':' disabled')+'><button class="wa-btn primario" onclick="agTestar()"'+(pode&&!_ag.testando?'':' disabled')+'>Enviar</button><button class="wa-btn" onclick="_ag.teste=[];agRender()">Recomeçar</button></div>'+
       (pode?'':'<div class="ag-dica">Só a gestão testa o agente.</div>');
+  }else if(_ag.aba==='resultados'){
+    corpo='<div id="ag-met"><div class="au-vazio" style="padding:18px">Carregando…</div></div>';
   }else if(_ag.aba==='atividade'){
-    const rot={resposta:'Respondeu',transferencia:'Passou para a equipe',sugestao:'Sugestão',resumo:'Resumo',teste:'Teste',erro:'Erro'};
+    const rot={resposta:'Respondeu',transferencia:'Passou para a equipe',sugestao:'Sugestão',resumo:'Resumo',teste:'Teste',erro:'Erro',agendamento:'Agendou',perdido:'Encerrou (perdido)'};
     corpo=_ag.registros.length?'<table class="sq-tab" style="width:100%"><thead><tr><th>Quando</th><th>O quê</th><th>Detalhe</th><th>Tokens</th></tr></thead><tbody>'+
       _ag.registros.map(r=>'<tr><td style="white-space:nowrap">'+new Date(r.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</td><td'+(r.tipo==='erro'?' style="color:#DC756A"':'')+'>'+(rot[r.tipo]||r.tipo)+'</td><td style="max-width:520px;white-space:pre-wrap;font-size:11.5px">'+_auEsc(String(r.detalhe||'').slice(0,300))+(r.conversa_id?' <button class="cl-link" onclick="agAbrirConversa(\''+r.conversa_id+'\')">abrir conversa</button>':'')+'</td><td style="font-size:11px;color:#8C98B1">'+(r.tokens_entrada||r.tokens_saida?(r.tokens_entrada||0)+' / '+(r.tokens_saida||0):'')+'</td></tr>').join('')+'</tbody></table>'
       :'<div class="au-vazio" style="padding:18px">Nada ainda.</div>';
@@ -14877,6 +14879,49 @@ function agRender(){
       '<div class="ag-corpo">'+corpo+'</div>'+
     '</div>';
   const ch=document.getElementById('ag-chat');if(ch)ch.scrollTop=ch.scrollHeight;
+  if(_ag.aba==='resultados')agMetricas(_ag.metDias||7);
+}
+// ---------- (28/10/2026) resultados do Agente de IA ----------
+async function agMetricas(dias){
+  _ag.metDias=dias;
+  const el=document.getElementById('ag-met');if(!el)return;
+  let r;try{r=await _waRest('rpc/metricas_ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_dias:dias})});}
+  catch(e){el.innerHTML='<div class="au-vazio" style="padding:18px">Não foi possível carregar: '+_auEsc(e.message)+'</div>';return;}
+  if(!document.getElementById('ag-met'))return;
+  const pc=(a,b)=>b?Math.round(100*a/b)+'%':'-';
+  const fm=v=>v==null?'-':(v<1?Math.round(v*60)+' s':v>=60?(v/60).toFixed(1).replace('.',',')+' h':Math.round(v)+' min');
+  const card=(v,rot,det)=>'<div style="background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:10px 12px;min-width:120px;flex:1"><div style="font-size:20px;font-weight:700">'+v+'</div><div style="font-size:12px">'+rot+'</div>'+(det?'<div style="font-size:11px;color:#8C98B1;margin-top:2px">'+det+'</div>':'')+'</div>';
+  const tb=(cab,linhas)=>'<table class="sq-tab" style="width:100%;font-size:12px"><thead><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+linhas.map(l=>'<tr>'+l.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  const conv=r.conversas||0;
+  // custo aproximado (Sonnet: US$ 3 por milhão de tokens de entrada e US$ 15 de saída; o cache barateia a entrada)
+  const usd=((r.tokens_entrada||0)*3+(r.tokens_saida||0)*15)/1e6;
+  el.innerHTML=
+    '<div style="display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:10px">Período: '+[1,7,30,90].map(d=>'<button class="wa-btn'+(d===dias?' primario':'')+'" onclick="agMetricas('+d+')">'+(d===1?'24 h':d+' dias')+'</button>').join('')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      card(conv,'conversas atendidas',(r.leads_novos||0)+' leads novos · '+(conv-(r.leads_novos||0))+' contatos que já existiam')+
+      card(pc(r.responderam||0,conv),'responderam a IA',(r.responderam||0)+' de '+conv)+
+      card(r.agendou_ia||0,'agendaram pela IA',pc(r.agendou_ia||0,conv)+' das conversas'+(r.agendou_online?' · '+r.agendou_online+' online':''))+
+      card(r.agendou_total||0,'agendaram no total',pc(r.agendou_total||0,conv)+' (IA + equipe depois)')+
+      card(r.compareceu||0,'compareceram',r.agendou_total?pc(r.compareceu||0,r.agendou_total)+' de quem agendou':'aparece depois da avaliação')+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
+      card(fm(r.mediana_1a_min),'tempo da 1ª resposta','mediana')+
+      card(r.transferiu||0,'passou para a equipe',pc(r.transferiu||0,conv))+
+      card(r.equipe_entrou||0,'a equipe assumiu',pc(r.equipe_entrou||0,conv)+' das conversas')+
+      card(r.perdido||0,'encerrou (fora da Baixada)','')+
+      card(r.fora_do_horario||0,'fora do horário',(r.fora_do_horario_agendou||0)+' agendaram · à noite, domingo')+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
+      card(r.msgs_ia_media??'-','mensagens da IA por conversa','')+
+      card(r.msgs_ate_agendar??'-','mensagens até agendar','IA + lead, em quem agendou')+
+      card(r.robos_ignorados||0,'robôs ignorados','respostas automáticas de empresas')+
+      card(r.erros||0,'erros','')+
+      card('US$ '+usd.toFixed(2).replace('.',','),'consumo aproximado',Math.round(((r.tokens_entrada||0)+(r.tokens_saida||0))/1000)+' mil tokens')+
+    '</div>'+
+    '<div style="height:12px"></div><b style="font-size:12.5px">Por dia</b>'+
+    tb(['Dia','Conversas','Leads novos','Responderam','Agendou (IA)','Agendou (total)','Passou p/ equipe'],(r.por_dia||[]).map(d=>[new Date(d.dia+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'}),d.conversas,d.leads_novos,d.responderam+' ('+pc(d.responderam,d.conversas)+')',d.agendou_ia,d.agendou_total,d.transferiu]))+
+    ((r.motivos||[]).length?'<div style="height:12px"></div><b style="font-size:12.5px">Por que passou para a equipe (últimas)</b><ul style="font-size:12px;margin:6px 0 0 18px;padding:0">'+r.motivos.map(m=>'<li style="margin-bottom:3px">'+_auEsc(m)+'</li>').join('')+'</ul>':'')+
+    '<div class="ag-dica" style="margin-top:10px">Conta as conversas em que a IA mandou mensagem desde 27/10 17h30 (quando foi ligada para todos), sem as respostas automáticas de outras empresas. "Agendaram no total" = etapa atual Agendou ou depois, mesmo que a equipe tenha terminado o agendamento. Compare com a meta: 25% de agendamento.</div>';
 }
 // atualiza só o botão Salvar enquanto digita (sem redesenhar e perder o cursor)
 function _agMarcar(){const b=document.getElementById('ag-salvar');if(b)b.disabled=!_agSujo();}
