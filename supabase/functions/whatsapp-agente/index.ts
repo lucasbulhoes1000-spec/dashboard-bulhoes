@@ -470,7 +470,12 @@ export function montarHistorico(msgs: any[], terminarComPaciente = true): { role
 }
 
 export function dividirBlocos(texto: string, max: number): string[] {
-  return String(texto ?? "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).slice(0, Math.max(1, max));
+  // separa nos parágrafos; o que passar do limite vai junto no último balão (antes era cortado:
+  // a confirmação perdia "A consulta dura…" e "Posso contar com o seu comparecimento?")
+  const b = String(texto ?? "").split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean);
+  const m = Math.max(1, max);
+  if (b.length <= m) return b;
+  return [...b.slice(0, m - 1), b.slice(m - 1).join("\n\n")];
 }
 
 // ---------- Claude ----------
@@ -659,6 +664,18 @@ export async function responder(conversaId: string, versao: number, pausa = espe
     const { c, ctx, msgs } = dados;
     const hist = montarHistorico(msgs);
     if (!hist.length || msgs[msgs.length - 1]?.direcao !== "recebida") { await concluir(); return "nada"; }
+    // reação (👍) não é mensagem para responder
+    const ultRec = msgs[msgs.length - 1];
+    if (ultRec?.tipo === "reaction") { await concluir(); return "reacao"; }
+    // resposta automática de outra empresa (gente que respondeu a um disparo com o robô dela):
+    // a IA não conversa com robô; desliga nesta conversa
+    const recebidas = msgs.filter((m: any) => m.direcao === "recebida" && String(m.texto ?? "").trim());
+    const AUTO = /(agradece (o |seu |pelo )?(seu )?contato|agradecemos (o |sua |seu |pela? )?(sua )?(mensagem|contato)|mensagem autom[aá]tica|resposta autom[aá]tica|hor[aá]rio de atendimento|no momento (n[aã]o )?(estamos|podemos)|em breve (retornaremos|responderemos|entraremos)|retornaremos (o mais breve|em breve)|fora do (nosso )?hor[aá]rio)/i;
+    if (recebidas.length && recebidas.length <= 3 && recebidas.every((m: any) => AUTO.test(String(m.texto))) && !msgs.some((m: any) => /^IA: /.test(String(m.autor_email ?? "")))) {
+      await banco(`/rest/v1/conversas?id=eq.${conversaId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ robo_ligado: false }) }).catch(() => {});
+      await registro({ conversa_id: conversaId, tipo: "transferencia", detalhe: "Resposta automática de outra empresa: a IA não respondeu e desligou nesta conversa.", autor: "agente" });
+      await concluir(); return "auto_resposta";
+    }
     if (!janelaAberta(c)) { await concluir(); return "sem_janela"; }
     const autor = "IA: " + (a.nome || "Agente");
     let primeira = true, encerrou = false, enviados: string[] = [];
