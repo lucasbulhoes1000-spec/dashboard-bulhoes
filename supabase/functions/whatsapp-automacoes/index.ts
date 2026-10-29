@@ -247,6 +247,12 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
         case "midia":
         case "modelo": {
           const quando = p.ignorar_horario ? agora() : proximoHorario(agora(), regras);
+          if (quando > agora() + 30_000 && regras.fora_do_horario === "pular") {
+            // (29/10/2026) mensagem que só faz sentido na hora (ex.: a "Primeira mensagem"
+            // de 5 min): fora do horário não sai nem fica guardada para depois
+            await avancar(x, i, p.tipo, "pulado", "fora do horário: não enviou", i, null, "saiu");
+            return "saiu";
+          }
           if (quando > agora() + 30_000) {
             // (25/10/2026) volta para as condições ("se") logo antes da mensagem: elas
             // são conferidas de novo na hora em que a mensagem sai de fato (ex.: quem
