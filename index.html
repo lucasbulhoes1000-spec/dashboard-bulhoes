@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-154723">
+<meta name="lume-versao" content="20261031-155653">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -15304,8 +15304,10 @@ async function agMetricas(dias){
   const card=(v,rot,det)=>'<div style="background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:10px 12px;min-width:120px;flex:1"><div style="font-size:20px;font-weight:700">'+v+'</div><div style="font-size:12px">'+rot+'</div>'+(det?'<div style="font-size:11px;color:#8C98B1;margin-top:2px">'+det+'</div>':'')+'</div>';
   const tb=(cab,linhas)=>'<table class="sq-tab" style="width:100%;font-size:12px"><thead><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>'+linhas.map(l=>'<tr>'+l.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
   const conv=r.conversas||0;
-  // custo aproximado (Sonnet: US$ 3 por milhão de tokens de entrada e US$ 15 de saída; o cache barateia a entrada)
-  const usd=((r.tokens_entrada||0)*3+(r.tokens_saida||0)*15)/1e6;
+  // custo aproximado (Sonnet 5.5: US$ 2 por milhão de tokens de entrada e US$ 10 de saída; o cache barateia a entrada)
+  const usd=((r.tokens_entrada||0)*2+(r.tokens_saida||0)*10)/1e6;
+  const rs=v=>'R$ '+Math.round(v||0).toLocaleString('pt-BR');
+  const pas=r.ia_passadas||0;
   el.innerHTML=
     '<div style="display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:10px">Período: '+[1,7,30,90].map(d=>'<button class="wa-btn'+(d===dias?' primario':'')+'" onclick="agMetricas('+d+')">'+(d===1?'24 h':d+' dias')+'</button>').join('')+'</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
@@ -15314,6 +15316,15 @@ async function agMetricas(dias){
       card(r.agendou_ia||0,'agendaram pela IA',pc(r.agendou_ia||0,conv)+' das conversas'+(r.agendou_online?' · '+r.agendou_online+' online':''))+
       card(r.agendou_total||0,'agendaram no total',pc(r.agendou_total||0,conv)+' (IA + equipe depois)')+
       card(r.compareceu||0,'compareceram',r.agendou_total?pc(r.compareceu||0,r.agendou_total)+' de quem agendou':'aparece depois da avaliação')+
+    '</div>'+
+    '<div style="height:12px"></div><b style="font-size:12.5px">Avaliações agendadas pela IA: resultado</b>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">'+
+      card(r.agendou_ia||0,'avaliações da IA',pas+' já aconteceram · '+(r.ia_aguardando||0)+' por vir')+
+      card(r.ia_compareceu||0,'compareceram',pas?pc(r.ia_compareceu||0,pas)+' das que já aconteceram':'aparece depois da avaliação')+
+      card(r.ia_faltou||0,'faltaram ou desmarcaram',pas?pc(r.ia_faltou||0,pas)+' das que já aconteceram':'')+
+      card(r.ia_sem_status||0,'sem status','já passou e a etapa segue "Agendou"')+
+      card(r.ia_vendas||0,'fecharam',(r.ia_compareceu?pc(r.ia_vendas||0,r.ia_compareceu)+' de quem compareceu':'orçamento aprovado depois do agendamento'))+
+      card(rs(r.ia_vendas_valor),'vendido','pacientes agendados pela IA')+
     '</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
       card(fm(r.mediana_1a_min),'tempo da 1ª resposta','mediana')+
