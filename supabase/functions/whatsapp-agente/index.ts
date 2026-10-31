@@ -189,7 +189,8 @@ export function horariosLivres(cfg: any, agenda: any[], agora: number): Horario[
       const inicioMs = Date.parse(`${d}T${hhmm(t)}:00-03:00`);
       if (inicioMs < limite) continue;
       if (!livreEm(ints, t, t + dur)) continue;
-      if (sem !== 6 && !sobraAlmoco([...ints, [t, t + dur]])) continue;
+      // só recusa o horário que tira o almoço; se o almoço já não cabia (ou já está bloqueado na agenda), o resto do dia segue livre
+      if (sem !== 6 && sobraAlmoco(ints) && !sobraAlmoco([...ints, [t, t + dur]])) continue;
       out.push({ data: d, hora: hhmm(t), fim: hhmm(t + dur) });
     }
   }
