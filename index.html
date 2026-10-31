@@ -3122,36 +3122,74 @@ function toggleMobileSidebar(){
 // CONTROLE DE ACESSO POR ÁREA (24/07/2026, pedido do usuário)
 // Lucas, Larissa e Gabi sempre têm acesso total a tudo. As demais pessoas
 // só entram direto nas áreas listadas pra elas — em qualquer outra área
-// restrita, precisam da senha (mesma senha 14891 já usada nas edições
-// manuais). O desbloqueio por senha vale só pra sessão atual (some se
+// restrita, precisam da senha da área (conferida no servidor desde 31/10/2026). O desbloqueio por senha vale só pra sessão atual (some se
 // recarregar a página) — não é salvo em lugar nenhum.
 // ============================================================
 // (20/10/2026) E-mails atualizados para os logins da Supabase Auth.
 const ACESSO_TOTAL_LOGINS=['lucasbulhoes1000@gmail.com','larissa@bulhoesodontologia.com.br','gabi@bulhoesodontologia.com.br'];
 const ACESSO_ORCAMENTOS_FECHADOS=[...ACESSO_TOTAL_LOGINS,'victoria@bulhoesodontologia.com.br'];
-const SENHA_ACESSO_RESTRITO='14891';
-let _acessoDesbloqueado={estoque:false,'rel-orcamentos':false,gerenciar:false};
+// (31/10/2026) As senhas das áreas saíram do código: ficam cifradas no banco e são conferidas
+// no servidor (SQL 058). A gestão define a senha na primeira vez que abrir a área.
+let _acessoDesbloqueado={estoque:false,'rel-orcamentos':false,gerenciar:false,comissoes:false};
+const AREAS_SENHA={restrita:'Gerenciar, Orçamentos Fechados e edições manuais',comissoes:'Comissões'};
+async function _rpcArea(fn,args){
+  const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args)});
+  const t=await r.text();if(!r.ok){let m=t;try{m=JSON.parse(t).message||t;}catch(e){}throw new Error(m);}
+  return t?JSON.parse(t):null;
+}
+async function _areaDefinirSenha(area){
+  const n1=prompt('🔒 Defina a nova senha da área '+AREAS_SENHA[area]+' (mínimo 4 caracteres):');
+  if(n1===null)return false;
+  if(n1.length<4){alert('A senha precisa ter pelo menos 4 caracteres.');return false;}
+  const n2=prompt('Digite a mesma senha de novo, para confirmar:');
+  if(n2===null)return false;
+  if(n1!==n2){alert('As duas senhas ficaram diferentes. Tente de novo.');return false;}
+  try{await _rpcArea('area_definir_senha',{p_area:area,p_nova:n1});}catch(e){alert('Não deu para salvar a senha: '+e.message);return false;}
+  try{registrarAuditoria('Senha','definiu a senha da área '+area);}catch(e){}
+  alert('Senha definida. Use essa senha daqui para a frente.');
+  return true;
+}
+// pede a senha da área e confere no servidor; devolve true se liberou
+async function pedirSenhaArea(area,titulo){
+  let tem;
+  try{tem=await _rpcArea('area_tem_senha',{p_area:area});}catch(e){alert('Não deu para conferir a senha agora. Tente de novo.');return false;}
+  if(!tem){
+    if(!ACESSO_TOTAL_LOGINS.includes(usuarioAtualEmail())){alert('A senha desta área ainda não foi definida. Peça para a gestão abrir a área e definir.');return false;}
+    if(!confirm('🔒 A área '+titulo+' ainda não tem senha (a antiga deixou de valer). Definir a senha agora?'))return false;
+    return _areaDefinirSenha(area);
+  }
+  const s=prompt('🔒 Área restrita — digite a senha pra entrar em '+titulo+':');
+  if(s===null)return false;
+  let r;try{r=await _rpcArea('area_conferir',{p_area:area,p_senha:s});}catch(e){alert('Não deu para conferir a senha agora. Tente de novo.');return false;}
+  if(r==='ok')return true;
+  alert(r==='bloqueado'?'Muitas tentativas erradas. Espere 15 minutos e tente de novo.':'Senha incorreta.');
+  return false;
+}
+// troca da senha de uma área (botão "Senha" do topo, só gestão)
+async function trocarSenhaArea(){
+  const op=prompt('Trocar a senha de qual área?\n1 = Gerenciar, Orçamentos Fechados e edições manuais\n2 = Comissões');
+  if(op===null)return;
+  const area=op.trim()==='1'?'restrita':op.trim()==='2'?'comissoes':null;
+  if(!area){alert('Digite 1 ou 2.');return;}
+  _areaDefinirSenha(area);
+}
 
 function verificarAcessoPagina(page){
   const email=usuarioAtualEmail();
-  // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi —
-  // pedido explícito do usuário, é a única exceção ao "acesso total".
+  const liberar=(area,titulo)=>{pedirSenhaArea(area,titulo).then(ok=>{if(ok){_acessoDesbloqueado[page]=true;irParaPagina(page);}});return false;};
+  // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi — pedido explícito do usuário.
   if(page==='gerenciar'){
     if(_acessoDesbloqueado.gerenciar)return true;
-    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Gerenciar:');
-    if(senha===null)return false;
-    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado.gerenciar=true;return true;}
-    alert('Senha incorreta.');
-    return false;
+    return liberar('restrita','Gerenciar');
   }
   if(page==='rel-orcamentos'){
     if(ACESSO_ORCAMENTOS_FECHADOS.includes(email))return true;
     if(_acessoDesbloqueado['rel-orcamentos'])return true;
-    const senha=prompt('🔒 Área restrita — digite a senha pra entrar em Orçamentos Fechados:');
-    if(senha===null)return false;
-    if(senha===SENHA_ACESSO_RESTRITO){_acessoDesbloqueado['rel-orcamentos']=true;return true;}
-    alert('Senha incorreta.');
-    return false;
+    return liberar('restrita','Orçamentos Fechados');
+  }
+  if(page==='comissoes'){
+    if(_acessoDesbloqueado.comissoes)return true;
+    return liberar('comissoes','Comissões');
   }
   return true; // qualquer outra página não tem restrição
 }
@@ -3179,18 +3217,7 @@ function switchPage(page,el){
   else if(page==='trafego-pago') abrirTrafegoPago();
   else if(page==='gerenciar') setTimeout(()=>renderLista(_currentListaTab||'origens'),50);
   else if(page==='comissoes'){
-    // Pede senha antes de entrar em Comissões
-    const senhaOk=sessionStorage.getItem('comissoes_auth');
-    if(senhaOk!=='ok'){
-      const s=prompt('Digite a senha para acessar Comissões:');
-      if(!s||s.trim()!=='bulhoes923'){
-        alert('Senha incorreta.');
-        // Volta para a página anterior
-        const prevNav=document.querySelector('.nav-item.active');
-        return;
-      }
-      sessionStorage.setItem('comissoes_auth','ok');
-    }
+    // (31/10/2026) a senha de Comissões é conferida no servidor (verificarAcessoPagina)
     setTimeout(()=>initComissoes(),50);
   }
   else if(page==='rel-origem') setTimeout(()=>initRelOrigem(),50);
@@ -12768,6 +12795,7 @@ async function fazerLogin(){
 // Troca de senha da própria pessoa (fica no menu do usuário / pode ser chamada pelo console).
 async function trocarMinhaSenha(){
   if(!_sb)return;
+  if(ACESSO_TOTAL_LOGINS.includes(usuarioAtualEmail())&&confirm('Quer trocar a senha de uma ÁREA RESTRITA (Gerenciar ou Comissões)?\n\nOK = senha de área\nCancelar = a sua senha de login'))return trocarSenhaArea();
   const nova=prompt('Digite a nova senha (mínimo 8 caracteres):');
   if(nova===null)return;
   if(nova.length<8){alert('A senha precisa ter pelo menos 8 caracteres.');return;}
@@ -13662,9 +13690,13 @@ function abrirEdicaoManual(campo){
   setTimeout(()=>document.getElementById('edicao-manual-senha').focus(), 100);
 }
 
-function confirmarSenhaEdicao(){
+async function confirmarSenhaEdicao(){
   const senha = document.getElementById('edicao-manual-senha').value;
-  if(senha !== '14891'){
+  let rs='errada';
+  try{rs=await _rpcArea('area_conferir',{p_area:'restrita',p_senha:senha});}catch(e){}
+  if(rs==='sem_senha'){alert('A senha das áreas restritas ainda não foi definida. A gestão define ao abrir Gerenciar.');return;}
+  if(rs!=='ok'){
+    document.getElementById('edicao-manual-senha-erro').textContent = rs==='bloqueado'?'Muitas tentativas erradas. Espere 15 minutos.':'Senha incorreta.';
     document.getElementById('edicao-manual-senha-erro').style.display = 'block';
     return;
   }
