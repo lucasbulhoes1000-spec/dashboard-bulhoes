@@ -3121,9 +3121,9 @@ function iniPeriodo(p){_iniPeriodo=p;document.querySelectorAll('.ini-periodo but
 function _iniJanela(p){
   const agora=new Date(),ini=new Date(agora);ini.setHours(0,0,0,0);
   let de,ate=agora,deAnt,ateAnt,nomeAnt;
-  if(p==='hoje'){de=ini;deAnt=new Date(ini.getTime()-864e5);ateAnt=new Date(agora.getTime()-864e5);nomeAnt='ontem até agora';}
-  else if(p==='7d'){de=new Date(ini.getTime()-6*864e5);deAnt=new Date(de.getTime()-7*864e5);ateAnt=de;nomeAnt='7 dias anteriores';}
-  else{de=new Date(agora.getFullYear(),agora.getMonth(),1);deAnt=new Date(agora.getFullYear(),agora.getMonth()-1,1);ateAnt=new Date(deAnt.getFullYear(),deAnt.getMonth(),agora.getDate(),agora.getHours(),agora.getMinutes());nomeAnt='mesmo ponto do mês passado';}
+  if(p==='hoje'){de=ini;deAnt=new Date(ini.getTime()-864e5);ateAnt=new Date(agora.getTime()-864e5);nomeAnt='ontem';}
+  else if(p==='7d'){de=new Date(ini.getTime()-6*864e5);deAnt=new Date(de.getTime()-7*864e5);ateAnt=de;nomeAnt='7 dias antes';}
+  else{de=new Date(agora.getFullYear(),agora.getMonth(),1);deAnt=new Date(agora.getFullYear(),agora.getMonth()-1,1);ateAnt=new Date(deAnt.getFullYear(),deAnt.getMonth(),agora.getDate(),agora.getHours(),agora.getMinutes());nomeAnt='mês passado';}
   return {de,ate,deAnt,ateAnt,nomeAnt};
 }
 const _iniDia=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -3138,11 +3138,12 @@ const _iniIco={
 };
 const _iniSvg=k=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+(_iniIco[k]||'')+'</svg>';
 function _iniVar(a,b,dinheiro){
+  const vs=' vs '+(_iniJanela(_iniPeriodo).nomeAnt);
   if(b==null)return '';
-  if(!a&&!b)return 'igual ao período anterior';
-  const d=a-b;if(d===0)return 'igual ao período anterior';
+  if(!a&&!b)return 'igual a'+(_iniPeriodo==='hoje'?' ontem':vs.replace(' vs ',' '));
+  const d=a-b;if(d===0)return 'igual a'+(_iniPeriodo==='hoje'?' ontem':vs.replace(' vs ',' '));
   const t=dinheiro?'R$ '+Math.abs(d).toLocaleString('pt-BR',{maximumFractionDigits:0}):Math.abs(d);
-  return '<span class="'+(d>0?'up':'down')+'">'+(d>0?'▲ ':'▼ ')+t+'</span> vs período anterior';
+  return '<span class="'+(d>0?'up':'down')+'">'+(d>0?'▲ ':'▼ ')+t+'</span>'+vs;
 }
 async function carregarInicio(){
   if(!document.getElementById('ini-kpis')||_iniCarregando)return;
