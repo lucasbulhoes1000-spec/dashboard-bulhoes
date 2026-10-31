@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Bulhões">
+<meta name="apple-mobile-web-app-title" content="Lume">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
@@ -2854,7 +2854,7 @@ async function pushSalvarTipos(){
 }
 async function pushTeste(){
   try{await _waRest('push_fila',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},
-    body:JSON.stringify({tipo:'teste',titulo:'Teste do Backoffice Bulhões 🔔',corpo:'Se você está vendo isto, as notificações estão funcionando.',pagina:'inicio',para_email:usuarioAtualEmail()})});
+    body:JSON.stringify({tipo:'teste',titulo:'Teste do Lume 🔔',corpo:'Se você está vendo isto, as notificações estão funcionando.',pagina:'inicio',para_email:usuarioAtualEmail()})});
     showToast('success','Teste enviado','A notificação chega em até 1 minuto.');}catch(e){showToast('error','Não enviou',String(e.message||e));}
 }
 async function pushDesativar(){

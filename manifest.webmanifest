@@ -1,16 +1,29 @@
 {
-  "name": "Backoffice Bulhões",
-  "short_name": "Bulhões",
-  "description": "Backoffice da Bulhões Odontologia",
+  "name": "Lume · Bulhões Odontologia",
+  "short_name": "Lume",
+  "description": "Lume, o CRM da Bulhões Odontologia",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#070E20",
-  "theme_color": "#070E20",
+  "background_color": "#0B1530",
+  "theme_color": "#0B1530",
   "icons": [
-    { "src": "/icone-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icone-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icone-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
