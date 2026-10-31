@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-162924">
+<meta name="lume-versao" content="20261031-164207">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -822,6 +822,11 @@ tbody tr:hover td{background:#0D1A33;}
 .sskb-campo .dp-in{height:34px;width:100%}
 .sskb-dupla{display:flex;gap:10px}
 .sskb-mbotoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.sskb-cab{cursor:grab}.sskb-col.fora{opacity:.75}
+.sskb-colrow{display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:0.5px solid #1C2C50}
+.sskb-ord{display:flex;gap:2px}.sskb-ord .wa-btn{padding:2px 7px}
+.sskb-fixa{font-size:11px;color:#8C98B1;white-space:nowrap;min-width:110px}
+.sskb-n{font-size:11px;color:#66738F;min-width:22px;text-align:right}
 @media (max-width:768px){.sskb-col{flex-basis:78vw}.sskb-acoes{margin-left:0;width:100%}.sskb-acoes input{flex:1}.sskb-dupla{flex-direction:column;gap:0}}
 
 .dp-card{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
@@ -6842,7 +6847,7 @@ async function abrirSocialSelling(){
   const el=document.getElementById('ss-conteudo');if(!el)return;
   if(!_ss.carregado)el.innerHTML='<div class="au-vazio">Carregando…</div>';
   try{await Promise.all([ssCarregar(),ssCarregarMeta()]);}catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar: '+_waEsc(e.message)+'</div>';return;}
-  if(_ss.aba==='funil'){ssKanban();return;}
+  if(_ss.aba==='funil'){await ssCarregarColunas();ssKanban();return;}
   ssRender();
   ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling'&&_ss.aba==='registro')ssRender();}).catch(()=>{});
 }
@@ -6908,21 +6913,39 @@ function ssRender(){
 // Quem responde no direct (Instagram conectado) vira card sozinho em "Leads de entrada";
 // a Lívia arrasta entre as colunas. Compareceu e Venda o banco move sozinho pelo Clinicorp
 // (ss_resultados, a cada 15 min), desde que o card tenha telefone.
-const SS_ETAPAS=[['entrada','Leads de entrada','#8C98B1'],['conversa','Conversa em andamento','#6FA8FF'],['material_1','Envio de material 1','#B79CFF'],['material_2','Envio de material 2','#B79CFF'],['sem_interesse','Não tem interesse','#E08A7E'],['amigo_lari','Amigo Lari','#66738F'],['dentista','Dentista','#66738F'],['faltou_horario','Faltou horário','#E2BE6A'],['agendou','Agendou','#D4AF5A'],['compareceu','Compareceu','#7FD3A0'],['venda','Venda','#7FD3A0']];
-const SS_ETAPA_NOME=Object.fromEntries(SS_ETAPAS.map(e=>[e[0],e[1]]));
-const SS_ATIVAS=['entrada','conversa','material_1','material_2','faltou_horario'];
+// colunas editáveis (configuracoes.ss_colunas): [k, nome, cor, tipo] na ordem do quadro
+// tipo: normal | perdido | fora (guardado, fora das contas) | resultado (agendou, compareceu, venda)
+const SS_ETAPAS_PADRAO=[['entrada','Leads de entrada','#8C98B1','normal'],['conversa','Conversa em andamento','#6FA8FF','normal'],['material_1','Envio de material 1','#B79CFF','normal'],['material_2','Envio de material 2','#B79CFF','normal'],['sem_interesse','Não tem interesse','#E08A7E','perdido'],['amigo_lari','Amigo Lari','#66738F','fora'],['dentista','Dentista','#66738F','fora'],['faltou_horario','Faltou horário','#E2BE6A','normal'],['agendou','Agendou','#D4AF5A','resultado'],['compareceu','Compareceu','#7FD3A0','resultado'],['venda','Venda','#7FD3A0','resultado']];
+const SS_FIXAS={entrada:'Quem responde no direct entra aqui',sem_interesse:'Usada quando a abordagem é marcada como desqualificada',agendou:'Pede telefone e data da avaliação',compareceu:'O Lume move sozinho pelo Clinicorp',venda:'O Lume move sozinho pelo Clinicorp'};
+const SS_TIPOS_COL={normal:'Em andamento',perdido:'Perdido',fora:'Fora das contas',resultado:'Resultado'};
+let SS_ETAPAS=SS_ETAPAS_PADRAO.map(x=>x.slice());
+let SS_ETAPA_NOME=Object.fromEntries(SS_ETAPAS.map(e=>[e[0],e[1]]));
+const ssTipoCol=k=>((SS_ETAPAS.find(e=>e[0]===k)||[])[3])||'normal';
+async function ssCarregarColunas(){
+  try{const r=await _waRest('configuracoes?chave=eq.ss_colunas&select=valor');const v=r&&r[0]&&r[0].valor;
+    if(Array.isArray(v)&&v.length)SS_ETAPAS=v.filter(c=>c&&c.k).map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal']);}catch(e){}
+  // coluna fixa que sumiu da configuração volta no fim (as regras automáticas dependem dela)
+  Object.keys(SS_FIXAS).forEach(k=>{if(!SS_ETAPAS.some(e=>e[0]===k))SS_ETAPAS.push(SS_ETAPAS_PADRAO.find(e=>e[0]===k).slice());});
+  SS_ETAPA_NOME=Object.fromEntries(SS_ETAPAS.map(e=>[e[0],e[1]]));
+}
+async function ssSalvarColunas(cols){
+  await _waRest('configuracoes?on_conflict=chave',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({chave:'ss_colunas',valor:cols.map(([k,nome,cor,tipo])=>({k,nome,cor,tipo}))})});
+  SS_ETAPAS=cols.map(x=>x.slice());SS_ETAPA_NOME=Object.fromEntries(SS_ETAPAS.map(e=>[e[0],e[1]]));
+}
 function ssDiasNaEtapa(l){const t=Date.parse(l.etapa_em||l.atualizado_em||l.criado_em);return isNaN(t)?0:Math.floor((Date.now()-t)/864e5);}
 function ssTempo(l){const t=Date.parse(l.etapa_em||l.atualizado_em||l.criado_em);if(isNaN(t))return '';const m=(Date.now()-t)/6e4;return m<60?'agora':m<1440?Math.floor(m/60)+' h':Math.floor(m/1440)+' d';}
 function ssRotulo(l){return l.nome||(String(l.instagram).startsWith('id:')?'Instagram':'@'+l.instagram);}
 function ssKanban(){
   const el=document.getElementById('ss-conteudo');if(!el)return;
   const b=_ss.kbusca.trim().toLowerCase();
-  const cards=_ss.linhas.filter(l=>l.etapa)
+  const cards=_ss.linhas.filter(l=>l.etapa).map(l=>SS_ETAPA_NOME[l.etapa]?l:Object.assign(l,{etapa:'entrada'}))
     .filter(l=>!_ss.kperfil||l.perfil===_ss.kperfil)
     .filter(l=>!b||[l.instagram,l.nome,l.telefone,l.obs].some(x=>String(x||'').toLowerCase().includes(b)));
   const hoje=ssHoje(),ontem=localDateStr(new Date(Date.now()-864e5));
-  const ativos=cards.filter(l=>SS_ATIVAS.includes(l.etapa)).length;
-  const parados=cards.filter(l=>['conversa','material_1','material_2'].includes(l.etapa)&&ssDiasNaEtapa(l)>=3).length;
+  const ativos=cards.filter(l=>ssTipoCol(l.etapa)==='normal').length;
+  const ssParado=l=>ssTipoCol(l.etapa)==='normal'&&l.etapa!=='entrada'&&ssDiasNaEtapa(l)>=3;
+  const parados=cards.filter(ssParado).length;
   const novos=d=>cards.filter(l=>String(l.criado_em||'').slice(0,10)===d||l.respondeu_em===d).length;
   const mesIni=hoje.slice(0,8)+'01';
   const doMes=l=>String(l.etapa_em||'').slice(0,10)>=mesIni;
@@ -6931,7 +6954,7 @@ function ssKanban(){
   const valor=vendas.reduce((s,l)=>s+Number(l.venda_valor||0),0);
   const stat=(t,v,c)=>'<div class="sskb-stat"><div>'+t+'</div><b style="color:'+(c||'#EEF1F7')+'">'+v+'</b></div>';
   const card=l=>{
-    const parado=['conversa','material_1','material_2'].includes(l.etapa)&&ssDiasNaEtapa(l)>=3;
+    const parado=ssParado(l);
     const insta=String(l.instagram).startsWith('id:')?'':'@'+l.instagram;
     return '<div class="sskb-card'+(parado?' parado':'')+'" draggable="true" ondragstart="event.dataTransfer.setData(\'text/plain\',\''+l.id+'\');this.classList.add(\'arrastando\')" ondragend="this.classList.remove(\'arrastando\')" onclick="ssCardAbrir('+l.id+')">'+
       '<div class="sskb-l1"><span class="sskb-nome">'+_waEsc(ssRotulo(l))+'</span><span class="sskb-t" title="tempo nesta etapa">'+ssTempo(l)+'</span></div>'+
@@ -6948,16 +6971,71 @@ function ssKanban(){
       stat('Agendaram no mês',ag,'#D4AF5A')+stat('Vendas no mês',vendas.length+(valor?' · R$ '+Math.round(valor).toLocaleString('pt-BR'):''),'#7FD3A0')+
       '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar @, nome, telefone" value="'+_waEsc(_ss.kbusca)+'" oninput="_ss.kbusca=this.value;clearTimeout(_ss.tk);_ss.tk=setTimeout(()=>{ssKanban();const i=document.querySelector(\'.sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_ss.kperfil=this.value;ssKanban()"><option value="">Todos os perfis</option>'+SS_PERFIS.map(p=>'<option'+(_ss.kperfil===p?' selected':'')+'>'+p+'</option>').join('')+'</select>'+
+        '<button class="wa-btn" onclick="ssColunasEditar()" title="Renomear, reordenar, criar ou apagar colunas">⚙ Colunas</button>'+
         '<button class="wa-btn primario" onclick="ssCardAbrir(null)">+ Novo card</button></div>'+
     '</div>'+
-    '<div class="sskb-quadro">'+SS_ETAPAS.map(([k,nome,cor])=>{
+    '<div class="sskb-quadro">'+SS_ETAPAS.map(([k,nome,cor,tipo])=>{
       const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
       const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.venda_valor||0),0):0;
-      return '<div class="sskb-col" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="event.preventDefault();this.classList.remove(\'sobre\');ssMover(+event.dataTransfer.getData(\'text/plain\'),\''+k+'\')">'+
-        '<div class="sskb-cab" style="border-color:'+cor+'"><div>'+nome+'</div><small>'+cs.length+' '+(cs.length===1?'lead':'leads')+(tot?' · R$ '+Math.round(tot).toLocaleString('pt-BR'):'')+'</small></div>'+
+      return '<div class="sskb-col'+(tipo==='fora'?' fora':'')+'" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="ssSoltar(event,this,\''+k+'\')">'+
+        '<div class="sskb-cab" style="border-color:'+cor+'" draggable="true" title="Arraste para mudar a coluna de lugar" ondragstart="event.stopPropagation();event.dataTransfer.setData(\'text/coluna\',\''+k+'\')"><div>'+_waEsc(nome)+'</div><small>'+cs.length+' '+(cs.length===1?'lead':'leads')+(tot?' · R$ '+Math.round(tot).toLocaleString('pt-BR'):'')+'</small></div>'+
         '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">'+(k==='entrada'?'Quem responder no direct aparece aqui':'Arraste um card para cá')+'</div>')+'</div></div>';
     }).join('')+'</div>'+
     '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Agendou</b>, coloque telefone e data da avaliação: daí <b>Compareceu</b> e <b>Venda</b> andam sozinhos pelo Clinicorp. <b>Amigo Lari</b> e <b>Dentista</b> ficam guardados, fora das contas.</div>';
+}
+function ssSoltar(ev,el,k){
+  ev.preventDefault();el.classList.remove('sobre');
+  const col=ev.dataTransfer.getData('text/coluna');
+  if(col){ssMoverColuna(col,k);return;}
+  ssMover(+ev.dataTransfer.getData('text/plain'),k);
+}
+async function ssMoverColuna(de,para){
+  if(de===para)return;
+  const cols=SS_ETAPAS.map(x=>x.slice());const i=cols.findIndex(c=>c[0]===de),j=cols.findIndex(c=>c[0]===para);if(i<0||j<0)return;
+  const [c]=cols.splice(i,1);cols.splice(j,0,c);
+  const antes=SS_ETAPAS;SS_ETAPAS=cols;ssKanban();
+  try{await ssSalvarColunas(cols);}catch(e){SS_ETAPAS=antes;ssKanban();showToast('error','Não mudou a ordem',/403|42501|row-level/i.test(e.message)?'Só a gestão muda as colunas.':e.message);}
+}
+function ssColunasEditar(){
+  ssCardFechar();
+  _ss.edCols=SS_ETAPAS.map(x=>x.slice());
+  const m=document.createElement('div');m.id='sskb-modal';m.className='sskb-fundo';m.onclick=e=>{if(e.target===m)ssCardFechar();};
+  m.innerHTML='<div class="sskb-modal" style="width:620px"><div class="sskb-mcab"><b>Colunas do funil</b><button class="wa-btn" onclick="ssCardFechar()">✕</button></div><div id="sskb-cols"></div>'+
+    '<div class="sskb-mbotoes"><button class="wa-btn" onclick="ssColAdd()">+ Nova coluna</button><span style="flex:1"></span><button class="wa-btn primario" onclick="ssColSalvar()">Salvar</button></div>'+
+    '<div class="au-dica" style="margin-top:8px">A ordem aqui é a ordem do quadro (também dá para arrastar o título da coluna no quadro). <b>Fora das contas</b>: o card fica guardado e não entra nos números. As colunas com 🔒 têm regra automática: mudam de nome e lugar, mas não podem ser apagadas.</div></div>';
+  document.body.appendChild(m);ssColRender();
+}
+function ssColRender(){
+  const el=document.getElementById('sskb-cols');if(!el)return;
+  const qtd=k=>_ss.linhas.filter(l=>l.etapa===k).length;
+  el.innerHTML=_ss.edCols.map(([k,nome,cor,tipo],i)=>{
+    const fixa=SS_FIXAS[k];const n=qtd(k);
+    return '<div class="sskb-colrow">'+
+      '<div class="sskb-ord"><button class="wa-btn" '+(i?'':'disabled')+' onclick="ssColMover('+i+',-1)">↑</button><button class="wa-btn" '+(i<_ss.edCols.length-1?'':'disabled')+' onclick="ssColMover('+i+',1)">↓</button></div>'+
+      '<input type="color" value="'+_waEsc(cor)+'" onchange="_ss.edCols['+i+'][2]=this.value" style="width:34px;height:32px;border:none;background:none;padding:0">'+
+      '<input class="dp-in" style="height:32px;flex:1;min-width:120px" value="'+_waEsc(nome)+'" maxlength="40" oninput="_ss.edCols['+i+'][1]=this.value">'+
+      (fixa||tipo==='resultado'?'<span class="sskb-fixa" title="'+_waEsc(fixa||'')+'">🔒 '+_waEsc(SS_TIPOS_COL[tipo])+'</span>':
+        '<select class="dp-in" style="height:32px;width:auto" onchange="_ss.edCols['+i+'][3]=this.value">'+['normal','perdido','fora'].map(t=>'<option value="'+t+'"'+(t===tipo?' selected':'')+'>'+SS_TIPOS_COL[t]+'</option>').join('')+'</select>')+
+      '<span class="sskb-n">'+n+'</span>'+
+      (fixa?'<span style="width:34px"></span>':'<button class="wa-btn" title="'+(n?'Mova os '+n+' card(s) antes de apagar':'Apagar coluna')+'" '+(n?'disabled':'')+' onclick="ssColApagar('+i+')">🗑</button>')+
+    '</div>';}).join('');
+}
+function ssColMover(i,d){const c=_ss.edCols;const j=i+d;if(j<0||j>=c.length)return;[c[i],c[j]]=[c[j],c[i]];ssColRender();}
+function ssColApagar(i){_ss.edCols.splice(i,1);ssColRender();}
+function ssColAdd(){
+  const k='c_'+Date.now().toString(36);
+  const pos=Math.max(0,_ss.edCols.findIndex(c=>c[0]==='agendou'));
+  _ss.edCols.splice(pos,0,[k,'Nova coluna','#6FA8FF','normal']);ssColRender();
+  const ins=document.querySelectorAll('#sskb-cols .sskb-colrow input.dp-in');const i=ins[pos];if(i){i.focus();i.select();}
+}
+async function ssColSalvar(){
+  const cols=_ss.edCols.map(([k,n,c,t])=>[k,String(n||'').trim().slice(0,40),c,t]);
+  if(cols.some(c=>!c[1])){showToast('error','Toda coluna precisa de nome','');return;}
+  const nomes=cols.map(c=>c[1].toLowerCase());if(new Set(nomes).size!==nomes.length){showToast('error','Tem duas colunas com o mesmo nome','');return;}
+  const sumiu=SS_ETAPAS.filter(e=>!cols.some(c=>c[0]===e[0])&&_ss.linhas.some(l=>l.etapa===e[0]));
+  if(sumiu.length){showToast('error','Coluna com cards','Mova os cards de "'+sumiu[0][1]+'" antes de apagar.');return;}
+  try{await ssSalvarColunas(cols);ssCardFechar();ssKanban();showToast('success','Colunas salvas','');}
+  catch(e){showToast('error','Não salvou',/403|42501|row-level/i.test(e.message)?'Só a gestão muda as colunas.':e.message);}
 }
 async function ssPatch(id,corpo){
   const r=await _waRest('social_selling?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
