@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-132307">
+<meta name="lume-versao" content="20261031-133448">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -169,6 +169,29 @@ tbody tr:hover td{background:#0D1A33;}
 .cal-dia{transition:background .12s;}
 .cal-dia:hover{background:#12213F;}
 .cal-dia-hoje{background:#12213F!important;box-shadow:inset 0 0 0 1.5px #D4AF5A;}
+/* ===== Especialista de tráfego (31/10/2026) ===== */
+.tp-ia-bt{background:#B08A3E!important;color:#FFFFFF!important;border-color:#D4AF5A!important;font-weight:600;}
+#tp-ia{background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;padding:18px 22px;margin-bottom:16px;}
+.tpia-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.tpia-cab h3{margin:0;font-size:16px;color:#EEF1F7;}
+.tpia-meta{font-size:12px;color:#8C98B1;}
+.tpia-corpo{font-size:13.5px;line-height:1.6;color:#C3CBDB;}
+.tpia-corpo h2{font-size:15px;color:#EEF1F7;margin:20px 0 8px;padding-top:14px;border-top:1px solid #1D2D4E;}
+.tpia-corpo h2:first-child{border-top:none;padding-top:0;margin-top:6px;}
+.tpia-corpo h3{font-size:14px;color:#EEF1F7;margin:14px 0 6px;}
+.tpia-corpo p{margin:6px 0;}.tpia-corpo strong{color:#EEF1F7;}
+.tpia-corpo ul,.tpia-corpo ol{margin:6px 0;padding-left:20px;}.tpia-corpo li{margin:3px 0;}
+.tpia-tab{overflow-x:auto;margin:8px 0;border:1px solid #2A3D66;border-radius:10px;}
+.tpia-tab table{border-collapse:collapse;width:100%;font-size:12.5px;display:table;white-space:normal;}
+.tpia-tab th{background:#12213F;color:#EEF1F7;text-align:left;padding:8px 10px;font-weight:600;white-space:nowrap;}
+.tpia-tab td{padding:7px 10px;border-top:1px solid #1D2D4E;color:#C3CBDB;vertical-align:top;}
+.tpia-dec{display:inline-block;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.03em;white-space:nowrap;}
+.tpia-dec.escalar{background:rgba(95,196,138,.18);color:#7FD3A0;}.tpia-dec.manter{background:rgba(110,140,170,.2);color:#C3CBDB;}
+.tpia-dec.ajustar{background:rgba(212,175,90,.18);color:#E2BE6A;}.tpia-dec.aguardar{background:rgba(140,152,177,.16);color:#8C98B1;}
+.tpia-dec.pausar{background:rgba(224,103,90,.18);color:#E08A7E;}
+.tpia-carregando{display:flex;align-items:center;gap:12px;color:#C3CBDB;font-size:13px;padding:8px 0;}
+.tpia-hist{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #1D2D4E;font-size:12px;color:#8C98B1;align-items:center;}
+.tpia-hist button{background:#12213F;border:1px solid #2A3D66;color:#C3CBDB;border-radius:6px;padding:3px 9px;font-size:11.5px;cursor:pointer;}
 /* ===== INÍCIO (31/10/2026) ===== */
 .ini{max-width:1180px;margin:0 auto;padding:6px 28px 36px;display:flex;flex-direction:column;gap:22px;}
 .ini-topo{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;}
@@ -1463,8 +1486,10 @@ body{letter-spacing:-.1px;}
       <div><div style="font-size:10px;color:#8C98B1;margin-bottom:3px;">Data final</div><input type="date" id="tp-to" onchange="aplicarFiltroTrafegoPago()" style="border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;"></div>
       <div><div style="font-size:10px;color:#8C98B1;margin-bottom:3px;">ID-Anúncio</div><input type="search" id="tp-ad" name="busca-anuncio" autocomplete="off" oninput="filterAdTable()" placeholder="ID ou nome do anúncio" style="border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;min-width:200px;"></div>
       <div><div style="font-size:10px;color:#8C98B1;margin-bottom:3px;">ID-Campanha</div><input type="search" id="tp-camp" name="busca-campanha" autocomplete="off" oninput="filterAdTable()" placeholder="Nome da campanha" style="border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;min-width:200px;"></div>
-      <button class="fb" style="margin-left:auto;background:#5A7A9A;color:#FFFFFF;border-color:#6E8CAA;" onclick="exportarFunilParaIA()" title="Baixa 2 planilhas CSV (resumo por anúncio + pessoas anonimizadas) para enviar a outra IA">⬇ Exportar p/ IA</button>
+      <button class="fb tp-ia-bt" style="margin-left:auto;" onclick="tpAnalisarIA()" title="O especialista de performance analisa o período e diz o que pausar, manter, ajustar ou escalar">✨ Analisar com IA</button>
+      <button class="fb" style="background:#5A7A9A;color:#FFFFFF;border-color:#6E8CAA;" onclick="exportarFunilParaIA()" title="Baixa 2 planilhas CSV (resumo por anúncio + pessoas anonimizadas) para enviar a outra IA">⬇ Exportar p/ IA</button>
     </div>
+    <div id="tp-ia" style="display:none"></div>
     <div id="trafego-pago-host"></div>
   </div>
 </div>
@@ -6473,6 +6498,105 @@ function atualizarCardRoasGeral(roas,vendas,spend,semAnuncio){
   if(sub)sub.textContent=spend>0?(roas>=7.5?'na meta (7,5x) · ':(roas>=4?'abaixo da meta de 7,5x, acima do mínimo de 4x · ':'abaixo do mínimo de 4x · '))+`${fmt(vendas)} em vendas de novos pacientes de tráfego pago`+(semAnuncio>0?` (${fmt(vendas-semAnuncio)} com anúncio identificado + ${fmt(semAnuncio)} sem anúncio)`:'')+` ÷ ${fmt(spend)} investidos`:'sem investimento no período';
 }
 
+// ===== ESPECIALISTA DE TRÁFEGO PAGO (31/10/2026) =====
+// Junta os números do período (os mesmos da tabela "Funil por anúncio", com os filtros aplicados),
+// manda para a função whatsapp-agente (ação analise_trafego) e mostra a análise aqui.
+function _tpDadosParaIA(){
+  const adMap=window._lastAdMap||{};
+  const meta={};
+  (typeof _lastMetaAds!=='undefined'?_lastMetaAds:[]).forEach(a=>{const id=String(a.ad_id||'');if(!id)return;const o=meta[id]||(meta[id]={imp:0,cli:0});o.imp+=Number(a.impressions||0);o.cli+=Number(a.clicks||0);});
+  const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
+  const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
+  const qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
+  const qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
+  let linhas=Object.entries(adMap);
+  if(campFilt)linhas=linhas.filter(([,d])=>d.campaign===campFilt);
+  if(adsetFilt)linhas=linhas.filter(([,d])=>d.adset===adsetFilt);
+  if(qAd)linhas=linhas.filter(([k,d])=>String(k).toLowerCase().includes(qAd)||String(d.label||'').toLowerCase().includes(qAd));
+  if(qCamp)linhas=linhas.filter(([,d])=>String(d.campaign||'').toLowerCase().includes(qCamp));
+  const r2=v=>Math.round(Number(v||0)*100)/100;
+  const div=(a,b)=>b>0?r2(a/b):null;
+  const anuncios=linhas.map(([k,d])=>{const m=meta[k]||{imp:0,cli:0};const g=Number(d.spend||0);
+    return{id:k==='__sem_rastreio__'?null:k,anuncio:k==='__sem_rastreio__'?'(leads e vendas sem anúncio identificado)':(d.label||k),conjunto:d.adset||'',campanha:d.campaign||'',
+      gasto:r2(g),impressoes:m.imp||null,cliques:m.cli||null,ctr_pct:m.imp?r2(m.cli/m.imp*100):null,cpm:m.imp?r2(g/m.imp*1000):null,cpc:m.cli?r2(g/m.cli):null,
+      leads:d.leads||0,cpl:div(g,d.leads),agendamentos:d.agend||0,custo_agend:div(g,d.agend),comparecimentos:d.comp||0,fechamentos_novos:d.fechou||0,
+      custo_venda:div(g,d.fechou),vendas_rs:r2(d.vendas),roas:div(d.vendas,g),recompras:d.recompras||0};})
+    .sort((a,b)=>b.gasto-a.gasto||b.leads-a.leads).slice(0,150);
+  const soma=k=>anuncios.reduce((s,x)=>s+(Number(x[k])||0),0);
+  const tot={gasto:r2(soma('gasto')),leads:soma('leads'),agendamentos:soma('agendamentos'),comparecimentos:soma('comparecimentos'),fechamentos_novos:soma('fechamentos_novos'),vendas_rs:r2(soma('vendas_rs'))};
+  tot.cpl=div(tot.gasto,tot.leads);tot.custo_venda=div(tot.gasto,tot.fechamentos_novos);tot.roas=div(tot.vendas_rs,tot.gasto);
+  tot.taxa_agendamento_pct=tot.leads?r2(tot.agendamentos/tot.leads*100):null;tot.taxa_comparecimento_pct=tot.agendamentos?r2(tot.comparecimentos/tot.agendamentos*100):null;tot.taxa_fechamento_pct=tot.comparecimentos?r2(tot.fechamentos_novos/tot.comparecimentos*100):null;
+  const camp={};anuncios.forEach(a=>{const c=camp[a.campanha||'(sem campanha)']||(camp[a.campanha||'(sem campanha)']={campanha:a.campanha||'(sem campanha)',gasto:0,leads:0,agendamentos:0,comparecimentos:0,fechamentos_novos:0,vendas_rs:0,anuncios:0});
+    c.gasto+=a.gasto;c.leads+=a.leads;c.agendamentos+=a.agendamentos;c.comparecimentos+=a.comparecimentos;c.fechamentos_novos+=a.fechamentos_novos;c.vendas_rs+=a.vendas_rs;c.anuncios++;});
+  const porCampanha=Object.values(camp).map(c=>({...c,gasto:r2(c.gasto),vendas_rs:r2(c.vendas_rs),cpl:div(c.gasto,c.leads),custo_venda:div(c.gasto,c.fechamentos_novos),roas:div(c.vendas_rs,c.gasto)})).sort((a,b)=>b.gasto-a.gasto);
+  const aud=window._auditoriaFunilAnuncio;
+  const rg=getRange('trafego');
+  const dias=Math.round((new Date(rg.until+'T12:00')-new Date(rg.since+'T12:00'))/864e5)+1;
+  return{de:rg.since,ate:rg.until,filtro:[campFilt&&'campanha '+campFilt,adsetFilt&&'conjunto '+adsetFilt,qAd&&'anúncio contém "'+qAd+'"',qCamp&&'campanha contém "'+qCamp+'"'].filter(Boolean).join(', ')||null,
+    dados:{periodo:{de:rg.since,ate:rg.until,dias},
+      como_ler:['Leads, agendamentos, comparecimentos e fechamentos vêm do CRM ligados ao anúncio de origem do lead.','fechamentos_novos e vendas_rs contam só pacientes novos (sem recompras), com valor real do Clinicorp.','Gasto, impressões e cliques vêm do Meta Ads no período.','Os dados não dizem se o anúncio está ativo ou pausado hoje.'],
+      rastreamento:aud?{pct_leads_com_anuncio:r2((aud.coberturaLeads||0)*100),leads_sem_anuncio:aud.leadsSemRastreio||0,fechamentos_sem_anuncio:aud.fechamentosSemRastreio||0,vendas_sem_anuncio_rs:r2(aud.vendasSemRastreio||0)}:null,
+      totais:tot,por_campanha:porCampanha,por_anuncio:anuncios}};
+}
+function _tpMd(md){
+  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inl=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*]+)\*/g,'$1<em>$2</em>')
+    .replace(/\b(ESCALAR|MANTER|AJUSTAR|AGUARDAR|PAUSAR)\b/g,(m)=>'<span class="tpia-dec '+m.toLowerCase()+'">'+m+'</span>');
+  const linhas=String(md||'').split('\n');let h='',i=0,lista=null;
+  const fechaLista=()=>{if(lista){h+='</'+lista+'>';lista=null;}};
+  while(i<linhas.length){
+    const l=linhas[i];
+    if(/^\s*\|/.test(l)){
+      fechaLista();const bloco=[];while(i<linhas.length&&/^\s*\|/.test(linhas[i])){bloco.push(linhas[i]);i++;}
+      const cel=x=>x.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+      const corpo=bloco.filter(x=>!/^[\s|:-]+$/.test(x));
+      if(corpo.length){h+='<div class="tpia-tab"><table><thead><tr>'+cel(corpo[0]).map(c=>'<th>'+inl(c)+'</th>').join('')+'</tr></thead><tbody>'+corpo.slice(1).map(r=>'<tr>'+cel(r).map(c=>'<td>'+inl(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';}
+      continue;
+    }
+    let m;
+    if((m=l.match(/^(#{2,4})\s+(.*)/))){fechaLista();h+=(m[1].length===2?'<h2>':'<h3>')+inl(m[2])+(m[1].length===2?'</h2>':'</h3>');}
+    else if((m=l.match(/^\s*[-*]\s+(.*)/))){if(lista!=='ul'){fechaLista();h+='<ul>';lista='ul';}h+='<li>'+inl(m[1])+'</li>';}
+    else if((m=l.match(/^\s*\d+[.)]\s+(.*)/))){if(lista!=='ol'){fechaLista();h+='<ol>';lista='ol';}h+='<li>'+inl(m[1])+'</li>';}
+    else if(/^#\s+/.test(l)){fechaLista();h+='<h2>'+inl(l.replace(/^#\s+/,''))+'</h2>';}
+    else if(l.trim()===''){fechaLista();}
+    else{fechaLista();h+='<p>'+inl(l)+'</p>';}
+    i++;
+  }
+  fechaLista();return h;
+}
+function _tpIaMostrar(a){
+  const box=document.getElementById('tp-ia');if(!box)return;
+  const quando=a.criado_em?new Date(a.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  const per=a.periodo_de?new Date(a.periodo_de+'T12:00').toLocaleDateString('pt-BR')+' a '+new Date(a.periodo_ate+'T12:00').toLocaleDateString('pt-BR'):'';
+  box.style.display='block';
+  box.innerHTML='<div class="tpia-cab"><h3>✨ Análise do especialista de performance</h3><div style="display:flex;gap:8px;align-items:center"><span class="tpia-meta">'+per+(a.filtro?' · '+_auEsc(a.filtro):'')+(quando?' · gerada '+quando:'')+'</span><button class="wa-btn" onclick="document.getElementById(\'tp-ia\').style.display=\'none\'">Fechar</button></div></div>'+
+    (a.incompleta?'<div class="tpia-meta" style="color:#E2BE6A">A análise ficou longa e foi cortada no fim. Filtre por campanha para uma análise completa.</div>':'')+
+    '<div class="tpia-corpo">'+_tpMd(a.texto)+'</div><div class="tpia-hist" id="tpia-hist"></div>';
+  _tpIaHistorico();
+}
+async function _tpIaHistorico(){
+  const el=document.getElementById('tpia-hist');if(!el)return;
+  try{const l=(await _waRest('analises_ia?tipo=eq.trafego&select=id,periodo_de,periodo_ate,criado_em&order=criado_em.desc&limit=8'))||[];
+    if(l.length<2){el.style.display='none';return;}
+    el.innerHTML='Análises anteriores: '+l.map(x=>'<button onclick="_tpIaAbrir('+x.id+')">'+new Date(x.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' · '+(x.periodo_de?new Date(x.periodo_de+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'–'+new Date(x.periodo_ate+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'')+'</button>').join('');
+  }catch(e){el.style.display='none';}
+}
+async function _tpIaAbrir(id){try{const a=(await _waRest('analises_ia?id=eq.'+id+'&select=*'))?.[0];if(a)_tpIaMostrar(a);}catch(e){}}
+async function tpAnalisarIA(){
+  if(!_waEhGestao()){showToast('error','Só a gestão','A análise com IA é liberada para a gestão.');return;}
+  if(window._trafegoPronto===false||!window._lastAdMap){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
+  const pacote=_tpDadosParaIA();
+  if(!pacote.dados.por_anuncio.length){showToast('error','Sem dados','Não há anúncios no período escolhido.');return;}
+  const box=document.getElementById('tp-ia');box.style.display='block';
+  box.innerHTML='<div class="tpia-carregando"><div class="spinner"></div><div>O especialista está analisando '+pacote.dados.por_anuncio.length+' anúncios de '+new Date(pacote.de+'T12:00').toLocaleDateString('pt-BR')+' a '+new Date(pacote.ate+'T12:00').toLocaleDateString('pt-BR')+'…<br><span class="tpia-meta">Leva de 30 segundos a 2 minutos.</span></div></div>';
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+  try{
+    const j=await _agAcao({acao:'analise_trafego',de:pacote.de,ate:pacote.ate,filtro:pacote.filtro,dados:JSON.stringify(pacote.dados)});
+    _tpIaMostrar({texto:j.texto,criado_em:j.criado_em,periodo_de:pacote.de,periodo_ate:pacote.ate,filtro:pacote.filtro,incompleta:j.incompleta});
+  }catch(e){
+    box.innerHTML='<div class="tpia-cab"><h3>✨ Análise do especialista</h3><button class="wa-btn" onclick="document.getElementById(\'tp-ia\').style.display=\'none\'">Fechar</button></div><div class="tpia-meta" style="color:#E08A7E">Não deu para gerar a análise: '+String(e.message||e).replace(/</g,'&lt;')+'</div>';
+  }
+}
 // ===== FILTER AD TABLE =====
 function filterAdTable(){
   const adMap=window._lastAdMap;if(!adMap)return;
