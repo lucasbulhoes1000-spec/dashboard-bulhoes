@@ -148,6 +148,20 @@ const dataDoItem = (a: any) => {
 };
 
 export type Horario = { data: string; hora: string; fim: string };
+
+/** Feriados em que a clínica não atende (nacionais, SP e Santos), no formato AAAA-MM-DD. */
+export function feriados(ano: number): Set<string> {
+  // Páscoa (algoritmo de Meeus) para Carnaval, Sexta-feira Santa e Corpus Christi
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  const pascoa = Date.UTC(ano, mes - 1, dia);
+  const rel = (n: number) => new Date(pascoa + n * 86_400_000).toISOString().slice(0, 10);
+  const fixos = ["01-01", "01-26", "04-21", "05-01", "07-09", "09-07", "09-08", "10-12", "11-02", "11-15", "11-20", "12-25"];
+  // 26/01 aniversário de Santos · 09/07 Revolução Constitucionalista (SP) · 08/09 N. Sra. do Monte Serrat (Santos)
+  return new Set([...fixos.map((x) => `${ano}-${x}`), rel(-48), rel(-47), rel(-2), rel(60)]); // Carnaval (seg e ter), Sexta-feira Santa, Corpus Christi
+}
 /** Horários livres da profissional, respeitando expediente, sábado, almoço e antecedência. */
 export function horariosLivres(cfg: any, agenda: any[], agora: number): Horario[] {
   const prof = String(cfg.profissional_id ?? "");
@@ -181,6 +195,10 @@ export function horariosLivres(cfg: any, agenda: any[], agora: number): Horario[
   for (let n = 0; n <= Number(cfg.dias_busca ?? 14); n++) {
     const d = diaLocal(agora, n);
     const sem = new Date(d + "T12:00:00Z").getUTCDay();
+    // feriado não agenda, a não ser que a clínica avise que vai abrir (agendamento.abrir_em: ["AAAA-MM-DD"]);
+    // agendamento.fechado_em fecha outros dias (ex.: emendas)
+    const abre = Array.isArray(cfg.abrir_em) && cfg.abrir_em.includes(d);
+    if (!abre && (feriados(Number(d.slice(0, 4))).has(d) || (Array.isArray(cfg.fechado_em) && cfg.fechado_em.includes(d)))) continue;
     if (sem === 0 || diaInteiro.has(d)) continue;
     const ini = minutos(sem === 6 ? cfg.sabado_inicio : cfg.semana_inicio), ult = minutos(sem === 6 ? cfg.sabado_ultimo : cfg.semana_ultimo);
     if (isNaN(ini) || isNaN(ult)) continue;
