@@ -76,6 +76,120 @@ async function tokenDoNumero(id: string): Promise<string> {
   return t;
 }
 
+// ---------- notificações no celular (Web Push, sem biblioteca: VAPID + aes128gcm, RFC 8291/8292) ----------
+const _te = new TextEncoder();
+function b64u(buf: ArrayBuffer | Uint8Array): string {
+  const b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = ""; for (const x of b) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function deB64u(s: string): Uint8Array {
+  const t = String(s).replace(/-/g, "+").replace(/_/g, "/"); const p = t + "===".slice((t.length + 3) % 4);
+  const bin = atob(p); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out;
+}
+function juntar(...partes: Uint8Array[]): Uint8Array {
+  const n = partes.reduce((t, p) => t + p.length, 0); const out = new Uint8Array(n); let o = 0;
+  for (const p of partes) { out.set(p, o); o += p.length; } return out;
+}
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, bytes: number): Promise<Uint8Array> {
+  const k = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, k, bytes * 8));
+}
+export async function pushGerarChaves(): Promise<{ publica: string; privada: JsonWebKey }> {
+  const par = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const publica = b64u(await crypto.subtle.exportKey("raw", par.publicKey));
+  const privada = await crypto.subtle.exportKey("jwk", par.privateKey);
+  return { publica, privada };
+}
+async function vapidCabecalho(endpoint: string, chaves: { publica: string; privada: JsonWebKey }, contato: string): Promise<string> {
+  const aud = new URL(endpoint).origin;
+  const cab = b64u(_te.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const corpo = b64u(_te.encode(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: contato })));
+  const k = await crypto.subtle.importKey("jwk", chaves.privada, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const ass = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, k, _te.encode(cab + "." + corpo));
+  return `vapid t=${cab}.${corpo}.${b64u(ass)}, k=${chaves.publica}`;
+}
+export async function pushCifrar(texto: string, p256dh: string, auth: string): Promise<Uint8Array> {
+  const uaPub = deB64u(p256dh), segredo = deB64u(auth);
+  const meu = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey("raw", meu.publicKey));
+  const uaKey = await crypto.subtle.importKey("raw", uaPub, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, meu.privateKey, 256));
+  const ikm = await hkdf(segredo, ecdh, juntar(_te.encode("WebPush: info\0"), uaPub, asPub), 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(salt, ikm, _te.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(salt, ikm, _te.encode("Content-Encoding: nonce\0"), 12);
+  const k = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, k, juntar(_te.encode(texto), new Uint8Array([2]))));
+  const rs = new Uint8Array([0, 0, 16, 0]); // 4096
+  return juntar(salt, rs, new Uint8Array([asPub.length]), asPub, cifrado);
+}
+/** Envia uma notificação. Devolve o status HTTP do serviço de push (201 = ok; 404/410 = inscrição morta). */
+export async function pushEnviar(insc: { endpoint: string; p256dh: string; auth: string }, dados: unknown, chaves: { publica: string; privada: JsonWebKey }, contato = "mailto:lucasbulhoes1000@gmail.com"): Promise<{ status: number; erro: string }> {
+  const corpo = await pushCifrar(JSON.stringify(dados), insc.p256dh, insc.auth);
+  const r = await fetch(insc.endpoint, { method: "POST", headers: {
+    "Authorization": await vapidCabecalho(insc.endpoint, chaves, contato),
+    "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", "TTL": "86400", "Urgency": "high",
+  }, body: corpo });
+  const txt = r.ok ? "" : (await r.text().catch(() => "")).slice(0, 200);
+  return { status: r.status, erro: txt };
+}
+
+// (31/10/2026) fila de notificações (push_fila): avaliação agendada, venda fechada e teste.
+// As chaves VAPID são criadas aqui na primeira vez e ficam só no banco (push_chaves).
+let _pushChavesOk = false;
+async function pushChaves(): Promise<{ publica: string; privada: JsonWebKey } | null> {
+  let c = (await bancoJson(`/rest/v1/push_chaves?id=eq.1&select=publica,privada`).catch(() => []))?.[0];
+  if (!c) {
+    const nova = await pushGerarChaves();
+    await banco(`/rest/v1/push_chaves`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ id: 1, publica: nova.publica, privada: nova.privada }) });
+    c = (await bancoJson(`/rest/v1/push_chaves?id=eq.1&select=publica,privada`).catch(() => []))?.[0];
+  }
+  return c ?? null;
+}
+async function rodarPush(cont: Record<string, number>) {
+  if (!_pushChavesOk) { _pushChavesOk = !!(await pushChaves()); }
+  const fila: any[] = (await bancoJson(`/rest/v1/push_fila?status=eq.pendente&select=*&order=id&limit=20`).catch(() => [])) ?? [];
+  if (!fila.length) return;
+  const chaves = await pushChaves();
+  if (!chaves) return;
+  const insc: any[] = (await bancoJson(`/rest/v1/push_inscricoes?ativo=is.true&select=id,email,endpoint,p256dh,auth,tipos`).catch(() => [])) ?? [];
+  const agoraIso = () => new Date().toISOString();
+  for (const f of fila) {
+    // trava: só uma execução do motor pega cada notificação
+    const pego = await bancoJson(`/rest/v1/push_fila?id=eq.${f.id}&status=eq.pendente`, { method: "PATCH",
+      headers: { Prefer: "return=representation" }, body: JSON.stringify({ status: "enviando" }) }).catch(() => []);
+    if (!pego?.length) continue;
+    if (Date.parse(f.criado_em) < Date.now() - 2 * 86400000) {
+      await banco(`/rest/v1/push_fila?id=eq.${f.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "ignorado", detalhe: "antiga demais para avisar" }) });
+      continue;
+    }
+    const alvo = insc.filter((i) => f.para_email ? i.email === f.para_email : (i.tipos ?? []).includes(f.tipo));
+    let ok = 0; const falhas: string[] = [];
+    for (const i of alvo) {
+      try {
+        const r = await pushEnviar(i, { titulo: f.titulo, corpo: f.corpo, url: f.pagina ? "/?pagina=" + encodeURIComponent(f.pagina) : "/", tag: f.tipo + "-" + f.id }, chaves);
+        if (r.status >= 200 && r.status < 300) {
+          ok++;
+          await banco(`/rest/v1/push_inscricoes?id=eq.${i.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ ultimo_envio_em: agoraIso(), ultimo_erro: null }) }).catch(() => {});
+        } else {
+          falhas.push(`${i.email} ${r.status}`);
+          const morta = r.status === 404 || r.status === 410;
+          await banco(`/rest/v1/push_inscricoes?id=eq.${i.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify(morta ? { ativo: false, ultimo_erro: `${r.status} ${r.erro}`.slice(0, 300) } : { ultimo_erro: `${r.status} ${r.erro}`.slice(0, 300) }) }).catch(() => {});
+        }
+      } catch (e) { falhas.push(`${i.email} ${String((e as Error)?.message ?? e).slice(0, 80)}`); }
+    }
+    await banco(`/rest/v1/push_fila?id=eq.${f.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: ok || !alvo.length ? "enviado" : "erro", enviado_em: agoraIso(),
+        detalhe: (`${ok} de ${alvo.length} aparelho(s)` + (falhas.length ? "; falhas: " + falhas.join(", ") : "")).slice(0, 500) }) }).catch(() => {});
+    cont.push = (cont.push ?? 0) + 1;
+  }
+}
+
 // ---------- regras de horário ----------
 function hm(s: unknown, padrao: number): number {
   const m = /^(\d{1,2}):(\d{2})$/.exec(String(s ?? ""));
@@ -830,6 +944,7 @@ export async function handler(req: Request): Promise<Response> {
   const cont: Record<string, number> = {};
   // disparos em massa primeiro (não dependem da chave geral: cada um é decisão da equipe)
   // mensagens agendadas pela equipe primeiro (hora marcada), depois disparos em massa
+  await rodarPush(cont).catch((e) => { cont.push_erro_motor = 1; console.error("push", e); });
   await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
   await rodarRespostasLembrete(cont).catch((e) => { cont.lembrete_resposta_erro_motor = 1; console.error("respostas lembrete", e); });
   await rodarLembretes(inicio, cont).catch((e) => { cont.lembrete_erro_motor = 1; console.error("lembretes", e); });
