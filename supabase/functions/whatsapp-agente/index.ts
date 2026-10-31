@@ -509,10 +509,12 @@ export function mensagensComCache(msgs: any[]): any[] {
   }
   return out;
 }
-async function chamarClaude(modelo: string, sistema: string, mensagens: any[], tools: any[], criatividade: number, maxTokens = 2000) {
+async function chamarClaude(modelo: string, sistema: string, mensagens: any[], tools: any[], criatividade: number, maxTokens = 2000, extra: any = {}) {
   if (!ANTHROPIC_API_KEY) throw new Error("falta a chave da Anthropic (segredo ANTHROPIC_API_KEY na Supabase)");
-  const corpo: any = { model: modelo, max_tokens: maxTokens, system: sistemaComCache(sistema), messages: mensagensComCache(mensagens), temperature: Math.max(0, Math.min(1, Number(criatividade))) };
+  const corpo: any = { model: modelo, max_tokens: maxTokens, system: sistemaComCache(sistema), messages: mensagensComCache(mensagens) };
+  if (criatividade != null) corpo.temperature = Math.max(0, Math.min(1, Number(criatividade)));
   if (tools.length) corpo.tools = tools;
+  Object.assign(corpo, extra);
   const pedir = async (c: any) => {
     const r = await fetch(ANTHROPIC_URL, {
       method: "POST",
@@ -525,6 +527,7 @@ async function chamarClaude(modelo: string, sistema: string, mensagens: any[], t
   let r = await pedir(corpo);
   // alguns modelos não aceitam "temperature": tenta de novo sem
   if (!r.ok && r.status === 400 && /temperature/i.test(JSON.stringify(r.j))) { delete corpo.temperature; r = await pedir(corpo); }
+  if (!r.ok && r.status === 400 && corpo.thinking && /thinking/i.test(JSON.stringify(r.j))) { delete corpo.thinking; r = await pedir(corpo); }
   if (!r.ok) throw new Error(`Anthropic ${r.status}: ${String(r.j?.error?.message ?? JSON.stringify(r.j)).slice(0, 300)}`);
   return r.j;
 }
@@ -596,9 +599,9 @@ async function analisarTrafego(dados: any, autor: string) {
   if (texto.length > 250_000) throw new Error("dados grandes demais; filtre o período ou a campanha");
   const modelo = "claude-sonnet-5-5";
   const pedido = `Período analisado: ${String(dados?.de ?? "")} a ${String(dados?.ate ?? "")}${dados?.filtro ? " (filtro: " + String(dados.filtro) + ")" : ""}.\n\nDados (JSON):\n${texto}`;
-  const j = await chamarClaude(modelo, PROMPT_TRAFEGO, [{ role: "user", content: pedido }], [], 0.3, 6000);
+  const j = await chamarClaude(modelo, PROMPT_TRAFEGO, [{ role: "user", content: pedido }], [], null as any, 12000, { thinking: { type: "between_tools" } });
   const saida = (j?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
-  if (!saida) throw new Error("a IA não devolveu a análise; tente de novo");
+  if (!saida) throw new Error(`a IA não devolveu a análise (parada: ${j?.stop_reason ?? "?"}; blocos: ${(j?.content ?? []).map((b: any) => b.type).join(",") || "nenhum"}); tente de novo`);
   const reg = { tipo: "trafego", periodo_de: dados?.de || null, periodo_ate: dados?.ate || null, filtro: dados?.filtro || null, texto: saida,
     modelo, tokens_entrada: j?.usage?.input_tokens ?? null, tokens_saida: j?.usage?.output_tokens ?? null, criado_por: autor };
   const r = await bancoJson(`/rest/v1/analises_ia`, { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(reg) }).catch(() => null);
