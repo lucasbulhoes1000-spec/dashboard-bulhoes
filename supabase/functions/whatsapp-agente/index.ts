@@ -405,6 +405,10 @@ export function ferramentas(imagens: any[], agendamento = false) {
     name: "encerrar_sem_interesse",
     description: "Marca o lead como Perdido e para de responder. Use só quando as instruções mandarem (ex.: mora fora da Baixada Santista e não pode vir a Santos fazer o tratamento). Agradeça antes de usar.",
     input_schema: { type: "object", properties: { motivo: { type: "string", description: "Por que o lead foi encerrado (ex.: mora em outra cidade e não pode vir a Santos)" } }, required: ["motivo"] },
+  }, {
+    name: "salvar_nome",
+    description: "Salva o nome completo do paciente no cadastro (card do CRM). Use assim que a pessoa disser nome e sobrenome, uma vez só, sem comentar com o paciente. Não use para apelido nem só o primeiro nome.",
+    input_schema: { type: "object", properties: { nome_completo: { type: "string", description: "Nome e sobrenome como o paciente escreveu, com as iniciais maiúsculas" } }, required: ["nome_completo"] },
   }];
   if (agendamento) {
     t.push({
@@ -608,7 +612,7 @@ async function analisarTrafego(dados: any, autor: string) {
   return { texto: saida, id: r?.[0]?.id ?? null, criado_em: r?.[0]?.criado_em ?? new Date().toISOString(), incompleta: j?.stop_reason === "max_tokens" };
 }
 
-export type Acao = { tipo: "texto"; texto: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string } | { tipo: "perdido"; motivo: string };
+export type Acao = { tipo: "texto"; texto: string } | { tipo: "nome"; nome: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string } | { tipo: "perdido"; motivo: string };
 export type Agenda = { ver: (periodo: string, data?: string) => Promise<string>; marcar: (x: any) => Promise<string> };
 
 /**
@@ -648,6 +652,10 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
           transferiu = true;
           await executar({ tipo: "perdido", motivo: String(b.input?.motivo ?? "") });
           resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Lead encerrado como Perdido. Não escreva mais nada." });
+        } else if (b.name === "salvar_nome") {
+          const nome = String(b.input?.nome_completo ?? "").replace(/\s+/g, " ").trim();
+          const ok = nome.split(" ").length >= 2 && nome.length <= 80 && /^[\p{L}' .-]+$/u.test(nome) && (await executar({ tipo: "nome", nome }));
+          resultados.push({ type: "tool_result", tool_use_id: b.id, content: ok ? "Nome salvo. Continue a conversa normalmente, sem comentar isso." : "Nome não salvo (precisa de nome e sobrenome). Continue a conversa normalmente." });
         } else if (b.name === "enviar_imagem") {
           const img = imagens.find((i) => i.nome === b.input?.nome);
           if (img && (await executar({ tipo: "imagem", nome: img.nome, link: img.link }))) {
@@ -779,6 +787,16 @@ export async function responder(conversaId: string, versao: number, pausa = espe
         enviados.push("[imagem: " + x.nome + "]");
         return r.ok;
       }
+      if (x.tipo === "nome") {
+        // card do CRM com o nome completo (não mexe em nome editado à mão pela equipe)
+        const tel = encodeURIComponent(String(c.telefone ?? ""));
+        if (c.telefone && !String(c.telefone).startsWith("ig:")) {
+          await banco(`/rest/v1/pacientes?telefone=eq.${tel}&editado_manualmente=is.false`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nome: x.nome }) }).catch(() => {});
+          await banco(`/rest/v1/eventos_proprios?telefone=eq.${tel}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nome: x.nome }) }).catch(() => {});
+        }
+        await banco(`/rest/v1/conversas?id=eq.${conversaId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nome_contato: x.nome }) }).catch(() => {});
+        return true;
+      }
       if (x.tipo === "perdido") {
         encerrou = true;
         // CRM: etapa Perdido e robô desligado nesta conversa (ninguém precisa assumir)
@@ -859,7 +877,7 @@ async function testar(dados: any) {
   const acoes: Acao[] = [];
   const res = await gerarResposta(a, imagens, montarSistema(a, imagens, { nome: dados?.nome || "" }), hist, async (x) => { acoes.push(x); return true; },
     a.agendamento?.ligado ? agendaReal(a, { telefone: "" }, {}, null, true) : undefined);
-  await registro({ tipo: "teste", detalhe: acoes.map((x) => x.tipo === "texto" ? x.texto : x.tipo === "imagem" ? "[imagem: " + x.nome + "]" : "[transferiu: " + x.motivo + "]").join("\n\n").slice(0, 2000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: dados?._autor });
+  await registro({ tipo: "teste", detalhe: acoes.map((x) => x.tipo === "texto" ? x.texto : x.tipo === "imagem" ? "[imagem: " + x.nome + "]" : x.tipo === "nome" ? "[salvou o nome: " + x.nome + "]" : "[transferiu: " + (x as any).motivo + "]").join("\n\n").slice(0, 2000), modelo: a.modelo, tokens_entrada: res.uso.entrada, tokens_saida: res.uso.saida, autor: dados?._autor });
   return { acoes, uso: res.uso, bruto: res.bruto, parada: res.parada };
 }
 

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-133448">
+<meta name="lume-versao" content="20261031-154723">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -15260,7 +15260,7 @@ function agRender(){
       (_ag.hor?(_ag.hor.erro?'<div class="ag-chip erro">'+_auEsc(_ag.hor.erro)+'</div>':'<div class="ag-dica" style="color:#EEF1F7">Manhã: <b>'+_auEsc((_ag.hor.manha||[]).join(' ou ')||'sem horário')+'</b><br>Tarde: <b>'+_auEsc((_ag.hor.tarde||[]).join(' ou ')||'sem horário')+'</b><br><span style="color:#8C98B1">Livres: '+(_ag.hor.livres||[]).slice(0,24).map(h=>h.data.slice(8,10)+'/'+h.data.slice(5,7)+' '+h.hora).join(' · ')+'</span></div>'):'')+
       '<div class="ag-dica">Nas instruções, diga quando o agente deve oferecer horários (ex.: depois de perguntar manhã ou tarde). Ele só oferece o que a agenda devolver e confirma o nome completo antes de marcar.</div>';
   }else if(_ag.aba==='testar'){
-    const bal=_ag.teste.map(x=>x.de==='paciente'?'<div class="ag-b pac">'+_auEsc(x.texto)+'</div>':x.tipo==='imagem'?'<div class="ag-b ag"><img src="'+_auEsc(x.link)+'" style="max-width:160px;border-radius:6px;display:block"><small>'+_auEsc(x.nome)+'</small></div>':x.tipo==='transferir'?'<div class="ag-b sis">↪ Passaria para a equipe: '+_auEsc(x.motivo||'')+'</div>':x.tipo==='erro'?'<div class="ag-b sis erro">'+_auEsc(x.texto)+'</div>':'<div class="ag-b ag">'+_auEsc(x.texto)+'</div>').join('');
+    const bal=_ag.teste.map(x=>x.de==='paciente'?'<div class="ag-b pac">'+_auEsc(x.texto)+'</div>':x.tipo==='imagem'?'<div class="ag-b ag"><img src="'+_auEsc(x.link)+'" style="max-width:160px;border-radius:6px;display:block"><small>'+_auEsc(x.nome)+'</small></div>':x.tipo==='transferir'?'<div class="ag-b sis">↪ Passaria para a equipe: '+_auEsc(x.motivo||'')+'</div>':x.tipo==='nome'?'<div class="ag-b sis">✎ Salvaria o nome no card: '+_auEsc(x.nome||'')+'</div>':x.tipo==='erro'?'<div class="ag-b sis erro">'+_auEsc(x.texto)+'</div>':'<div class="ag-b ag">'+_auEsc(x.texto)+'</div>').join('');
     corpo='<div class="ag-dica">Converse como se fosse o paciente. Nada é enviado no WhatsApp. Usa o que está na tela, mesmo antes de salvar.</div>'+
       '<div class="ag-chat" id="ag-chat">'+(bal||'<div class="au-vazio" style="padding:18px">Escreva a primeira mensagem do paciente.</div>')+(_ag.testando?'<div class="ag-b ag" style="opacity:.6">digitando…</div>':'')+'</div>'+
       '<div class="ag-nova"><input class="wa-var" id="ag-teste-txt" placeholder="Mensagem do paciente…" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();agTestar();}"'+(pode&&!_ag.testando?'':' disabled')+'><button class="wa-btn primario" onclick="agTestar()"'+(pode&&!_ag.testando?'':' disabled')+'>Enviar</button><button class="wa-btn" onclick="_ag.teste=[];agRender()">Recomeçar</button></div>'+
