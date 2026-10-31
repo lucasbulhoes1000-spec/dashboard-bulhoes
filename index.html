@@ -8,13 +8,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
+<meta name="lume-versao" content="20261031-131520">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Lume">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1067,6 +1068,32 @@ body{letter-spacing:-.1px;}
 .gal-item .nome{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.7));color:#fff;font-size:10px;padding:10px 5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .gal-subir{aspect-ratio:1;border:1.5px dashed #2A3D66;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#8C98B1;font-size:12px;text-align:center;padding:6px;}
 .gal-subir:hover{border-color:#E2BE6A;color:#E2BE6A;}
+
+/* ===== CELULAR (31/10/2026): app Lume no iPhone/Android ===== */
+@media (max-width:768px){
+  .sidebar{width:0!important;border-right:none!important;}
+  .sidebar.mobile-open{width:240px!important;border-right:1px solid #2A3D66!important;}
+  .main{margin-left:0!important;}
+  .topbar{padding:0 10px!important;gap:8px!important;flex-wrap:nowrap!important;}
+  .topbar-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+  .topbar-right{flex-wrap:nowrap!important;gap:6px!important;flex-shrink:0;}
+  .btn-top{font-size:0!important;padding:7px 9px!important;flex-shrink:0;line-height:0;}
+  .btn-top .ic{width:17px!important;height:17px!important;margin:0!important;}
+  #last-update{display:none!important;}
+  .content{overflow-x:hidden;}
+  .two-col{grid-template-columns:1fr!important;}
+  .r3,.r4,.r5,.r6{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  .mc-ind{padding:16px!important;min-height:96px!important;}
+  .mc-ind-value{font-size:22px!important;}
+  .ini-periodo{width:100%;}.ini-periodo button{flex:1;}
+  .ini-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .ini-kpi{min-height:92px;padding:13px 14px;}
+  .ini-kpi-val{font-size:22px;}
+  .ini-kpi-val small{display:block;margin:2px 0 0;font-size:11.5px;}
+  .ini-kpi-var{font-size:11px;}
+  .ini-etapa{grid-template-columns:96px 1fr 36px;gap:10px;}
+  .ini-atalhos{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
 </style>
 <script>try{if(localStorage.getItem('bulhoes_tema')==='claro'){document.documentElement.style.background='#FAFAFC';document.documentElement.setAttribute('data-tema','claro');}}catch(e){}</script>
 <style>.pac-cat-tab{background:#12213F!important;color:#E2BE6A!important;}.pac-cat-tab.active{background:#B08A3E!important;color:#FFFFFF!important;}</style>
@@ -2780,6 +2807,30 @@ function pedirPermissaoNotificacao(){
   });
 }
 
+// ===== APP SEMPRE ATUALIZADO (31/10/2026) =====
+// No celular o app fica aberto em segundo plano e não recarrega sozinho. Quando a pessoa
+// volta para o app, conferimos se saiu versão nova do site; se saiu, recarrega.
+(function(){
+  const atual=(document.querySelector('meta[name="lume-versao"]')||{}).content||'';
+  let conferindo=false;
+  async function conferir(){
+    if(conferindo||!atual)return;conferindo=true;
+    try{
+      const t=await (await fetch('/?_v='+Date.now(),{cache:'no-store'})).text();
+      const m=t.match(/name="lume-versao" content="([^"]+)"/);
+      if(m&&m[1]!==atual){
+        if(typeof _crmPendente!=='undefined'&&_crmPendente){conferindo=false;return;}
+        try{showToast('success','Lume atualizado','Carregando a versão nova…');}catch(e){}
+        try{sessionStorage.setItem('bulhoes_voltar',JSON.stringify({pagina:typeof currentPage!=='undefined'?currentPage:'inicio'}));}catch(e){}
+        setTimeout(()=>location.reload(),900);return;
+      }
+    }catch(e){}
+    conferindo=false;
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')conferir();});
+  window.addEventListener('pageshow',conferir);
+  setTimeout(conferir,4000);
+})();
 // ===== APP NO CELULAR + NOTIFICAÇÕES (31/10/2026) =====
 // O backoffice instala pela tela inicial (manifest + sw.js) e a gestão recebe no celular:
 // avaliação agendada e venda fechada. Quem envia é o motor das automações (push_fila).
