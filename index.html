@@ -2,20 +2,20 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <!-- VERSÃO FINAL DEFINITIVA — performance conservadora — 26/08/2026 -->
 <title>Lume · Bulhões Odontologia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-131626">
+<meta name="lume-versao" content="20261031-132015">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Lume">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -1094,6 +1094,28 @@ body{letter-spacing:-.1px;}
   .ini-etapa{grid-template-columns:96px 1fr 36px;gap:10px;}
   .ini-atalhos{grid-template-columns:repeat(2,minmax(0,1fr));}
   .ini-kpi:last-child:nth-child(odd){grid-column:1/-1;}
+  /* barra do iPhone: o topo desce o tamanho da área do relógio */
+  .topbar{padding-top:env(safe-area-inset-top)!important;height:calc(52px + env(safe-area-inset-top))!important;background:#070E20!important;}
+  .sidebar{padding-top:env(safe-area-inset-top);}
+  .btn-top{width:36px;height:36px;padding:0!important;display:inline-flex!important;align-items:center;justify-content:center;}
+  /* Dashboard limpo no celular */
+  #page-dashboard .dash-tabs{display:none!important;}
+  .source-badges{display:none!important;}
+  .filters{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;margin:0 -14px 16px!important;padding:2px 14px;-webkit-overflow-scrolling:touch;}
+  .filters::-webkit-scrollbar{display:none;}
+  .filters .fb{flex-shrink:0;font-size:12.5px!important;padding:7px 13px!important;}
+  .filters .fb[onclick*="gerarRelatorio"]{margin-left:0!important;}
+  .funil-linha{grid-template-columns:1fr auto!important;grid-template-areas:"rot pct" "tri tri";gap:6px 10px!important;}
+  .funil-rotulo{grid-area:rot;text-align:left!important;font-size:13px!important;}
+  .funil-pct{grid-area:pct;}
+  .funil-trilho{grid-area:tri;height:28px!important;}
+  .funil-barra{font-size:12px!important;}
+  .mc-ind{min-height:0!important;padding:14px!important;border-radius:12px!important;}
+  .mc-ind-label{font-size:12px!important;line-height:1.35;}
+  .mc-ind-icon{display:none!important;}
+  .mc-ind-value{font-size:19px!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;margin-top:10px!important;}
+  #content-trafego > div:first-child{flex-wrap:wrap;gap:6px;}
+  #content-trafego > div:first-child label{font-size:11.5px!important;}
   .mc-ind-label{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;}
 }
 </style>
