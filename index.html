@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-155653">
+<meta name="lume-versao" content="20261031-162924">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -796,6 +796,34 @@ tbody tr:hover td{background:#0D1A33;}
 
 /* ===== Mensagens em massa (layout do Cloudia) ===== */
 #page-disparos .au-wrap,#page-social-selling .au-wrap{max-width:none;}
+/* (31/10/2026) Social Selling em Kanban */
+.sskb-topo{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
+.sskb-stat{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:8px 12px;min-width:120px}
+.sskb-stat div{font-size:11px;color:#8C98B1}.sskb-stat b{font-size:19px}
+.sskb-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.sskb-quadro{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;align-items:flex-start;min-height:60vh}
+.sskb-col{flex:0 0 250px;background:#0A1530;border:0.5px solid #1C2C50;border-radius:10px;display:flex;flex-direction:column;max-height:72vh}
+.sskb-col.sobre{border-color:#D4AF5A;background:#0F1C3A}
+.sskb-cab{padding:10px 12px 8px;border-bottom:2px solid;font-size:11.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#C3CBDB}
+.sskb-cab small{display:block;font-weight:500;text-transform:none;letter-spacing:0;color:#8C98B1;margin-top:2px}
+.sskb-lista{padding:8px;display:flex;flex-direction:column;gap:7px;overflow-y:auto}
+.sskb-card{background:#12213F;border:0.5px solid #2A3D66;border-radius:8px;padding:8px 10px;cursor:grab;font-size:12px}
+.sskb-card:hover{border-color:#8C98B1}.sskb-card.parado{border-left:3px solid #E2BE6A}.sskb-card.arrastando{opacity:.4}
+.sskb-l1{display:flex;justify-content:space-between;gap:6px}.sskb-nome{color:#EEF1F7;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sskb-t{color:#66738F;font-size:10.5px;white-space:nowrap}.sskb-ig{color:#8C98B1;font-size:11px;margin-top:1px}
+.sskb-l3{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.sskb-tag{font-size:10px;padding:1px 6px;border-radius:9px;background:#1C2C50;color:#C3CBDB}
+.sskb-tag.dm{color:#B79CFF}.sskb-tag.ouro{color:#E2BE6A}.sskb-tag.verde{color:#7FD3A0}
+.sskb-vazio{font-size:11px;color:#66738F;text-align:center;padding:14px 6px;border:1px dashed #1C2C50;border-radius:8px}
+.sskb-fundo{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px}
+.sskb-modal{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:12px;width:440px;max-width:100%;max-height:92vh;overflow:auto;padding:16px}
+.sskb-mcab{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;color:#EEF1F7}
+.sskb-campo{display:flex;flex-direction:column;gap:4px;margin-bottom:9px;font-size:11.5px;color:#8C98B1;flex:1}
+.sskb-campo .dp-in{height:34px;width:100%}
+.sskb-dupla{display:flex;gap:10px}
+.sskb-mbotoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+@media (max-width:768px){.sskb-col{flex-basis:78vw}.sskb-acoes{margin-left:0;width:100%}.sskb-acoes input{flex:1}.sskb-dupla{flex-direction:column;gap:0}}
+
 .dp-card{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
 .dp-busca{display:flex;align-items:center;gap:8px;max-width:420px;height:34px;border:0.5px solid #2A3D66;border-radius:6px;padding:0 10px;color:#8C98B1;}
 .dp-busca input{flex:1;border:none;outline:none;font-size:13px;color:#EEF1F7;background:transparent;}
@@ -1891,7 +1919,8 @@ body{letter-spacing:-.1px;}
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
     <div class="page" id="page-social-selling">
       <div class="dash-tabs ss-tabs">
-        <div class="tab active" id="ss-tab-registro" onclick="ssAba('registro')"><span class="tab-dot"></span>Registro</div>
+        <div class="tab active" id="ss-tab-funil" onclick="ssAba('funil')"><span class="tab-dot"></span>Funil</div>
+        <div class="tab" id="ss-tab-registro" onclick="ssAba('registro')"><span class="tab-dot"></span>Abordagens</div>
         <div class="tab" id="ss-tab-painel" onclick="ssAba('painel')"><span class="tab-dot"></span>Painel</div>
       </div>
       <div style="padding-top:20px;">
@@ -6729,7 +6758,7 @@ function filterAdTable(){
 const SS_TIPOS=['Seguidor','Curtida','Comentário','Enquete/Reação','Stories','Reativação'];
 const SS_PERFIS=['Dra. Larissa','Clínica'];
 const SS_STATUS={em_andamento:'Em andamento',agendou:'Agendou',desqualificado:'Desqualificado'};
-const _ss={linhas:[],carregado:false,periodo:'mes',status:'',busca:'',clin:null,clinChave:''};
+const _ss={linhas:[],carregado:false,periodo:'mes',status:'',busca:'',clin:null,clinChave:'',aba:'funil',kbusca:'',kperfil:''};
 function ssUsuario(v){
   const s=String(v||'').trim();
   const m=s.match(/instagram\.com\/([^/?#\s]+)/i);
@@ -6794,9 +6823,11 @@ async function ssLinhasDashboard(){
 }
 function ssAba(qual){
   _ss.aba=qual;
+  document.getElementById('ss-tab-funil').classList.toggle('active',qual==='funil');
   document.getElementById('ss-tab-registro').classList.toggle('active',qual==='registro');
   document.getElementById('ss-tab-painel').classList.toggle('active',qual==='painel');
-  document.getElementById('ss-conteudo').style.display=qual==='registro'?'':'none';
+  document.getElementById('ss-conteudo').style.display=qual!=='painel'?'':'none';
+  if(qual!=='painel'){abrirSocialSelling();}
   const host=document.getElementById('ss-painel-host');host.style.display=qual==='painel'?'':'none';
   if(qual==='painel'){
     // o painel que ficava no Dashboard agora mora aqui
@@ -6811,8 +6842,9 @@ async function abrirSocialSelling(){
   const el=document.getElementById('ss-conteudo');if(!el)return;
   if(!_ss.carregado)el.innerHTML='<div class="au-vazio">Carregando…</div>';
   try{await Promise.all([ssCarregar(),ssCarregarMeta()]);}catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar: '+_waEsc(e.message)+'</div>';return;}
+  if(_ss.aba==='funil'){ssKanban();return;}
   ssRender();
-  ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling')ssRender();}).catch(()=>{});
+  ssResultadosClinicorp(_ss.linhas).then(()=>{if(currentPage==='social-selling'&&_ss.aba==='registro')ssRender();}).catch(()=>{});
 }
 function ssFiltradas(){
   const pr=ssPeriodo();const b=_ss.busca.trim().toLowerCase();
@@ -6871,6 +6903,136 @@ function ssRender(){
     (lista.length?'<div class="table-card" style="overflow:auto;"><table style="width:100%;font-size:12px;"><thead><tr><th>Abordagem</th><th>Instagram</th><th>Perfil</th><th>Tipo</th><th>Follow-ups</th><th>Respondeu</th><th>Status</th><th>Nome</th><th>Telefone</th><th>Avaliação</th><th>Clinicorp</th><th>Obs.</th><th></th></tr></thead><tbody>'+lista.map(linhaTabela).join('')+'</tbody></table></div>'
       :'<div class="au-vazio">Nenhuma abordagem neste filtro.</div>');
   if(_ss.foco){const i=document.getElementById('ss-novo-insta');if(i)i.focus();_ss.foco=false;}
+}
+// ===== (31/10/2026) Social Selling em Kanban =====
+// Quem responde no direct (Instagram conectado) vira card sozinho em "Leads de entrada";
+// a Lívia arrasta entre as colunas. Compareceu e Venda o banco move sozinho pelo Clinicorp
+// (ss_resultados, a cada 15 min), desde que o card tenha telefone.
+const SS_ETAPAS=[['entrada','Leads de entrada','#8C98B1'],['conversa','Conversa em andamento','#6FA8FF'],['material_1','Envio de material 1','#B79CFF'],['material_2','Envio de material 2','#B79CFF'],['sem_interesse','Não tem interesse','#E08A7E'],['amigo_lari','Amigo Lari','#66738F'],['dentista','Dentista','#66738F'],['faltou_horario','Faltou horário','#E2BE6A'],['agendou','Agendou','#D4AF5A'],['compareceu','Compareceu','#7FD3A0'],['venda','Venda','#7FD3A0']];
+const SS_ETAPA_NOME=Object.fromEntries(SS_ETAPAS.map(e=>[e[0],e[1]]));
+const SS_ATIVAS=['entrada','conversa','material_1','material_2','faltou_horario'];
+function ssDiasNaEtapa(l){const t=Date.parse(l.etapa_em||l.atualizado_em||l.criado_em);return isNaN(t)?0:Math.floor((Date.now()-t)/864e5);}
+function ssTempo(l){const t=Date.parse(l.etapa_em||l.atualizado_em||l.criado_em);if(isNaN(t))return '';const m=(Date.now()-t)/6e4;return m<60?'agora':m<1440?Math.floor(m/60)+' h':Math.floor(m/1440)+' d';}
+function ssRotulo(l){return l.nome||(String(l.instagram).startsWith('id:')?'Instagram':'@'+l.instagram);}
+function ssKanban(){
+  const el=document.getElementById('ss-conteudo');if(!el)return;
+  const b=_ss.kbusca.trim().toLowerCase();
+  const cards=_ss.linhas.filter(l=>l.etapa)
+    .filter(l=>!_ss.kperfil||l.perfil===_ss.kperfil)
+    .filter(l=>!b||[l.instagram,l.nome,l.telefone,l.obs].some(x=>String(x||'').toLowerCase().includes(b)));
+  const hoje=ssHoje(),ontem=localDateStr(new Date(Date.now()-864e5));
+  const ativos=cards.filter(l=>SS_ATIVAS.includes(l.etapa)).length;
+  const parados=cards.filter(l=>['conversa','material_1','material_2'].includes(l.etapa)&&ssDiasNaEtapa(l)>=3).length;
+  const novos=d=>cards.filter(l=>String(l.criado_em||'').slice(0,10)===d||l.respondeu_em===d).length;
+  const mesIni=hoje.slice(0,8)+'01';
+  const doMes=l=>String(l.etapa_em||'').slice(0,10)>=mesIni;
+  const ag=cards.filter(l=>['agendou','compareceu','venda'].includes(l.etapa)&&doMes(l)).length;
+  const vendas=cards.filter(l=>l.etapa==='venda'&&doMes(l));
+  const valor=vendas.reduce((s,l)=>s+Number(l.venda_valor||0),0);
+  const stat=(t,v,c)=>'<div class="sskb-stat"><div>'+t+'</div><b style="color:'+(c||'#EEF1F7')+'">'+v+'</b></div>';
+  const card=l=>{
+    const parado=['conversa','material_1','material_2'].includes(l.etapa)&&ssDiasNaEtapa(l)>=3;
+    const insta=String(l.instagram).startsWith('id:')?'':'@'+l.instagram;
+    return '<div class="sskb-card'+(parado?' parado':'')+'" draggable="true" ondragstart="event.dataTransfer.setData(\'text/plain\',\''+l.id+'\');this.classList.add(\'arrastando\')" ondragend="this.classList.remove(\'arrastando\')" onclick="ssCardAbrir('+l.id+')">'+
+      '<div class="sskb-l1"><span class="sskb-nome">'+_waEsc(ssRotulo(l))+'</span><span class="sskb-t" title="tempo nesta etapa">'+ssTempo(l)+'</span></div>'+
+      (l.nome&&insta?'<div class="sskb-ig">'+_waEsc(insta)+'</div>':'')+
+      '<div class="sskb-l3">'+(l.perfil?'<span class="sskb-tag">'+_waEsc(l.perfil==='Dra. Larissa'?'Lari':l.perfil)+'</span>':'')+
+        (l.conversa_id?'<span class="sskb-tag dm">💬 direct</span>':'')+
+        (l.etapa==='agendou'&&l.agendado_para?'<span class="sskb-tag ouro">📅 '+ssFmt(l.agendado_para).slice(0,5)+'</span>':'')+
+        (l.etapa==='venda'&&l.venda_valor?'<span class="sskb-tag verde">R$ '+Math.round(l.venda_valor).toLocaleString('pt-BR')+'</span>':'')+
+        (parado?'<span class="sskb-tag ouro">parado</span>':'')+'</div></div>';
+  };
+  el.innerHTML=
+    '<div class="sskb-topo">'+
+      stat('Ativos no funil',ativos)+stat('Novos hoje / ontem',novos(hoje)+' / '+novos(ontem))+stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
+      stat('Agendaram no mês',ag,'#D4AF5A')+stat('Vendas no mês',vendas.length+(valor?' · R$ '+Math.round(valor).toLocaleString('pt-BR'):''),'#7FD3A0')+
+      '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar @, nome, telefone" value="'+_waEsc(_ss.kbusca)+'" oninput="_ss.kbusca=this.value;clearTimeout(_ss.tk);_ss.tk=setTimeout(()=>{ssKanban();const i=document.querySelector(\'.sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
+        '<select class="dp-in" style="height:32px;width:auto" onchange="_ss.kperfil=this.value;ssKanban()"><option value="">Todos os perfis</option>'+SS_PERFIS.map(p=>'<option'+(_ss.kperfil===p?' selected':'')+'>'+p+'</option>').join('')+'</select>'+
+        '<button class="wa-btn primario" onclick="ssCardAbrir(null)">+ Novo card</button></div>'+
+    '</div>'+
+    '<div class="sskb-quadro">'+SS_ETAPAS.map(([k,nome,cor])=>{
+      const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
+      const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.venda_valor||0),0):0;
+      return '<div class="sskb-col" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="event.preventDefault();this.classList.remove(\'sobre\');ssMover(+event.dataTransfer.getData(\'text/plain\'),\''+k+'\')">'+
+        '<div class="sskb-cab" style="border-color:'+cor+'"><div>'+nome+'</div><small>'+cs.length+' '+(cs.length===1?'lead':'leads')+(tot?' · R$ '+Math.round(tot).toLocaleString('pt-BR'):'')+'</small></div>'+
+        '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">'+(k==='entrada'?'Quem responder no direct aparece aqui':'Arraste um card para cá')+'</div>')+'</div></div>';
+    }).join('')+'</div>'+
+    '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Agendou</b>, coloque telefone e data da avaliação: daí <b>Compareceu</b> e <b>Venda</b> andam sozinhos pelo Clinicorp. <b>Amigo Lari</b> e <b>Dentista</b> ficam guardados, fora das contas.</div>';
+}
+async function ssPatch(id,corpo){
+  const r=await _waRest('social_selling?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+  const l=_ss.linhas.find(x=>x.id===id);if(l&&r&&r[0])Object.assign(l,r[0]);
+  if(l&&l.telefone&&['agendou','compareceu','venda'].includes(l.etapa))ssMarcarOrigem(l.telefone);
+  return l;
+}
+async function ssMover(id,etapa){
+  const l=_ss.linhas.find(x=>x.id===id);if(!l||l.etapa===etapa)return;
+  if(etapa==='agendou'&&(!l.telefone||!l.agendado_para)){ssCardAbrir(id,etapa);return;}
+  const antes=l.etapa;l.etapa=etapa;l.etapa_em=new Date().toISOString();ssKanban();
+  try{await ssPatch(id,{etapa});ssKanban();}
+  catch(e){l.etapa=antes;ssKanban();showToast('error','Não moveu o card',e.message);}
+}
+function ssCardFechar(){const m=document.getElementById('sskb-modal');if(m)m.remove();}
+function ssCardAbrir(id,etapaNova){
+  ssCardFechar();
+  const l=id?_ss.linhas.find(x=>x.id===id):{etapa:'entrada',perfil:'Dra. Larissa'};if(!l)return;
+  const novo=!id;const et=etapaNova||l.etapa||'entrada';
+  const insta=l.instagram&&!String(l.instagram).startsWith('id:')?l.instagram:'';
+  const campo=(rot,html)=>'<label class="sskb-campo"><span>'+rot+'</span>'+html+'</label>';
+  const m=document.createElement('div');m.id='sskb-modal';m.className='sskb-fundo';
+  m.onclick=e=>{if(e.target===m)ssCardFechar();};
+  m.innerHTML='<div class="sskb-modal">'+
+    '<div class="sskb-mcab"><b>'+(novo?'Novo card':_waEsc(ssRotulo(l)))+'</b><button class="wa-btn" onclick="ssCardFechar()">✕</button></div>'+
+    (etapaNova==='agendou'?'<div class="au-dica" style="margin:0 0 8px">Para ir para <b>Agendou</b>, coloque o telefone e a data da avaliação. É com eles que o Lume acompanha comparecimento e venda no Clinicorp.</div>':'')+
+    campo('Instagram',novo?'<input id="sskb-ig" class="dp-in" placeholder="@usuario ou link do perfil">':(insta?'<a href="https://www.instagram.com/'+encodeURIComponent(insta)+'/" target="_blank" rel="noopener" style="color:#E2BE6A">@'+_waEsc(insta)+'</a>':'<span style="color:#8C98B1">@ ainda não identificado</span>'))+
+    campo('Nome','<input id="sskb-nome" class="dp-in" value="'+_waEsc(l.nome||'')+'">')+
+    '<div class="sskb-dupla">'+campo('Etapa','<select id="sskb-etapa" class="dp-in">'+SS_ETAPAS.map(e=>'<option value="'+e[0]+'"'+(e[0]===et?' selected':'')+'>'+e[1]+'</option>').join('')+'</select>')+
+      campo('Perfil','<select id="sskb-perfil" class="dp-in">'+SS_PERFIS.map(p=>'<option'+(l.perfil===p?' selected':'')+'>'+p+'</option>').join('')+'</select>')+'</div>'+
+    '<div class="sskb-dupla">'+campo('Telefone (WhatsApp)','<input id="sskb-tel" class="dp-in" type="tel" placeholder="(13) 99999-9999" value="'+_waEsc(l.telefone||'')+'">')+
+      campo('Data da avaliação','<input id="sskb-data" class="dp-in" type="date" value="'+_waEsc(l.agendado_para||'')+'">')+'</div>'+
+    campo('Observações','<textarea id="sskb-obs" class="dp-in" style="height:70px;padding:8px">'+_waEsc(l.obs||'')+'</textarea>')+
+    (l.etapa==='venda'&&l.venda_valor?'<div style="font-size:12px;color:#7FD3A0;margin:4px 0">Venda no Clinicorp: R$ '+Math.round(l.venda_valor).toLocaleString('pt-BR')+'</div>':'')+
+    (!novo?'<div style="font-size:11px;color:#66738F;margin:4px 0">Na etapa há '+ssTempo(l)+(l.abordado_em?' · abordado em '+ssFmt(l.abordado_em):'')+(l.tentativas?' · '+l.tentativas+' follow-up(s)':'')+'</div>':'')+
+    '<div class="sskb-mbotoes">'+
+      (!novo&&l.conversa_id?'<button class="wa-btn" onclick="ssAbrirConversa(\''+l.conversa_id+'\')">💬 Abrir conversa</button>':'')+
+      (!novo?'<button class="wa-btn" onclick="ssTirarDoFunil('+l.id+')" title="O card some do funil (a abordagem continua registrada)">Tirar do funil</button>':'')+
+      '<span style="flex:1"></span><button class="wa-btn primario" onclick="ssCardSalvar('+(id||'null')+')">Salvar</button></div></div>';
+  document.body.appendChild(m);
+  const f=document.getElementById(novo?'sskb-ig':(etapaNova==='agendou'?'sskb-tel':'sskb-nome'));if(f)f.focus();
+}
+async function ssCardSalvar(id){
+  const v=x=>(document.getElementById(x)||{}).value;
+  const etapa=v('sskb-etapa');const tel=String(v('sskb-tel')||'').replace(/\D/g,'');const data=v('sskb-data')||null;
+  if(etapa==='agendou'&&(!tel||!data)){showToast('error','Falta telefone ou data','Em Agendou, coloque o telefone e a data da avaliação.');return;}
+  if(tel&&(tel.length<10||tel.length>13)){showToast('error','Telefone incompleto','Coloque com DDD.');return;}
+  const corpo={nome:String(v('sskb-nome')||'').trim()||null,etapa,perfil:v('sskb-perfil'),telefone:tel||null,agendado_para:data,obs:String(v('sskb-obs')||'').trim()||null};
+  try{
+    if(!id){
+      const u=ssUsuario(v('sskb-ig'));if(!u){showToast('error','Coloque o @ ou o link do perfil','');return;}
+      const ja=_ss.linhas.find(l=>l.instagram===u);
+      if(ja){
+        if(ja.etapa){showToast('error','@'+u+' já está no funil','Em '+SS_ETAPA_NOME[ja.etapa]+'.');return;}
+        await ssPatch(ja.id,corpo);
+      }else{
+        const r=await _waRest('social_selling',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(Object.assign({instagram:u,respondeu:true},corpo))});
+        if(r&&r[0])_ss.linhas.unshift(r[0]);
+        if(tel&&['agendou','compareceu','venda'].includes(etapa))ssMarcarOrigem(tel);
+      }
+    }else await ssPatch(id,corpo);
+    ssCardFechar();ssKanban();showToast('success','Card salvo','');
+  }catch(e){showToast('error','Não salvou',/duplicate|23505/.test(e.message)?'Esse @ já existe.':e.message);}
+}
+async function ssTirarDoFunil(id){
+  const b=document.querySelector('button[onclick="ssTirarDoFunil('+id+')"]');
+  if(b&&b.dataset.conf!=='1'){b.dataset.conf='1';b.textContent='Confirmar?';setTimeout(()=>{if(b){b.dataset.conf='';b.textContent='Tirar do funil';}},3000);return;}
+  try{await ssPatch(id,{etapa:null,etapa_em:null});ssCardFechar();ssKanban();}catch(e){showToast('error','Não tirou',e.message);}
+}
+async function ssAbrirConversa(cid){
+  ssCardFechar();
+  const nav=[...document.querySelectorAll('.nav-item')].find(n=>String(n.getAttribute('onclick')||'').includes("'conversas'"));
+  switchPage('conversas',nav||document.createElement('div'));
+  for(let i=0;i<30;i++){if(_wa.conversas.find(c=>c.id===cid)){waAbrir(cid);return;}await new Promise(r=>setTimeout(r,300));}
+  showToast('error','Conversa não encontrada na lista','Procure pelo nome na Central.');
 }
 function ssConferirNovo(){
   const u=ssUsuario((document.getElementById('ss-novo-insta')||{}).value);const av=document.getElementById('ss-novo-aviso');if(!av)return;
