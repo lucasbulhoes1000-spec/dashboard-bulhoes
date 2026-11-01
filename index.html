@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-195832">
+<meta name="lume-versao" content="20261101-200831">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -5519,7 +5519,9 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // Campanha de captação = tem resultado do tipo "conversa por mensagem" (click-to-WhatsApp/Messenger).
   // A Meta reporta isso no array `actions`, com action_type contendo "messaging_conversation_started".
   // Campanhas com outro objetivo (ex: tráfego/visita ao perfil) não têm essa action e ficam de fora.
-  const isCaptacaoAd=(ad)=>(ad.actions||[]).some(a=>String(a.action_type||'').includes('messaging_conversation_started'));
+  // (01/11/2026) o Apps Script às vezes manda `actions` vazio: aí vale o tipo da campanha (Meta ou nome)
+  const isCaptacaoAd=(ad)=>(ad.actions||[]).some(a=>String(a.action_type||'').includes('messaging_conversation_started'))
+    ||(typeof _tpTipo==='function'&&['mensagem','cadastro'].includes(_tpTipo(String(ad.ad_id||''),{campaign:ad.campaign_name})));
   const adMap={};    // chave: ad_id completo da Meta
   const adNameMap={}; // chave: ad_name normalizado → Set de ad_ids (nome pode repetir em conjuntos diferentes)
   metaAds.forEach(ad=>{
@@ -6846,6 +6848,9 @@ function filterAdTable(){
   const totComp=adRows.reduce((s,[,d])=>s+(d.comp||0),0);
   const totFechou=adRows.reduce((s,[,d])=>s+(d.fechou||0),0);
   const totVendas=adRows.reduce((s,[,d])=>s+(d.vendas||0),0);
+  // (01/11/2026) CPL e custo por agendamento/comparecimento só com o gasto das campanhas
+  // que geram lead (mensagem e cadastro). Perfil/tráfego entra no gasto total, no CAC e no ROAS.
+  const spendCap=adRows.filter(([k,d])=>['mensagem','cadastro'].includes(_tpTipo(k,d))).reduce((s,[,d])=>s+(d.spend||0),0);
 
   // Indicador de confiabilidade para decisão de mídia.
   const aud=window._auditoriaFunilAnuncio;
@@ -6858,8 +6863,8 @@ function filterAdTable(){
       +(aud.vendasSemRastreio?` · ${fmt(aud.vendasSemRastreio)} em vendas sem anúncio`:'')
       +(aud.recompras?`<br>Fora dos contratos e do ROAS: ${aud.recompras} recompra(s) de pacientes antigos que vieram de anúncio (${fmt(aud.vendasRecompra||0)}, manutenção, ajuste etc.)`:'');
   }
-  const totCpl=totLeads>0?totSpend/totLeads:0;
-  const totCpc=totFechou>0?totSpend/totFechou:0;
+  const totCpl=totLeads>0?spendCap/totLeads:0;
+  const totCpc=totFechou>0?totSpend/totFechou:0; // CAC e ROAS: gasto total (inclui perfil)
   const totRoas=totSpend>0?totVendas/totSpend:0;
   atualizarCardRoasGeral(totRoas,totVendas,totSpend,((adRows.find(([k])=>k==='__sem_rastreio__')||[])[1]||{}).vendas||0);
 
@@ -6870,7 +6875,8 @@ function filterAdTable(){
   if(_filtroVis)_setTxt('t-spend',fmt(totSpend));else if(window._tpSpendTotal!=null)_setTxt('t-spend',fmt(window._tpSpendTotal));
   _setTxt('ad-kpi-leads',totLeads?fmtN(totLeads):'—');
   _setTxt('t-leads-sub',totLeads?'leads de anúncios no período':'sem leads de anúncio');
-  _setTxt('t-cpl',totLeads>0&&totSpend>0?fmt(totCpl):'—');
+  _setTxt('t-cpl',totLeads>0&&spendCap>0?fmt(totCpl):'—');
+  try{const sb=document.getElementById('t-cpl')?.parentElement?.querySelector('.ms');if(sb)sb.textContent=spendCap<totSpend?'gasto das campanhas de mensagem ÷ leads (sem as de perfil)':'gasto ÷ leads pagos';}catch(e){}
   _setTxt('ad-kpi-cac',totFechou>0?fmt(totCpc):'—');
   // metas do processo comercial (25/10/2026): CAC ideal R$ 800, máximo R$ 1.500
   try{const e=document.getElementById('ad-kpi-cac'),sb=document.getElementById('ad-kpi-cac-sub');
@@ -6929,9 +6935,9 @@ function filterAdTable(){
       {k:'leads',t:'Leads',v:(k,d)=>d.leads||0,h:(k,d)=>d.leads>0?d.leads+lupa('lupaAdLeads',k):'—',tot:()=>totLeads||'—'},
       {k:'cpl',t:'CPL',c:1,v:(k,d)=>d.leads>0?d.spend/d.leads:Infinity,h:(k,d)=>d.leads>0?fmt(d.spend/d.leads):'—',st:(k,d)=>cplBg(d.leads>0?d.spend/d.leads:0),tot:()=>totLeads>0?fmt(totCpl):'—'},
       {k:'agend',t:'Agend.',v:(k,d)=>d.agend||0,h:(k,d)=>d.agend>0?d.agend+lupa('lupaAdAgend',k):'—',tot:()=>totAgend||'—'},
-      {k:'cpa',t:'C/agend.',c:1,v:(k,d)=>d.agend>0?d.spend/d.agend:Infinity,h:(k,d)=>d.agend>0?fmt(d.spend/d.agend):'—',tot:()=>totAgend>0?fmt(totSpend/totAgend):'—'},
+      {k:'cpa',t:'C/agend.',c:1,v:(k,d)=>d.agend>0?d.spend/d.agend:Infinity,h:(k,d)=>d.agend>0?fmt(d.spend/d.agend):'—',tot:()=>totAgend>0?fmt(spendCap/totAgend):'—'},
       {k:'comp',t:'Compareceu',v:(k,d)=>d.comp||0,h:(k,d)=>d.comp>0?d.comp+lupa('lupaAdComp',k,'Ver comparecimentos'):'—',tot:()=>totComp||'—'},
-      {k:'cpcomp',t:'C/comp.',c:1,v:(k,d)=>d.comp>0?d.spend/d.comp:Infinity,h:(k,d)=>d.comp>0?fmt(d.spend/d.comp):'—',tot:()=>totComp>0?fmt(totSpend/totComp):'—'},
+      {k:'cpcomp',t:'C/comp.',c:1,v:(k,d)=>d.comp>0?d.spend/d.comp:Infinity,h:(k,d)=>d.comp>0?fmt(d.spend/d.comp):'—',tot:()=>totComp>0?fmt(spendCap/totComp):'—'},
       {k:'fechou',t:'Contratos',cl:'tg',v:(k,d)=>d.fechou||0,h:(k,d)=>d.fechou>0?d.fechou+lupa('lupaAdFechou',k,'Ver fechamentos'):'0',tot:()=>totFechou||'—'},
       {k:'cac',t:'CAC',c:1,v:(k,d)=>d.fechou>0?d.spend/d.fechou:Infinity,h:(k,d)=>d.fechou>0?fmt(d.spend/d.fechou):'—',tot:()=>totFechou>0?fmt(totCpc):'—'},
       {k:'vendas',t:'Valor contratos',cl:'tg',v:(k,d)=>d.vendas||0,h:(k,d)=>d.vendas>0?fmtK(d.vendas)+lupa('lupaAdVendas',k,'Ver vendas'):'—',tot:()=>totVendas>0?fmtK(totVendas):'—'},
