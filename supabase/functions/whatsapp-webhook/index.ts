@@ -28,6 +28,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const WA_TOKEN = Deno.env.get("WA_TOKEN") ?? "";
 const WA_APP_SECRET = Deno.env.get("WA_APP_SECRET") ?? "";
 const WA_VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
+const IG_VERIFY_TOKEN = Deno.env.get("IG_VERIFY_TOKEN") ?? ""; // (01/11/2026) frase do webhook do Instagram
 const IG_TOKEN = Deno.env.get("IG_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 
@@ -237,8 +238,9 @@ export async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
 
   if (req.method === "GET") {
-    const ok = url.searchParams.get("hub.mode") === "subscribe" && WA_VERIFY_TOKEN !== "" &&
-      url.searchParams.get("hub.verify_token") === WA_VERIFY_TOKEN;
+    const vt = url.searchParams.get("hub.verify_token") ?? "";
+    const ok = url.searchParams.get("hub.mode") === "subscribe" && vt !== "" &&
+      ((WA_VERIFY_TOKEN !== "" && vt === WA_VERIFY_TOKEN) || (IG_VERIFY_TOKEN !== "" && vt === IG_VERIFY_TOKEN));
     return ok ? new Response(url.searchParams.get("hub.challenge") ?? "", { status: 200 })
               : new Response("verificação recusada", { status: 403 });
   }
