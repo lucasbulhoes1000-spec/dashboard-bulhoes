@@ -423,8 +423,12 @@ export async function handler(req: Request): Promise<Response> {
           const p: Record<string, unknown> = {};
           p.pages_read_engagement = ok(await meta(`/${pg.id}?fields=name,fan_count,followers_count`, undefined, pg.access_token));
           p.pages_manage_metadata = ok(await meta(`/${pg.id}/subscribed_apps`, undefined, pg.access_token));
-          const fd = await meta(`/${pg.id}/feed?fields=id&limit=1`, undefined, pg.access_token);
-          const post = fd.j?.data?.[0]?.id;
+          let fd: any = null, post = "";
+          for (const cam of ["published_posts", "posts", "feed"]) {
+            fd = await meta(`/${pg.id}/${cam}?fields=id&limit=1`, undefined, pg.access_token);
+            post = fd.j?.data?.[0]?.id ?? "";
+            if (fd.ok) break;
+          }
           p.pages_manage_engagement = post ? [ok(await meta(`/${post}/comments?fields=id,message,from&limit=1`, undefined, pg.access_token)), ok(await meta(`/${post}/reactions?summary=true&limit=1`, undefined, pg.access_token))] : ok(fd);
           if (ig?.id) {
             p.instagram_basic = ok(await meta(`/${ig.id}?fields=username,followers_count,media_count`, undefined, pg.access_token));
