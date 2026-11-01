@@ -118,10 +118,36 @@ const somaAcoes = (lista: any, teste: (t: string) => boolean) => {
 };
 const primeiraAcao = (lista: any) => Array.isArray(lista) && lista.length ? Math.round(Number(lista[0]?.value ?? 0)) : null;
 
+/** Resumo legível da segmentação do conjunto (sem dados pessoais: só critérios do anúncio). */
+export function resumoPublico(t: any): any {
+  if (!t || typeof t !== "object") return null;
+  const nomes = (l: any) => (Array.isArray(l) ? l.map((x: any) => x?.name ?? x?.id).filter(Boolean) : []);
+  const geo = t.geo_locations ?? {};
+  const locais = [
+    ...nomes(geo.cities).map((n: string, i: number) => n + (geo.cities[i]?.radius ? ` (+${geo.cities[i].radius} ${geo.cities[i].distance_unit ?? "km"})` : "")),
+    ...nomes(geo.regions), ...nomes(geo.zips),
+    ...(Array.isArray(geo.custom_locations) ? geo.custom_locations.map((c: any) => `${c.name ?? c.address_string ?? "ponto"} (${c.radius ?? "?"} ${c.distance_unit ?? "km"})`) : []),
+    ...(Array.isArray(geo.countries) ? geo.countries : []),
+  ];
+  const flex = Array.isArray(t.flexible_spec) ? t.flexible_spec : [];
+  const interesses = flex.flatMap((f: any) => [...nomes(f.interests), ...nomes(f.behaviors), ...nomes(f.life_events), ...nomes(f.work_positions), ...nomes(f.education_majors)]);
+  return {
+    idade: `${t.age_min ?? 18}-${t.age_max ?? 65}`,
+    generos: Array.isArray(t.genders) && t.genders.length ? t.genders.map((g: number) => g === 1 ? "homens" : g === 2 ? "mulheres" : String(g)) : ["todos"],
+    locais: locais.slice(0, 20),
+    interesses: [...nomes(t.interests), ...interesses].slice(0, 40),
+    publicos_personalizados: nomes(t.custom_audiences).slice(0, 20),
+    publicos_excluidos: nomes(t.excluded_custom_audiences).slice(0, 20),
+    advantage_publico: t.targeting_automation?.advantage_audience === 1,
+    plataformas: t.publisher_platforms ?? "automático",
+    posicionamentos_instagram: t.instagram_positions ?? null,
+  };
+}
+
 // ---------- sincronização ----------
 async function sincronizarEstrutura(conta: string): Promise<number> {
   const campos = "id,name,status,effective_status,created_time," +
-    "adset{id,name,effective_status,optimization_goal,destination_type,daily_budget}," +
+    "adset{id,name,effective_status,optimization_goal,destination_type,daily_budget,targeting}," +
     "campaign{id,name,effective_status,objective,daily_budget}," +
     "creative{object_type,title,body,thumbnail_url}";
   const ads = await todasPaginas(`/${conta}/ads`, {
@@ -141,6 +167,7 @@ async function sincronizarEstrutura(conta: string): Promise<number> {
       orcamento_dia_campanha: a.campaign?.daily_budget != null ? Number(a.campaign.daily_budget) / 100 : null,
       tipo: "", criativo_tipo: a.creative?.object_type ?? null, criativo_titulo: a.creative?.title ?? null,
       criativo_texto: a.creative?.body ? String(a.creative.body).slice(0, 1500) : null, criativo_miniatura: a.creative?.thumbnail_url ?? null,
+      publico: resumoPublico(a.adset?.targeting),
       atualizado_em: agora,
     };
     l.tipo = tipoCampanha({ objetivo: l.objetivo, destino: l.destino, otimizacao: l.otimizacao, nome: l.campaign_nome });
@@ -185,6 +212,37 @@ async function sincronizarInsights(conta: string, de: string, ate: string): Prom
   return linhas.length;
 }
 
+/** Números por conjunto e dia, quebrados por idade+gênero e por posicionamento. */
+async function sincronizarQuebras(conta: string, de: string, ate: string): Promise<number> {
+  const conjuntos: [string, string, (x: any) => string][] = [
+    ["idade_genero", "age,gender", (x) => `${x.age}|${x.gender}`],
+    ["posicionamento", "publisher_platform,platform_position", (x) => `${x.publisher_platform}|${x.platform_position}`],
+  ];
+  const agora = new Date().toISOString();
+  let n = 0;
+  for (const [quebra, breakdowns, chave] of conjuntos) {
+    const l = await todasPaginas(`/${conta}/insights`, {
+      level: "adset", time_increment: "1", breakdowns, limit: "500",
+      fields: "adset_id,spend,impressions,inline_link_clicks,clicks,actions",
+      time_range: JSON.stringify({ since: de, until: ate }),
+    }, 80);
+    const linhas = l.map((x: any) => ({
+      dia: x.date_start, adset_id: String(x.adset_id), quebra, chave: chave(x),
+      gasto: num(x.spend) ?? 0, impressoes: Math.round(num(x.impressions) ?? 0), cliques: num(x.inline_link_clicks ?? x.clicks),
+      conversas: somaAcoes(x.actions, (t) => t === "onsite_conversion.messaging_conversation_started_7d"),
+      visitas_perfil: somaAcoes(x.actions, (t) => /profile_visit|instagram_profile/i.test(t)),
+      atualizado_em: agora,
+    }));
+    for (let i = 0; i < linhas.length; i += 500) {
+      await bancoJson("/rest/v1/meta_quebras_dia?on_conflict=dia,adset_id,quebra,chave", {
+        method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(linhas.slice(i, i + 500)),
+      });
+    }
+    n += linhas.length;
+  }
+  return n;
+}
+
 const diaLocal = (ms: number, n = 0) => new Date(ms + FUSO_MIN * 60_000 + n * 86_400_000).toISOString().slice(0, 10);
 const somaDias = (d: string, n: number) => new Date(Date.parse(d + "T12:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
@@ -192,16 +250,18 @@ async function sincronizar(de: string, ate: string, comEstrutura = true) {
   if (!TOKEN) throw new Error("falta o segredo META_ACCESS_TOKEN na Supabase");
   const cs = await contas();
   if (!cs.length) throw new Error("o token não enxerga nenhuma conta de anúncios ativa (dê acesso ao usuário do sistema)");
-  let anuncios = 0, linhas = 0;
+  let anuncios = 0, linhas = 0, quebras = 0;
+  const avisos: string[] = [];
   for (const c of cs) {
     if (comEstrutura) anuncios += await sincronizarEstrutura(c);
     // blocos de 10 dias para não estourar o tempo da Meta
     for (let ini = de; ini <= ate; ini = somaDias(ini, 10)) {
       const fim = somaDias(ini, 9) < ate ? somaDias(ini, 9) : ate;
       linhas += await sincronizarInsights(c, ini, fim);
+      quebras += await sincronizarQuebras(c, ini, fim).catch((e) => { avisos.push("quebras: " + String(e?.message ?? e).slice(0, 150)); return 0; });
     }
   }
-  return { contas: cs, anuncios, linhas_dia: linhas, de, ate };
+  return { contas: cs, anuncios, linhas_dia: linhas, linhas_quebras: quebras, avisos, de, ate };
 }
 
 export async function handler(req: Request): Promise<Response> {

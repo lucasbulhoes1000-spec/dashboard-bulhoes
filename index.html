@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-200831">
+<meta name="lume-versao" content="20261101-202730">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -6638,6 +6638,30 @@ function _tpDadosParaIA(){
       rastreamento:aud?{pct_leads_com_anuncio:r2((aud.coberturaLeads||0)*100),leads_sem_anuncio:aud.leadsSemRastreio||0,fechamentos_sem_anuncio:aud.fechamentosSemRastreio||0,vendas_sem_anuncio_rs:r2(aud.vendasSemRastreio||0)}:null,
       totais:tot,por_campanha:porCampanha,por_anuncio:anuncios,tendencia_semanal:tendencia}};
 }
+/** Segmentação de cada conjunto e resultado por idade/gênero e por posicionamento (Meta). */
+async function _tpPublicos(pacote){
+  try{
+    const est=_tpMeta.estrutura;if(!est||!est.size)return null;
+    const tipoAd={};pacote.dados.por_anuncio.forEach(a=>{if(a.id)tipoAd[a.id]=a.tipo_campanha;});
+    const conj={};
+    Object.keys(tipoAd).forEach(id=>{const e=est.get(String(id));if(!e||!e.adset_id)return;
+      const a=pacote.dados.por_anuncio.find(x=>x.id===id)||{};
+      const c=conj[e.adset_id]||(conj[e.adset_id]={conjunto:a.conjunto,campanha:a.campanha,tipo_campanha:tipoAd[id],publico:e.publico||null,gasto:0,leads:0,agendamentos:0,comparecimentos:0,fechamentos_novos:0});
+      c.gasto+=a.gasto||0;c.leads+=a.leads||0;c.agendamentos+=a.agendamentos||0;c.comparecimentos+=a.comparecimentos||0;c.fechamentos_novos+=a.fechamentos_novos||0;});
+    const ids=Object.keys(conj);if(!ids.length)return null;
+    let out=[],off=0;
+    for(;;){const r=await _waRest('meta_quebras_dia?select=adset_id,quebra,chave,gasto,impressoes,cliques,conversas,visitas_perfil&dia=gte.'+pacote.de+'&dia=lte.'+pacote.ate+'&limit=1000&offset='+off);out=out.concat(r||[]);if(!r||r.length<1000)break;off+=1000;}
+    const r2=v=>Math.round(v*100)/100;
+    const ag={};
+    out.forEach(x=>{const c=conj[x.adset_id];if(!c)return;const k=x.quebra+'|'+c.tipo_campanha+'|'+x.chave;
+      const o=ag[k]||(ag[k]={quebra:x.quebra,tipo_campanha:c.tipo_campanha,chave:x.chave.replace('|',' · '),gasto:0,imp:0,cli:0,conv:0,vis:0});
+      o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.cli+=+x.cliques||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;});
+    const lista=q=>Object.values(ag).filter(o=>o.quebra===q&&o.gasto>=5).sort((a,b)=>b.gasto-a.gasto).slice(0,30)
+      .map(o=>({tipo_campanha:o.tipo_campanha,segmento:o.chave,gasto:r2(o.gasto),impressoes:o.imp,ctr_pct:o.imp?r2(o.cli/o.imp*100):null,conversas:o.conv||null,custo_por_conversa:o.conv?r2(o.gasto/o.conv):null,visitas_perfil:o.vis||null,custo_por_visita:o.vis?r2(o.gasto/o.vis):null}));
+    return{publicos:Object.values(conj).map(c=>({...c,gasto:r2(c.gasto)})).sort((a,b)=>b.gasto-a.gasto).slice(0,40),
+      quebras:{obs:'conversas e visitas são do Meta; leads e vendas por idade/posicionamento não existem no CRM',idade_genero:lista('idade_genero'),posicionamento:lista('posicionamento')}};
+  }catch(e){return null;}
+}
 /** Mesmo intervalo imediatamente antes do período (números do Meta), para comparar. */
 async function _tpPeriodoAnterior(pacote){
   try{
@@ -6703,6 +6727,7 @@ async function tpAnalisarIA(){
   const pacote=_tpDadosParaIA();
   if(!pacote.dados.por_anuncio.length){showToast('error','Sem dados','Não há anúncios no período escolhido.');return;}
   pacote.dados.periodo_anterior_meta=await _tpPeriodoAnterior(pacote);
+  const pq=await _tpPublicos(pacote);if(pq){pacote.dados.publicos=pq.publicos;pacote.dados.quebras=pq.quebras;}
   const box=document.getElementById('tp-ia');box.style.display='block';
   box.innerHTML='<div class="tpia-carregando"><div class="spinner"></div><div>O especialista está analisando '+pacote.dados.por_anuncio.length+' anúncios de '+new Date(pacote.de+'T12:00').toLocaleDateString('pt-BR')+' a '+new Date(pacote.ate+'T12:00').toLocaleDateString('pt-BR')+'…<br><span class="tpia-meta">Leva de 30 segundos a 2 minutos.</span></div></div>';
   box.scrollIntoView({behavior:'smooth',block:'start'});
@@ -6746,7 +6771,7 @@ async function _tpMetaCarregar(){
   let mudou=false;
   if(!_tpMeta.estrutura&&!_tpMeta.carregandoEst){
     _tpMeta.carregandoEst=true;
-    try{const l=await _waRest('meta_estrutura?select=ad_id,ad_status_efetivo,adset_status_efetivo,campaign_status_efetivo,objetivo,destino,otimizacao,tipo,ad_criado_em,criativo_tipo,criativo_texto,orcamento_dia_conjunto,orcamento_dia_campanha&limit=5000');
+    try{const l=await _waRest('meta_estrutura?select=ad_id,adset_id,publico,ad_status_efetivo,adset_status_efetivo,campaign_status_efetivo,objetivo,destino,otimizacao,tipo,ad_criado_em,criativo_tipo,criativo_texto,orcamento_dia_conjunto,orcamento_dia_campanha&limit=5000');
       _tpMeta.estrutura=new Map((l||[]).map(x=>[String(x.ad_id),x]));mudou=true;}
     catch(e){_tpMeta.estrutura=new Map();}
     _tpMeta.carregandoEst=false;
