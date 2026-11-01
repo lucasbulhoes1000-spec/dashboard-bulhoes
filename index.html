@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-202730">
+<meta name="lume-versao" content="20261101-205852">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -5226,9 +5226,27 @@ async function _loadTrafegoImpl(op){
   }
 }
 
+// (01/11/2026) Meta direto da Supabase (tabelas meta_insights_dia + meta_estrutura, função meta-sync).
+// Se a Supabase não tiver o período inteiro, cai no Apps Script como antes.
+async function _fetchMetaSupabase(range){
+  if(typeof _waRest!=='function'||!_sbAccessToken)return null;
+  const min=await _waRest('meta_insights_dia?select=dia&order=dia.asc&limit=1');
+  if(!min||!min.length||min[0].dia>range.since)return null;
+  let out=[],o=0;
+  for(;;){const r=await _waRest('meta_insights_dia?select=ad_id,gasto,impressoes,cliques,conversas&dia=gte.'+range.since+'&dia=lte.'+range.until+'&limit=1000&offset='+o);out=out.concat(r||[]);if(!r||r.length<1000)break;o+=1000;}
+  const ag={};out.forEach(x=>{const a=ag[x.ad_id]||(ag[x.ad_id]={g:0,i:0,c:0,cv:0});a.g+=+x.gasto||0;a.i+=+x.impressoes||0;a.c+=+x.cliques||0;a.cv+=+x.conversas||0;});
+  const ids=Object.keys(ag);if(!ids.length)return[];
+  const est={};
+  for(let i=0;i<ids.length;i+=150){const r=await _waRest('meta_estrutura?select=ad_id,ad_nome,adset_id,adset_nome,campaign_id,campaign_nome&ad_id=in.('+ids.slice(i,i+150).join(',')+')');(r||[]).forEach(x=>est[x.ad_id]=x);}
+  return ids.map(id=>{const a=ag[id],e=est[id]||{};return{ad_id:String(id),ad_name:e.ad_nome||id,adset_id:e.adset_id||'',adset_name:e.adset_nome||'',campaign_id:e.campaign_id||'',campaign_name:e.campaign_nome||'',
+    spend:Math.round(a.g*100)/100,impressions:a.i,clicks:a.c,actions:a.cv?[{action_type:'onsite_conversion.messaging_conversation_started_7d',value:String(a.cv)}]:[]};});
+}
 async function fetchMeta(){
   try{
     const range=getRange('trafego');
+    try{const sb=await _fetchMetaSupabase(range);
+      if(sb){document.getElementById('badge-meta').textContent='⬤ Meta Ads — direto (API)';console.log('[META] Supabase:',sb.length,'anúncios');return sb;}
+    }catch(e){console.warn('[META] Supabase falhou, usando Apps Script:',e);}
     const url=CLOUDIA_URL+'?action=metaInsightsFinal&from='+encodeURIComponent(range.since)+'&to='+encodeURIComponent(range.until);
     const res=await fetch(url);
     const payload=await res.json();
@@ -6653,7 +6671,8 @@ async function _tpPublicos(pacote){
     for(;;){const r=await _waRest('meta_quebras_dia?select=adset_id,quebra,chave,gasto,impressoes,cliques,conversas,visitas_perfil&dia=gte.'+pacote.de+'&dia=lte.'+pacote.ate+'&limit=1000&offset='+off);out=out.concat(r||[]);if(!r||r.length<1000)break;off+=1000;}
     const r2=v=>Math.round(v*100)/100;
     const ag={};
-    out.forEach(x=>{const c=conj[x.adset_id];if(!c)return;const k=x.quebra+'|'+c.tipo_campanha+'|'+x.chave;
+    const destConj={};est.forEach(e=>{if(e.adset_id)destConj[e.adset_id]=e.destino;});
+    out.forEach(x=>{const c=conj[x.adset_id];if(!c)return;if(!x.visitas_perfil&&destConj[x.adset_id]==='INSTAGRAM_PROFILE')x.visitas_perfil=x.cliques;const k=x.quebra+'|'+c.tipo_campanha+'|'+x.chave;
       const o=ag[k]||(ag[k]={quebra:x.quebra,tipo_campanha:c.tipo_campanha,chave:x.chave.replace('|',' · '),gasto:0,imp:0,cli:0,conv:0,vis:0});
       o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.cli+=+x.cliques||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;});
     const lista=q=>Object.values(ag).filter(o=>o.quebra===q&&o.gasto>=5).sort((a,b)=>b.gasto-a.gasto).slice(0,30)
@@ -6771,7 +6790,8 @@ async function _tpMetaCarregar(){
   let mudou=false;
   if(!_tpMeta.estrutura&&!_tpMeta.carregandoEst){
     _tpMeta.carregandoEst=true;
-    try{const l=await _waRest('meta_estrutura?select=ad_id,adset_id,publico,ad_status_efetivo,adset_status_efetivo,campaign_status_efetivo,objetivo,destino,otimizacao,tipo,ad_criado_em,criativo_tipo,criativo_texto,orcamento_dia_conjunto,orcamento_dia_campanha&limit=5000');
+    try{let l=[],off=0;
+      for(;;){const r=await _waRest('meta_estrutura?select=ad_id,adset_id,publico,ad_status_efetivo,adset_status_efetivo,campaign_status_efetivo,objetivo,destino,otimizacao,tipo,ad_criado_em,criativo_tipo,criativo_texto,orcamento_dia_conjunto,orcamento_dia_campanha&order=ad_id&limit=1000&offset='+off);l=l.concat(r||[]);if(!r||r.length<1000)break;off+=1000;}
       _tpMeta.estrutura=new Map((l||[]).map(x=>[String(x.ad_id),x]));mudou=true;}
     catch(e){_tpMeta.estrutura=new Map();}
     _tpMeta.carregandoEst=false;
@@ -6787,6 +6807,9 @@ async function _tpMetaCarregar(){
       const ag={};
       out.forEach(x=>{const o=ag[x.ad_id]||(ag[x.ad_id]={gasto:0,imp:0,alc:0,cli:0,link:0,conv:0,vis:0,lf:0,v3:0,thru:0,v100:0,dias:0});
         o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.alc+=+x.alcance||0;o.cli+=+x.cliques||0;o.link+=+x.cliques_link||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;o.lf+=+x.leads_formulario||0;o.v3+=+x.video_3s||0;o.thru+=+x.thruplays||0;o.v100+=+x.video_100||0;o.dias++;});
+      // visitas ao perfil: nas campanhas com destino perfil do Instagram, o Meta conta como clique no link
+      Object.entries(ag).forEach(([id,o])=>{const e=_tpMeta.estrutura.get(String(id));if(!o.vis&&e&&e.destino==='INSTAGRAM_PROFILE')o.vis=o.link||o.cli;});
+      out.forEach(x=>{const e=_tpMeta.estrutura.get(String(x.ad_id));if(!x.visitas_perfil&&e&&e.destino==='INSTAGRAM_PROFILE')x.visitas_perfil=x.cliques_link||x.cliques;});
       _tpMeta.ins=ag;_tpMeta.insDias=out;_tpMeta.insChave=chave;mudou=true;
     }catch(e){_tpMeta.ins=null;_tpMeta.insChave=chave;}
     _tpMeta.carregandoIns=false;

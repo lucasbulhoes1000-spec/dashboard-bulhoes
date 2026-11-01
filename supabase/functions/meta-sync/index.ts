@@ -89,6 +89,9 @@ async function todasPaginas(caminho: string, params: Record<string, string>, lim
 
 async function contas(): Promise<string[]> {
   if (CONTAS_FIXAS.length) return CONTAS_FIXAS.map((c) => c.startsWith("act_") ? c : "act_" + c);
+  // contas da clínica escolhidas na Supabase (configuracoes.meta_contas = ["act_..."]): não mistura com o Instituto
+  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.meta_contas&select=valor`).catch(() => null))?.[0]?.valor;
+  if (Array.isArray(cfg) && cfg.length) return cfg.map(String);
   const l = await todasPaginas("/me/adaccounts", { fields: "id,name,account_status", limit: "50" }, 5);
   return l.filter((c: any) => Number(c.account_status) === 1).map((c: any) => String(c.id));
 }
@@ -152,12 +155,12 @@ async function sincronizarEstrutura(conta: string): Promise<number> {
     "creative{object_type,title,body,thumbnail_url}";
   const ads = await todasPaginas(`/${conta}/ads`, {
     fields: campos, limit: "200",
-    effective_status: JSON.stringify(["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "ARCHIVED", "IN_PROCESS", "WITH_ISSUES", "DISAPPROVED", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"]),
+    effective_status: JSON.stringify(["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED", "IN_PROCESS", "WITH_ISSUES", "DISAPPROVED", "PENDING_REVIEW", "PREAPPROVED", "PENDING_BILLING_INFO"]),
   });
   const agora = new Date().toISOString();
   const linhas = ads.map((a: any) => {
     const l = {
-      ad_id: String(a.id), ad_nome: a.name ?? null, ad_status: a.status ?? null, ad_status_efetivo: a.effective_status ?? null,
+      ad_id: String(a.id), conta: conta, ad_nome: a.name ?? null, ad_status: a.status ?? null, ad_status_efetivo: a.effective_status ?? null,
       ad_criado_em: a.created_time ?? null,
       adset_id: a.adset?.id ?? null, adset_nome: a.adset?.name ?? null, adset_status_efetivo: a.adset?.effective_status ?? null,
       otimizacao: a.adset?.optimization_goal ?? null, destino: a.adset?.destination_type ?? null,
@@ -291,7 +294,25 @@ export async function handler(req: Request): Promise<Response> {
         const de = String(dados.de ?? ""), ate = String(dados.ate ?? hoje);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(de) || !/^\d{4}-\d{2}-\d{2}$/.test(ate) || de > ate) return json({ ok: false, erro: "datas inválidas" }, 400);
         if (Date.parse(ate) - Date.parse(de) > 95 * 86_400_000) return json({ ok: false, erro: "no máximo 95 dias por vez" }, 400);
-        return json({ ok: true, ...(await sincronizar(de, ate, dados.estrutura !== false)) });
+        // roda em segundo plano (o pedido HTTP corta em 150 s); o resultado fica no log da função
+        const tarefa = sincronizar(de, ate, dados.estrutura !== false)
+          .then((r) => console.log("[meta-sync] historico ok", JSON.stringify(r)))
+          .catch((e) => console.error("[meta-sync] historico erro", String(e)));
+        // @ts-ignore EdgeRuntime existe no Supabase
+        if (typeof EdgeRuntime !== "undefined") { (globalThis as any).EdgeRuntime.waitUntil(tarefa); return json({ ok: true, em_segundo_plano: true, de, ate }); }
+        await tarefa;
+        return json({ ok: true, de, ate });
+      }
+      case "contas": {
+        // gasto dos últimos 30 dias e campanhas ativas de cada conta que o token enxerga
+        const l = await todasPaginas("/me/adaccounts", { fields: "id,name,account_status", limit: "50" }, 3);
+        const out: any[] = [];
+        for (const c of l) {
+          const ins = await graph(`/${c.id}/insights`, { fields: "spend", date_preset: "last_30d" }).catch(() => null);
+          const camp = await graph(`/${c.id}/campaigns`, { fields: "name", limit: "15", effective_status: JSON.stringify(["ACTIVE"]) }).catch(() => null);
+          out.push({ id: c.id, nome: c.name, gasto_30d: ins?.data?.[0]?.spend ?? "0", campanhas_ativas: (camp?.data ?? []).map((x: any) => x.name) });
+        }
+        return json({ ok: true, contas: out });
       }
       case "diagnostico": {
         if (!TOKEN) return json({ ok: false, erro: "falta o segredo META_ACCESS_TOKEN" });
