@@ -31,6 +31,23 @@ const WA_VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
 const IG_TOKEN = Deno.env.get("IG_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 
+// ---------- transcrição de áudio (01/11/2026) ----------
+// Segredo OPENAI_API_KEY (sem ele, nada é transcrito). Modelo: OPENAI_TRANSCRICAO (padrão gpt-4o-mini-transcribe).
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+export async function transcreverAudio(bytes: ArrayBuffer, mime: string): Promise<string> {
+  if (!OPENAI_API_KEY || !bytes.byteLength) return "";
+  if (bytes.byteLength > 24 * 1024 * 1024) return "";
+  const m = String(mime || "audio/ogg").split(";")[0].trim();
+  const ext = /ogg|opus/.test(m) ? "ogg" : /mpeg|mp3/.test(m) ? "mp3" : /mp4|m4a/.test(m) ? "m4a" : /aac/.test(m) ? "aac" : /wav/.test(m) ? "wav" : /webm/.test(m) ? "webm" : "ogg";
+  const fd = new FormData();
+  fd.append("file", new Blob([bytes], { type: m }), "audio." + ext);
+  fd.append("model", Deno.env.get("OPENAI_TRANSCRICAO") || "gpt-4o-mini-transcribe");
+  fd.append("language", "pt");
+  const r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + OPENAI_API_KEY }, body: fd });
+  if (!r.ok) throw new Error("transcrição " + r.status + " " + (await r.text()).slice(0, 200));
+  return String((await r.json())?.text ?? "").trim();
+}
+
 const enc = new TextEncoder();
 
 function hex(buf: ArrayBuffer): string {
@@ -94,10 +111,11 @@ export async function baixarMidia(m: Midia): Promise<void> {
     const mime = (dados.mime_type || m.mime || "application/octet-stream").split(";")[0].trim();
     const ext = EXTENSOES[mime] ?? (m.nome?.split(".").pop() || "bin");
     const caminho = `${m.conversa_id}/${m.mensagem_id}.${ext}`;
+    const bytes = await arquivo.arrayBuffer();
     const up = await banco(`/storage/v1/object/whatsapp-midia/${caminho}`, {
       method: "POST",
       headers: { "Content-Type": mime, "x-upsert": "true" },
-      body: await arquivo.arrayBuffer(),
+      body: bytes,
     });
     if (!up.ok) throw new Error("Storage " + up.status + " " + (await up.text()).slice(0, 200));
     await banco(`/rest/v1/mensagens?id=eq.${m.mensagem_id}`, {
@@ -105,6 +123,13 @@ export async function baixarMidia(m: Midia): Promise<void> {
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ midia_caminho: caminho, midia_tipo: mime, atualizada_em: new Date().toISOString() }),
     });
+    // áudio: transcreve para a equipe ler e para o Agente de IA entender
+    if (mime.startsWith("audio/") && OPENAI_API_KEY) {
+      try {
+        const texto = await transcreverAudio(bytes, mime);
+        if (texto) await banco(`/rest/v1/mensagens?id=eq.${m.mensagem_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ transcricao: texto.slice(0, 8000) }) });
+      } catch (e) { console.error("[whatsapp-webhook] transcrição", m.mensagem_id, String(e)); }
+    }
   } catch (e) {
     console.error("[whatsapp-webhook] mídia", m.midia_id, String(e));
     await banco(`/rest/v1/mensagens?id=eq.${m.mensagem_id}`, {

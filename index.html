@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-112014">
+<meta name="lume-versao" content="20261101-113815">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -787,10 +787,13 @@ tbody tr:hover td{background:#0D1A33;}
 .cl-acao-card:hover{border-color:#D4AF5A;}
 .cl-acao-card .seta{width:20px;height:20px;border-radius:4px;background:#12213F;display:flex;align-items:center;justify-content:center;}
 .wa-voltar{border:none;background:none;font-size:18px;color:#EEF1F7;}
+.wa-transc{margin-top:6px;font-size:12.5px;line-height:1.45;color:#C3CBDB;background:rgba(255,255,255,.04);border-left:2px solid #D4AF5A;padding:6px 8px;border-radius:4px;white-space:pre-wrap}
+.wa-transc span{display:block;font-size:10.5px;color:#8C98B1;margin-bottom:2px}
+.wa-transc-bt{margin-top:5px;font-size:11.5px;background:none;border:0.5px solid #2A3D66;color:#C3CBDB;border-radius:6px;padding:3px 8px;cursor:pointer}
 @media (max-width:768px){
   .wa-wrap,.wa-wrap.painel-aberto{grid-template-columns:1fr;}
   .wa-cab-nome{font-size:14px;}
-  .cl-robo{display:none;}
+  .cl-robo{display:inline-flex;margin:0 2px;}.cl-robo .trilho{display:none;}.cl-robo .bola{width:34px;height:34px;}
   .wa-msgs{padding:10px;}
 }
 
@@ -14394,7 +14397,7 @@ async function _waAcao(dados){
 // colunas das mensagens (canal só existe depois do SQL 012; sem ela, segue sem)
 let _waTemCanal=true;
 function _waMsgs(resto){
-  const cols='id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,responde_a,midia_url,'+(_waTemCanal?'canal,':'')+'enviada_em';
+  const cols='id,conversa_id,wa_message_id,direcao,tipo,texto,midia_id,midia_tipo,midia_caminho,midia_nome,status,erro,autor_email,origem_anuncio,responde_a,midia_url,transcricao,'+(_waTemCanal?'canal,':'')+'enviada_em';
   return _waRest('mensagens?select='+cols+'&conversa_id=eq.'+resto).catch(e=>{
     if(_waTemCanal&&/canal/.test(e.message)){_waTemCanal=false;return _waMsgs(resto);}
     throw e;
@@ -15082,7 +15085,9 @@ function _waMidiaHtml(m){
   }
   const p=_waEsc(m.midia_caminho);
   if(tipo==='image'||tipo==='sticker')return '<div class="wa-midia"><img data-wa-midia="'+p+'" alt="Foto" onclick="waAbrirMidia(this)" style="'+(tipo==='sticker'?'max-width:140px;':'')+'"></div>';
-  if(tipo==='audio'||tipo==='voice')return '<div class="wa-midia"><audio controls preload="none" data-wa-midia="'+p+'"></audio></div>';
+  if(tipo==='audio'||tipo==='voice')return '<div class="wa-midia"><audio controls preload="none" data-wa-midia="'+p+'"></audio></div>'+
+    (m.transcricao?'<div class="wa-transc"><span>📝 Transcrição</span>'+_waEsc(m.transcricao)+'</div>':
+      (m.direcao==='recebida'?'<button class="wa-transc-bt" onclick="waTranscrever(\''+m.id+'\',this)">📝 Transcrever</button>':''));
   if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" data-wa-midia="'+p+'"></video></div>';
   return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" data-wa-midia="'+p+'" data-wa-link="1">📄 '+_waEsc(m.midia_nome||'Documento')+'</a></div>';
 }
@@ -15688,6 +15693,14 @@ async function waCarregarAgente(){
   if(currentPage==='conversas'&&_wa.atual){waRenderChatBaseBarra();waRenderPainel();}
 }
 function waRenderChatBaseBarra(){const b=document.getElementById('wa-btn-sugerir');if(b)b.style.display=_wa.agente&&_wa.agente.assistente_virtual?'':'none';}
+async function waTranscrever(id,bt){
+  if(bt){bt.disabled=true;bt.textContent='Transcrevendo…';}
+  try{
+    const j=await _agAcao({acao:'transcrever',mensagem_id:id});
+    const m=(_wa.msgs||[]).find(x=>x.id===id);if(m)m.transcricao=j.texto||'(áudio sem fala)';
+    waRenderMsgs(false);
+  }catch(e){if(bt){bt.disabled=false;bt.textContent='📝 Transcrever';}showToast('error','Não transcreveu',e.message);}
+}
 async function waRoboAlternar(){
   const c=_wa.atual;if(!c)return;
   const novo=!c.robo_ligado;
@@ -16122,6 +16135,8 @@ function sqFechar(){
 function _sqSujo(){_au.sujo=true;}
 function sqSet(campo,v){_au.atual[campo]=v;_sqSujo();}
 function sqRegra(campo,v){_au.atual.regras[campo]=v;_sqSujo();}
+function sqFds(on){const r=_au.atual.regras;if(on){r.sabado=r.sabado||{inicio:'14:10',fim:'18:00'};r.domingo=r.domingo||{inicio:'10:00',fim:'18:00'};r.robo_fim_de_semana=true;}else{delete r.sabado;delete r.domingo;delete r.robo_fim_de_semana;}_sqSujo();auRenderEditor();}
+function sqFdsHora(dia,campo,v){const r=_au.atual.regras;r[dia]=r[dia]||{};r[dia][campo]=v;_sqSujo();}
 function sqAlternar(sec){_au[sec]=!_au[sec];auRenderEditor();}
 function _sqSwitch(on,acao,rot){return '<label class="sq-tg"><span class="sq-switch"><input type="checkbox" '+(on?'checked':'')+' onchange="'+acao+'"><span></span></span>'+_auEsc(rot)+'</label>';}
 function _sqQ(t){return '<span class="dp-q" title="'+_auEsc(t)+'">?</span>';}
@@ -16167,6 +16182,11 @@ function auRenderEditor(){
           '<div class="sq-av-cab" onclick="sqAlternar(\'secAv\')">'+(_au.secAv?'⌃':'⌄')+' Opções avançadas gerais da sequência</div>'+
           (_au.secAv?'<div class="sq-av">'+
             _sqSwitch(r.pular_fim_de_semana,'sqRegra(\'pular_fim_de_semana\',this.checked)','Pular finais de semana')+
+            _sqSwitch(!!(r.sabado||r.domingo),'sqFds(this.checked)','Enviar no fim de semana em horário próprio')+
+            ((r.sabado||r.domingo)?'<div class="sq-horas">'+
+              '<label>Sábado das<input class="dp-in" type="time" value="'+_auEsc((r.sabado||{}).inicio||'')+'" onchange="sqFdsHora(\'sabado\',\'inicio\',this.value)"></label><label>até<input class="dp-in" type="time" value="'+_auEsc((r.sabado||{}).fim||'')+'" onchange="sqFdsHora(\'sabado\',\'fim\',this.value)"></label>'+
+              '<label>Domingo das<input class="dp-in" type="time" value="'+_auEsc((r.domingo||{}).inicio||'')+'" onchange="sqFdsHora(\'domingo\',\'inicio\',this.value)"></label><label>até<input class="dp-in" type="time" value="'+_auEsc((r.domingo||{}).fim||'')+'" onchange="sqFdsHora(\'domingo\',\'fim\',this.value)"></label></div>'+
+              _sqSwitch(r.robo_fim_de_semana===true,'sqRegra(\'robo_fim_de_semana\',this.checked)','Ligar o robô (Agente de IA) na conversa quando a mensagem sair no fim de semana'):'')+
             _sqSwitch(evitar,'sqEvitar(this.checked)','Evitar horário')+
             (evitar?'<div class="sq-horas"><label>Se o horário for superior à:<input class="dp-in" type="time" value="'+_auEsc(r.fim)+'" onchange="sqRegra(\'fim\',this.value)"></label><label>Envie no dia seguinte às:<input class="dp-in" type="time" value="'+_auEsc(r.inicio)+'" onchange="sqRegra(\'inicio\',this.value)"></label></div>':'')+
             _sqSwitch(r.reentrada!=='nunca','sqRegra(\'reentrada\',this.checked?\'depois_de_sair\':\'nunca\')','Permitir que o contato entre de novo depois de sair')+

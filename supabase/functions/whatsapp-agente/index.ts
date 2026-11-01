@@ -460,13 +460,39 @@ export function ferramentas(imagens: any[], agendamento = false) {
   return t;
 }
 
+// ---------- transcrição de áudio (01/11/2026) ----------
+// Segredo OPENAI_API_KEY (sem ele, nada é transcrito). Modelo: OPENAI_TRANSCRICAO (padrão gpt-4o-mini-transcribe).
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+export async function transcreverAudio(bytes: ArrayBuffer, mime: string): Promise<string> {
+  if (!OPENAI_API_KEY || !bytes.byteLength) return "";
+  if (bytes.byteLength > 24 * 1024 * 1024) return "";
+  const m = String(mime || "audio/ogg").split(";")[0].trim();
+  const ext = /ogg|opus/.test(m) ? "ogg" : /mpeg|mp3/.test(m) ? "mp3" : /mp4|m4a/.test(m) ? "m4a" : /aac/.test(m) ? "aac" : /wav/.test(m) ? "wav" : /webm/.test(m) ? "webm" : "ogg";
+  const fd = new FormData();
+  fd.append("file", new Blob([bytes], { type: m }), "audio." + ext);
+  fd.append("model", Deno.env.get("OPENAI_TRANSCRICAO") || "gpt-4o-mini-transcribe");
+  fd.append("language", "pt");
+  const r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: "Bearer " + OPENAI_API_KEY }, body: fd });
+  if (!r.ok) throw new Error("transcrição " + r.status + " " + (await r.text()).slice(0, 200));
+  return String((await r.json())?.text ?? "").trim();
+}
+/** Transcreve um áudio já guardado no Storage e grava na mensagem. */
+async function transcreverMensagem(m: any): Promise<string> {
+  if (!OPENAI_API_KEY || !m?.midia_caminho) return "";
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/whatsapp-midia/${m.midia_caminho}`, { headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY } });
+  if (!r.ok) throw new Error("Storage " + r.status);
+  const texto = await transcreverAudio(await r.arrayBuffer(), m.midia_tipo || r.headers.get("content-type") || "audio/ogg");
+  if (texto) await banco(`/rest/v1/mensagens?id=eq.${m.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ transcricao: texto.slice(0, 8000) }) });
+  return texto;
+}
+
 /** Texto de uma mensagem do banco para o histórico do agente. */
 export function textoDaMensagem(m: any): string {
   const t = String(m.texto ?? "").trim();
   switch (m.tipo) {
     case "text": case "button": case "interactive": return t;
     case "image": return "[foto]" + (t && !/^📷/.test(t) ? " " + t : "");
-    case "audio": case "voice": return "[áudio]";
+    case "audio": case "voice": return m.transcricao ? "[áudio do paciente, transcrito] " + String(m.transcricao).trim() : "[áudio]";
     case "video": return "[vídeo]" + (t && !/^🎥/.test(t) ? " " + t : "");
     case "document": return "[documento] " + t.replace(/^📄\s*/, "");
     case "sticker": return "[figurinha]";
@@ -752,7 +778,7 @@ async function carregarConversa(id: string) {
   const [p, msgs] = await Promise.all([
     bancoJson(`/rest/v1/pacientes?telefone=eq.${c.telefone}&select=nome,etapa,origem`).catch(() => []),
     // ia_desde: "reiniciar conversa" para o agente (ele só lê o que veio depois)
-    bancoJson(`/rest/v1/mensagens?conversa_id=eq.${id}${c.ia_desde ? `&enviada_em=gte.${encodeURIComponent(c.ia_desde)}` : ""}&select=direcao,tipo,texto,autor_email,enviada_em&order=enviada_em.desc&limit=40`),
+    bancoJson(`/rest/v1/mensagens?conversa_id=eq.${id}${c.ia_desde ? `&enviada_em=gte.${encodeURIComponent(c.ia_desde)}` : ""}&select=id,direcao,tipo,texto,autor_email,enviada_em,transcricao,midia_caminho,midia_tipo,midia_id&order=enviada_em.desc&limit=40`),
   ]);
   const pac = p?.[0];
   return { c, ctx: { nome: pac?.nome || c.nome_contato || c.nome_perfil || "", etapa: pac?.etapa ?? null, origem: pac?.origem ?? null }, msgs: (msgs ?? []).reverse() };
@@ -768,6 +794,19 @@ export async function responder(conversaId: string, versao: number, pausa = espe
     const dados = await carregarConversa(conversaId);
     if (!dados || !dados.c.robo_ligado) { await concluir(); return "sem_robo"; }
     const { c, ctx, msgs } = dados;
+    // (01/11/2026) áudio que acabou de chegar: espera a transcrição (até ~25 s) para entender o que a pessoa disse
+    if (OPENAI_API_KEY) {
+      const pend = msgs.slice(-6).filter((m: any) => m.direcao === "recebida" && (m.tipo === "audio" || m.tipo === "voice") && !m.transcricao);
+      for (const m of pend) {
+        for (let t = 0; t < 8 && !m.transcricao; t++) {
+          if (m.midia_caminho && t >= 2) break;
+          await espera(3000);
+          const n = (await bancoJson(`/rest/v1/mensagens?id=eq.${m.id}&select=midia_caminho,midia_tipo,transcricao`).catch(() => []))?.[0];
+          if (n) Object.assign(m, n);
+        }
+        if (!m.transcricao && m.midia_caminho) m.transcricao = await transcreverMensagem(m).catch(() => "");
+      }
+    }
     const hist = montarHistorico(msgs);
     if (!hist.length || msgs[msgs.length - 1]?.direcao !== "recebida") { await concluir(); return "nada"; }
     // reação (👍) não é mensagem para responder
@@ -1204,6 +1243,14 @@ export async function handler(req: Request): Promise<Response> {
         return json({ ok: true, ...(await sugerir(String(dados.conversa_id), u.email)) });
       case "resumir":
         return json({ ok: true, ...(await resumir(String(dados.conversa_id), u.email)) });
+      case "transcrever": {
+        const m = (await bancoJson(`/rest/v1/mensagens?id=eq.${encodeURIComponent(String(dados.mensagem_id ?? ""))}&select=id,tipo,midia_caminho,midia_tipo,transcricao`))?.[0];
+        if (!m) return json({ ok: false, erro: "mensagem não encontrada" }, 404);
+        if (m.transcricao) return json({ ok: true, texto: m.transcricao });
+        if (!OPENAI_API_KEY) return json({ ok: false, erro: "falta a chave da transcrição (segredo OPENAI_API_KEY na Supabase)" });
+        if (!m.midia_caminho) return json({ ok: false, erro: "o áudio ainda não foi baixado" });
+        return json({ ok: true, texto: await transcreverMensagem(m) });
+      }
       case "analise_trafego":
         if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão pede a análise de tráfego" }, 403);
         return json({ ok: true, ...(await analisarTrafego(dados, u.email)) });

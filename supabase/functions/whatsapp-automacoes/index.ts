@@ -197,14 +197,18 @@ function hm(s: unknown, padrao: number): number {
 }
 /** Próximo instante permitido para mandar mensagem (agora, se já estiver dentro do horário). */
 export function proximoHorario(agora: number, regras: any): number {
-  const ini = hm(regras?.inicio, 0), fim = hm(regras?.fim, 24 * 60);
+  const iniP = hm(regras?.inicio, 0), fimP = hm(regras?.fim, 24 * 60);
   const pular = regras?.pular_fim_de_semana === true;
-  if (ini >= fim) return agora; // horário inválido: não restringe
+  if (iniP >= fimP) return agora; // horário inválido: não restringe
   const local = new Date(agora + FUSO_MIN * 60_000); // "relógio" de Brasília em campos UTC
   for (let d = 0; d < 8; d++) {
     const dia = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + d));
     const sem = dia.getUTCDay();
-    if (pular && (sem === 0 || sem === 6)) continue;
+    // (01/11/2026) horário próprio de sábado e domingo (regras.sabado / regras.domingo = {inicio, fim})
+    const proprio = sem === 6 ? regras?.sabado : sem === 0 ? regras?.domingo : null;
+    if (pular && (sem === 0 || sem === 6) && !proprio) continue;
+    let ini = iniP, fim = fimP;
+    if (proprio) { ini = hm(proprio.inicio, iniP); fim = hm(proprio.fim, fimP); if (ini >= fim) continue; }
     const abre = dia.getTime() + ini * 60_000, fecha = dia.getTime() + fim * 60_000; // ainda em "relógio local"
     const agoraLocal = local.getTime();
     if (d === 0) {
@@ -441,6 +445,12 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             return "erro";
           }
           await registrar(k.c, r.j?.messages?.[0]?.id ?? null, tipo, registro, autor, "enviada", null, r.j);
+          // (01/11/2026) follow-up de fim de semana: a equipe não está, então a IA responde quem voltar
+          const semLocal = new Date(agora() + FUSO_MIN * 60_000).getUTCDay();
+          if (regras.robo_fim_de_semana === true && (semLocal === 0 || semLocal === 6) && !k.c.robo_ligado) {
+            await banco(`/rest/v1/conversas?id=eq.${k.c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ robo_ligado: true }) }).catch(() => {});
+            k.c.robo_ligado = true;
+          }
           await avancar(x, i, p.tipo, "ok", p.tipo === "modelo" ? p.nome : registro.slice(0, 120), i + 1, null, "ativa", k.c.id);
           i++; continue;
         }
@@ -522,7 +532,8 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
               // veio do Cloudia na virada: as mensagens da equipe ficaram no Cloudia
               v = !ultLead || agora() - ultLead >= Math.min(min, 1440) * 60_000;
             } else {
-              const eq = k.c ? (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${k.c.id}&direcao=eq.enviada&autor_email=like.*%40*&status=neq.falhou&select=enviada_em&order=enviada_em.desc&limit=1`).catch(() => []))?.[0] : null;
+              // (01/11/2026) a IA também conta como "a equipe falou" (antes o follow-up nunca saía nas conversas da IA)
+              const eq = k.c ? (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${k.c.id}&direcao=eq.enviada&or=(autor_email.like.*%40*,autor_email.like.IA*)&status=neq.falhou&select=enviada_em&order=enviada_em.desc&limit=1`).catch(() => []))?.[0] : null;
               const ultEquipe = eq?.enviada_em ? Date.parse(eq.enviada_em) : 0;
               if (ultEquipe && ultEquipe > ultLead) {
                 const vence = ultEquipe + min * 60_000;
