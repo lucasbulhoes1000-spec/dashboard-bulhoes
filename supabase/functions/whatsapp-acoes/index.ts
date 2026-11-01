@@ -407,6 +407,32 @@ export async function handler(req: Request): Promise<Response> {
         }
         return resposta(req, { ok: true, contas });
       }
+      case "instagram_teste_meta": {
+        // (01/11/2026) Só gestão: faz uma chamada de leitura por permissão, que a Meta exige antes de publicar o app.
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão" }, 403);
+        if (!IG_TOKEN) return resposta(req, { ok: false, erro: "falta o segredo IG_TOKEN" }, 500);
+        const out: Record<string, unknown> = {};
+        const ok = (r: any) => r.ok ? "ok" : erroMeta(r.j);
+        const pgs = await meta(`/me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=50`, undefined, IG_TOKEN);
+        out.pages_show_list = ok(pgs);
+        const bm: string[] = [];
+        for (const tk of [IG_TOKEN, WA_TOKEN]) for (const cam of [`/me/businesses?fields=id,name`, `/159483861578141?fields=id,name`]) bm.push(ok(await meta(cam, undefined, tk)));
+        out.business_management = bm;
+        for (const pg of pgs.j?.data ?? []) {
+          const ig = pg.instagram_business_account;
+          const p: Record<string, unknown> = {};
+          p.pages_read_engagement = ok(await meta(`/${pg.id}?fields=name,fan_count,followers_count`, undefined, pg.access_token));
+          if (ig?.id) {
+            p.instagram_basic = ok(await meta(`/${ig.id}?fields=username,followers_count,media_count`, undefined, pg.access_token));
+            const md = await meta(`/${ig.id}/media?fields=id,comments_count&limit=3`, undefined, pg.access_token);
+            const mid = md.j?.data?.[0]?.id;
+            p.instagram_manage_comments = mid ? ok(await meta(`/${mid}/comments?fields=id,timestamp&limit=1`, undefined, pg.access_token)) : ok(md);
+            p.instagram_manage_messages = ok(await meta(`/${pg.id}/conversations?platform=instagram&fields=id,updated_time&limit=1`, undefined, pg.access_token));
+          }
+          out[pg.name] = p;
+        }
+        return resposta(req, { ok: true, chamadas: out });
+      }
       case "configurar": {
         // Só gestão: liga o app à conta do WhatsApp e mostra os números (com o ID de cada um).
         if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão configura o WhatsApp" }, 403);
