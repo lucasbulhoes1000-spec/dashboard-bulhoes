@@ -2,13 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <!-- VERSÃO FINAL DEFINITIVA — performance conservadora — 26/08/2026 -->
 <title>Lume · Bulhões Odontologia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261031-164207">
+<meta name="lume-versao" content="20261101-112014">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -1173,6 +1173,15 @@ body{letter-spacing:-.1px;}
   #content-trafego > div:first-child{flex-wrap:wrap;gap:6px;}
   #content-trafego > div:first-child label{font-size:11.5px!important;}
   .mc-ind-label{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;}
+  /* (01/11/2026) sem zoom nem tela "escorregando" para o lado no iPhone */
+  html,body{overflow-x:hidden!important;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  body{touch-action:manipulation;}
+  input,select,textarea{font-size:16px!important;}
+  /* cabeçalho da conversa: nome e telefone numa linha só, botões sempre visíveis */
+  #wa-cab{gap:8px!important;}
+  #wa-cab .wa-cab-info{flex:1 1 auto;min-width:0;}
+  #wa-cab .wa-cab-nome,#wa-cab .wa-cab-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #wa-cab .wa-cab-acoes{flex-shrink:0;gap:4px!important;}
 }
 </style>
 <script>try{if(localStorage.getItem('bulhoes_tema')==='claro'){document.documentElement.style.background='#FAFAFC';document.documentElement.setAttribute('data-tema','claro');}}catch(e){}</script>
