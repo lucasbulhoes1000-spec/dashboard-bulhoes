@@ -396,6 +396,7 @@ export function montarSistema(a: any, imagens: any[], ctx: { nome?: string; etap
     partes.push("# Agendamento da avaliação\n" +
       `Você pode marcar a ${a.agendamento.procedimento || "avaliação"} direto na agenda${a.agendamento.profissional_nome ? " da " + a.agendamento.profissional_nome : ""}. ` +
       "Para saber os horários, use a ferramenta ver_horarios (nunca invente horário). Ofereça exatamente as opções que ela devolver. " +
+      "Quando o paciente pedir um dia ou um horário específico, consulte ver_horarios com esse dia (e a hora) antes de responder. Nunca diga que um horário está ou não está disponível sem conferir esse horário exato na ferramenta. " +
       "Antes de marcar, confirme o horário escolhido e o nome completo do paciente. Para marcar, use agendar_avaliacao e só diga que está marcado se ela confirmar.");
   }
   const info = [`Agora: ${agoraBrasilia(agora)} (horário de Brasília).`];
@@ -432,10 +433,11 @@ export function ferramentas(imagens: any[], agendamento = false) {
   if (agendamento) {
     t.push({
       name: "ver_horarios",
-      description: "Consulta a agenda e devolve as duas opções livres mais próximas para a avaliação.",
+      description: "Consulta a agenda. Sem data: as duas opções livres mais próximas. Com data: todos os horários livres desse dia. Com data e hora: confere se aquele horário exato está livre. Use sempre que o paciente pedir um dia ou horário específico.",
       input_schema: { type: "object", properties: {
-        periodo: { type: "string", enum: ["manha", "tarde", "qualquer"], description: "Período que o paciente prefere" },
+        periodo: { type: "string", enum: ["manha", "tarde", "qualquer"], description: "Período que o paciente prefere (use qualquer quando ele pedir um horário exato)" },
         data: { type: "string", description: "Opcional: um dia específico pedido pelo paciente (AAAA-MM-DD)" },
+        hora: { type: "string", description: "Opcional: horário exato pedido pelo paciente (HH:MM), junto com a data" },
       }, required: ["periodo"] },
     });
     t.push({
@@ -658,7 +660,7 @@ async function analisarTrafego(dados: any, autor: string) {
 }
 
 export type Acao = { tipo: "texto"; texto: string } | { tipo: "nome"; nome: string } | { tipo: "imagem"; nome: string; link: string } | { tipo: "transferir"; motivo: string } | { tipo: "perdido"; motivo: string };
-export type Agenda = { ver: (periodo: string, data?: string) => Promise<string>; marcar: (x: any) => Promise<string> };
+export type Agenda = { ver: (periodo: string, data?: string, hora?: string) => Promise<string>; marcar: (x: any) => Promise<string> };
 
 /**
  * Conversa com o Claude até ele terminar (no máximo 4 voltas), devolvendo as ações em ordem.
@@ -709,7 +711,7 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
             resultados.push({ type: "tool_result", tool_use_id: b.id, content: "Não foi possível enviar essa imagem.", is_error: true });
           }
         } else if (agenda && b.name === "ver_horarios") {
-          const txt = await agenda.ver(String(b.input?.periodo ?? "qualquer"), b.input?.data ? String(b.input.data) : undefined).catch((e) => "Não consegui consultar a agenda agora (" + String(e?.message ?? e).slice(0, 120) + "). Passe para a equipe.");
+          const txt = await agenda.ver(String(b.input?.periodo ?? "qualquer"), b.input?.data ? String(b.input.data) : undefined, b.input?.hora ? String(b.input.hora) : undefined).catch((e) => "Não consegui consultar a agenda agora (" + String(e?.message ?? e).slice(0, 120) + "). Passe para a equipe.");
           resultados.push({ type: "tool_result", tool_use_id: b.id, content: txt });
         } else if (agenda && b.name === "agendar_avaliacao") {
           const txt = await agenda.marcar(b.input ?? {}).catch((e) => "Não consegui marcar (" + String(e?.message ?? e).slice(0, 160) + "). Não diga que está marcado; passe para a equipe.");
@@ -731,9 +733,26 @@ export async function gerarResposta(a: any, imagens: any[], sistema: string, his
 export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | null, simular = false): Agenda {
   const cfg = a.agendamento ?? {};
   return {
-    ver: async (periodo, data) => {
+    ver: async (periodo, data, hora) => {
       const agora = Date.now();
-      const op = duasOpcoes(horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora), periodo, data);
+      const livres = horariosLivres(cfg, await agendaDaProfissional(cfg, agora), agora);
+      // (01/11/2026) dia ou horário pedido pelo paciente: confere de verdade em vez de só oferecer duas opções
+      if (data) {
+        const doDia = livres.filter((h) => h.data === data);
+        const lista = (hs: Horario[]) => hs.map((h) => `${h.hora} [data=${h.data} hora=${h.hora}]`).join(", ");
+        if (hora) {
+          const mh = /(\d{1,2})\D?(\d{2})?/.exec(String(hora));
+          const hh = mh ? `${mh[1].padStart(2, "0")}:${mh[2] ?? "00"}` : String(hora).slice(0, 5);
+          const x = doDia.find((h) => h.hora === hh);
+          if (x) return `Livre: ${descreverHorario(x, agora)} [data=${x.data} hora=${x.hora}]. Pode confirmar esse horário com o paciente.`;
+          return doDia.length ? `O horário ${hh} de ${data} não está livre. Livres nesse dia: ${lista(doDia)}.` : `Não há horário livre em ${data}. Ofereça outro dia.`;
+        }
+        const filtrados = doDia.filter((h) => periodo === "manha" ? minutos(h.hora) < 720 : periodo === "tarde" ? minutos(h.hora) >= 720 : true);
+        if (filtrados.length) return `Livres em ${data}${periodo !== "qualquer" ? " (" + (periodo === "manha" ? "manhã" : "tarde") + ")" : ""}: ${lista(filtrados)}. Ofereça os que combinam com o pedido.`;
+        if (doDia.length) return `Nesse período não há horário em ${data}, mas no dia há: ${lista(doDia)}.`;
+        return `Sem horário livre em ${data}. Ofereça procurar outro dia.`;
+      }
+      const op = duasOpcoes(livres, periodo, data);
       if (!op.length) return data ? `Sem horário livre em ${data} nesse período. Ofereça procurar outro dia ou período.` : `Sem horário livre nos próximos ${cfg.dias_busca ?? 14} dias nesse período. Ofereça o outro período ou passe para a equipe.`;
       return "Opções (ofereça estas duas): " + op.map((h) => `${descreverHorario(h, agora)} [data=${h.data} hora=${h.hora}]`).join(" ou ");
     },
@@ -750,7 +769,7 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
       const online = x.online === true || String(x.online) === "true";
       const obs = (online ? "AVALIAÇÃO ONLINE (Google Meet): enviar o link ao paciente. " : "") + String(x.observacoes ?? "");
       const r = await marcarNoClinicorp(cfg, { data: String(x.data), hora: String(x.hora).slice(0, 5) }, nome, conv?.telefone ?? "", obs, Date.now(), [ctx?.nome, conv?.nome_contato, conv?.nome_perfil].filter(Boolean).map(String));
-      if (!r.ok) return `Não foi possível marcar: ${r.motivo}. Consulte ver_horarios de novo e ofereça outras opções.`;
+      if (!r.ok) return `Não foi possível marcar: ${r.motivo}. Antes de dizer ao paciente que o horário não está disponível, consulte ver_horarios com data=${String(x.data)} para ver os livres desse dia e ofereça os mais próximos.`;
       // CRM: etapa "Agendou"
       const agoraIso = new Date().toISOString();
       if (conv?.telefone) {
