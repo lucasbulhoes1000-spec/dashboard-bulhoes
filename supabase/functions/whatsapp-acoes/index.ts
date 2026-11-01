@@ -397,7 +397,8 @@ export async function handler(req: Request): Promise<Response> {
             body: JSON.stringify({ ig_id: ig.id, page_id: pg.id, usuario: ig.username ?? null, apelido, ...(dados.atribuir_a ? { atribuir_a: String(dados.atribuir_a).toLowerCase() } : {}) }),
           });
           let assinatura: unknown = true;
-          for (const campos of ["messages,messaging_postbacks,message_reactions,messaging_seen", "messages"]) {
+          // (01/11/2026) para o Instagram basta o app inscrito na Página: sem pages_messaging, usa um campo da Página
+          for (const campos of ["messages,messaging_postbacks,message_reactions,messaging_seen", "messages", "feed", "name"]) {
             const a = await meta(`/${pg.id}/subscribed_apps?subscribed_fields=${campos}`, {}, pg.access_token);
             assinatura = a.ok ? campos : erroMeta(a.j);
             if (a.ok) break;
