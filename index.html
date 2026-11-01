@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-113815">
+<meta name="lume-versao" content="20261101-195832">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -997,6 +997,29 @@ tbody tr:hover td,.modal-table tr:hover td{background:rgba(212,175,90,.05) !impo
 button:disabled{opacity:.45;cursor:default;}
 
 tr.linha-sem-desempenho td{background:rgba(224,103,90,.05) !important;}
+/* Tráfego Pago: barra de visão (01/11/2026) */
+.tpv-barra{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;}
+.tpv-seg{display:inline-flex;border:1px solid #2A3D66;border-radius:9px;overflow:hidden;}
+.tpv-seg button{background:#0D1A33;color:#C3CBDB;border:0;border-right:1px solid #2A3D66;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;}
+.tpv-seg button:last-child{border-right:0;}
+.tpv-seg button.on{background:#B08A3E;color:#fff;font-weight:600;}
+.tpv-seg button small{opacity:.75;margin-left:4px;}
+.tpv-chave{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#E2BE6A;cursor:pointer;user-select:none;white-space:nowrap;}
+.tpv-chave input{display:none;}
+.tpv-chave span{position:relative;width:34px;height:18px;background:#2A3D66;border-radius:18px;transition:.2s;flex:0 0 auto;}
+.tpv-chave span::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s;}
+.tpv-chave input:checked+span{background:#B08A3E;}
+.tpv-chave input:checked+span::after{left:18px;}
+.tpv-sel{border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;min-width:160px;max-width:260px;}
+.tpv-info{font-size:11px;color:#8C98B1;}
+#t-ads-thead th.tpv-ord{cursor:pointer;user-select:none;white-space:nowrap;}
+#t-ads-thead th.tpv-ord:hover{color:#E2BE6A;}
+#t-ads-thead th .tpv-seta{font-size:9px;color:#E2BE6A;margin-left:3px;}
+.tpv-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;background:#66738F;}
+.tpv-dot.ativo{background:#5FC48A;}
+.tpv-dot.erro{background:#E0675A;}
+body.tp-sem-custos .tp-c{display:none !important;}
+@media (max-width:700px){.tpv-sel{min-width:0;flex:1 1 140px;}.tpv-seg button{padding:6px 9px;}}
 input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-text-fill-color:var(--txt);-webkit-box-shadow:0 0 0 1000px var(--surf2) inset;caret-color:var(--txt);transition:background-color 9999s;}
 input[type="date"]::-webkit-calendar-picker-indicator,input[type="datetime-local"]::-webkit-calendar-picker-indicator{filter:invert(.8) sepia(.6) saturate(2) hue-rotate(5deg);}
 
@@ -1428,17 +1451,21 @@ body{letter-spacing:-.1px;}
                   <div class="mc" style="margin:0;"><div class="ml">Anúncios sem performance</div><div class="mv" style="color:#D27F74;" id="ad-kpi-semperf">—</div><div class="ms" id="ad-kpi-semperf-sub">gasto sem contrato</div></div>
                 </div>
                 <div id="ad-tracking-audit" style="font-size:11px;color:#C3CBDB;background:#12213F;border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;margin-bottom:10px;"></div>
-                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-                  <select id="ad-filter-campaign" onchange="filterAdTable()" style="border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;min-width:160px;">
+                <div class="tpv-barra">
+                  <div class="tpv-seg" id="tpv-tipo"></div>
+                  <label class="tpv-chave" title="Mostra só campanhas, conjuntos e anúncios que estão rodando agora"><input type="checkbox" id="tpv-ativos" onchange="tpvMudar('ativos',this.checked)"><span></span>Só ativos</label>
+                  <label class="tpv-chave" title="Esconde gasto, CPL, custos por etapa, CAC e ROAS"><input type="checkbox" id="tpv-custos" onchange="tpvMudar('custos',this.checked)"><span></span>Mostrar custos</label>
+                  <select id="ad-filter-campaign" onchange="filterAdTable()" class="tpv-sel">
                     <option value="">Todas as campanhas</option>
                   </select>
-                  <select id="ad-filter-adset" onchange="filterAdTable()" style="border:1px solid #2A3D66;border-radius:8px;padding:6px 10px;font-size:12px;color:#EEF1F7;background:#0D1A33;min-width:160px;">
+                  <select id="ad-filter-adset" onchange="filterAdTable()" class="tpv-sel">
                     <option value="">Todos os conjuntos</option>
                   </select>
+                  <span class="tpv-info" id="tpv-info"></span>
                 </div>
                 <div class="tw">
                   <table>
-                    <thead><tr>
+                    <thead id="t-ads-thead"><tr>
                       <th>Anúncio</th><th>Conjunto</th><th>Campanha</th>
                       <th style="text-align:right">Valor gasto</th><th style="text-align:right">Leads</th><th style="text-align:right">CPL</th>
                       <th style="text-align:right">Agend.</th><th style="text-align:right">C/agend.</th>
@@ -5744,7 +5771,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   const cpcomp=comp>0?spend/comp:0;
   // cpc2 calculado após atualizar contratos (ver abaixo)
 
-  document.getElementById('t-spend').textContent=fmt(spend);
+  document.getElementById('t-spend').textContent=fmt(spend);window._tpSpendTotal=spend;
   document.getElementById('t-cpl').textContent=cplReal>0?fmt(cplReal):'—';
   const elCplGeral=document.getElementById('t-cpl-geral');
   if(elCplGeral)elCplGeral.textContent=cplGeral>0?fmt(cplGeral):'—';
@@ -6551,20 +6578,30 @@ function _tpDadosParaIA(){
   const adMap=window._lastAdMap||{};
   const meta={};
   (typeof _lastMetaAds!=='undefined'?_lastMetaAds:[]).forEach(a=>{const id=String(a.ad_id||'');if(!id)return;const o=meta[id]||(meta[id]={imp:0,cli:0});o.imp+=Number(a.impressions||0);o.cli+=Number(a.clicks||0);});
+  // mesmos filtros da tela: tipo de campanha, "só ativos", campanha, conjunto e buscas
+  const linhas=_tpLinhasVisiveis(false);
   const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
   const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
   const qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
   const qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
-  let linhas=Object.entries(adMap);
-  if(campFilt)linhas=linhas.filter(([,d])=>d.campaign===campFilt);
-  if(adsetFilt)linhas=linhas.filter(([,d])=>d.adset===adsetFilt);
-  if(qAd)linhas=linhas.filter(([k,d])=>String(k).toLowerCase().includes(qAd)||String(d.label||'').toLowerCase().includes(qAd));
-  if(qCamp)linhas=linhas.filter(([,d])=>String(d.campaign||'').toLowerCase().includes(qCamp));
   const r2=v=>Math.round(Number(v||0)*100)/100;
   const div=(a,b)=>b>0?r2(a/b):null;
-  const anuncios=linhas.map(([k,d])=>{const m=meta[k]||{imp:0,cli:0};const g=Number(d.spend||0);
+  const pct=(a,b)=>b>0?r2(a/b*100):null;
+  const est=_tpMeta.estrutura||new Map();
+  const ins=_tpMeta.ins||{};
+  const hojeMs=Date.now();
+  const anuncios=linhas.map(([k,d])=>{const e=est.get(String(k))||null;const mi=ins[k]||null;const m=meta[k]||{imp:0,cli:0};const g=Number(d.spend||0);
+    const imp=mi?mi.imp:m.imp,cli=mi?(mi.link||mi.cli):m.cli;
     return{id:k==='__sem_rastreio__'?null:k,anuncio:k==='__sem_rastreio__'?'(leads e vendas sem anúncio identificado)':(d.label||k),conjunto:d.adset||'',campanha:d.campaign||'',
-      gasto:r2(g),impressoes:m.imp||null,cliques:m.cli||null,ctr_pct:m.imp?r2(m.cli/m.imp*100):null,cpm:m.imp?r2(g/m.imp*1000):null,cpc:m.cli?r2(g/m.cli):null,
+      tipo_campanha:_tpTipo(k,d),
+      status:e?e.ad_status_efetivo:null,objetivo:e?e.objetivo:null,destino:e?e.destino:null,
+      dias_no_ar:e&&e.ad_criado_em?Math.max(0,Math.round((hojeMs-Date.parse(e.ad_criado_em))/864e5)):null,
+      formato:e?e.criativo_tipo:null,texto_do_anuncio:e&&e.criativo_texto?String(e.criativo_texto).slice(0,220):null,
+      orcamento_dia:e?(e.orcamento_dia_conjunto||e.orcamento_dia_campanha||null):null,
+      gasto:r2(g),impressoes:imp||null,cliques_link:cli||null,ctr_pct:pct(cli,imp),cpm:imp?r2(g/imp*1000):null,cpc:div(g,cli),
+      conversas_iniciadas_meta:mi?mi.conv:null,custo_por_conversa:mi&&mi.conv?r2(g/mi.conv):null,
+      visitas_perfil:mi?mi.vis:null,custo_por_visita:mi&&mi.vis?r2(g/mi.vis):null,
+      retencao_3s_pct:mi&&mi.imp&&mi.v3?pct(mi.v3,mi.imp):null,thruplay_pct:mi&&mi.v3&&mi.thru?pct(mi.thru,mi.v3):null,
       leads:d.leads||0,cpl:div(g,d.leads),agendamentos:d.agend||0,custo_agend:div(g,d.agend),comparecimentos:d.comp||0,fechamentos_novos:d.fechou||0,
       custo_venda:div(g,d.fechou),vendas_rs:r2(d.vendas),roas:div(d.vendas,g),recompras:d.recompras||0};})
     .sort((a,b)=>b.gasto-a.gasto||b.leads-a.leads).slice(0,150);
@@ -6572,17 +6609,46 @@ function _tpDadosParaIA(){
   const tot={gasto:r2(soma('gasto')),leads:soma('leads'),agendamentos:soma('agendamentos'),comparecimentos:soma('comparecimentos'),fechamentos_novos:soma('fechamentos_novos'),vendas_rs:r2(soma('vendas_rs'))};
   tot.cpl=div(tot.gasto,tot.leads);tot.custo_venda=div(tot.gasto,tot.fechamentos_novos);tot.roas=div(tot.vendas_rs,tot.gasto);
   tot.taxa_agendamento_pct=tot.leads?r2(tot.agendamentos/tot.leads*100):null;tot.taxa_comparecimento_pct=tot.agendamentos?r2(tot.comparecimentos/tot.agendamentos*100):null;tot.taxa_fechamento_pct=tot.comparecimentos?r2(tot.fechamentos_novos/tot.comparecimentos*100):null;
-  const camp={};anuncios.forEach(a=>{const c=camp[a.campanha||'(sem campanha)']||(camp[a.campanha||'(sem campanha)']={campanha:a.campanha||'(sem campanha)',gasto:0,leads:0,agendamentos:0,comparecimentos:0,fechamentos_novos:0,vendas_rs:0,anuncios:0});
-    c.gasto+=a.gasto;c.leads+=a.leads;c.agendamentos+=a.agendamentos;c.comparecimentos+=a.comparecimentos;c.fechamentos_novos+=a.fechamentos_novos;c.vendas_rs+=a.vendas_rs;c.anuncios++;});
+  const camp={};anuncios.forEach(a=>{const c=camp[a.campanha||'(sem campanha)']||(camp[a.campanha||'(sem campanha)']={campanha:a.campanha||'(sem campanha)',tipo_campanha:a.tipo_campanha,objetivo:a.objetivo,gasto:0,leads:0,agendamentos:0,comparecimentos:0,fechamentos_novos:0,vendas_rs:0,anuncios:0,anuncios_ativos:0});
+    c.gasto+=a.gasto;c.leads+=a.leads;c.agendamentos+=a.agendamentos;c.comparecimentos+=a.comparecimentos;c.fechamentos_novos+=a.fechamentos_novos;c.vendas_rs+=a.vendas_rs;c.anuncios++;if(a.status==='ACTIVE')c.anuncios_ativos++;});
   const porCampanha=Object.values(camp).map(c=>({...c,gasto:r2(c.gasto),vendas_rs:r2(c.vendas_rs),cpl:div(c.gasto,c.leads),custo_venda:div(c.gasto,c.fechamentos_novos),roas:div(c.vendas_rs,c.gasto)})).sort((a,b)=>b.gasto-a.gasto);
+  // tendência semana a semana (números do Meta), no total e por campanha, só dos anúncios filtrados
+  let tendencia=null;
+  if(_tpMeta.insDias&&_tpMeta.insDias.length){
+    const ids=new Set(anuncios.map(a=>a.id).filter(Boolean));const nomeCamp={};linhas.forEach(([k,d])=>{nomeCamp[k]=d.campaign||'(sem campanha)';});
+    const sem=dia=>{const dt=new Date(dia+'T12:00:00');const dw=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-dw);return localDateStr(dt);};
+    const T={},C={};
+    _tpMeta.insDias.forEach(x=>{if(!ids.has(String(x.ad_id)))return;const s=sem(x.dia);
+      [[T,s],[C,(nomeCamp[x.ad_id]||'?')+'|'+s]].forEach(([obj,key])=>{const o=obj[key]||(obj[key]={gasto:0,imp:0,cli:0,conv:0,vis:0});o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.cli+=+(x.cliques_link||x.cliques)||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;});});
+    const fmtS=(o)=>({gasto:r2(o.gasto),impressoes:o.imp,ctr_pct:pct(o.cli,o.imp),cpm:o.imp?r2(o.gasto/o.imp*1000):null,conversas:o.conv,custo_por_conversa:o.conv?r2(o.gasto/o.conv):null,visitas_perfil:o.vis||null});
+    tendencia={semana_comeca_segunda:true,total:Object.keys(T).sort().map(s=>({semana:s,...fmtS(T[s])})),
+      por_campanha:Object.keys(C).sort().map(k=>{const[c,s]=k.split('|');return{campanha:c,semana:s,...fmtS(C[k])};})};
+  }
   const aud=window._auditoriaFunilAnuncio;
   const rg=getRange('trafego');
   const dias=Math.round((new Date(rg.until+'T12:00')-new Date(rg.since+'T12:00'))/864e5)+1;
-  return{de:rg.since,ate:rg.until,filtro:[campFilt&&'campanha '+campFilt,adsetFilt&&'conjunto '+adsetFilt,qAd&&'anúncio contém "'+qAd+'"',qCamp&&'campanha contém "'+qCamp+'"'].filter(Boolean).join(', ')||null,
+  return{de:rg.since,ate:rg.until,filtro:[_tpv.tipo!=='todos'&&'tipo '+_tpv.tipo,_tpv.ativos&&'só ativos',campFilt&&'campanha '+campFilt,adsetFilt&&'conjunto '+adsetFilt,qAd&&'anúncio contém "'+qAd+'"',qCamp&&'campanha contém "'+qCamp+'"'].filter(Boolean).join(', ')||null,
     dados:{periodo:{de:rg.since,ate:rg.until,dias},
-      como_ler:['Leads, agendamentos, comparecimentos e fechamentos vêm do CRM ligados ao anúncio de origem do lead.','fechamentos_novos e vendas_rs contam só pacientes novos (sem recompras), com valor real do Clinicorp.','Gasto, impressões e cliques vêm do Meta Ads no período.','Os dados não dizem se o anúncio está ativo ou pausado hoje.'],
+      como_ler:['Leads, agendamentos, comparecimentos e fechamentos vêm do CRM ligados ao anúncio de origem do lead.','fechamentos_novos e vendas_rs contam só pacientes novos (sem recompras), com valor real do Clinicorp.','Gasto, impressões, cliques, conversas, visitas ao perfil e vídeo vêm do Meta Ads.',
+        'tipo_campanha: mensagem (anúncio que leva ao WhatsApp/direct), perfil (tráfego para o perfil do Instagram), cadastro (formulário). Cada tipo tem objetivo diferente.',
+        _tpTemStatus()?'status é o status real do anúncio no Meta (ACTIVE = rodando; PAUSED, CAMPAIGN_PAUSED, ADSET_PAUSED = parado).':'O status real do anúncio ainda não está disponível (status = null).',
+        'retencao_3s_pct = visualizações de 3 s ÷ impressões (gancho do vídeo); thruplay_pct = thruplays ÷ visualizações de 3 s (retenção até o fim).'],
       rastreamento:aud?{pct_leads_com_anuncio:r2((aud.coberturaLeads||0)*100),leads_sem_anuncio:aud.leadsSemRastreio||0,fechamentos_sem_anuncio:aud.fechamentosSemRastreio||0,vendas_sem_anuncio_rs:r2(aud.vendasSemRastreio||0)}:null,
-      totais:tot,por_campanha:porCampanha,por_anuncio:anuncios}};
+      totais:tot,por_campanha:porCampanha,por_anuncio:anuncios,tendencia_semanal:tendencia}};
+}
+/** Mesmo intervalo imediatamente antes do período (números do Meta), para comparar. */
+async function _tpPeriodoAnterior(pacote){
+  try{
+    const de=new Date(pacote.de+'T12:00'),ate=new Date(pacote.ate+'T12:00');const n=Math.round((ate-de)/864e5)+1;
+    const aAte=new Date(de.getTime()-864e5),aDe=new Date(aAte.getTime()-(n-1)*864e5);
+    const ids=new Set(pacote.dados.por_anuncio.map(a=>a.id).filter(Boolean));if(!ids.size)return null;
+    let out=[],off=0;
+    for(;;){const r=await _waRest('meta_insights_dia?select=ad_id,gasto,impressoes,cliques,cliques_link,conversas,visitas_perfil&dia=gte.'+localDateStr(aDe)+'&dia=lte.'+localDateStr(aAte)+'&limit=1000&offset='+off);out=out.concat(r||[]);if(!r||r.length<1000)break;off+=1000;}
+    const o={gasto:0,imp:0,cli:0,conv:0,vis:0};out.forEach(x=>{if(!ids.has(String(x.ad_id)))return;o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.cli+=+(x.cliques_link||x.cliques)||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;});
+    if(!o.imp&&!o.gasto)return null;
+    const r2=v=>Math.round(v*100)/100;
+    return{de:localDateStr(aDe),ate:localDateStr(aAte),obs:'só números do Meta dos mesmos anúncios',gasto:r2(o.gasto),impressoes:o.imp,ctr_pct:o.imp?r2(o.cli/o.imp*100):null,cpm:o.imp?r2(o.gasto/o.imp*1000):null,conversas:o.conv,custo_por_conversa:o.conv?r2(o.gasto/o.conv):null,visitas_perfil:o.vis||null};
+  }catch(e){return null;}
 }
 function _tpMd(md){
   const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -6631,8 +6697,10 @@ async function _tpIaAbrir(id){try{const a=(await _waRest('analises_ia?id=eq.'+id
 async function tpAnalisarIA(){
   if(!_waEhGestao()){showToast('error','Só a gestão','A análise com IA é liberada para a gestão.');return;}
   if(window._trafegoPronto===false||!window._lastAdMap){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
+  try{await _tpMetaCarregar();}catch(e){}
   const pacote=_tpDadosParaIA();
   if(!pacote.dados.por_anuncio.length){showToast('error','Sem dados','Não há anúncios no período escolhido.');return;}
+  pacote.dados.periodo_anterior_meta=await _tpPeriodoAnterior(pacote);
   const box=document.getElementById('tp-ia');box.style.display='block';
   box.innerHTML='<div class="tpia-carregando"><div class="spinner"></div><div>O especialista está analisando '+pacote.dados.por_anuncio.length+' anúncios de '+new Date(pacote.de+'T12:00').toLocaleDateString('pt-BR')+' a '+new Date(pacote.ate+'T12:00').toLocaleDateString('pt-BR')+'…<br><span class="tpia-meta">Leva de 30 segundos a 2 minutos.</span></div></div>';
   box.scrollIntoView({behavior:'smooth',block:'start'});
@@ -6644,8 +6712,123 @@ async function tpAnalisarIA(){
   }
 }
 // ===== FILTER AD TABLE =====
+// ===== TRÁFEGO PAGO: visão (01/11/2026) =====
+// Tipo de campanha (mensagem × perfil × cadastro), "só ativos", chave de custos e
+// ordenação por coluna. Status e objetivo vêm do Meta (tabela meta_estrutura, função
+// meta-sync); sem ela, o tipo sai pelo padrão do nome e "ativo" = teve gasto no período.
+const TPV_TIPOS=[['todos','Todos'],['mensagem','Mensagem'],['perfil','Perfil'],['cadastro','Cadastro'],['outro','Outros']];
+const _tpv=(()=>{let v={};try{v=JSON.parse(localStorage.getItem('tp_visao')||'{}')||{};}catch(e){}
+  return{tipo:v.tipo||'todos',ativos:v.ativos===true,custos:v.custos!==false,ord:v.ord||{k:'spend',dir:-1}};})();
+function _tpvSalvar(){try{localStorage.setItem('tp_visao',JSON.stringify(_tpv));}catch(e){}}
+function tpvMudar(k,v){
+  _tpv[k]=v;
+  if(k==='tipo'){_tpv.ord={k:'spend',dir:-1};const c=document.getElementById('ad-filter-campaign'),a=document.getElementById('ad-filter-adset');if(c)c.value='';if(a)a.value='';}
+  _tpvSalvar();filterAdTable();
+}
+function tpvOrdenar(k){
+  if(_tpv.ord.k===k)_tpv.ord.dir=-_tpv.ord.dir;
+  else _tpv.ord={k,dir:/^(anuncio|conjunto|campanha)$/.test(k)?1:-1};
+  _tpvSalvar();filterAdTable();
+}
+function _tpvAplicarCustos(){
+  document.body.classList.toggle('tp-sem-custos',!_tpv.custos);
+  ['t-spend','t-cpl','ad-kpi-cac','ad-kpi-semperf','t-roas-geral'].forEach(id=>{const e=document.getElementById(id);const c=e&&e.closest('.mc');if(c)c.classList.add('tp-c');});
+  const ck=document.getElementById('tpv-custos');if(ck)ck.checked=_tpv.custos;
+  const ca=document.getElementById('tpv-ativos');if(ca)ca.checked=_tpv.ativos;
+}
+
+// ---- dados do Meta na Supabase ----
+const _tpMeta={estrutura:null,carregandoEst:false,ins:null,insChave:'',carregandoIns:false};
+async function _tpMetaCarregar(){
+  if(typeof _waRest!=='function')return;
+  let mudou=false;
+  if(!_tpMeta.estrutura&&!_tpMeta.carregandoEst){
+    _tpMeta.carregandoEst=true;
+    try{const l=await _waRest('meta_estrutura?select=ad_id,ad_status_efetivo,adset_status_efetivo,campaign_status_efetivo,objetivo,destino,otimizacao,tipo,ad_criado_em,criativo_tipo,criativo_texto,orcamento_dia_conjunto,orcamento_dia_campanha&limit=5000');
+      _tpMeta.estrutura=new Map((l||[]).map(x=>[String(x.ad_id),x]));mudou=true;}
+    catch(e){_tpMeta.estrutura=new Map();}
+    _tpMeta.carregandoEst=false;
+  }
+  let rg=null;try{rg=getRange('trafego');}catch(e){}
+  const chave=rg?rg.since+'|'+rg.until:'';
+  if(rg&&_tpMeta.insChave!==chave&&!_tpMeta.carregandoIns&&_tpMeta.estrutura&&_tpMeta.estrutura.size){
+    _tpMeta.carregandoIns=true;
+    try{
+      let out=[],de=0;
+      for(;;){const r=await _waRest('meta_insights_dia?select=dia,ad_id,gasto,impressoes,alcance,cliques,cliques_link,conversas,visitas_perfil,leads_formulario,video_3s,thruplays,video_100&dia=gte.'+rg.since+'&dia=lte.'+rg.until+'&order=dia&limit=1000&offset='+de);
+        out=out.concat(r||[]);if(!r||r.length<1000)break;de+=1000;}
+      const ag={};
+      out.forEach(x=>{const o=ag[x.ad_id]||(ag[x.ad_id]={gasto:0,imp:0,alc:0,cli:0,link:0,conv:0,vis:0,lf:0,v3:0,thru:0,v100:0,dias:0});
+        o.gasto+=+x.gasto||0;o.imp+=+x.impressoes||0;o.alc+=+x.alcance||0;o.cli+=+x.cliques||0;o.link+=+x.cliques_link||0;o.conv+=+x.conversas||0;o.vis+=+x.visitas_perfil||0;o.lf+=+x.leads_formulario||0;o.v3+=+x.video_3s||0;o.thru+=+x.thruplays||0;o.v100+=+x.video_100||0;o.dias++;});
+      _tpMeta.ins=ag;_tpMeta.insDias=out;_tpMeta.insChave=chave;mudou=true;
+    }catch(e){_tpMeta.ins=null;_tpMeta.insChave=chave;}
+    _tpMeta.carregandoIns=false;
+  }
+  if(mudou&&window._lastAdMap)filterAdTable();
+}
+function _tpTipoNome(nome){
+  const n=String(nome||'').toUpperCase();
+  if(/WPP|WHATS|MENSAG|DIRECT/.test(n))return'mensagem';
+  if(/TRAFEGO|TRÁFEGO|PERFIL|SEGUID|TOPO BIO|VISITA/.test(n))return'perfil';
+  if(/LEAD|FORM|CADASTRO/.test(n))return'cadastro';
+  return'outro';
+}
+function _tpTipo(id,d){
+  if(id==='__sem_rastreio__')return'mensagem';
+  const e=_tpMeta.estrutura&&_tpMeta.estrutura.get(String(id));
+  return(e&&e.tipo)||_tpTipoNome(d&&d.campaign);
+}
+/** true = rodando agora. Sem o status do Meta: teve gasto no período. */
+function _tpAtivo(id,d){
+  if(id==='__sem_rastreio__')return true;
+  const e=_tpMeta.estrutura&&_tpMeta.estrutura.get(String(id));
+  if(e)return e.ad_status_efetivo==='ACTIVE';
+  return(d.spend||0)>0;
+}
+function _tpTemStatus(){return!!(_tpMeta.estrutura&&_tpMeta.estrutura.size);}
+/** Linhas do Funil por anúncio com todos os filtros da tela (tipo, ativos, campanha, conjunto, buscas). */
+function _tpLinhasVisiveis(semCampConj){
+  const adMap=window._lastAdMap||{};
+  let rows=Object.entries(adMap);
+  rows=rows.filter(([k,d])=>(_tpv.tipo==='todos'||_tpTipo(k,d)===_tpv.tipo)&&(!_tpv.ativos||_tpAtivo(k,d)));
+  if(semCampConj)return rows;
+  const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
+  const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
+  if(campFilt)rows=rows.filter(([,d])=>d.campaign===campFilt);
+  if(adsetFilt)rows=rows.filter(([,d])=>d.adset===adsetFilt);
+  ['tp-ad','tp-camp'].forEach(id=>{const e=document.getElementById(id);if(e&&e.value.includes('@'))e.value='';});
+  const qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
+  const qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
+  if(qAd)rows=rows.filter(([k,d])=>String(k).toLowerCase().includes(qAd)||String(d.label||'').toLowerCase().includes(qAd));
+  if(qCamp)rows=rows.filter(([,d])=>String(d.campaign||'').toLowerCase().includes(qCamp));
+  return rows;
+}
+function _tpvBarra(){
+  const adMap=window._lastAdMap||{};
+  const todas=Object.entries(adMap).filter(([k,d])=>!_tpv.ativos||_tpAtivo(k,d));
+  const cont={};todas.forEach(([k,d])=>{const t=_tpTipo(k,d);cont[t]=(cont[t]||0)+(k==='__sem_rastreio__'?0:1);});
+  const tot=todas.filter(([k])=>k!=='__sem_rastreio__').length;
+  const seg=document.getElementById('tpv-tipo');
+  if(seg)seg.innerHTML=TPV_TIPOS.filter(([k])=>k==='todos'||k==='mensagem'||k==='perfil'||cont[k]).map(([k,n])=>'<button class="'+(_tpv.tipo===k?'on':'')+'" onclick="tpvMudar(\'tipo\',\''+k+'\')">'+n+'<small>'+(k==='todos'?tot:(cont[k]||0))+'</small></button>').join('');
+  // listas de campanha e conjunto só com o que sobra depois do tipo e do "só ativos"
+  const base=_tpLinhasVisiveis(true).filter(([k])=>k!=='__sem_rastreio__');
+  const campSel=document.getElementById('ad-filter-campaign'),adsetSel=document.getElementById('ad-filter-adset');
+  const esc=v=>String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  if(campSel){const prev=campSel.value;const cs=[...new Set(base.map(([,d])=>d.campaign||'').filter(Boolean))].sort();
+    campSel.innerHTML='<option value="">Todas as campanhas ('+cs.length+')</option>'+cs.map(c=>'<option value="'+esc(c)+'"'+(c===prev?' selected':'')+'>'+esc(c)+'</option>').join('');
+    if(prev&&!cs.includes(prev))campSel.value='';}
+  if(adsetSel){const prev=adsetSel.value;const cSel=campSel?campSel.value:'';
+    const as=[...new Set(base.filter(([,d])=>!cSel||d.campaign===cSel).map(([,d])=>d.adset||'').filter(Boolean))].sort();
+    adsetSel.innerHTML='<option value="">Todos os conjuntos ('+as.length+')</option>'+as.map(a=>'<option value="'+esc(a)+'"'+(a===prev?' selected':'')+'>'+esc(a)+'</option>').join('');
+    if(prev&&!as.includes(prev))adsetSel.value='';}
+  const info=document.getElementById('tpv-info');
+  if(info)info.textContent=_tpTemStatus()?'status do Meta':(_tpv.ativos?'"ativo" = teve gasto no período (status real do Meta ainda não conectado)':'');
+}
+
 function filterAdTable(){
   const adMap=window._lastAdMap;if(!adMap)return;
+  _tpvAplicarCustos();
+  _tpMetaCarregar();
   // Enquanto o Clinicorp (agenda + vendas reais) não respondeu, NÃO mostra número
   // provisório — evita o valor "pular" de um número para outro.
   if(window._trafegoPronto===false){
@@ -6655,17 +6838,8 @@ function filterAdTable(){
     if(tb)tb.innerHTML='<tr><td colspan="16" class="empty-state">⏳ Carregando dados finais do Clinicorp… (os números aparecem só quando estiverem completos)</td></tr>';
     return;
   }
-  const campFilt=(document.getElementById('ad-filter-campaign')||{}).value||'';
-  const adsetFilt=(document.getElementById('ad-filter-adset')||{}).value||'';
-  let adRows=Object.entries(adMap).sort((a,b)=>(b[1].leads||0)-(a[1].leads||0)||(b[1].spend||0)-(a[1].spend||0));
-  if(campFilt)adRows=adRows.filter(([,d])=>d.campaign===campFilt);
-  if(adsetFilt)adRows=adRows.filter(([,d])=>d.adset===adsetFilt);
-  // o Chrome às vezes preenche esses campos com o e-mail do login e a tabela some
-  ['tp-ad','tp-camp'].forEach(id=>{const e=document.getElementById(id);if(e&&e.value.includes('@'))e.value='';});
-  const _qAd=((document.getElementById('tp-ad')||{}).value||'').trim().toLowerCase();
-  const _qCamp=((document.getElementById('tp-camp')||{}).value||'').trim().toLowerCase();
-  if(_qAd)adRows=adRows.filter(([k,d])=>String(k).toLowerCase().includes(_qAd)||String(d.label||'').toLowerCase().includes(_qAd));
-  if(_qCamp)adRows=adRows.filter(([,d])=>String(d.campaign||'').toLowerCase().includes(_qCamp));
+  _tpvBarra();
+  let adRows=_tpLinhasVisiveis(false);
   const totSpend=adRows.reduce((s,[,d])=>s+(d.spend||0),0);
   const totLeads=adRows.reduce((s,[,d])=>s+(d.leads||0),0);
   const totAgend=adRows.reduce((s,[,d])=>s+(d.agend||0),0);
@@ -6685,16 +6859,15 @@ function filterAdTable(){
       +(aud.recompras?`<br>Fora dos contratos e do ROAS: ${aud.recompras} recompra(s) de pacientes antigos que vieram de anúncio (${fmt(aud.vendasRecompra||0)}, manutenção, ajuste etc.)`:'');
   }
   const totCpl=totLeads>0?totSpend/totLeads:0;
-  const totCpa=totAgend>0?totSpend/totAgend:0;
-  const totCpcomp=totComp>0?totSpend/totComp:0;
   const totCpc=totFechou>0?totSpend/totFechou:0;
-  const totTicket=totFechou>0?totVendas/totFechou:0;
   const totRoas=totSpend>0?totVendas/totSpend:0;
-  const totConv=totLeads>0?totFechou/totLeads*100:0;
   atualizarCardRoasGeral(totRoas,totVendas,totSpend,((adRows.find(([k])=>k==='__sem_rastreio__')||[])[1]||{}).vendas||0);
 
   // Cards de topo
   const _setTxt=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  // com algum filtro de visão, o gasto do topo acompanha a tabela; sem filtro fica o total do Meta
+  const _filtroVis=_tpv.tipo!=='todos'||_tpv.ativos||['ad-filter-campaign','ad-filter-adset','tp-ad','tp-camp'].some(id=>((document.getElementById(id)||{}).value||'').trim());
+  if(_filtroVis)_setTxt('t-spend',fmt(totSpend));else if(window._tpSpendTotal!=null)_setTxt('t-spend',fmt(window._tpSpendTotal));
   _setTxt('ad-kpi-leads',totLeads?fmtN(totLeads):'—');
   _setTxt('t-leads-sub',totLeads?'leads de anúncios no período':'sem leads de anúncio');
   _setTxt('t-cpl',totLeads>0&&totSpend>0?fmt(totCpl):'—');
@@ -6709,61 +6882,87 @@ function filterAdTable(){
   _setTxt('ad-kpi-semperf',semPerf.length?fmt(gastoSemPerf):'R$ 0');
   _setTxt('ad-kpi-semperf-sub',semPerf.length+' anúncio(s) com leads e 0 contratos (contrato pode demorar a fechar)'+(totSpend>0?' · '+(gastoSemPerf/totSpend*100).toFixed(0)+'% do gasto':''));
 
-  // Ordena: maior gasto primeiro, "sem rastreamento" por último
+  const pctF=v=>v.toFixed(2).replace('.',',')+'%';
+  const xF=v=>v.toFixed(2).replace('.',',')+'x';
+  const nF=v=>Number(v||0).toLocaleString('pt-BR');
+  const esc=v=>String(v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const lupa=(fn,name,tit)=>' <button class="lupa" onclick="'+fn+'(\''+name+'\')"'+(tit?' title="'+tit+'"':'')+'>🔍</button>';
+  // dados do Meta por anúncio (Supabase; senão, impressões e cliques do Apps Script)
+  const metaAs={};(typeof _lastMetaAds!=='undefined'?_lastMetaAds:[]).forEach(a=>{const id=String(a.ad_id||'');if(!id)return;const o=metaAs[id]||(metaAs[id]={imp:0,cli:0});o.imp+=Number(a.impressions||0);o.cli+=Number(a.clicks||0);});
+  const mi=k=>(_tpMeta.ins&&_tpMeta.ins[k])||null;
+  const imp=k=>{const m=mi(k);return m?m.imp:(metaAs[k]?metaAs[k].imp:0);};
+  const cli=k=>{const m=mi(k);return m?(m.link||m.cli):(metaAs[k]?metaAs[k].cli:0);};
+  const dot=k=>{if(k==='__sem_rastreio__'||!_tpTemStatus())return'';const e=_tpMeta.estrutura.get(String(k));if(!e)return'<span class="tpv-dot" title="sem status"></span>';
+    const st=e.ad_status_efetivo||'';return'<span class="tpv-dot'+(st==='ACTIVE'?' ativo':(/DISAPPROVED|WITH_ISSUES/.test(st)?' erro':''))+'" title="'+esc(st)+'"></span>';};
+  const cplVals=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&d.leads>0&&d.spend>0).map(([,d])=>d.spend/d.leads).sort((a,b)=>a-b);
+  const medCpl=cplVals.length?cplVals[Math.floor(cplVals.length/2)]:0;
+  const cplBg=c=>!c||!medCpl?'':(c<=medCpl?'background:rgba(95,196,138,.16);color:#9BE3B5;':(c>medCpl*1.5?'background:rgba(224,103,90,.16);color:#EAADA4;':''));
+  const R='text-align:right';
+  // colunas: k (ordenação), t (título), c (é custo), v (valor para ordenar), h (célula), tot (total)
+  let cols;
+  if(_tpv.tipo==='perfil'){
+    const vis=k=>{const m=mi(k);return m?m.vis:null;};
+    const tImp=adRows.reduce((s,[k])=>s+imp(k),0),tCli=adRows.reduce((s,[k])=>s+cli(k),0);
+    const tVis=adRows.reduce((s,[k])=>s+(vis(k)||0),0),tV3=adRows.reduce((s,[k])=>s+((mi(k)||{}).v3||0),0);
+    cols=[
+      {k:'anuncio',t:'Anúncio',v:(k,d)=>String(d.label||k).toLowerCase(),h:(k,d)=>{const l=d.label||k;return dot(k)+'<span class="pill" title="'+esc(l)+'">'+esc(l.substring(0,28))+(l.length>28?'...':'')+'</span>';},tot:()=>'TOTAL / MÉDIA'},
+      {k:'conjunto',t:'Conjunto',v:(k,d)=>String(d.adset||'').toLowerCase(),h:(k,d)=>'<span class="tm" title="'+esc(d.adset)+'">'+esc((d.adset||'').substring(0,22))+'</span>',tot:()=>''},
+      {k:'campanha',t:'Campanha',v:(k,d)=>String(d.campaign||'').toLowerCase(),h:(k,d)=>'<span class="tm" title="'+esc(d.campaign)+'">'+esc((d.campaign||'').substring(0,22))+'</span>',tot:()=>''},
+      {k:'spend',t:'Valor gasto',c:1,v:(k,d)=>d.spend||0,h:(k,d)=>fmtK(d.spend||0),tot:()=>fmtK(totSpend)},
+      {k:'imp',t:'Impressões',v:k=>imp(k),h:k=>imp(k)?nF(imp(k)):'—',tot:()=>tImp?nF(tImp):'—'},
+      {k:'cpm',t:'CPM',c:1,v:(k,d)=>imp(k)?d.spend/imp(k)*1000:Infinity,h:(k,d)=>imp(k)?fmt(d.spend/imp(k)*1000):'—',tot:()=>tImp?fmt(totSpend/tImp*1000):'—'},
+      {k:'cli',t:'Cliques',v:k=>cli(k),h:k=>cli(k)?nF(cli(k)):'—',tot:()=>tCli?nF(tCli):'—'},
+      {k:'ctr',t:'CTR',v:k=>imp(k)?cli(k)/imp(k):-1,h:k=>imp(k)?pctF(cli(k)/imp(k)*100):'—',tot:()=>tImp?pctF(tCli/tImp*100):'—'},
+      {k:'cpc',t:'Custo/clique',c:1,v:(k,d)=>cli(k)?d.spend/cli(k):Infinity,h:(k,d)=>cli(k)?fmt(d.spend/cli(k)):'—',tot:()=>tCli?fmt(totSpend/tCli):'—'},
+      {k:'vis',t:'Visitas ao perfil',v:k=>vis(k)||0,h:k=>vis(k)!=null?nF(vis(k)):'—',tot:()=>_tpMeta.ins?nF(tVis):'—'},
+      {k:'cvis',t:'Custo/visita',c:1,v:(k,d)=>vis(k)?d.spend/vis(k):Infinity,h:(k,d)=>vis(k)?fmt(d.spend/vis(k)):'—',tot:()=>tVis?fmt(totSpend/tVis):'—'},
+      {k:'hook',t:'Retenção 3s',v:k=>{const m=mi(k);return m&&m.imp?m.v3/m.imp:-1;},h:k=>{const m=mi(k);return m&&m.imp&&m.v3?pctF(m.v3/m.imp*100):'—';},tot:()=>tImp&&tV3?pctF(tV3/tImp*100):'—'},
+      {k:'leads',t:'Leads',v:(k,d)=>d.leads||0,h:(k,d)=>d.leads>0?d.leads+lupa('lupaAdLeads',k):'—',tot:()=>totLeads||'—'},
+    ];
+  }else{
+    const tTicket=totFechou>0?totVendas/totFechou:0,tConv=totLeads>0?totFechou/totLeads*100:0;
+    cols=[
+      {k:'anuncio',t:'Anúncio',v:(k,d)=>String(d.label||k).toLowerCase(),h:(k,d)=>{const l=d.label||k;return dot(k)+'<span class="pill" title="'+esc(l)+'">'+esc(l.substring(0,28))+(l.length>28?'...':'')+'</span>';},tot:()=>'TOTAL / MÉDIA'},
+      {k:'conjunto',t:'Conjunto',v:(k,d)=>String(d.adset||'').toLowerCase(),h:(k,d)=>'<span class="tm" title="'+esc(d.adset)+'">'+esc((d.adset||'').substring(0,22))+'</span>',tot:()=>''},
+      {k:'campanha',t:'Campanha',v:(k,d)=>String(d.campaign||'').toLowerCase(),h:(k,d)=>'<span class="tm" title="'+esc(d.campaign)+'">'+esc((d.campaign||'').substring(0,22))+'</span>',tot:()=>''},
+      {k:'spend',t:'Valor gasto',c:1,v:(k,d)=>d.spend||0,h:(k,d)=>fmtK(d.spend||0),tot:()=>fmtK(totSpend)},
+      {k:'leads',t:'Leads',v:(k,d)=>d.leads||0,h:(k,d)=>d.leads>0?d.leads+lupa('lupaAdLeads',k):'—',tot:()=>totLeads||'—'},
+      {k:'cpl',t:'CPL',c:1,v:(k,d)=>d.leads>0?d.spend/d.leads:Infinity,h:(k,d)=>d.leads>0?fmt(d.spend/d.leads):'—',st:(k,d)=>cplBg(d.leads>0?d.spend/d.leads:0),tot:()=>totLeads>0?fmt(totCpl):'—'},
+      {k:'agend',t:'Agend.',v:(k,d)=>d.agend||0,h:(k,d)=>d.agend>0?d.agend+lupa('lupaAdAgend',k):'—',tot:()=>totAgend||'—'},
+      {k:'cpa',t:'C/agend.',c:1,v:(k,d)=>d.agend>0?d.spend/d.agend:Infinity,h:(k,d)=>d.agend>0?fmt(d.spend/d.agend):'—',tot:()=>totAgend>0?fmt(totSpend/totAgend):'—'},
+      {k:'comp',t:'Compareceu',v:(k,d)=>d.comp||0,h:(k,d)=>d.comp>0?d.comp+lupa('lupaAdComp',k,'Ver comparecimentos'):'—',tot:()=>totComp||'—'},
+      {k:'cpcomp',t:'C/comp.',c:1,v:(k,d)=>d.comp>0?d.spend/d.comp:Infinity,h:(k,d)=>d.comp>0?fmt(d.spend/d.comp):'—',tot:()=>totComp>0?fmt(totSpend/totComp):'—'},
+      {k:'fechou',t:'Contratos',cl:'tg',v:(k,d)=>d.fechou||0,h:(k,d)=>d.fechou>0?d.fechou+lupa('lupaAdFechou',k,'Ver fechamentos'):'0',tot:()=>totFechou||'—'},
+      {k:'cac',t:'CAC',c:1,v:(k,d)=>d.fechou>0?d.spend/d.fechou:Infinity,h:(k,d)=>d.fechou>0?fmt(d.spend/d.fechou):'—',tot:()=>totFechou>0?fmt(totCpc):'—'},
+      {k:'vendas',t:'Valor contratos',cl:'tg',v:(k,d)=>d.vendas||0,h:(k,d)=>d.vendas>0?fmtK(d.vendas)+lupa('lupaAdVendas',k,'Ver vendas'):'—',tot:()=>totVendas>0?fmtK(totVendas):'—'},
+      {k:'ticket',t:'Ticket',cl:'tg',v:(k,d)=>d.fechou>0?d.vendas/d.fechou:0,h:(k,d)=>d.fechou>0?fmt(d.vendas/d.fechou):'—',tot:()=>tTicket>0?fmt(tTicket):'—'},
+      {k:'roas',t:'ROAS',c:1,cl:'tg',v:(k,d)=>d.spend>0?d.vendas/d.spend:-1,h:(k,d)=>d.spend>0?xF(d.vendas/d.spend):'—',tot:()=>totSpend>0?xF(totRoas):'—'},
+      {k:'conv',t:'Conversão',cl:'tg',v:(k,d)=>d.leads>0?d.fechou/d.leads:-1,h:(k,d)=>d.leads>0?pctF(d.fechou/d.leads*100):'—',tot:()=>totLeads>0?pctF(tConv):'—'},
+    ];
+  }
+  // ordenação (o "sem anúncio identificado" fica sempre por último)
+  let ord=cols.find(c=>c.k===_tpv.ord.k)||cols.find(c=>c.k==='spend');
+  if(ord.c&&!_tpv.custos)ord=cols.find(c=>c.k==='leads')||cols[0];
+  const dir=ord.k===_tpv.ord.k?_tpv.ord.dir:-1;
   adRows.sort((a,b)=>{
     if(a[0]==='__sem_rastreio__')return 1;
     if(b[0]==='__sem_rastreio__')return -1;
-    return (b[1].spend||0)-(a[1].spend||0)||(b[1].leads||0)-(a[1].leads||0);
+    const va=ord.v(a[0],a[1]),vb=ord.v(b[0],b[1]);
+    // "sem valor" (—) vai para o fim nos dois sentidos
+    const na=va===Infinity||va===-1,nb=vb===Infinity||vb===-1;
+    if(na!==nb)return na?1:-1;
+    if(typeof va==='string')return dir*va.localeCompare(vb,'pt-BR');
+    return dir*((va||0)-(vb||0))||(b[1].spend||0)-(a[1].spend||0);
   });
-  // CPL: verde = bom (<= mediana), vermelho = ruim (> 1,5x mediana)
-  const cpls=adRows.filter(([k,d])=>k!=='__sem_rastreio__'&&d.leads>0&&d.spend>0).map(([,d])=>d.spend/d.leads).sort((a,b)=>a-b);
-  const medCpl=cpls.length?cpls[Math.floor(cpls.length/2)]:0;
-  const cplBg=(c)=>!c||!medCpl?'':(c<=medCpl?'background:rgba(95,196,138,.16);color:#9BE3B5;':(c>medCpl*1.5?'background:rgba(224,103,90,.16);color:#EAADA4;':''));
-  const pctF=v=>v.toFixed(2).replace('.',',')+'%';
-
-  const totalRow=`<tr style="font-weight:700;background:#12213F;border-top:2px solid #2A3D66;">
-    <td colspan="3" style="font-size:12px;color:#EEF1F7;">TOTAL / MÉDIA</td>
-    <td style="text-align:right" class="ta">${fmtK(totSpend)}</td>
-    <td style="text-align:right">${totLeads||'—'}</td>
-    <td style="text-align:right" class="ta">${totLeads>0?fmt(totCpl):'—'}</td>
-    <td style="text-align:right">${totAgend||'—'}</td>
-    <td style="text-align:right" class="ta">${totAgend>0?fmt(totCpa):'—'}</td>
-    <td style="text-align:right">${totComp||'—'}</td>
-    <td style="text-align:right" class="ta">${totComp>0?fmt(totCpcomp):'—'}</td>
-    <td style="text-align:right" class="tg">${totFechou||'—'}</td>
-    <td style="text-align:right" class="ta">${totFechou>0?fmt(totCpc):'—'}</td>
-    <td style="text-align:right" class="tg">${totVendas>0?fmtK(totVendas):'—'}</td>
-    <td style="text-align:right" class="tg">${totTicket>0?fmt(totTicket):'—'}</td>
-    <td style="text-align:right" class="tg">${totSpend>0?totRoas.toFixed(2).replace('.',',')+'x':'—'}</td>
-    <td style="text-align:right" class="tg">${totLeads>0?pctF(totConv):'—'}</td>
-  </tr>`;
-  document.getElementById('t-ads-tbody').innerHTML=adRows.length>0?totalRow+adRows.map(([name,d])=>{
-    const adCpl=d.leads>0?d.spend/d.leads:0,adCpa=d.agend>0?d.spend/d.agend:0;
-    const adCpcomp=d.comp>0?d.spend/d.comp:0,adCpc=d.fechou>0?d.spend/d.fechou:0;
-    const adTicket=d.fechou>0?d.vendas/d.fechou:0;
-    const adRoas=d.spend>0?d.vendas/d.spend:0;
-    const adConv=d.leads>0?d.fechou/d.leads*100:0;
-    const lbl=(d.label||name);
-    const semDesemp=name!=='__sem_rastreio__'&&d.spend>0&&!(d.fechou>0)&&!(d.vendas>0);
-    return`<tr${semDesemp?' class="linha-sem-desempenho"':''}>
-      <td><span class="pill" title="${lbl.replace(/"/g,'&quot;')}">${lbl.substring(0,28)}${lbl.length>28?'...':''}</span></td>
-      <td class="tm" title="${(d.adset||'').replace(/"/g,'&quot;')}">${(d.adset||'').substring(0,22)}</td>
-      <td class="tm" title="${(d.campaign||'').replace(/"/g,'&quot;')}">${(d.campaign||'').substring(0,22)}</td>
-      <td style="text-align:right" class="ta">${fmtK(d.spend)}</td>
-      <td style="text-align:right">${d.leads>0?d.leads+' <button class="lupa" onclick="lupaAdLeads(\''+name+'\')">🔍</button>':'—'}</td>
-      <td style="text-align:right;${cplBg(adCpl)}" class="ta">${d.leads>0?fmt(adCpl):'—'}</td>
-      <td style="text-align:right">${d.agend>0?d.agend+' <button class="lupa" onclick="lupaAdAgend(\''+name+'\')">🔍</button>':'—'}</td>
-      <td style="text-align:right" class="ta">${d.agend>0?fmt(adCpa):'—'}</td>
-      <td style="text-align:right">${d.comp>0?d.comp+' <button class="lupa" onclick="lupaAdComp(\''+name+'\')" title="Ver comparecimentos">🔍</button>':'—'}</td>
-      <td style="text-align:right" class="ta">${d.comp>0?fmt(adCpcomp):'—'}</td>
-      <td style="text-align:right" class="tg">${d.fechou>0?d.fechou+' <button class="lupa" onclick="lupaAdFechou(\''+name+'\')" title="Ver fechamentos">🔍</button>':'0'}</td>
-      <td style="text-align:right" class="ta">${d.fechou>0?fmt(adCpc):'—'}</td>
-      <td style="text-align:right" class="tg">${d.vendas>0?fmtK(d.vendas)+' <button class="lupa" onclick="lupaAdVendas(\''+name+'\')" title="Ver vendas">🔍</button>':'—'}</td>
-      <td style="text-align:right" class="tg">${adTicket>0?fmt(adTicket):'—'}</td>
-      <td style="text-align:right" class="tg">${d.spend>0?adRoas.toFixed(2).replace('.',',')+'x':'—'}</td>
-      <td style="text-align:right" class="tg">${d.leads>0?pctF(adConv):'—'}</td>
-    </tr>`;
-  }).join(''):'<tr><td colspan="16" class="empty-state">Nenhum anúncio encontrado</td></tr>';
+  const thead=document.getElementById('t-ads-thead');
+  if(thead)thead.innerHTML='<tr>'+cols.map((c,i)=>'<th class="tpv-ord'+(c.c?' tp-c':'')+'" style="'+(i>2?R:'')+'" onclick="tpvOrdenar(\''+c.k+'\')" title="Ordenar por '+c.t+'">'+c.t+(c.k===ord.k?'<span class="tpv-seta">'+(dir<0?'▼':'▲')+'</span>':'')+'</th>').join('')+'</tr>';
+  const clsCel=(c,i)=>(c.c?'tp-c ':'')+(c.cl||(c.c?'ta':(i<3?'':'')));
+  const totalRow='<tr style="font-weight:700;background:#12213F;border-top:2px solid #2A3D66;">'+cols.map((c,i)=>'<td class="'+clsCel(c,i)+'" style="'+(i>2?R:'font-size:12px;color:#EEF1F7;')+'">'+c.tot()+'</td>').join('')+'</tr>';
+  const tb=document.getElementById('t-ads-tbody');
+  tb.innerHTML=adRows.length>0?totalRow+adRows.map(([name,d])=>{
+    const semDesemp=_tpv.tipo!=='perfil'&&name!=='__sem_rastreio__'&&d.spend>0&&!(d.fechou>0)&&!(d.vendas>0);
+    return'<tr'+(semDesemp?' class="linha-sem-desempenho"':'')+'>'+cols.map((c,i)=>'<td class="'+clsCel(c,i)+'" style="'+(i>2?R+';':'')+(c.st?c.st(name,d):'')+'">'+c.h(name,d)+'</td>').join('')+'</tr>';
+  }).join(''):'<tr><td colspan="'+cols.length+'" class="empty-state">Nenhum anúncio encontrado'+(_tpv.ativos?' (o filtro "Só ativos" está ligado)':'')+'</td></tr>';
 }
 
 // ===== SOCIAL SELLING =====
