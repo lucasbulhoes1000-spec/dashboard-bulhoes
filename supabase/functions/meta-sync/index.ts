@@ -104,6 +104,7 @@ export function tipoCampanha(x: { objetivo?: string | null; destino?: string | n
   if (/WHATSAPP|MESSENGER|INSTAGRAM_DIRECT|MESSAG/.test(dest) || /CONVERSATIONS|REPLIES/.test(ot) || obj === "MESSAGES") return "mensagem";
   if (/INSTAGRAM_PROFILE|PROFILE/.test(dest) || /PROFILE_VISIT/.test(ot)) return "perfil";
   if (obj === "OUTCOME_LEADS" || obj === "LEAD_GENERATION" || /LEAD/.test(ot) || dest === "ON_AD") return "cadastro";
+  if (dest === "WEBSITE" || obj === "OUTCOME_SALES" || obj === "CONVERSIONS") return "outro";
   if (obj === "OUTCOME_TRAFFIC" || obj === "LINK_CLICKS" || obj === "OUTCOME_AWARENESS") return "perfil";
   // sem dado do Meta: pelo padrão de nomes da clínica
   if (/WPP|WHATS|MENSAG|DIRECT/.test(nome)) return "mensagem";
