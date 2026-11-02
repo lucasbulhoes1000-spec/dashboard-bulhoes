@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-205852">
+<meta name="lume-versao" content="20261101-210421">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -6627,7 +6627,9 @@ function _tpDadosParaIA(){
     .sort((a,b)=>b.gasto-a.gasto||b.leads-a.leads).slice(0,150);
   const soma=k=>anuncios.reduce((s,x)=>s+(Number(x[k])||0),0);
   const tot={gasto:r2(soma('gasto')),leads:soma('leads'),agendamentos:soma('agendamentos'),comparecimentos:soma('comparecimentos'),fechamentos_novos:soma('fechamentos_novos'),vendas_rs:r2(soma('vendas_rs'))};
-  tot.cpl=div(tot.gasto,tot.leads);tot.custo_venda=div(tot.gasto,tot.fechamentos_novos);tot.roas=div(tot.vendas_rs,tot.gasto);
+  // CPL só com o gasto das campanhas que geram lead (mensagem e cadastro); CAC e ROAS com o gasto total
+  tot.gasto_campanhas_de_lead=r2(anuncios.filter(a=>['mensagem','cadastro'].includes(a.tipo_campanha)).reduce((s,a)=>s+(a.gasto||0),0));
+  tot.cpl=div(tot.gasto_campanhas_de_lead,tot.leads);tot.custo_venda=div(tot.gasto,tot.fechamentos_novos);tot.roas=div(tot.vendas_rs,tot.gasto);
   tot.taxa_agendamento_pct=tot.leads?r2(tot.agendamentos/tot.leads*100):null;tot.taxa_comparecimento_pct=tot.agendamentos?r2(tot.comparecimentos/tot.agendamentos*100):null;tot.taxa_fechamento_pct=tot.comparecimentos?r2(tot.fechamentos_novos/tot.comparecimentos*100):null;
   const camp={};anuncios.forEach(a=>{const c=camp[a.campanha||'(sem campanha)']||(camp[a.campanha||'(sem campanha)']={campanha:a.campanha||'(sem campanha)',tipo_campanha:a.tipo_campanha,objetivo:a.objetivo,gasto:0,leads:0,agendamentos:0,comparecimentos:0,fechamentos_novos:0,vendas_rs:0,anuncios:0,anuncios_ativos:0});
     c.gasto+=a.gasto;c.leads+=a.leads;c.agendamentos+=a.agendamentos;c.comparecimentos+=a.comparecimentos;c.fechamentos_novos+=a.fechamentos_novos;c.vendas_rs+=a.vendas_rs;c.anuncios++;if(a.status==='ACTIVE')c.anuncios_ativos++;});
@@ -6651,6 +6653,7 @@ function _tpDadosParaIA(){
     dados:{periodo:{de:rg.since,ate:rg.until,dias},
       como_ler:['Leads, agendamentos, comparecimentos e fechamentos vêm do CRM ligados ao anúncio de origem do lead.','fechamentos_novos e vendas_rs contam só pacientes novos (sem recompras), com valor real do Clinicorp.','Gasto, impressões, cliques, conversas, visitas ao perfil e vídeo vêm do Meta Ads.',
         'tipo_campanha: mensagem (anúncio que leva ao WhatsApp/direct), perfil (tráfego para o perfil do Instagram), cadastro (formulário). Cada tipo tem objetivo diferente.',
+        'totais.cpl usa só o gasto das campanhas de mensagem e cadastro (gasto_campanhas_de_lead); custo_venda (CAC) e roas usam o gasto total.',
         _tpTemStatus()?'status é o status real do anúncio no Meta (ACTIVE = rodando; PAUSED, CAMPAIGN_PAUSED, ADSET_PAUSED = parado).':'O status real do anúncio ainda não está disponível (status = null).',
         'retencao_3s_pct = visualizações de 3 s ÷ impressões (gancho do vídeo); thruplay_pct = thruplays ÷ visualizações de 3 s (retenção até o fim).'],
       rastreamento:aud?{pct_leads_com_anuncio:r2((aud.coberturaLeads||0)*100),leads_sem_anuncio:aud.leadsSemRastreio||0,fechamentos_sem_anuncio:aud.fechamentosSemRastreio||0,vendas_sem_anuncio_rs:r2(aud.vendasSemRastreio||0)}:null,
