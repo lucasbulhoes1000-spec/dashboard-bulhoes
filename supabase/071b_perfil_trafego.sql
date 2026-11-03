@@ -10,6 +10,6 @@ create policy meta_quebras_dia_trafego on public.meta_quebras_dia for select to 
 drop policy if exists analises_ia_trafego on public.analises_ia;
 create policy analises_ia_trafego on public.analises_ia for select to authenticated using (public.tem_papel('trafego'));
 -- Samuel (gestor de tráfego). O login (Authentication → Add user) é criado pelo Lucas.
-insert into public.equipe (email, nome, papel) values ('EMAIL_DO_SAMUEL', 'Samuel', 'trafego')
+insert into public.equipe (email, nome, papel) values ('samuel.trafego@bulhoesodontologia.com.br', 'Samuel', 'trafego')
   on conflict (email) do update set papel = 'trafego', ativo = true;
 select email, nome, papel, ativo from public.equipe where papel = 'trafego';
