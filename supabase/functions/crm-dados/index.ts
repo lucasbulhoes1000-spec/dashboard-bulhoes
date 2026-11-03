@@ -289,7 +289,12 @@ async function vendasBruto(fromParam?: string, toParam?: string) {
   const [ay, am] = formatarDataISO(hoje).split("-").map(Number);
   const from = fromParam || `${ay}-${String(am).padStart(2, "0")}-01`;
   const to = toParam || formatarDataISO(hoje);
-  const url = "https://api.clinicorp.com/rest/v1/financial/list_summary?subscriber_id=" + encodeURIComponent(username) + "&from=" + from + "&to=" + to;
+  // (03/11/2026) busca até 45 dias depois do fim do período: um lançamento feito depois, mas com a
+  // data de fechamento corrigida à mão no card (orçamento aprovado antes), volta para o mês certo.
+  const hojeIso = formatarDataISO(hoje);
+  const maisTarde = formatarDataISO(new Date(Date.parse(to + "T12:00:00Z") + 45 * 86_400_000));
+  const toConsulta = to >= hojeIso ? to : (maisTarde < hojeIso ? maisTarde : hojeIso);
+  const url = "https://api.clinicorp.com/rest/v1/financial/list_summary?subscriber_id=" + encodeURIComponent(username) + "&from=" + from + "&to=" + toConsulta;
   const resp = await fetch(url, { headers: { accept: "application/json", Authorization: authHeader } });
   const corpoTxt = await resp.text();
   if (resp.status !== 200) return { status: "erro", mensagem: "Clinicorp (financial/list_summary) retornou " + resp.status, corpo: corpoTxt.substring(0, 500) };
@@ -309,7 +314,7 @@ async function vendasBruto(fromParam?: string, toParam?: string) {
   revenue = revenue.filter((v) => {
     const dl = String(v.Date || "").substring(0, 10);
     if (!dl) { qtdSemDataLancamento++; return true; }
-    return dl >= from && dl <= to;
+    return dl >= from && dl <= toConsulta;
   });
   const CACHE_KEY = "clinicorp_phone_by_personid_v1";
   const cacheTelefones: Record<string, string | null> = (await cacheLer(CACHE_KEY)) ?? {};
@@ -337,7 +342,6 @@ async function vendasBruto(fromParam?: string, toParam?: string) {
   const palavrasRecompra = ["manutenç", "manutenc", "ajuste", "avaliaç", "avaliac", "profilaxia", "pix"];
   for (const v of revenue) {
     const valor = Number(v.Amount || 0);
-    total += valor;
     const personId = v.PersonId;
     const tel = (personId && personId !== -1 && tem(telefonePorPersonId, String(personId))) ? telefonePorPersonId[String(personId)] : null;
     const descLower = String(v.Description || "").toLowerCase();
@@ -355,7 +359,9 @@ async function vendasBruto(fromParam?: string, toParam?: string) {
       if (o.status !== "Aprovado" || !o.entradaManual) return false;
       return Math.abs(Number(o.fechValor || o.valor || 0) - valor) < 0.01;
     });
+    let orcUsado: any = null;
     if (manual) {
+      orcUsado = manual;
       classe = manual.pacienteAntigo ? "Recompra" : "Novo";
       if (manual.tratamento) descricaoFinal = manual.tratamento;
     } else if (!ehClaramenteRecompra && tel) {
@@ -363,9 +369,15 @@ async function vendasBruto(fromParam?: string, toParam?: string) {
         if (o.status !== "Aprovado" || o.pacienteAntigo) return false;
         return Math.abs(Number(o.fechValor || o.valor || 0) - valor) < 0.01;
       });
-      if (batido) { classe = "Novo"; if (batido.tratamento) descricaoFinal = batido.tratamento; }
+      if (batido) { orcUsado = batido; classe = "Novo"; if (batido.tratamento) descricaoFinal = batido.tratamento; }
     }
-    registros.push({ nome: limparNomeClinicorp(v.PatientName) || "(sem nome)", telefone: tel || "", valor, data: (v.Date || "").substring(0, 10), descricao: descricaoFinal, classe });
+    // data de fechamento corrigida à mão no card vale mais que a data do lançamento no Clinicorp
+    let dataVenda = (v.Date || "").substring(0, 10);
+    const fechManual = orcUsado && orcUsado._manualFields && orcUsado._manualFields.fechData && /^\d{4}-\d{2}-\d{2}$/.test(String(orcUsado.fechData || "")) ? String(orcUsado.fechData) : "";
+    if (fechManual) dataVenda = fechManual;
+    if (dataVenda && (dataVenda < from || dataVenda > to)) continue;
+    total += valor;
+    registros.push({ nome: limparNomeClinicorp(v.PatientName) || "(sem nome)", telefone: tel || "", valor, data: dataVenda, dataLancamento: (v.Date || "").substring(0, 10), descricao: descricaoFinal, classe });
   }
   const totalNovo = registros.filter((r) => r.classe === "Novo").reduce((s, r) => s + r.valor, 0);
   return {
