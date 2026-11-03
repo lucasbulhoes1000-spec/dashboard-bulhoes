@@ -1032,7 +1032,9 @@ export async function handler(req: Request): Promise<Response> {
   }
 
   const u = await usuario(req);
-  if (!u || !["gestao", "avaliacao", "comercial"].includes(u.papel)) return json({ ok: false, erro: "sem permissão" }, 403);
+  if (!u || !["gestao", "avaliacao", "comercial", "trafego"].includes(u.papel)) return json({ ok: false, erro: "sem permissão" }, 403);
+  // (03/11/2026) gestor de tráfego: só a análise de tráfego
+  if (u.papel === "trafego" && dados?.acao !== "analise_trafego") return json({ ok: false, erro: "sem permissão" }, 403);
   try {
     switch (dados?.acao) {
       case "status":
@@ -1289,7 +1291,7 @@ export async function handler(req: Request): Promise<Response> {
         return json({ ok: true, texto: await transcreverMensagem(m) });
       }
       case "analise_trafego":
-        if (u.papel !== "gestao") return json({ ok: false, erro: "só a gestão pede a análise de tráfego" }, 403);
+        if (u.papel !== "gestao" && u.papel !== "trafego") return json({ ok: false, erro: "só a gestão pede a análise de tráfego" }, 403);
         return json({ ok: true, ...(await analisarTrafego(dados, u.email)) });
       default:
         return json({ ok: false, erro: "ação desconhecida" }, 400);

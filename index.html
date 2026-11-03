@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#070E20">
-<meta name="lume-versao" content="20261101-210421">
+<meta name="lume-versao" content="20261103-092659">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icone-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -2680,7 +2680,7 @@ if(_sb){
   _sb.auth.onAuthStateChange((evento,sessao)=>{
     _sbAccessToken=sessao?sessao.access_token:null;
     if(evento==='SIGNED_OUT'&&localStorage.getItem('bulhoes_logado')==='true'){
-      ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
+      ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao','bulhoes_papel'].forEach(k=>localStorage.removeItem(k));
       location.reload();
     }
   });
@@ -3433,7 +3433,27 @@ async function trocarSenhaArea(){
   _areaDefinirSenha(area);
 }
 
+// (03/11/2026) Perfil "trafego" (gestor de tráfego, tabela equipe): só a tela Tráfego Pago,
+// e as lupas aparecem sem a coluna de nome.
+window._soTrafego=(()=>{try{return localStorage.getItem('bulhoes_papel')==='trafego';}catch(e){return false;}})();
+async function _carregarPapel(){
+  try{
+    const r=await _waRest('equipe?email=eq.'+encodeURIComponent(usuarioAtualEmail())+'&select=papel');
+    const p=(r&&r[0]&&r[0].papel)||'';
+    try{localStorage.setItem('bulhoes_papel',p);}catch(e){}
+    window._soTrafego=p==='trafego';
+    _aplicarSoTrafego();
+  }catch(e){}
+}
+function _aplicarSoTrafego(){
+  document.body.classList.toggle('so-trafego',!!window._soTrafego);
+  if(!window._soTrafego)return;
+  document.querySelectorAll('.nav-item').forEach(n=>{n.style.display=/trafego-pago/.test(n.getAttribute('onclick')||'')?'':'none';});
+  document.querySelectorAll('.nav-section').forEach(n=>{n.style.display='none';});
+  if(typeof currentPage==='undefined'||currentPage!=='trafego-pago'){try{irParaPagina('trafego-pago');}catch(e){}}
+}
 function verificarAcessoPagina(page){
+  if(window._soTrafego&&page!=='trafego-pago')return false;
   const email=usuarioAtualEmail();
   const liberar=(area,titulo)=>{pedirSenhaArea(area,titulo).then(ok=>{if(ok){_acessoDesbloqueado[page]=true;irParaPagina(page);}});return false;};
   // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi — pedido explícito do usuário.
@@ -6743,7 +6763,7 @@ async function _tpIaHistorico(){
 }
 async function _tpIaAbrir(id){try{const a=(await _waRest('analises_ia?id=eq.'+id+'&select=*'))?.[0];if(a)_tpIaMostrar(a);}catch(e){}}
 async function tpAnalisarIA(){
-  if(!_waEhGestao()){showToast('error','Só a gestão','A análise com IA é liberada para a gestão.');return;}
+  if(!_waEhGestao()&&!window._soTrafego){showToast('error','Só a gestão','A análise com IA é liberada para a gestão.');return;}
   if(window._trafegoPronto===false||!window._lastAdMap){showToast('error','Dados ainda carregando','Espere a tabela terminar de carregar e tente de novo.');return;}
   try{await _tpMetaCarregar();}catch(e){}
   const pacote=_tpDadosParaIA();
@@ -9276,6 +9296,11 @@ function getStatusAgend(stage){
 // MODAL
 let _modalPerPage=0;
 function openModal(title,headers,rows,customCount){
+  // (03/11/2026) gestor de tráfego: lupas sem a coluna de nome
+  if(window._soTrafego&&Array.isArray(headers)){
+    const fora=headers.map((h,i)=>/^\s*nome/i.test(String(h))?i:-1).filter(i=>i>=0);
+    if(fora.length){headers=headers.filter((h,i)=>!fora.includes(i));rows=(rows||[]).map(r=>Array.isArray(r)?r.filter((c,i)=>!fora.includes(i)):r);}
+  }
   // Sempre acrescenta a contagem real de registros ao título, de forma consistente.
   // customCount é usado quando rows inclui uma linha de TOTAL que não deve ser contada.
   const baseTitle=String(title).replace(/\s*—\s*\d+\s*(registros?|únicos no período|clientes|contratos)?\s*$/i,'').trim();
@@ -13617,7 +13642,7 @@ async function _sessaoRecusadaPeloServidor(){
     }
   }catch(e){}
   try{await _sb.auth.signOut({scope:'local'});}catch(e){}
-  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
+  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao','bulhoes_papel'].forEach(k=>localStorage.removeItem(k));
   try{sessionStorage.setItem('bulhoes_aviso_login','Sua sessão expirou. Entre de novo para continuar.');}catch(e){}
   location.reload();
 }
@@ -13626,11 +13651,12 @@ async function fazerLogout(){
   // scope local: sair aqui não derruba o login da pessoa nos outros aparelhos/abas.
   try{if(_sb)await _sb.auth.signOut({scope:'local'});}catch(e){}
   _idbLimpar();
-  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));
+  ['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao','bulhoes_papel'].forEach(k=>localStorage.removeItem(k));
   location.reload();
 }
 
 function iniciarApp(){
+  try{_aplicarSoTrafego();_carregarPapel();}catch(e){}
   // volta para a tela em que a pessoa estava (ex.: depois de trocar o tema)
   try{const v=JSON.parse(sessionStorage.getItem('bulhoes_voltar')||'null');sessionStorage.removeItem('bulhoes_voltar');
     if(v&&v.pagina&&v.pagina!=='inicio')setTimeout(()=>{try{
@@ -14541,7 +14567,7 @@ window.addEventListener('load',async()=>{
   // volta para a tela de login.
   let sessao=null;
   try{if(_sb){const r=await _sb.auth.getSession();sessao=r&&r.data?r.data.session:null;}}catch(e){}
-  if(!sessao){['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao'].forEach(k=>localStorage.removeItem(k));}
+  if(!sessao){['bulhoes_email','bulhoes_logado','bulhoes_nome','bulhoes_versao_sessao','bulhoes_papel'].forEach(k=>localStorage.removeItem(k));}
   else{_sbAccessToken=sessao.access_token;}
   verificarLogin();
   try{const aviso=sessionStorage.getItem('bulhoes_aviso_login');if(aviso){sessionStorage.removeItem('bulhoes_aviso_login');const el=document.getElementById('login-error');if(el){el.textContent=aviso;el.style.display='block';}}}catch(e){}
