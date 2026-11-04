@@ -86,7 +86,8 @@ begin
            || jsonb_build_object('nota', p_nota,
                                  'motivo', coalesce(left(nullif(trim(p_motivo), ''), 2000), ''),
                                  'data', to_char(now() at time zone 'America/Sao_Paulo', 'YYYY-MM-DD'),
-                                 'via', 'formulario');
+                                 'via', 'formulario')
+           || case when coalesce(trim(c.nome), '') <> '' then jsonb_build_object('nome', trim(c.nome)) else '{}'::jsonb end;
   ficha := ficha || jsonb_build_object('nps', v_nps);
   remoto := remoto || jsonb_build_object(c.chave, ficha);
 

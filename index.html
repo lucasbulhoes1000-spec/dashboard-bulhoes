@@ -10333,7 +10333,9 @@ function indNome(ph,d){
   const row=cloudiaRowPorTel(ph);if(row&&row.name)return String(row.name).trim();
   const c=(clientesData||[]).find(x=>normalizePhone(x.phone||'')===normalizePhone(ph));if(c&&c.name)return String(c.name).trim();
   const f=(_fluxoPacientes||[]).find(x=>normalizePhone(x.tel||'')===normalizePhone(ph));
-  return f?String(f.nome||'').trim():'';
+  if(f&&f.nome)return String(f.nome).trim();
+  // (04/11/2026) nome gravado pelo formulário de NPS (vem do convite)
+  return d.nps&&d.nps.nome?String(d.nps.nome).trim():'';
 }
 // pacientes = quem tem orçamento no CRM
 function indPacientes(){
@@ -10429,7 +10431,7 @@ function renderIndicacoes(){
   document.getElementById('ri-promotores').innerHTML=proms.length?proms.map(({k,ph,d})=>`
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
       <span style="font-weight:700;color:#6ADC96;min-width:28px;">${d.nps.nota}</span>
-      <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;"> · ${d.nps.data?new Date(d.nps.data+'T12:00').toLocaleDateString('pt-BR'):''}${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
+      <span style="flex:1;min-width:160px;color:#EEF1F7;"><b>${_indEsc(indNome(ph,d)||('Sem nome · tel. final '+String(ph).slice(-4)))}</b><span style="color:#8C98B1;font-size:11px;"> · ${d.nps.data?new Date(d.nps.data+'T12:00').toLocaleDateString('pt-BR'):''}${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
       <a href="${indWa(ph,IND_TEXTOS.promotor(_primeiroNome(indNome(ph,d))))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 Pedir indicação</a>
       <button onclick="indPedidoFeito('${_indEsc(k)}')" style="background:#5A8A6A;color:#FFFFFF;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;">Pedido feito</button>
     </div>`).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum promotor esperando o pedido. As notas entram pelo Fluxo pós-venda.</div>';
@@ -10461,7 +10463,7 @@ function renderIndicacoes(){
     const n=Number(d.nps.nota);const cor=n<=6?'#E58A8A':'#E2BE6A';
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
       <span style="font-weight:700;color:${cor};min-width:28px;">${n}</span>
-      <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;">${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
+      <span style="flex:1;min-width:160px;color:#EEF1F7;"><b>${_indEsc(indNome(ph,d)||('Sem nome · tel. final '+String(ph).slice(-4)))}</b><span style="color:#8C98B1;font-size:11px;">${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
       <a href="${indWa(ph,IND_TEXTOS[n<=6?'detrator':'neutro'](_primeiroNome(indNome(ph,d))))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 ${n<=6?'Avisar que a Dra. vai ligar':'Perguntar o que faltou'}</a>
     </div>`;}).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum detrator ou neutro no período.</div>';
 }

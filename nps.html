@@ -55,7 +55,7 @@ function obrigado(){
 function formulario(nome){
   el.innerHTML=
     '<h1>'+(nome?'Oi, '+esc(nome)+'!':'Oi!')+'<br>Como foi a sua experiência?</h1>'+
-    '<p class="sub">Leva menos de 1 minuto. A sua resposta ajuda a Dra. Larissa e toda a equipe a cuidar cada vez melhor de quem passa por aqui.</p>'+
+    '<p class="sub">Leva menos de 1 minuto. A sua resposta ajuda toda a nossa equipe a cuidar cada vez melhor de quem passa por aqui.</p>'+
     '<div class="pergunta">De 0 a 10, o quanto você recomendaria a Bulhões Odontologia para um amigo ou familiar?</div>'+
     '<div class="notas" id="notas">'+Array.from({length:11},(_,i)=>'<button type="button" data-n="'+i+'" aria-label="Nota '+i+'">'+i+'</button>').join('')+'</div>'+
     '<div class="legenda"><span>Não recomendaria</span><span>Recomendaria com certeza</span></div>'+
