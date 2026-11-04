@@ -18372,14 +18372,28 @@ function _kbOrcVelho(it){const b=_kbOrcBase(it);return !!b&&(Date.now()-b.getTim
 function _fupRetorno(it){
   // retorno combinado na avaliação (Pix de compromisso). Antes ficava como fase
   // "Retorno combinado (Pix)" com a data no próximo contato da atividade.
+  // pix: '' | 'pago' | 'devolvido' (antes era true/false)
   const r=it.d&&it.d.fupRetorno;
-  if(r&&r.data)return {data:r.data,pix:!!r.pix};
-  if(r&&r.limpo)return null;
+  if(r&&!r.limpo){
+    const pix=r.pix===true||r.pix==='pago'?'pago':(r.pix==='devolvido'?'devolvido':'');
+    if(r.data||pix)return {data:r.data||'',pix,pixEm:r.pixEm||''};
+  }
+  if(r)return null;
   const f=String(it.fase||'');
   if(['Retorno combinado (Pix)','Agendou retorno','Aguardando entrada','Avaliação comercial'].includes(f)){
-    const p=it.atv&&it.atv.proximo;return {data:p||'',pix:f==='Retorno combinado (Pix)'};
+    const p=it.atv&&it.atv.proximo;return {data:p||'',pix:f==='Retorno combinado (Pix)'?'pago':''};
   }
   return null;
+}
+// prioridade no quadro: Pix de compromisso pago (ainda não devolvido)
+function _fupPrioridade(it){const r=!it.fechou&&_fupRetorno(it);return !!(r&&r.pix==='pago');}
+function _fupSalvarRetornoDe(key,data,pix){
+  if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  const ant=_ccData[key].fupRetorno||{};
+  const antPix=ant.pix===true?'pago':(ant.pix||'');
+  _ccData[key].fupRetorno={data:data||'',pix:pix||'',pixEm:(pix&&pix!==antPix)?new Date().toISOString():(ant.pixEm||''),por:localStorage.getItem('bulhoes_email')||''};
+  if(!data&&!pix)_ccData[key].fupRetorno={limpo:true};
+  salvarCRMDebounced();
 }
 function _kbOrcColuna(it){
   if(it.fechou)return 'Fechou';
@@ -18498,8 +18512,9 @@ function fupRender(){
       <div class="fup-bt">Retorno combinado na avaliação</div>
       <label>Data combinada para falar com a paciente (o prazo passa a ser essa data)</label>
       <input id="fup-ret-data" type="date" value="${_kbEsc(ret.data||'')}">
-      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;"><input id="fup-ret-pix" type="checkbox" style="width:auto;" ${ret.pix?'checked':''}> Pagou o Pix de compromisso (R$ 100)</label>
-      <div class="fup-acoes"><button type="button" onclick="fupSalvarRetorno()">Salvar retorno</button>${ret.data||ret.pix?'<button type="button" onclick="fupSalvarRetorno(true)">Tirar retorno</button>':''}</div>
+      <label>Pix de compromisso</label>
+      <select id="fup-ret-pix">${'<option value=""'+(!ret.pix?' selected':'')+'>Não pagou</option><option value="pago"'+(ret.pix==='pago'?' selected':'')+'>Pago (R$ 100)</option><option value="devolvido"'+(ret.pix==='devolvido'?' selected':'')+'>Devolvido</option>'}</select>
+      <div class="fup-acoes"><button type="button" onclick="fupSalvarRetorno()">Salvar</button></div>
     </div>
     ${blocos.map((b,k)=>`<div class="fup-bloco"><div class="fup-bt">${_kbEsc(b.t)}</div>${b.nota?'<div class="fup-nota">'+_kbEsc(b.nota)+'</div>':''}
       <textarea id="fup-txt-${k}" rows="${Math.min(12,Math.max(2,Math.ceil(b.x.length/68)+b.x.split('\n').length-1))}">${_kbEsc(b.x)}</textarea>
@@ -18545,10 +18560,9 @@ function fupSalvarBeneficio(){
 function fupSalvarRetorno(limpar){
   const it=_fupAtual&&_fupAtual.it;if(!it||!it.r)return;
   const key=ccKey(it.r);if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
-  _ccData[key].fupRetorno=limpar?{limpo:true}:{data:document.getElementById('fup-ret-data').value||'',pix:!!document.getElementById('fup-ret-pix').checked};
+  _fupSalvarRetornoDe(key,limpar?'':(document.getElementById('fup-ret-data').value||''),limpar?'':(document.getElementById('fup-ret-pix').value||''));
   it.d=_ccData[key];
-  salvarCRMDebounced();
-  showToast('success',limpar?'Retorno retirado':'Retorno salvo','Aparece no card.');
+  showToast('success','Salvo','Aparece no card.');
   try{if(typeof kbRender==='function')kbRender('clientes');}catch(e){}
   fupRender();
 }
@@ -18560,7 +18574,8 @@ function fupEnviei(){
   const d=_ccData[key];
   (d.fupLog||(d.fupLog=[])).push({etapa:a.etapa,em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''});
   // o retorno combinado era para este contato: depois de enviar, o prazo volta a ser o da sequência
-  if(_fupRetorno(a.it))d.fupRetorno={limpo:true};
+  const r0=_fupRetorno(a.it);
+  if(r0&&r0.data)_fupSalvarRetornoDe(key,'',r0.pix);
   fupFechar();
   editarFaseAtivTabela(key,destino);
   if(destino==='Cadência mensal')showToast('success','Sequência concluída','O card foi para a Cadência mensal.');
@@ -18569,17 +18584,23 @@ function fupEnviei(){
 function ccFupNotasRender(d){
   const el=document.getElementById('cc-fup-notas');if(!el)return;
   const fn=(d&&d.fupNotas)||{};
+  const ret=_fupRetorno({d:d||{},fase:(d&&d.atividades&&d.atividades[0]&&d.atividades[0].fase)||'',atv:(d&&d.atividades&&d.atividades[0])||null})||{};
   el.innerHTML='<div style="background:#12213F;border:1px solid #2A3D66;border-radius:9px;padding:10px 12px;margin-bottom:12px;">'+
     '<div style="font-size:12px;font-weight:700;color:#E2BE6A;margin-bottom:6px;">Para o follow-up (preencher depois da avaliação)</div>'+
     '<input id="cc-fup-queria" value="'+_kbEsc(fn.queria||'')+'" placeholder="O que a paciente mais queria ou a dúvida que ficou" style="width:100%;box-sizing:border-box;border:1px solid #2A3D66;border-radius:7px;padding:7px 9px;font-size:12.5px;margin-bottom:6px;">'+
     '<div style="display:flex;gap:6px;"><select id="cc-fup-motivo" style="flex:1;border:1px solid #2A3D66;border-radius:7px;padding:7px 9px;font-size:12.5px;"><option value="">Por que não fechou</option>'+FUP_MOTIVOS.map(o=>'<option'+(fn.motivo===o?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
-    '<button type="button" onclick="ccFupNotasSalvar()" style="background:#B08A3E;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button></div></div>';
+    '</div><div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap;">'+
+    '<label style="font-size:11.5px;color:#C3CBDB;">Retorno combinado</label><input id="cc-fup-ret" type="date" value="'+_kbEsc(ret.data||'')+'" style="border:1px solid #2A3D66;border-radius:7px;padding:6px 8px;font-size:12.5px;">'+
+    '<label style="font-size:11.5px;color:#C3CBDB;">Pix de compromisso</label><select id="cc-fup-pix" style="border:1px solid #2A3D66;border-radius:7px;padding:6px 8px;font-size:12.5px;">'+'<option value=""'+(!ret.pix?' selected':'')+'>Não pagou</option><option value="pago"'+(ret.pix==='pago'?' selected':'')+'>Pago (R$ 100)</option><option value="devolvido"'+(ret.pix==='devolvido'?' selected':'')+'>Devolvido</option>'+'</select>'+
+    '<button type="button" onclick="ccFupNotasSalvar()" style="background:#B08A3E;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;">Salvar</button></div></div>';
 }
 function ccFupNotasSalvar(){
   const r=clientesData[_currentClienteIdx];if(!r)return;
   const key=ccKey(r);if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
   _ccData[key].fupNotas={queria:(document.getElementById('cc-fup-queria').value||'').trim(),motivo:document.getElementById('cc-fup-motivo').value||'',em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''};
-  salvarCRMDebounced();
+  const rD=document.getElementById('cc-fup-ret').value||'',rP=document.getElementById('cc-fup-pix').value||'';
+  const atual=_fupRetorno({d:_ccData[key],fase:'',atv:null});
+  if(rD||rP||atual)_fupSalvarRetornoDe(key,rD,rP);else salvarCRMDebounced();
   showToast('success','Anotação salva','A Lívia vê isso no follow-up.');
 }
 const KB_LIMITE=40;
@@ -18857,10 +18878,10 @@ const KB_QUADROS={
     coluna:(it)=>_kbOrcColuna(it),
     // (04/11/2026) retorno combinado / Pix de compromisso primeiro (prioridade), depois o prazo mais antigo
     ordenar:(l,col)=>{
-      const k=it=>{const r=it.fechou?null:_fupRetorno(it);const p=_kbOrcPrazo(it,col);return [r?0:1,r&&r.data?r.data:'9999',p?p.ate.getTime():9e15];};
+      const k=it=>{const r=it.fechou?null:_fupRetorno(it);const p=_kbOrcPrazo(it,col);return [_fupPrioridade(it)?0:1,r&&r.data?r.data:'9999',p?p.ate.getTime():9e15];};
       return l.slice().sort((a,b)=>{const x=k(a),y=k(b);for(let i=0;i<3;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1;}return 0;});
     },
-    classeCard:(it)=>(!it.fechou&&_fupRetorno(it))?('kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':'')):'',
+    classeCard:(it)=>_fupPrioridade(it)?('kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':'')):'',
     valor:(it)=>it.fechou?it.fechado:it.aberto,
     metricas:(cols,todos,porCol)=>{
       const m={};const hoje=new Date(new Date().toDateString());
@@ -18884,7 +18905,9 @@ const KB_QUADROS={
       const ret=_fupRetorno(it);
       if(ret&&!it.fechou){
         const dd=ret.data?new Date(ret.data+'T00:00'):null;
-        prazo+='<span class="kb-tag '+(!dd||dd<hoje?'atraso':(+dd===+hoje?'hoje':'ok'))+'">'+(ret.pix?'Pix de compromisso · ':'')+(dd?'retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'retorno sem data')+'</span> ';
+        if(ret.pix==='pago')prazo+='<span class="kb-tag ok">Pix de compromisso pago</span> ';
+        if(ret.pix==='devolvido')prazo+='<span class="kb-tag">Pix devolvido</span> ';
+        if(dd)prazo+='<span class="kb-tag '+(dd<hoje?'atraso':(+dd===+hoje?'hoje':''))+'">retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span> ';
       }
       const px=_kbOrcPrazo(it,col);
       if(px&&!px.retorno)prazo+='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">mandar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
@@ -18906,7 +18929,7 @@ const KB_QUADROS={
       editarFaseAtivTabela(ccKey(it.r),col);
       return true;
     },
-    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Novos pacientes e recompras ficam juntos (a recompra tem selo no card). Quem não vai receber follow-up: arraste para Descarte, no fim do quadro. Pix de compromisso e retorno combinado aparecem no card e o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
+    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Novos pacientes e recompras ficam juntos (a recompra tem selo no card). Quem não vai receber follow-up: arraste para Descarte, no fim do quadro. Pix de compromisso e retorno combinado: a Dra. Victoria marca na ficha do cliente (aba Orçamentos) ou a Lívia na mensagem do card; Pix pago deixa o card no topo e destacado, Devolvido tira o destaque; com retorno combinado o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
   },
   fluxo:{
     titulo:'Em Fluxo',
