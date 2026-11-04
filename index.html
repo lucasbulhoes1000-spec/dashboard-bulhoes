@@ -1635,15 +1635,16 @@ body{letter-spacing:-.1px;}
     <div class="page" id="page-clientes">
       <!-- CARDS RESUMO -->
       <div class="row r4" style="margin-bottom:16px;">
-        <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms" id="cc-total-clientes-label">orçamentos de novos pacientes</div></div>
-        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">novos pacientes em aberto</div></div>
+        <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms" id="cc-total-clientes-label">maior orçamento de cada paciente</div></div>
+        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">pacientes em aberto (novos e recompras)</div></div>
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
       </div>
 
       <!-- DIVISÃO PRINCIPAL DA ABA CLIENTES -->
       <div style="display:flex;gap:8px;margin:0 0 12px 0;align-items:center;">
-        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #D4AF5A;background:#B08A3E;color:#FFFFFF;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
+        <button id="clientes-tab-todos" onclick="setTipoOrcamentoClientes('todos')" style="border:0.5px solid #D4AF5A;background:#B08A3E;color:#FFFFFF;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Todos</button>
+        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #2A3D66;background:#0D1A33;color:#E2BE6A;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
         <button id="clientes-tab-recompra" onclick="setTipoOrcamentoClientes('recompra')" style="border:0.5px solid #2A3D66;background:#0D1A33;color:#E2BE6A;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">↻ Recompras</button>
       </div>
 
@@ -8705,9 +8706,16 @@ function toggleProximosContatos(){
   document.getElementById('clientes-count').textContent=comProximo.length+' clientes com próx. contato';
   _clientesFiltrados=comProximo;_clientesPage=1;renderClientesPage();
 }
-let _clientesTipoOrcamento='novo';
+let _clientesTipoOrcamento='todos';
 function setTipoOrcamentoClientes(tipo){
-  _clientesTipoOrcamento=(tipo==='recompra')?'recompra':'novo';
+  _clientesTipoOrcamento=(tipo==='recompra'||tipo==='novo')?tipo:'todos';
+  const bTodos=document.getElementById('clientes-tab-todos');
+  if(bTodos){
+    const ativo=_clientesTipoOrcamento==='todos';
+    bTodos.style.background=ativo?'#B08A3E':'#0D1A33';
+    bTodos.style.color=ativo?'#FFFFFF':'#E2BE6A';
+    bTodos.style.borderColor=ativo?'#D4AF5A':'#2A3D66';
+  }
 
   const bNovo=document.getElementById('clientes-tab-novo');
   const bRec=document.getElementById('clientes-tab-recompra');
@@ -8728,7 +8736,7 @@ function setTipoOrcamentoClientes(tipo){
   const lblTotal=document.getElementById('cc-total-clientes-label');
   const lblAbertos=document.getElementById('cc-total-abertos-label');
   if(lblTotal)lblTotal.textContent=_clientesTipoOrcamento==='recompra'?'maior orçamento de cada recompra':'maior orçamento de cada paciente';
-  if(lblAbertos)lblAbertos.textContent=_clientesTipoOrcamento==='recompra'?'recompras em aberto':'novos pacientes em aberto';
+  if(lblAbertos)lblAbertos.textContent=_clientesTipoOrcamento==='recompra'?'recompras em aberto':_clientesTipoOrcamento==='novo'?'novos pacientes em aberto':'pacientes em aberto (novos e recompras)';
 
   filterClientesTable();
 }
@@ -8790,7 +8798,7 @@ function filterClientesTable(){
     if(orcsPeriodoTodos.length===0)return false;
 
     // Novo paciente x Recompra.
-    const orcsPeriodo=orcsPeriodoTodos.filter(o=>
+    const orcsPeriodo=tipoOrc==='todos'?orcsPeriodoTodos:orcsPeriodoTodos.filter(o=>
       tipoOrc==='recompra' ? o.pacienteAntigo===true : o.pacienteAntigo!==true
     );
     if(orcsPeriodo.length===0)return false;
@@ -8826,7 +8834,7 @@ function filterClientesTable(){
   });
 
   document.getElementById('clientes-count').textContent=
-    filtered.length+(tipoOrc==='recompra'?' recompras':' novos pacientes');
+    filtered.length+(tipoOrc==='recompra'?' recompras':tipoOrc==='novo'?' novos pacientes':' pacientes');
   _clientesFiltrados=filtered;
   _clientesPage=1;
   renderClientesPage();
@@ -18349,7 +18357,8 @@ const KB_ORC_ETAPAS=[
   {id:'6. Conseguiu ver?',dia:8,envio:true,alias:['Nova proposta'],dica:'Mandar no 8º dia'},
   {id:'7. Despedida',dia:10,envio:true,alias:['Conseguiu ver?'],dica:'Mandar no 10º dia'},
   {id:'Cadência mensal',dia:null,alias:['Mensagem de despedida'],dica:'Terminou a sequência ou fez a avaliação há mais de 30 dias: conteúdo mensal e campanhas internas'},
-  {id:'Fechou',dia:null,alias:['Pós venda']}
+  {id:'Fechou',dia:null,alias:['Pós venda']},
+  {id:'Descarte',dia:null,alias:[],dica:'Quem não vai receber follow-up. Arraste para cá; para voltar, arraste para a etapa certa'}
 ];
 const KB_ORC_ANTIGAS=['Compareceu - orçamento realizado','Aguardando 1° contato','Retorno combinado (Pix)','1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','3° contato - Depoimento','Pergunta sincera','Nova proposta','Conseguiu ver?','Mensagem de despedida'];
 function _kbOrcEtapa(fase){
@@ -18375,6 +18384,7 @@ function _fupRetorno(it){
 function _kbOrcColuna(it){
   if(it.fechou)return 'Fechou';
   const e=_kbOrcEtapa(it.fase);
+  if(e==='Descarte')return 'Descarte';
   const ret=_fupRetorno(it);
   const retFuturo=ret&&ret.data&&new Date(ret.data+'T23:59')>=new Date();
   if(e!=='Cadência mensal'&&!retFuturo&&_kbOrcVelho(it))return 'Cadência mensal';
@@ -18838,7 +18848,8 @@ const KB_QUADROS={
       const fechado=orcs.filter(o=>o.status==='Aprovado').reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
       const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
       const atv=(d.atividades&&d.atividades[0])||null;
-      return {r,ph,d,fechou,aberto,fechado,top,atv,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
+      const recompra=orcs.length>0&&orcs.every(o=>o.pacienteAntigo===true);
+      return {r,ph,d,fechou,aberto,fechado,top,atv,recompra,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
     coluna:(it)=>_kbOrcColuna(it),
     // (04/11/2026) retorno combinado / Pix de compromisso primeiro (prioridade), depois o prazo mais antigo
@@ -18881,18 +18892,18 @@ const KB_QUADROS={
         ${trat?'<div class="kb-linha"><span>'+_kbEsc(trat)+'</span></div>':''}
         <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${base?'<span>avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':''}</div>
         ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}
-        ${fn.motivo?'<div class="kb-linha"><span class="kb-tag">'+_kbEsc(fn.motivo)+'</span></div>':''}
+        ${(it.recompra||fn.motivo)?'<div class="kb-linha">'+(it.recompra?'<span class="kb-tag">Recompra</span> ':'')+(fn.motivo?'<span class="kb-tag">'+_kbEsc(fn.motivo)+'</span>':'')+'</div>':''}
         ${prox&&!it.fechou?'<button type="button" class="kb-fup-btn" onclick="event.stopPropagation();fupAbrir('+it._i+')">✉ Abrir mensagem</button>':''}`;
     },
     abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
     soltar:(it,col)=>{
       if(col==='Fechou'){showToast('error','Fechou anda sozinho','O card vai para Fechou quando o orçamento é aprovado.');return false;}
       const ret=_fupRetorno(it);const retFuturo=ret&&ret.data&&new Date(ret.data+'T23:59')>=new Date();
-      if(col!=='Cadência mensal'&&!retFuturo&&_kbOrcVelho(it)){showToast('error','Mais de 30 dias da avaliação','Fica na Cadência mensal. Se a paciente voltou a conversar, abra a mensagem e marque um retorno combinado.');return false;}
+      if(col!=='Cadência mensal'&&col!=='Descarte'&&!retFuturo&&_kbOrcVelho(it)){showToast('error','Mais de 30 dias da avaliação','Fica na Cadência mensal. Se a paciente voltou a conversar, abra a mensagem e marque um retorno combinado.');return false;}
       editarFaseAtivTabela(ccKey(it.r),col);
       return true;
     },
-    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Pix de compromisso e retorno combinado aparecem no card e o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
+    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Novos pacientes e recompras ficam juntos (a recompra tem selo no card). Quem não vai receber follow-up: arraste para Descarte, no fim do quadro. Pix de compromisso e retorno combinado aparecem no card e o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
   },
   fluxo:{
     titulo:'Em Fluxo',
