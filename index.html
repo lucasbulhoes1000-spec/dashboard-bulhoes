@@ -18354,6 +18354,15 @@ function _kbOrcEtapa(fase){
   const e=KB_ORC_ETAPAS.find(x=>x.id===f||x.alias.includes(f));
   return e?e.id:'__outras';
 }
+// (04/11/2026) quem compareceu há mais de 30 dias e não fechou vai direto para a
+// Cadência mensal (menos quem tem retorno combinado)
+function _kbOrcVelho(it){const b=_kbOrcBase(it);return !!b&&(Date.now()-b.getTime())/86400000>30;}
+function _kbOrcColuna(it){
+  if(it.fechou)return 'Fechou';
+  const e=_kbOrcEtapa(it.fase);
+  if(e!=='Retorno combinado (Pix)'&&e!=='Cadência mensal'&&_kbOrcVelho(it))return 'Cadência mensal';
+  return e;
+}
 function _kbOrcBase(it){
   // data da avaliação: a da consulta; se não tiver, a do orçamento de maior valor
   const t=parseCloudiaDate(it.r&&it.r.timestamp);
@@ -18420,7 +18429,7 @@ function fupBlocos(it,etapa){
 let _fupAtual=null;
 function fupAbrir(i){
   const it=(_kb.itens.clientes||[])[i];if(!it)return;
-  const col=it.fechou?'Fechou':_kbOrcEtapa(it.fase);
+  const col=_kbOrcColuna(it);
   const etapa=fupProximaEtapa(col);if(!etapa)return;
   _fupAtual={it,etapa,col};
   fupRender();
@@ -18786,7 +18795,7 @@ const KB_QUADROS={
       const atv=(d.atividades&&d.atividades[0])||null;
       return {r,ph,d,fechou,aberto,fechado,top,atv,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
-    coluna:(it)=>it.fechou?'Fechou':_kbOrcEtapa(it.fase),
+    coluna:(it)=>_kbOrcColuna(it),
     valor:(it)=>it.fechou?it.fechado:it.aberto,
     metricas:(cols,todos,porCol)=>{
       const m={};const hoje=new Date(new Date().toDateString());
@@ -18831,11 +18840,12 @@ const KB_QUADROS={
       if(col==='__outras'){showToast('error','Escolha uma etapa','Arraste para uma das etapas do follow-up.');return false;}
       if(col==='Compareceu - orçamento realizado'){showToast('error','Essa é a entrada','Quem acabou de fazer a avaliação entra aqui sozinho. Arraste para a etapa seguinte.');return false;}
       if(col==='Fechou'){showToast('error','Fechou anda sozinho','O card vai para Fechou quando o orçamento é aprovado.');return false;}
+      if(col!=='Cadência mensal'&&col!=='Retorno combinado (Pix)'&&_kbOrcVelho(it)){showToast('error','Mais de 30 dias da avaliação','Fica na Cadência mensal. Se a paciente voltou a conversar, use Retorno combinado (Pix) com a data.');return false;}
       editarFaseAtivTabela(ccKey(it.r),col);
       if(col==='Retorno combinado (Pix)')showToast('success','Marque a data do retorno','Abra o card e preencha o próximo contato com a data combinada.');
       return true;
     },
-    aviso:()=>'Follow-up de orçamentos (processo de 04/11/2026). O card fica na etapa da última mensagem enviada. Clique em ✉ Mensagem no card para ver o texto pronto, copiar ou abrir no WhatsApp, e depois em Enviei para mover o card. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10 e cadência mensal a partir do 30. Cada pessoa conta uma vez, pelo orçamento de maior valor.'
+    aviso:()=>'Follow-up de orçamentos (processo de 04/11/2026). O card fica na etapa da última mensagem enviada. Clique em ✉ Mensagem no card para ver o texto pronto, copiar ou abrir no WhatsApp, e depois em Enviei para mover o card. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10. Quem fez a avaliação há mais de 30 dias e não fechou vai sozinho para a Cadência mensal (menos quem tem Retorno combinado). Outras fases: cards com uma fase que não existe no processo (fases antigas ou criadas à mão); arraste para a etapa certa. Cada pessoa conta uma vez, pelo orçamento de maior valor.'
   },
   fluxo:{
     titulo:'Em Fluxo',
