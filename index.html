@@ -1106,6 +1106,10 @@ body{letter-spacing:-.1px;}
 .kb-tag.atraso{background:rgba(224,103,90,.15);color:#F2A79C;}
 .kb-barra{height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin:6px 0 2px;overflow:hidden;}
 .kb-barra i{display:block;height:100%;background:linear-gradient(90deg,#B08A3E,#F0CB72);}
+.kb-card.kb-pix{background:linear-gradient(180deg,#4A3A12,#33280C);border:1px solid #D4AF5A;box-shadow:0 0 0 1px rgba(212,175,90,.25);}
+.kb-card.kb-pix .kb-nome::before{content:'★ ';color:#F0CB72;}
+.kb-card.kb-pix-claro{background:linear-gradient(180deg,#FFF4D9,#FBE7B5)!important;border:1px solid #D9A93E!important;}
+.kb-card.kb-pix-claro .kb-nome::before{color:#B07A12;}
 .kb-fup-btn{display:block;width:100%;margin-top:8px;border:1px solid rgba(212,175,90,.45);background:rgba(212,175,90,.10);color:var(--gold-strong);font-size:11.5px;font-weight:600;border-radius:8px;padding:6px 8px;cursor:pointer;text-align:left;}
 .kb-fup-btn:hover{background:rgba(212,175,90,.2);}
 #fup-modal{position:fixed;inset:0;background:rgba(3,8,20,.62);z-index:1300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;}
@@ -18837,6 +18841,12 @@ const KB_QUADROS={
       return {r,ph,d,fechou,aberto,fechado,top,atv,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
     coluna:(it)=>_kbOrcColuna(it),
+    // (04/11/2026) retorno combinado / Pix de compromisso primeiro (prioridade), depois o prazo mais antigo
+    ordenar:(l,col)=>{
+      const k=it=>{const r=it.fechou?null:_fupRetorno(it);const p=_kbOrcPrazo(it,col);return [r?0:1,r&&r.data?r.data:'9999',p?p.ate.getTime():9e15];};
+      return l.slice().sort((a,b)=>{const x=k(a),y=k(b);for(let i=0;i<3;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1;}return 0;});
+    },
+    classeCard:(it)=>(!it.fechou&&_fupRetorno(it))?('kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':'')):'',
     valor:(it)=>it.fechou?it.fechado:it.aberto,
     metricas:(cols,todos,porCol)=>{
       const m={};const hoje=new Date(new Date().toDateString());
@@ -19047,6 +19057,7 @@ function kbRender(q){
   const cols=cfg.colunas();
   const porCol={};cols.forEach(c=>porCol[c.id]=[]);
   itens.forEach((it,i)=>{it._i=i;let c;try{c=cfg.coluna(it);}catch(e){c=cols[0].id;}if(!(c in porCol))c=cols[0].id;porCol[c].push(it);});
+  if(cfg.ordenar)cols.forEach(c=>{try{porCol[c.id]=cfg.ordenar(porCol[c.id],c.id)||porCol[c.id];}catch(e){}});
   const met=cfg.metricas?cfg.metricas(cols,itens,porCol):{};
   const valorDe=cfg.valor||null;
   _kb.cols[q]={};
@@ -19067,7 +19078,7 @@ function kbRender(q){
         ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
         ${mm?'<div class="kb-met'+(mm.fraco?' fraco':'')+(mm.alerta?' alerta':'')+'" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
       </header>
-      <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card" draggable="true" data-q="${q}" data-i="${it._i}"
+      <div class="kb-cards">${l.slice(0,lim).map(it=>`<article class="kb-card${cfg.classeCard?(' '+(cfg.classeCard(it,c.id)||'')):''}" draggable="true" data-q="${q}" data-i="${it._i}"
           ondragstart="kbPegou(event)" ondragend="kbLargou(event)" onclick="kbAbrir('${q}',${it._i})">${cfg.card(it,c.id)}</article>`).join('')}
         ${l.length>lim?`<button type="button" class="kb-mais" onclick="kbMais('${q}','${_kbEsc(c.id).replace(/'/g,"\\'")}')">mostrar mais ${Math.min(KB_LIMITE,l.length-lim)} de ${l.length-lim}</button>`:''}
         ${!l.length?'<div class="kb-vazio">'+(c.vazia?'Solte um card aqui':'Nenhum card')+'</div>':''}
