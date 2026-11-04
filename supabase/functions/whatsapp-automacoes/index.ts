@@ -269,19 +269,39 @@ export function corpoModelo(p: any, ctx: { nome?: string | null; telefone?: stri
 // Usa o modelo e a base de conhecimento da tela "Agente de IA". Se falhar, o passo
 // manda o texto fixo dele (p.texto).
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-export async function textoDaIA(c: any, nome?: string | null): Promise<string> {
+export async function textoDaIA(c: any, nome?: string | null, esperaMin = 0, instrucao = ""): Promise<string> {
   if (!ANTHROPIC_API_KEY || !c?.id) return "";
   const ag = (await bancoJson(`/rest/v1/agente_ia?id=eq.1&select=modelo,base_conhecimento`).catch(() => []))?.[0] ?? {};
   const msgs: any[] = ((await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&select=direcao,texto,tipo,enviada_em&order=enviada_em.desc&limit=30`).catch(() => [])) ?? []).reverse();
   const hist = msgs.filter((m) => String(m.texto ?? "").trim()).map((m) => (m.direcao === "recebida" ? "LEAD: " : "CLÍNICA: ") + String(m.texto).trim().slice(0, 600)).join("\n");
   if (!hist) return "";
+  // (04/11/2026) o lead já respondeu alguma mensagem da clínica? (a 1ª mensagem do lead, que vem do anúncio, não conta)
+  const iPrimeiraClinica = msgs.findIndex((m) => m.direcao !== "recebida");
+  const respondeu = iPrimeiraClinica >= 0 && msgs.slice(iPrimeiraClinica + 1).some((m) => m.direcao === "recebida");
+  // (04/11/2026) cada follow-up tem um papel: o primeiro só chama a atenção, os seguintes retomam com algo novo
+  let estagio: string, limite: number;
+  if (esperaMin > 0 && esperaMin <= 60) {
+    limite = 90;
+    estagio = "ESTE É SÓ UM TOQUE RÁPIDO. A pessoa pode só não ter visto a mensagem. Escreva UMA frase curta, de no máximo 90 caracteres, que só chame a atenção dela de volta para a conversa. " +
+      "Não faça pergunta sobre o sorriso, não fale de avaliação, cortesia, valores, Dra., agenda ou tratamento, não explique nada e não repita o que já foi dito. " +
+      "Exemplos do tamanho e do jeito certos: \"Oi, Fabiana! Conseguiu ver minha mensagem? 😊\" ou \"Oiii, ainda tá por aí? 💙\" (varie, não copie).";
+  } else if (esperaMin > 0 && esperaMin <= 180) {
+    limite = 160;
+    estagio = "É o segundo contato do dia. Escreva no máximo 2 frases curtas (até 160 caracteres) que retomem o ponto exato em que a conversa parou, com uma pergunta simples e fácil de responder. Não traga assunto novo.";
+  } else {
+    limite = 220;
+    estagio = "É o último contato do dia. Escreva no máximo 2 frases curtas (até 220 caracteres): uma informação útil da base ligada ao que a pessoa disse ou perguntou (se ela não disse nada, algo sobre como a clínica cuida da naturalidade do sorriso) e uma pergunta leve. Sem pressão.";
+  }
   const sistema =
     "Você é a Raffa, do atendimento da Bulhões Odontologia (lentes de contato dental em Santos). " +
-    "O lead parou de responder. Escreva UMA mensagem curta de follow-up (no máximo 300 caracteres) que retome a conversa exatamente do ponto em que parou.\n" +
-    "Regras: se o lead fez uma pergunta que ficou sem resposta, responda primeiro, usando só a base de conhecimento. " +
-    "Termine com uma pergunta simples que leve ao próximo passo (contar a queixa, escolher manhã ou tarde, confirmar). " +
-    "Não invente horários, valores, condições, prêmios ou números que não estejam na base. Nunca ofereça dia ou horário específico (você não vê a agenda): se a conversa parou na escolha de horário, pergunte qual dia e período ficam melhores. Não repita uma mensagem que a clínica já mandou. " +
+    "O lead parou de responder. Escreva UMA mensagem de follow-up de WhatsApp.\n" +
+    estagio + "\n" +
+    (respondeu ? "" : "O lead ainda NÃO respondeu nenhuma mensagem da clínica: não fale de avaliação, cortesia, valores nem agendamento, e não repita a pergunta que a clínica já fez. ") +
+    "Regras gerais: fale como uma pessoa no WhatsApp, simples e direta. Não liste opções (nada de \"cor, formato, tamanho ou espaços\"). Não fale de avaliação, cortesia ou valores se o lead não perguntou disso nem se a conversa ainda não chegou no agendamento. " +
+    "Se o lead fez uma pergunta que ficou sem resposta, responda primeiro, curto, usando só a base de conhecimento. " +
+    "Não invente horários, valores, condições, prêmios ou números. Nunca ofereça dia ou horário específico (você não vê a agenda). Não repita uma mensagem que a clínica já mandou. " +
     "Tom da Raffa: próximo, carinhoso, natural (pode usar \"Oiii\", no máximo um emoji). Nunca use hífen nem travessão. Não diga que é IA nem cite há quanto tempo a pessoa não responde. " +
+    (instrucao ? "Instrução deste passo: " + instrucao + " " : "") +
     "Responda só com o texto da mensagem." +
     (String(ag.base_conhecimento ?? "").trim() ? "\n\n# Base de conhecimento\n" + String(ag.base_conhecimento).trim() : "") +
     (nome ? `\n\nNome do lead: ${nome}.` : "");
@@ -294,8 +314,10 @@ export async function textoDaIA(c: any, nome?: string | null): Promise<string> {
   const j = await r.json();
   // nunca mandar texto cortado: se a resposta parou no limite, usa o texto de reserva do passo
   if (j?.stop_reason !== "end_turn") { console.error("[automacoes] ia parou:", j?.stop_reason, JSON.stringify(j?.usage ?? {})); return ""; }
-  const t = (j?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
-  return t.replace(/\s*[—–]\s*/g, ", ").slice(0, 700);
+  const t = (j?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim().replace(/\s*[—–]\s*/g, ", ");
+  // (04/11/2026) passou muito do tamanho do estágio: usa o texto de reserva do passo
+  if (t.length > limite + 40) { console.error("[automacoes] ia longa demais:", t.length, "limite", limite); return ""; }
+  return t;
 }
 
 // ---------- execução ----------
@@ -426,7 +448,7 @@ export async function processar(x: Exec, a: any, agora = () => Date.now(), geral
             tipo = fmt;
           } else if (p.tipo === "texto" || p.tipo === "ia") {
             registro = "";
-            if (p.tipo === "ia") registro = (await textoDaIA(k.c, k.nome).catch((e) => { console.error("[automacoes] ia", String(e)); return ""; })).trim();
+            if (p.tipo === "ia") registro = (await textoDaIA(k.c, k.nome, Number(passos.slice(0, i).reverse().find((q: any) => q?.tipo === "esperar")?.minutos) || 0, String(p.instrucao ?? "").trim()).catch((e) => { console.error("[automacoes] ia", String(e)); return ""; })).trim();
             if (!registro) registro = preencher(p.texto, dados).trim();
             if (!registro) { await avancar(x, i, "texto", "pulado", "texto vazio", i + 1, null, "ativa", k.c.id); i++; continue; }
             corpo = { type: "text", text: { body: registro.slice(0, 4096), preview_url: true } };
