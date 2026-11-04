@@ -2529,6 +2529,7 @@ body{letter-spacing:-.1px;}
             <option value="#Organico">#Organico</option>
             <option value="#Instagram ADS">#Instagram ADS</option>
             <option value="#Indicação">#Indicação</option>
+            <option value="#Programa de indicação">#Programa de indicação</option>
             <option value="#Social Selling">#Social Selling</option>
             <option value="__outra__">Outra (digitar)</option>
           </select>
@@ -3981,6 +3982,8 @@ function origemGrupoCanonico(origem){
   if(n.includes('instagram') && n.includes('ads'))return 'instagram_ads';
   if(n==='instagram'||n.includes('instagram ads'))return 'instagram_ads';
   if(n.includes('organico'))return 'organico';
+  // (04/11/2026) indicação ativa (pedido de 5 indicações) é origem própria
+  if(n.includes('programa') && n.includes('indicacao'))return 'programa_indicacao';
   if(n.includes('indicacao'))return 'indicacao';
   if(n.includes('social selling')||n==='social')return 'social_selling';
   if(n.includes('clinicorp direto'))return 'clinicorp_direto';
@@ -3998,6 +4001,7 @@ function origemLabelCanonico(origem){
     instagram_ads:'#Instagram ADS',
     organico:'#Orgânico',
     indicacao:'#Indicação',
+    programa_indicacao:'#Programa de indicação',
     social_selling:'#Social Selling',
     clinicorp_direto:'#Clinicorp Direto',
     cloudia_facebook:'Cloudia - Facebook',
@@ -10305,7 +10309,7 @@ function abrirEdicaoOrigem(){
   const ph=String(r.phone||'').replace(/\D/g,'');
   const origemAtual=(_ccData[ph]&&_ccData[ph].origemAtual)||getOrigemReal(ph)||applyEdits(r).origin||'';
   const select=document.getElementById('cc-origin-select');
-  const opcoesPadrao=['#Organico','#Instagram ADS','#Indicação','#Social Selling'];
+  const opcoesPadrao=['#Organico','#Instagram ADS','#Indicação','#Programa de indicação','#Social Selling'];
   if(opcoesPadrao.includes(origemAtual)){
     select.value=origemAtual;
     document.getElementById('cc-origin-custom').style.display='none';
@@ -10403,13 +10407,16 @@ function renderIndicacoes(){
     pac.push({k,ph,d});
   });
   // vendas do período por origem
+  let vendasProg=0;
   let vendas=0,vendasInd=0,valor=0,valorInd=0,indFechados=0,indFechadosComQuem=0;
   pac.forEach(({ph,d})=>{
     const aprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&!o.pacienteAntigo&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
     if(!aprov.length)return;
     const v=aprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
     vendas++;valor+=v;
-    const ind=/indica/i.test(origemAtualPaciente(ph,indNome(ph,d))||'')||!!d.indicadoPor;
+    const _org=origemAtualPaciente(ph,indNome(ph,d))||'';
+    const ind=/indica/i.test(_org)||!!d.indicadoPor;
+    if(ind&&/programa/i.test(_org))vendasProg++;
     if(ind){vendasInd++;valorInd+=v;indFechados++;if(d.indicadoPor&&d.indicadoPor.nome)indFechadosComQuem++;}
   });
   // NPS do período
@@ -10425,7 +10432,7 @@ function renderIndicacoes(){
   const indPer=pac.filter(({d})=>d.indicadoPor&&d.indicadoPor.nome&&(d.indicadoPor.em||'').slice(0,10)>=since&&(d.indicadoPor.em||'').slice(0,10)<=until);
   const indPerFech=indPer.filter(({d})=>(d.orcamentos||[]).some(o=>o.status==='Aprovado')).length;
   document.getElementById('ri-kpis').innerHTML=
-    _indCard('Vendas por indicação',vendas?Math.round(vendasInd/vendas*100)+'%':'—',`${vendasInd} de ${vendas} pacientes novos que fecharam · ${brl(valorInd)} de ${brl(valor)}`)+
+    _indCard('Vendas por indicação',vendas?Math.round(vendasInd/vendas*100)+'%':'—',`${vendasInd} de ${vendas} pacientes novos que fecharam (${vendasProg} pelo Programa de indicação) · ${brl(valorInd)} de ${brl(valor)}`)+
     _indCard('Indicações registradas',String(indPer.length),`${indPerFech} já fecharam · registradas no período`)+
     _indCard('NPS do período',score===null?'—':String(score),notas.length?`${notas.length} notas · ${prom} promotores · ${detr} detratores`:'Nenhuma nota registrada ainda')+
     _indCard('Taxa de adoção',base?(Math.round(nIndicadores/base*1000)/10).toLocaleString('pt-BR')+'%':'—',`${nIndicadores} pacientes já indicaram, de ${base} que fecharam tratamento (todas as datas)`)+
@@ -10474,7 +10481,7 @@ function renderIndicacoes(){
     const ind=(d.indicadoPor&&d.indicadoPor.nome)||'';
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
       <span style="flex:1;min-width:180px;color:#EEF1F7;"><b>${_indEsc(d.nomeAtual||'—')}</b><span style="color:#8C98B1;font-size:11px;"> · indicado por ${_indEsc(ind||'—')} · ${_indEsc(d.indicacao.momento||'')} · ${reg?new Date(reg+'T12:00').toLocaleDateString('pt-BR'):''}${cedo?' · chamar amanhã':''}</span></span>
-      <a href="${indWa(ph,IND_TEXTOS.chamarIndicado(_primeiroNome(d.nomeAtual),_primeiroNome(ind)))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;${cedo?'opacity:.6;':''}">💬 Chamar</a>
+      <a href="${indWa(ph,IND_TEXTOS.chamarIndicado(_primeiroNome(d.nomeAtual),_primeiroNome(ind),d.indicacao.tratamentoIndicador||''))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;${cedo?'opacity:.6;':''}">💬 Chamar</a>
       <button onclick="indChamei('${_indEsc(k)}')" style="background:#5A8A6A;color:#FFFFFF;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;">Chamei</button>
     </div>`;}).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum indicado esperando contato.</div>')+(jaChamados?`<div style="font-size:11px;color:#8C98B1;margin-top:8px;">${jaChamados} indicado(s) já chamado(s); o andamento aparece no ranking abaixo.</div>`:'');
   // detratores e neutros do período
@@ -10503,6 +10510,10 @@ function indAbrirRegistro(tel,momento,nomeFallback){
       <input class="ind-reg-nome" placeholder="Nome ${i+1}" style="flex:1.2;min-width:0;border:1px solid #2A3D66;border-radius:8px;padding:7px 9px;font-size:12px;background:#0D1A33;">
       <input class="ind-reg-tel" placeholder="WhatsApp (com DDD)" inputmode="tel" style="flex:1;min-width:0;border:1px solid #2A3D66;border-radius:8px;padding:7px 9px;font-size:12px;background:#0D1A33;"></div>`).join('');
   const momentos=['Fechamento','Entrega das lentes','NPS 9 ou 10','Outro'];
+  const dInd=ccDataLookup(ph)||{};
+  const orcTop=(dInd.orcamentos||[]).filter(o=>o.status==='Aprovado').sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
+  let tratPadrao=String((orcTop&&orcTop.tratamento)||'').trim();
+  if(tratPadrao)tratPadrao=tratPadrao.charAt(0).toLowerCase()+tratPadrao.slice(1);
   ov.innerHTML=`<div style="background:#12213F;border:1px solid #2A3D66;border-radius:14px;padding:18px;width:100%;max-width:520px;max-height:90vh;overflow:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:15px;font-weight:700;color:#EEF1F7;">🤝 Indicações de ${_indEsc(nome)}</div>
       <button onclick="document.getElementById('ind-reg-overlay').style.display='none'" style="background:none;border:none;color:#C3CBDB;font-size:18px;cursor:pointer;">✕</button></div>
@@ -10510,6 +10521,8 @@ function indAbrirRegistro(tel,momento,nomeFallback){
     <a href="${indWa(ph,IND_TEXTOS.pedir5(_primeiroNome(nome)))}" target="_blank" rel="noopener" style="display:inline-block;background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;margin-bottom:12px;">💬 Pedir 5 indicações pelo WhatsApp</a>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;"><span style="font-size:11px;color:#C3CBDB;">Momento</span>
       <select id="ind-reg-momento" style="border:1px solid #2A3D66;border-radius:8px;padding:5px 8px;font-size:12px;background:#0D1A33;">${momentos.map(m=>`<option ${m===momento?'selected':''}>${m}</option>`).join('')}</select></div>
+    <div style="margin-bottom:10px;"><div style="font-size:11px;color:#C3CBDB;margin-bottom:3px;">O que ${_indEsc(_primeiroNome(nome))} fez na clínica (entra na mensagem para os indicados)</div>
+      <input id="ind-reg-trat" value="${_indEsc(tratPadrao)}" placeholder="ex.: as lentes de contato em resina" style="width:100%;box-sizing:border-box;border:1px solid #2A3D66;border-radius:8px;padding:7px 9px;font-size:12px;background:#0D1A33;"></div>
     ${linhas}
     <div id="ind-reg-msg" style="font-size:11px;color:#E2BE6A;min-height:16px;margin:6px 0;"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -10523,6 +10536,7 @@ function indSalvarRegistro(phIndicador,nomeIndicador){
   const nomes=[...document.querySelectorAll('.ind-reg-nome')].map(x=>x.value.trim());
   const tels=[...document.querySelectorAll('.ind-reg-tel')].map(x=>normalizePhone(x.value));
   const momento=document.getElementById('ind-reg-momento').value;
+  const trat=(document.getElementById('ind-reg-trat').value||'').trim();
   const em=new Date().toISOString();
   const ok=[],pulados=[];
   nomes.forEach((n,i)=>{
@@ -10532,9 +10546,9 @@ function indSalvarRegistro(phIndicador,nomeIndicador){
     const ex=ccDataLookup(t);
     if((ex&&((ex.orcamentos||[]).length||ex.indicacao||ex.origemAtual))||cloudiaRowPorTel(t)){pulados.push((n||t)+' (já está no CRM)');return;}
     const d=npsDadosTel(t,true);
-    d.nomeAtual=n||t;d.origemAtual='#Indicação';d.editadoManualmente=true;
+    d.nomeAtual=n||t;d.origemAtual='#Programa de indicação';d.editadoManualmente=true;
     d.indicadoPor={nome:nomeIndicador,tel:normalizePhone(phIndicador),em,recompensa:{entregue:false}};
-    d.indicacao={registradoEm:em,momento,chamadoEm:null};
+    d.indicacao={registradoEm:em,momento,chamadoEm:null,tratamentoIndicador:trat};
     ok.push(n||t);
   });
   if(ok.length){
@@ -12966,7 +12980,7 @@ const IND_TEXTOS={
   promotor:n=>`${n}, que alegria ler isso! 💙 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
   pedir5:n=>`Oii, ${n}! 💙 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
   avisarAmigos:n=>`Muito obrigada, ${n}! 💙 Pra ninguém estranhar o nosso contato, você pode mandar a mensagem abaixo pra cada um? Amanhã a gente chama.\n\nOi! Lembrei de você 💙 Passei seu contato para a equipe da Bulhões Odontologia, aqui em Santos. Eles vão te chamar no WhatsApp para contar como funciona, e é sem compromisso nenhum!`,
-  chamarIndicado:(n,ind)=>`Oii, ${n}! Aqui é da equipe da Bulhões Odontologia 💙 ${ind} passou seu contato pra gente com muito carinho, achou que você ia gostar de conhecer a clínica. Você já pensou em mudar alguma coisa no seu sorriso?`,
+  chamarIndicado:(n,ind,trat)=>`Oii, ${n}! Aqui é da equipe da Bulhões Odontologia 💙 ${ind} ${trat?'fez '+trat+' aqui com a gente':'é paciente aqui da clínica'} e passou seu contato com muito carinho, achou que você ia gostar de conhecer a clínica também. Você já pensou em mudar alguma coisa no seu sorriso?`,
   neutro:n=>`Obrigada pela sinceridade, ${n} 💙 A gente quer que a sua experiência seja nota 10. O que faltou pra chegar lá? Pode falar à vontade, isso chega direto na Dra.`,
   detrator:n=>`${n}, obrigada por contar com tanta sinceridade. Sinto muito que a experiência não foi como você esperava. A Dra. quer entender com calma o que aconteceu. Ela pode te ligar? Qual horário fica melhor pra você?`,
   agradecer:n=>`Oii, ${n}! Passando pra te agradecer de coração: uma pessoa querida chegou até a gente por indicação sua 💙 Obrigada pela confiança de falar da Bulhões pra alguém tão próximo. Isso tem um valor enorme pra nós.`
@@ -14886,7 +14900,9 @@ function populateDynamicSelects(){
   ['cl-origem','cc2-origem','lc-origem'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     const cur=el.value;
-    el.innerHTML='<option value="">Selecione...</option>'+(_listas.origens?_listas.origens.ativos||[]:['#Instagram ADS','#Orgânico']).map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');
+    const _ors=(_listas.origens?(_listas.origens.ativos||[]).slice():['#Instagram ADS','#Orgânico']);
+    if(!_ors.includes('#Programa de indicação'))_ors.push('#Programa de indicação');
+    el.innerHTML='<option value="">Selecione...</option>'+_ors.map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');
   });
 }
 
