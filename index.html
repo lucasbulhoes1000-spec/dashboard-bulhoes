@@ -10408,6 +10408,11 @@ function renderIndicacoes(){
   const notas=pac.filter(({d})=>d.nps&&d.nps.nota!==null&&d.nps.nota!==undefined&&d.nps.nota!==''&&(d.nps.data||'')>=since&&(d.nps.data||'')<=until);
   const prom=notas.filter(x=>Number(x.d.nps.nota)>=9).length,detr=notas.filter(x=>Number(x.d.nps.nota)<=6).length;
   const score=notas.length?Math.round((prom-detr)/notas.length*100):null;
+  // taxa de adoção e engajamento (Noll, módulo 9), todas as datas
+  const base=pac.filter(({d})=>(d.orcamentos||[]).some(o=>o.status==='Aprovado')).length;
+  const indicadoresSet=new Set();let totInd=0;
+  pac.forEach(({d})=>{const ip=d.indicadoPor;if(ip&&ip.nome){totInd++;indicadoresSet.add(ip.tel||normStr(ip.nome));}});
+  const nIndicadores=indicadoresSet.size;
   // indicações recebidas no período (data do registro)
   const indPer=pac.filter(({d})=>d.indicadoPor&&d.indicadoPor.nome&&(d.indicadoPor.em||'').slice(0,10)>=since&&(d.indicadoPor.em||'').slice(0,10)<=until);
   const indPerFech=indPer.filter(({d})=>(d.orcamentos||[]).some(o=>o.status==='Aprovado')).length;
@@ -10415,6 +10420,8 @@ function renderIndicacoes(){
     _indCard('Vendas por indicação',vendas?Math.round(vendasInd/vendas*100)+'%':'—',`${vendasInd} de ${vendas} pacientes novos que fecharam · ${brl(valorInd)} de ${brl(valor)}`)+
     _indCard('Indicações registradas',String(indPer.length),`${indPerFech} já fecharam · registradas no período`)+
     _indCard('NPS do período',score===null?'—':String(score),notas.length?`${notas.length} notas · ${prom} promotores · ${detr} detratores`:'Nenhuma nota registrada ainda')+
+    _indCard('Taxa de adoção',base?(Math.round(nIndicadores/base*1000)/10).toLocaleString('pt-BR')+'%':'—',`${nIndicadores} pacientes já indicaram, de ${base} que fecharam tratamento (todas as datas)`)+
+    _indCard('Engajamento',nIndicadores?(Math.round(totInd/nIndicadores*10)/10).toLocaleString('pt-BR'):'—',`indicações por paciente que indica (${totInd} no total)`)+
     _indCard('Quem indicou preenchido',indFechados?Math.round(indFechadosComQuem/indFechados*100)+'%':'—',`${indFechadosComQuem} de ${indFechados} vendas por indicação com o nome de quem indicou`);
   // promotores pendentes (qualquer data)
   const proms=pac.filter(({d})=>d.nps&&Number(d.nps.nota)>=9&&d.nps.nota!==null&&d.nps.nota!==''&&!(d.nps.pedido&&d.nps.pedido.em))
@@ -10423,7 +10430,7 @@ function renderIndicacoes(){
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
       <span style="font-weight:700;color:#6ADC96;min-width:28px;">${d.nps.nota}</span>
       <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;"> · ${d.nps.data?new Date(d.nps.data+'T12:00').toLocaleDateString('pt-BR'):''}${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
-      <a href="${linkWhatsapp(ph)||'#'}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+      <a href="${indWa(ph,IND_TEXTOS.promotor(_primeiroNome(indNome(ph,d))))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 Pedir indicação</a>
       <button onclick="indPedidoFeito('${_indEsc(k)}')" style="background:#5A8A6A;color:#FFFFFF;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;">Pedido feito</button>
     </div>`).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum promotor esperando o pedido. As notas entram pelo Fluxo pós-venda.</div>';
   // indicadores (todas as datas)
@@ -10443,7 +10450,7 @@ function renderIndicacoes(){
   window._indGrupos=lista;
   document.getElementById('ri-indicadores').innerHTML=lista.length?lista.map((g,i)=>`
     <tr style="border-top:1px solid #1E2E52;">
-      <td style="padding:8px 16px;color:#EEF1F7;">${_indEsc(g.nome)}${g.tel?'':' <span style="color:#E58A8A;font-size:10px;" title="Nome não encontrado entre os pacientes">sem ficha</span>'}</td>
+      <td style="padding:8px 16px;color:#EEF1F7;">${_indEsc(g.nome)}${g.tel?` <a href="${indWa(g.tel,IND_TEXTOS.agradecer(_primeiroNome(g.nome)))}" target="_blank" rel="noopener" title="Duplo A: agradecer e ativar" style="color:#25D366;font-size:11px;text-decoration:none;">💬 agradecer</a>`:' <span style="color:#E58A8A;font-size:10px;" title="Nome não encontrado entre os pacientes">sem ficha</span>'}</td>
       <td style="text-align:center;">${g.ind}</td><td style="text-align:center;">${g.comp}</td><td style="text-align:center;">${g.fech}</td>
       <td style="text-align:center;">${g.valor?brl(g.valor):'—'}</td>
       <td style="text-align:center;">${g.devida?`<button onclick="indRecompensaEntregue(${i})" style="background:#B08A3E;color:#FFFFFF;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;">${g.devida} a entregar · marcar entregue</button>`:(g.entregue?'<span style="color:#6ADC96;">✓ entregue</span>':'<span style="color:#8C98B1;">—</span>')}</td>
@@ -10455,7 +10462,7 @@ function renderIndicacoes(){
     return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
       <span style="font-weight:700;color:${cor};min-width:28px;">${n}</span>
       <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;">${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
-      <a href="${linkWhatsapp(ph)||'#'}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+      <a href="${indWa(ph,IND_TEXTOS[n<=6?'detrator':'neutro'](_primeiroNome(indNome(ph,d))))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 ${n<=6?'Avisar que a Dra. vai ligar':'Perguntar o que faltou'}</a>
     </div>`;}).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum detrator ou neutro no período.</div>';
 }
 function indPedidoFeito(k){
@@ -12722,6 +12729,7 @@ function renderFluxoCards() {
             Pós-venda enviada
           </label>
           ${p.tel ? `<a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Chamar no WhatsApp</a>` : ''}
+          ${p.tel && !p.npsEnviado ? `<a href="${indWa(p.tel,IND_TEXTOS.nps(_primeiroNome(p.nome),npsLinkPaciente(p.nome,p.tel)))}" target="_blank" rel="noopener" title="Abre o WhatsApp com a mensagem e o link do formulário (já com o nome do paciente)" style="background:#B08A3E;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">⭐ Enviar NPS</a>` : ''}
         </div>
         ${p.npsEnviado ? npsLinhaHtml(p,pIdx) : ''}
       </div>` : ''}
@@ -12844,6 +12852,18 @@ function retomarFluxo(idx) {
 
 // (04/11/2026) NPS gravado na ficha do paciente: _ccData[ph].nps = {nota, motivo, data}
 // 9-10 promotor (pedir indicação), 7-8 neutro, 0-6 detrator (Dra. liga).
+// (04/11/2026) Textos do método Noll (doc "Indicação ativa e NPS: scripts e rotina")
+const NPS_FORM_URL='https://docs.google.com/forms/d/e/1FAIpQLSdFlSABXtXQAICH1-G12iAfkmbjeRpOobEo8kFDstapYbkkdA/viewform';
+function _primeiroNome(n){n=String(n||'').trim().split(/\s+/)[0]||'';return n?n.charAt(0).toUpperCase()+n.slice(1).toLowerCase():'';}
+function npsLinkPaciente(nome,tel){return NPS_FORM_URL+'?usp=pp_url&entry.1158559488='+encodeURIComponent((String(nome||'').trim()+(tel?' · '+normalizePhone(tel):'')).trim());}
+const IND_TEXTOS={
+  nps:(n,link)=>`Oii, ${n}! Aqui é a Lívia, da Bulhões 💙 Foi muito especial acompanhar você até o sorriso novo. Posso te pedir um favor rapidinho? Queremos saber como foi a sua experiência com a gente, leva menos de 1 minuto: ${link}`,
+  promotor:n=>`${n}, que alegria ler isso! 💙 Mostrei pra equipe e todo mundo ficou feliz. Uma coisa que a gente percebe: quase sempre quem passa por aqui tem alguém por perto que também sonha em mudar o sorriso e não sabe por onde começar. Se você lembrar de alguém assim, pode me mandar o contato ou passar o meu número, que eu cuido dessa pessoa com o mesmo carinho que tivemos com você. Tem alguém que te vem à cabeça?`,
+  neutro:n=>`Obrigada pela sinceridade, ${n} 💙 A gente quer que a sua experiência seja nota 10. O que faltou pra chegar lá? Pode falar à vontade, isso chega direto na Dra.`,
+  detrator:n=>`${n}, obrigada por contar com tanta sinceridade. Sinto muito que a experiência não foi como você esperava. A Dra. quer entender com calma o que aconteceu. Ela pode te ligar? Qual horário fica melhor pra você?`,
+  agradecer:n=>`Oii, ${n}! Passando pra te agradecer de coração: uma pessoa querida chegou até a gente por indicação sua 💙 Obrigada pela confiança de falar da Bulhões pra alguém tão próximo. Isso tem um valor enorme pra nós.`
+};
+function indWa(tel,texto){const l=linkWhatsapp(tel);return l?l+'?text='+encodeURIComponent(texto):'#';}
 function npsDadosTel(tel, criar){
   const d=ccDataLookup(tel);if(d||!criar)return d;
   const k=normalizePhone(tel);if(!k)return null;
@@ -12862,7 +12882,8 @@ function npsLinhaHtml(p,pIdx){
     <span style="font-size:12px;color:#C3CBDB;font-weight:600;">Nota NPS</span>
     <select onchange="salvarNpsFluxo(${pIdx},'nota',this.value)" style="border:1px solid #2A3D66;border-radius:8px;padding:5px 8px;font-size:12px;background:#0D1A33;color:${cor};font-weight:700;">${ops}</select>
     <input type="text" value="${String(nps.motivo||'').replace(/"/g,'&quot;')}" placeholder="O que o paciente comentou (opcional)" onchange="salvarNpsFluxo(${pIdx},'motivo',this.value)" style="flex:1;min-width:180px;border:1px solid #2A3D66;border-radius:8px;padding:5px 9px;font-size:12px;background:#0D1A33;">
-    <span style="font-size:11px;color:${cor};flex-basis:100%;">${dica}</span>
+    <span style="font-size:11px;color:${cor};flex:1;min-width:200px;">${dica}</span>
+    ${cl?`<a href="${indWa(p.tel,IND_TEXTOS[cl](_primeiroNome(p.nome)))}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 ${cl==='promotor'?'Pedir indicação':(cl==='neutro'?'Perguntar o que faltou':'Avisar que a Dra. vai ligar')}</a>`:''}
   </div>`;
 }
 function salvarNpsFluxo(idx,campo,valor){
