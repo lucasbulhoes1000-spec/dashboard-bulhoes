@@ -18334,34 +18334,55 @@ const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradeci
 // manda as mensagens e move o card; o CRM só controla o prazo de cada etapa,
 // contado da data da avaliação. "dia" = até quando aquela mensagem deve sair.
 const KB_ORC_ETAPAS=[
-  {id:'Compareceu - orçamento realizado',dia:null,alias:[''],dica:'Fez a avaliação e recebeu o orçamento. A Lívia arrasta para a próxima etapa'},
-  {id:'Retorno combinado (Pix)',dia:null,alias:['Agendou retorno','Aguardando entrada','Avaliação comercial'],dica:'Pediu para pensar: data de retorno combinada e Pix de compromisso de R$ 100'},
-  {id:'Aguardando 1° contato',dia:0,alias:[]},
-  // (04/11/2026) processo novo: o card fica na etapa da última mensagem ENVIADA
-  {id:'1. Agradecimento',dia:0,alias:['1° contato - Vídeo de agradecimento'],dica:'Mensagem 1 hora depois da avaliação'},
-  {id:'2. Antes e depois',dia:1,alias:['2° contato - Antes/Depois + lembrei de você']},
-  {id:'3. Depoimento',dia:3,alias:['3° contato - Depoimento']},
-  {id:'4. Mais um depoimento',dia:4,alias:['Pergunta sincera','Sem resposta']},
-  {id:'5. Mensagens apagadas',dia:7,alias:['Nova proposta']},
-  {id:'6. Conseguiu ver?',dia:8,alias:['Conseguiu ver?']},
-  {id:'7. Despedida',dia:10,alias:['Mensagem de despedida']},
-  {id:'Cadência mensal',dia:30,alias:[],dica:'Recebe um conteúdo por mês e as campanhas internas'},
+  // (04/11/2026) o card fica na etapa da mensagem que a Lívia vai mandar.
+  // Quem não fechou entra direto no 1. Agradecimento. Os aliases levam as fases
+  // antigas (que guardavam a última mensagem ENVIADA) para a mensagem seguinte.
+  {id:'1. Agradecimento',dia:0,envio:true,alias:['','Compareceu - orçamento realizado','Aguardando 1° contato','Retorno combinado (Pix)','Agendou retorno','Aguardando entrada','Avaliação comercial'],dica:'Mandar 1 hora depois da avaliação'},
+  {id:'2. Antes e depois',dia:1,envio:true,alias:['1° contato - Vídeo de agradecimento'],dica:'Mandar no dia seguinte à avaliação'},
+  {id:'3. Depoimento',dia:3,envio:true,alias:['2° contato - Antes/Depois + lembrei de você'],dica:'Mandar no 3º dia'},
+  {id:'4. Mais um depoimento',dia:4,envio:true,alias:['3° contato - Depoimento'],dica:'Mandar no 4º dia'},
+  {id:'5. Mensagens apagadas',dia:7,envio:true,alias:['Pergunta sincera','Sem resposta'],dica:'Mandar no 7º dia'},
+  {id:'6. Conseguiu ver?',dia:8,envio:true,alias:['Nova proposta'],dica:'Mandar no 8º dia'},
+  {id:'7. Despedida',dia:10,envio:true,alias:['Conseguiu ver?'],dica:'Mandar no 10º dia'},
+  {id:'Cadência mensal',dia:null,alias:['Mensagem de despedida'],dica:'Terminou a sequência ou fez a avaliação há mais de 30 dias: conteúdo mensal e campanhas internas'},
   {id:'Fechou',dia:null,alias:['Pós venda']}
 ];
-const KB_ORC_ANTIGAS=['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','3° contato - Depoimento','Pergunta sincera','Nova proposta','Conseguiu ver?','Mensagem de despedida'];
+const KB_ORC_ANTIGAS=['Compareceu - orçamento realizado','Aguardando 1° contato','Retorno combinado (Pix)','1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','3° contato - Depoimento','Pergunta sincera','Nova proposta','Conseguiu ver?','Mensagem de despedida'];
 function _kbOrcEtapa(fase){
   const f=String(fase||'');
-  const e=KB_ORC_ETAPAS.find(x=>x.id===f||x.alias.includes(f));
-  return e?e.id:'__outras';
+  const e=KB_ORC_ETAPAS.find(x=>x.id===f)||KB_ORC_ETAPAS.find(x=>x.alias.includes(f));
+  return e?e.id:'1. Agradecimento';
 }
 // (04/11/2026) quem compareceu há mais de 30 dias e não fechou vai direto para a
 // Cadência mensal (menos quem tem retorno combinado)
 function _kbOrcVelho(it){const b=_kbOrcBase(it);return !!b&&(Date.now()-b.getTime())/86400000>30;}
+function _fupRetorno(it){
+  // retorno combinado na avaliação (Pix de compromisso). Antes ficava como fase
+  // "Retorno combinado (Pix)" com a data no próximo contato da atividade.
+  const r=it.d&&it.d.fupRetorno;
+  if(r&&r.data)return {data:r.data,pix:!!r.pix};
+  if(r&&r.limpo)return null;
+  const f=String(it.fase||'');
+  if(['Retorno combinado (Pix)','Agendou retorno','Aguardando entrada','Avaliação comercial'].includes(f)){
+    const p=it.atv&&it.atv.proximo;return {data:p||'',pix:f==='Retorno combinado (Pix)'};
+  }
+  return null;
+}
 function _kbOrcColuna(it){
   if(it.fechou)return 'Fechou';
   const e=_kbOrcEtapa(it.fase);
-  if(e!=='Retorno combinado (Pix)'&&e!=='Cadência mensal'&&_kbOrcVelho(it))return 'Cadência mensal';
+  const ret=_fupRetorno(it);
+  const retFuturo=ret&&ret.data&&new Date(ret.data+'T23:59')>=new Date();
+  if(e!=='Cadência mensal'&&!retFuturo&&_kbOrcVelho(it))return 'Cadência mensal';
   return e;
+}
+// prazo da mensagem da coluna: o retorno combinado manda; senão, dias desde a avaliação
+function _kbOrcPrazo(it,col){
+  const e=KB_ORC_ETAPAS.find(x=>x.id===col);if(!e||!e.envio)return null;
+  const ret=_fupRetorno(it);
+  if(ret&&ret.data)return {nome:col,ate:new Date(ret.data+'T00:00'),retorno:true};
+  const b=_kbOrcBase(it);if(!b)return null;
+  return {nome:col,ate:new Date(b.getFullYear(),b.getMonth(),b.getDate()+e.dia)};
 }
 function _kbOrcBase(it){
   // data da avaliação: a da consulta; se não tiver, a do orçamento de maior valor
@@ -18385,7 +18406,7 @@ function _kbGarantirFasesProcesso(){
   try{
     if(!_listas||!_listas.fases)return;
     const at=_listas.fases.ativos||(_listas.fases.ativos=[]);let mudou=false;
-    KB_ORC_ETAPAS.forEach(e=>{if(e.id!=='Compareceu - orçamento realizado'&&!at.includes(e.id)){at.push(e.id);mudou=true;}});
+    KB_ORC_ETAPAS.forEach(e=>{if(!at.includes(e.id)){at.push(e.id);mudou=true;}});
     // (04/11/2026) etapas do processo antigo saem da lista (os cards antigos continuam no quadro pelo alias)
     const des=_listas.fases.desativos||(_listas.fases.desativos=[]);
     KB_ORC_ANTIGAS.forEach(n=>{const k=at.indexOf(n);if(k>=0){at.splice(k,1);if(!des.includes(n))des.push(n);mudou=true;}});
@@ -18395,11 +18416,13 @@ function _kbGarantirFasesProcesso(){
 // ===== Follow-up de orçamentos: script da Lívia dentro do card (04/11/2026) =====
 const FUP_MOTIVOS=['Financeiro','Medo do resultado','Momento','Conversar com alguém','Outro'];
 function fupProximaEtapa(col){
-  if(col==='Fechou'||col==='Cadência mensal'||col==='7. Despedida'||col==='Retorno combinado (Pix)'||col==='__outras')return null;
-  if(col==='Compareceu - orçamento realizado'||col==='Aguardando 1° contato')return '1. Agradecimento';
-  const i=KB_ORC_ETAPAS.findIndex(x=>x.id===col);
+  const e=KB_ORC_ETAPAS.find(x=>x.id===col);
+  return e&&e.envio?e.id:null;
+}
+function _fupDepois(etapa){
+  const i=KB_ORC_ETAPAS.findIndex(x=>x.id===etapa);
   const p=KB_ORC_ETAPAS[i+1];
-  return p&&p.dia!=null?p.id:null;
+  return p?p.id:'Cadência mensal';
 }
 function _fupPrimeiroNome(n){const p=String(n||'').trim().split(/\s+/)[0]||'';return p?p.charAt(0).toUpperCase()+p.slice(1).toLowerCase():'';}
 function fupBlocos(it,etapa){
@@ -18438,16 +18461,17 @@ function fupRender(){
   const {it,etapa,col}=_fupAtual;
   const fn=(it.d&&it.d.fupNotas)||{};
   const base=_kbOrcBase(it);
-  const px=_kbOrcProxima(it,col);
+  const px=_kbOrcPrazo(it,col);
+  const ret=_fupRetorno(it)||{};
   const ben=(_listas&&_listas.fupBeneficio)||{};
   const wa=linkWhatsapp(it.r&&it.r.phone);
   const blocos=fupBlocos(it,etapa);
-  const seguinte=etapa;
+  const seguinte=_fupDepois(etapa);
   let m=document.getElementById('fup-modal');
   if(!m){m=document.createElement('div');m.id='fup-modal';document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)fupFechar();});}
   m.innerHTML=`<div class="fup-box">
     <h3>${_kbEsc(etapa)}</h3>
-    <div class="fup-sub">${_kbEsc(it.nome)}${base?' · avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${px?' · enviar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${it.aberto>0?' · '+fmt(it.aberto):''}</div>
+    <div class="fup-sub">${_kbEsc(it.nome)}${base?' · avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${px?(px.retorno?' · retorno combinado ':' · mandar até ')+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${it.aberto>0?' · '+fmt(it.aberto):''}</div>
     <div class="fup-sec">
       <div class="fup-bt">Anotação da avaliação (Dra. Victoria)</div>
       <label>O que a paciente mais queria ou a dúvida que ficou</label>
@@ -18455,6 +18479,13 @@ function fupRender(){
       <label>Por que não fechou</label>
       <select id="fup-motivo"><option value="">Escolha</option>${FUP_MOTIVOS.map(o=>'<option'+(fn.motivo===o?' selected':'')+'>'+o+'</option>').join('')}</select>
       <div class="fup-acoes"><button type="button" onclick="fupSalvarNotas()">Salvar anotação</button></div>
+    </div>
+    <div class="fup-sec">
+      <div class="fup-bt">Retorno combinado na avaliação</div>
+      <label>Data combinada para falar com a paciente (o prazo passa a ser essa data)</label>
+      <input id="fup-ret-data" type="date" value="${_kbEsc(ret.data||'')}">
+      <label style="display:flex;align-items:center;gap:6px;margin-top:6px;"><input id="fup-ret-pix" type="checkbox" style="width:auto;" ${ret.pix?'checked':''}> Pagou o Pix de compromisso (R$ 100)</label>
+      <div class="fup-acoes"><button type="button" onclick="fupSalvarRetorno()">Salvar retorno</button>${ret.data||ret.pix?'<button type="button" onclick="fupSalvarRetorno(true)">Tirar retorno</button>':''}</div>
     </div>
     ${blocos.map((b,k)=>`<div class="fup-bloco"><div class="fup-bt">${_kbEsc(b.t)}</div>${b.nota?'<div class="fup-nota">'+_kbEsc(b.nota)+'</div>':''}
       <textarea id="fup-txt-${k}" rows="${Math.min(12,Math.max(2,Math.ceil(b.x.length/68)+b.x.split('\n').length-1))}">${_kbEsc(b.x)}</textarea>
@@ -18497,16 +18528,28 @@ function fupSalvarBeneficio(){
   showToast('success','Benefício do mês salvo','Vale para todos os cards na etapa 5.');
   fupRender();
 }
+function fupSalvarRetorno(limpar){
+  const it=_fupAtual&&_fupAtual.it;if(!it||!it.r)return;
+  const key=ccKey(it.r);if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  _ccData[key].fupRetorno=limpar?{limpo:true}:{data:document.getElementById('fup-ret-data').value||'',pix:!!document.getElementById('fup-ret-pix').checked};
+  it.d=_ccData[key];
+  salvarCRMDebounced();
+  showToast('success',limpar?'Retorno retirado':'Retorno salvo','Aparece no card.');
+  try{if(typeof kbRender==='function')kbRender('clientes');}catch(e){}
+  fupRender();
+}
 function fupEnviei(){
   const a=_fupAtual;if(!a||!a.it.r)return;
-  const destino=a.etapa;
+  const destino=_fupDepois(a.etapa);
   const key=ccKey(a.it.r);
   if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
   const d=_ccData[key];
-  (d.fupLog||(d.fupLog=[])).push({etapa:destino,em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''});
+  (d.fupLog||(d.fupLog=[])).push({etapa:a.etapa,em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''});
+  // o retorno combinado era para este contato: depois de enviar, o prazo volta a ser o da sequência
+  if(_fupRetorno(a.it))d.fupRetorno={limpo:true};
   fupFechar();
   editarFaseAtivTabela(key,destino);
-  if(destino==='7. Despedida')showToast('success','Despedida enviada','Na próxima, arraste o card para Cadência mensal.');
+  if(destino==='Cadência mensal')showToast('success','Sequência concluída','O card foi para a Cadência mensal.');
 }
 // ficha do cliente: anotação da avaliação para o follow-up
 function ccFupNotasRender(d){
@@ -18779,9 +18822,7 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('clientes-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('clientes-pagination')];},
     colunas:()=>{
       _kbGarantirFasesProcesso();
-      const cols=KB_ORC_ETAPAS.map(e=>({id:e.id,nome:e.id,solta:true,dica:e.dica||(e.dia!=null?'Mensagem até o dia '+e.dia+' depois da avaliação':'')}));
-      cols.push({id:'__outras',nome:'Outras fases',dica:'Fases antigas que não estão no processo: arraste para a etapa certa'});
-      return cols;
+      return KB_ORC_ETAPAS.map(e=>({id:e.id,nome:e.id,solta:true,dica:e.dica||''}));
     },
     itens:()=>(_clientesFiltrados||[]).map(r=>{
       const ph=String(r.phone||'').replace(/\D/g,'');
@@ -18803,12 +18844,11 @@ const KB_QUADROS={
         const l=porCol[c.id]||[];
         let atras=0,hj=0;
         l.forEach(it=>{
-          if(c.id==='Retorno combinado (Pix)'){const p=it.atv&&it.atv.proximo;if(p){const dd=new Date(p+'T00:00');if(dd<hoje)atras++;else if(+dd===+hoje)hj++;}return;}
-          const px=_kbOrcProxima(it,c.id);if(!px)return;
+          const px=_kbOrcPrazo(it,c.id);if(!px)return;
           if(px.ate<hoje)atras++;else if(+px.ate===+hoje)hj++;
         });
         const partes=[];if(hj)partes.push(hj+' para hoje');if(atras)partes.push(atras+' atrasado'+(atras>1?'s':''));
-        m[c.id]=partes.length?{txt:partes.join(' · '),det:'Prazo da próxima mensagem, contado da data da avaliação',alerta:atras>0}:null;
+        m[c.id]=partes.length?{txt:partes.join(' · '),det:'Prazo da mensagem desta etapa, contado da avaliação (ou a data do retorno combinado)',alerta:atras>0}:null;
       });
       return m;
     },
@@ -18817,14 +18857,13 @@ const KB_QUADROS={
       const trat=it.top&&it.top.tratamento?String(it.top.tratamento).split(',')[0].trim():'';
       const valor=it.fechou?it.fechado:it.aberto;
       let prazo='';
-      if(col==='Retorno combinado (Pix)'){
-        const p=it.atv&&it.atv.proximo;
-        if(p){const dd=new Date(p+'T00:00');prazo='<span class="kb-tag '+(dd<hoje?'atraso':(+dd===+hoje?'hoje':''))+'">retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';}
-        else prazo='<span class="kb-tag atraso">sem data de retorno</span>';
-      }else{
-        const px=_kbOrcProxima(it,col);
-        if(px)prazo='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">'+_kbEsc(px.nome.replace(/ - .*/,''))+' até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
+      const ret=_fupRetorno(it);
+      if(ret&&!it.fechou){
+        const dd=ret.data?new Date(ret.data+'T00:00'):null;
+        prazo+='<span class="kb-tag '+(!dd||dd<hoje?'atraso':(+dd===+hoje?'hoje':'ok'))+'">'+(ret.pix?'Pix de compromisso · ':'')+(dd?'retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'retorno sem data')+'</span> ';
       }
+      const px=_kbOrcPrazo(it,col);
+      if(px&&!px.retorno)prazo+='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">mandar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
       const base=_kbOrcBase(it);
       const fn=(it.d&&it.d.fupNotas)||{};
       const prox=fupProximaEtapa(col);
@@ -18833,19 +18872,17 @@ const KB_QUADROS={
         <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${base?'<span>avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':''}</div>
         ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}
         ${fn.motivo?'<div class="kb-linha"><span class="kb-tag">'+_kbEsc(fn.motivo)+'</span></div>':''}
-        ${prox&&!it.fechou?'<button type="button" class="kb-fup-btn" onclick="event.stopPropagation();fupAbrir('+it._i+')">✉ Mensagem: '+_kbEsc(prox)+'</button>':''}`;
+        ${prox&&!it.fechou?'<button type="button" class="kb-fup-btn" onclick="event.stopPropagation();fupAbrir('+it._i+')">✉ Abrir mensagem</button>':''}`;
     },
     abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
     soltar:(it,col)=>{
-      if(col==='__outras'){showToast('error','Escolha uma etapa','Arraste para uma das etapas do follow-up.');return false;}
-      if(col==='Compareceu - orçamento realizado'){showToast('error','Essa é a entrada','Quem acabou de fazer a avaliação entra aqui sozinho. Arraste para a etapa seguinte.');return false;}
       if(col==='Fechou'){showToast('error','Fechou anda sozinho','O card vai para Fechou quando o orçamento é aprovado.');return false;}
-      if(col!=='Cadência mensal'&&col!=='Retorno combinado (Pix)'&&_kbOrcVelho(it)){showToast('error','Mais de 30 dias da avaliação','Fica na Cadência mensal. Se a paciente voltou a conversar, use Retorno combinado (Pix) com a data.');return false;}
+      const ret=_fupRetorno(it);const retFuturo=ret&&ret.data&&new Date(ret.data+'T23:59')>=new Date();
+      if(col!=='Cadência mensal'&&!retFuturo&&_kbOrcVelho(it)){showToast('error','Mais de 30 dias da avaliação','Fica na Cadência mensal. Se a paciente voltou a conversar, abra a mensagem e marque um retorno combinado.');return false;}
       editarFaseAtivTabela(ccKey(it.r),col);
-      if(col==='Retorno combinado (Pix)')showToast('success','Marque a data do retorno','Abra o card e preencha o próximo contato com a data combinada.');
       return true;
     },
-    aviso:()=>'Follow-up de orçamentos (processo de 04/11/2026). O card fica na etapa da última mensagem enviada. Clique em ✉ Mensagem no card para ver o texto pronto, copiar ou abrir no WhatsApp, e depois em Enviei para mover o card. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10. Quem fez a avaliação há mais de 30 dias e não fechou vai sozinho para a Cadência mensal (menos quem tem Retorno combinado). Outras fases: cards com uma fase que não existe no processo (fases antigas ou criadas à mão); arraste para a etapa certa. Cada pessoa conta uma vez, pelo orçamento de maior valor.'
+    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Pix de compromisso e retorno combinado aparecem no card e o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
   },
   fluxo:{
     titulo:'Em Fluxo',
