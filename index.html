@@ -1318,6 +1318,10 @@ body{letter-spacing:-.1px;}
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></span>
       <span class="nav-label">Orçamentos Fechados</span>
     </div>
+    <div class="nav-item" onclick="switchPage('rel-indicacoes',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span>
+      <span class="nav-label">Indicações e NPS</span>
+    </div>
   </div>
 </div>
 
@@ -2225,6 +2229,34 @@ body{letter-spacing:-.1px;}
       </div>
     </div>
 
+    <!-- ===== INDICAÇÕES E NPS (04/11/2026, método Noll) ===== -->
+    <div class="page" id="page-rel-indicacoes">
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div><label style="font-size:11px;color:#8C98B1;display:block;margin-bottom:3px;">Data inicial</label><input type="date" id="ri-from" onchange="renderIndicacoes()" style="border:0.5px solid #2A3D66;border-radius:6px;padding:6px 10px;font-size:12px;background:#0D1A33;outline:none;"></div>
+        <div><label style="font-size:11px;color:#8C98B1;display:block;margin-bottom:3px;">Data final</label><input type="date" id="ri-to" onchange="renderIndicacoes()" style="border:0.5px solid #2A3D66;border-radius:6px;padding:6px 10px;font-size:12px;background:#0D1A33;outline:none;"></div>
+        <div style="font-size:11px;color:#8C98B1;max-width:520px;line-height:1.5;">Vendas pela data de fechamento. NPS pela data em que a nota foi registrada no Fluxo pós-venda. Quem indicou é preenchido no card do lead ou na origem do cliente quando a origem é #Indicação.</div>
+      </div>
+      <div id="ri-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px;"></div>
+      <div class="table-card" style="margin-bottom:18px;">
+        <div class="table-title" style="padding:14px 16px 6px;font-weight:700;">Promotores para pedir indicação</div>
+        <div style="font-size:11px;color:#8C98B1;padding:0 16px 10px;">Pacientes que deram 9 ou 10 e ainda não receberam o pedido. Depois de pedir, marque como feito.</div>
+        <div id="ri-promotores" style="padding:0 16px 14px;"></div>
+      </div>
+      <div class="table-card" style="margin-bottom:18px;">
+        <div class="table-title" style="padding:14px 16px 6px;font-weight:700;">Quem mais indica</div>
+        <div style="font-size:11px;color:#8C98B1;padding:0 16px 10px;">Todas as indicações registradas (sem filtro de data). Recompensa devida quando o indicado fecha.</div>
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr><th style="text-align:left;padding:8px 16px;">Indicador</th><th>Indicações</th><th>Compareceram</th><th>Fecharam</th><th>Valor fechado</th><th>Recompensa</th></tr></thead>
+          <tbody id="ri-indicadores"></tbody>
+        </table></div>
+      </div>
+      <div class="table-card" style="margin-bottom:18px;">
+        <div class="table-title" style="padding:14px 16px 6px;font-weight:700;">Detratores e neutros no período</div>
+        <div style="font-size:11px;color:#8C98B1;padding:0 16px 10px;">Nota até 6: a Dra. liga antes de qualquer pedido. Nota 7 ou 8: entender o que faltou.</div>
+        <div id="ri-detratores" style="padding:0 16px 14px;"></div>
+      </div>
+    </div>
+
     <!-- ===== REL ORÇAMENTOS FECHADOS ===== -->
     <div class="page" id="page-rel-orcamentos">
       <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
@@ -2481,7 +2513,9 @@ body{letter-spacing:-.1px;}
           <span id="cc-origin-tag-text"></span><span style="font-size:9px;opacity:.6;">✎</span>
         </button>
         <span id="cc-date-tag" style="background:#12213F;color:#E2BE6A;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
+        <span id="cc-indicador-tag" style="display:none;background:#12213F;color:#7FC8A9;padding:2px 10px;border-radius:20px;font-size:11px;"></span>
       </div>
+      <datalist id="indicador-datalist"></datalist>
       <div id="cc-origin-edit-wrap" style="display:none;margin-top:8px;background:#12213F;border-radius:8px;padding:10px 12px;">
         <div style="font-size:10px;color:#C3CBDB;font-weight:600;margin-bottom:6px;">Editar origem (prioridade sobre a origem da planilha)</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -2493,6 +2527,7 @@ body{letter-spacing:-.1px;}
             <option value="__outra__">Outra (digitar)</option>
           </select>
           <input id="cc-origin-custom" type="text" placeholder="Digite a origem..." style="display:none;flex:1;min-width:140px;border:1px solid #2A3D66;border-radius:8px;padding:7px 9px;font-size:12px;">
+          <input id="cc-indicador" list="indicador-datalist" type="text" placeholder="Quem indicou (paciente)" style="display:none;flex-basis:100%;border:1px solid #2A3D66;border-radius:8px;padding:7px 9px;font-size:12px;">
           <button onclick="salvarOrigemManual()" style="background:#5A8A6A;color:#FFFFFF;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button>
           <button onclick="document.getElementById('cc-origin-edit-wrap').style.display='none';" style="background:#12213F;color:#EEF1F7;border:none;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;">Cancelar</button>
         </div>
@@ -3517,7 +3552,7 @@ function switchPage(page,el){
   el.classList.add('active');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
+  const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-indicacoes':'Indicações e NPS','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
   document.getElementById('topbar-title').textContent=titles[page]||page;
   if(page==='inicio') carregarInicio();
   else if(page==='leads') renderLeads();
@@ -3537,6 +3572,7 @@ function switchPage(page,el){
   }
   else if(page==='rel-origem') setTimeout(()=>initRelOrigem(),50);
   else if(page==='rel-orcamentos') setTimeout(()=>initRelOrcamentos(),50);
+  else if(page==='rel-indicacoes') setTimeout(()=>initIndicacoes(),50);
 }
 
 function switchDashTab(tab,el){
@@ -10229,6 +10265,7 @@ function openClienteCard(idx){
   const origemEfetiva=(_ccData[ph_cc]&&_ccData[ph_cc].origemAtual)||getOrigemReal(ph_cc)||e_cc.origin||'—';
   document.getElementById('cc-origin-tag-text').textContent=origemEfetiva;
   document.getElementById('cc-origin-edit-wrap').style.display='none';
+  try{indRenderTag(ph_cc);}catch(eInd){}
   document.getElementById('cc-date-tag').textContent=fmtDate(r.created_at||r.timestamp);
   // Preenche datas de agendamento/consulta do _ccData
   const agendTs=(_ccData[ph_cc]&&_ccData[ph_cc].agendTimestamp)||'';
@@ -10271,13 +10308,168 @@ function abrirEdicaoOrigem(){
     document.getElementById('cc-origin-custom').style.display='block';
     document.getElementById('cc-origin-custom').value=origemAtual!=='—'?origemAtual:'';
   }
+  indPreencherDatalist();
+  const ind=(_ccData[ph]&&_ccData[ph].indicadoPor)||{};
+  const inpI=document.getElementById('cc-indicador');
+  inpI.value=ind.nome||'';
+  inpI.style.display=/indica/i.test(origemAtual)?'block':'none';
   document.getElementById('cc-origin-edit-wrap').style.display='block';
 }
 document.addEventListener('change',e=>{
   if(e.target&&e.target.id==='cc-origin-select'){
     document.getElementById('cc-origin-custom').style.display=e.target.value==='__outra__'?'block':'none';
+    document.getElementById('cc-indicador').style.display=/indica/i.test(e.target.value)?'block':'none';
+  }
+  if(e.target&&e.target.id==='lc-origem'){
+    document.getElementById('lc-indicador-wrap').style.display=/indica/i.test(e.target.value)?'block':'none';
+    if(/indica/i.test(e.target.value))indPreencherDatalist();
   }
 });
+// (04/11/2026) Indicação ativa (método Noll): quem indicou cada paciente.
+// _ccData[ph].indicadoPor = {nome, tel, em, recompensa:{entregue, em}}
+function indNome(ph,d){
+  d=d||ccDataLookup(ph)||{};
+  if(d.nomeAtual)return String(d.nomeAtual).trim();
+  const row=cloudiaRowPorTel(ph);if(row&&row.name)return String(row.name).trim();
+  const c=(clientesData||[]).find(x=>normalizePhone(x.phone||'')===normalizePhone(ph));if(c&&c.name)return String(c.name).trim();
+  const f=(_fluxoPacientes||[]).find(x=>normalizePhone(x.tel||'')===normalizePhone(ph));
+  return f?String(f.nome||'').trim():'';
+}
+// pacientes = quem tem orçamento no CRM
+function indPacientes(){
+  const out=[];const vistos=new Set();
+  Object.keys(_ccData||{}).forEach(k=>{
+    const d=_ccData[k];if(!d||!(d.orcamentos||[]).length)return;
+    const ph=normalizePhone(k);if(!ph||vistos.has(ph))return;vistos.add(ph);
+    const nome=indNome(ph,d);if(nome)out.push({ph,nome});
+  });
+  return out;
+}
+function indPreencherDatalist(){
+  const dl=document.getElementById('indicador-datalist');if(!dl||dl.dataset.ok)return;
+  const vistos=new Set();let html='';
+  indPacientes().forEach(({ph,nome})=>{
+    if(vistos.has(nome.toLowerCase()))return;vistos.add(nome.toLowerCase());
+    html+='<option value="'+nome.replace(/"/g,'&quot;')+'">final '+ph.slice(-4)+'</option>';
+  });
+  dl.innerHTML=html;dl.dataset.ok='1';
+}
+function indAcharTel(nome){
+  const n=normStr(nome);if(!n)return '';
+  const c=indPacientes().find(x=>normStr(x.nome)===n);
+  return c?c.ph:'';
+}
+function indSalvar(ph,nome){
+  nome=String(nome||'').trim();
+  if(!_ccData[ph])_ccData[ph]={orcamentos:[],anotacoes:[]};
+  const ant=_ccData[ph].indicadoPor||{};
+  if(!nome){delete _ccData[ph].indicadoPor;return;}
+  if(ant.nome===nome)return;
+  _ccData[ph].indicadoPor={nome:nome,tel:indAcharTel(nome),em:new Date().toISOString(),recompensa:ant.recompensa||{entregue:false}};
+}
+function indRenderTag(ph){
+  const t=document.getElementById('cc-indicador-tag');if(!t)return;
+  const ind=_ccData[ph]&&_ccData[ph].indicadoPor;
+  if(ind&&ind.nome){t.textContent='🤝 Indicado por '+ind.nome;t.style.display='inline-block';}else t.style.display='none';
+}
+function initIndicacoes(){
+  const f=document.getElementById('ri-from'),t=document.getElementById('ri-to');
+  if(!f.value){const n=new Date();f.value=n.getFullYear()+'-01-01';t.value=localDateStr(n);}
+  const go=()=>{try{renderIndicacoes();}catch(e){console.error('[indicacoes]',e);}};
+  if(!allCloudiaRows.length&&typeof fetchCloudia==='function'){fetchCloudia().then(rows=>{try{rebuildStageIndex(rows);}catch(e){}go();});}else go();
+}
+function _indCard(titulo,valor,sub){
+  return `<div style="background:#12213F;border:1px solid #2A3D66;border-radius:12px;padding:14px 16px;">
+    <div style="font-size:11px;color:#8C98B1;font-weight:600;">${titulo}</div>
+    <div style="font-size:24px;font-weight:700;color:#EEF1F7;margin-top:4px;">${valor}</div>
+    <div style="font-size:11px;color:#C3CBDB;margin-top:4px;line-height:1.4;">${sub}</div></div>`;
+}
+function _indEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderIndicacoes(){
+  const since=document.getElementById('ri-from').value||'0000',until=document.getElementById('ri-to').value||'9999';
+  const brl=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+  const vistos=new Set();const pac=[];
+  Object.keys(_ccData||{}).forEach(k=>{
+    const d=_ccData[k];if(!d||typeof d!=='object')return;
+    const ph=normalizePhone(k)||k;if(vistos.has(ph))return;vistos.add(ph);
+    pac.push({k,ph,d});
+  });
+  // vendas do período por origem
+  let vendas=0,vendasInd=0,valor=0,valorInd=0,indFechados=0,indFechadosComQuem=0;
+  pac.forEach(({ph,d})=>{
+    const aprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&!o.pacienteAntigo&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
+    if(!aprov.length)return;
+    const v=aprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+    vendas++;valor+=v;
+    const ind=/indica/i.test(origemAtualPaciente(ph,indNome(ph,d))||'')||!!d.indicadoPor;
+    if(ind){vendasInd++;valorInd+=v;indFechados++;if(d.indicadoPor&&d.indicadoPor.nome)indFechadosComQuem++;}
+  });
+  // NPS do período
+  const notas=pac.filter(({d})=>d.nps&&d.nps.nota!==null&&d.nps.nota!==undefined&&d.nps.nota!==''&&(d.nps.data||'')>=since&&(d.nps.data||'')<=until);
+  const prom=notas.filter(x=>Number(x.d.nps.nota)>=9).length,detr=notas.filter(x=>Number(x.d.nps.nota)<=6).length;
+  const score=notas.length?Math.round((prom-detr)/notas.length*100):null;
+  // indicações recebidas no período (data do registro)
+  const indPer=pac.filter(({d})=>d.indicadoPor&&d.indicadoPor.nome&&(d.indicadoPor.em||'').slice(0,10)>=since&&(d.indicadoPor.em||'').slice(0,10)<=until);
+  const indPerFech=indPer.filter(({d})=>(d.orcamentos||[]).some(o=>o.status==='Aprovado')).length;
+  document.getElementById('ri-kpis').innerHTML=
+    _indCard('Vendas por indicação',vendas?Math.round(vendasInd/vendas*100)+'%':'—',`${vendasInd} de ${vendas} pacientes novos que fecharam · ${brl(valorInd)} de ${brl(valor)}`)+
+    _indCard('Indicações registradas',String(indPer.length),`${indPerFech} já fecharam · registradas no período`)+
+    _indCard('NPS do período',score===null?'—':String(score),notas.length?`${notas.length} notas · ${prom} promotores · ${detr} detratores`:'Nenhuma nota registrada ainda')+
+    _indCard('Quem indicou preenchido',indFechados?Math.round(indFechadosComQuem/indFechados*100)+'%':'—',`${indFechadosComQuem} de ${indFechados} vendas por indicação com o nome de quem indicou`);
+  // promotores pendentes (qualquer data)
+  const proms=pac.filter(({d})=>d.nps&&Number(d.nps.nota)>=9&&d.nps.nota!==null&&d.nps.nota!==''&&!(d.nps.pedido&&d.nps.pedido.em))
+    .sort((a,b)=>String(b.d.nps.data||'').localeCompare(String(a.d.nps.data||'')));
+  document.getElementById('ri-promotores').innerHTML=proms.length?proms.map(({k,ph,d})=>`
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
+      <span style="font-weight:700;color:#6ADC96;min-width:28px;">${d.nps.nota}</span>
+      <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;"> · ${d.nps.data?new Date(d.nps.data+'T12:00').toLocaleDateString('pt-BR'):''}${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
+      <a href="${linkWhatsapp(ph)||'#'}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+      <button onclick="indPedidoFeito('${_indEsc(k)}')" style="background:#5A8A6A;color:#FFFFFF;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;">Pedido feito</button>
+    </div>`).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum promotor esperando o pedido. As notas entram pelo Fluxo pós-venda.</div>';
+  // indicadores (todas as datas)
+  const grupos={};
+  pac.forEach(({k,ph,d})=>{
+    const ip=d.indicadoPor;if(!ip||!ip.nome)return;
+    const chave=ip.tel||normStr(ip.nome);
+    const g=grupos[chave]||(grupos[chave]={nome:ip.nome,tel:ip.tel,ind:0,comp:0,fech:0,valor:0,devida:0,entregue:0,keys:[]});
+    g.ind++;
+    const orcs=d.orcamentos||[];
+    if(orcs.length||/compareceu|ganho/i.test(d.statusAtual||''))g.comp++;
+    const aprov=orcs.filter(o=>o.status==='Aprovado');
+    if(aprov.length){g.fech++;g.valor+=aprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
+      if(ip.recompensa&&ip.recompensa.entregue)g.entregue++;else{g.devida++;g.keys.push(k);}}
+  });
+  const lista=Object.values(grupos).sort((a,b)=>b.fech-a.fech||b.ind-a.ind);
+  window._indGrupos=lista;
+  document.getElementById('ri-indicadores').innerHTML=lista.length?lista.map((g,i)=>`
+    <tr style="border-top:1px solid #1E2E52;">
+      <td style="padding:8px 16px;color:#EEF1F7;">${_indEsc(g.nome)}${g.tel?'':' <span style="color:#E58A8A;font-size:10px;" title="Nome não encontrado entre os pacientes">sem ficha</span>'}</td>
+      <td style="text-align:center;">${g.ind}</td><td style="text-align:center;">${g.comp}</td><td style="text-align:center;">${g.fech}</td>
+      <td style="text-align:center;">${g.valor?brl(g.valor):'—'}</td>
+      <td style="text-align:center;">${g.devida?`<button onclick="indRecompensaEntregue(${i})" style="background:#B08A3E;color:#FFFFFF;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;">${g.devida} a entregar · marcar entregue</button>`:(g.entregue?'<span style="color:#6ADC96;">✓ entregue</span>':'<span style="color:#8C98B1;">—</span>')}</td>
+    </tr>`).join(''):'<tr><td colspan="6" style="padding:12px 16px;color:#8C98B1;">Nenhuma indicação com quem indicou registrado ainda.</td></tr>';
+  // detratores e neutros do período
+  const ruins=notas.filter(x=>Number(x.d.nps.nota)<=8).sort((a,b)=>Number(a.d.nps.nota)-Number(b.d.nps.nota));
+  document.getElementById('ri-detratores').innerHTML=ruins.length?ruins.map(({ph,d})=>{
+    const n=Number(d.nps.nota);const cor=n<=6?'#E58A8A':'#E2BE6A';
+    return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #1E2E52;">
+      <span style="font-weight:700;color:${cor};min-width:28px;">${n}</span>
+      <span style="flex:1;min-width:160px;color:#EEF1F7;">${_indEsc(indNome(ph,d)||'—')}<span style="color:#8C98B1;font-size:11px;">${d.nps.motivo?' · “'+_indEsc(d.nps.motivo)+'”':''}</span></span>
+      <a href="${linkWhatsapp(ph)||'#'}" target="_blank" rel="noopener" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+    </div>`;}).join(''):'<div style="font-size:12px;color:#8C98B1;">Nenhum detrator ou neutro no período.</div>';
+}
+function indPedidoFeito(k){
+  const d=_ccData[k];if(!d||!d.nps)return;
+  d.nps.pedido={em:new Date().toISOString()};
+  salvarCRMDebounced();renderIndicacoes();
+}
+function indRecompensaEntregue(i){
+  const g=(window._indGrupos||[])[i];if(!g)return;
+  if(!confirm('Marcar como entregue a recompensa de '+g.nome+' ('+g.devida+' indicação(ões) que fecharam)?'))return;
+  const em=new Date().toISOString();
+  g.keys.forEach(k=>{const ip=_ccData[k]&&_ccData[k].indicadoPor;if(ip)ip.recompensa={entregue:true,em};});
+  salvarCRMDebounced();renderIndicacoes();
+}
 function salvarOrigemManual(){
   const r=clientesData[_currentClienteIdx];if(!r)return;
   const ph=String(r.phone||'').replace(/\D/g,'');
@@ -10287,6 +10479,8 @@ function salvarOrigemManual(){
   if(!_ccData[ph])_ccData[ph]={orcamentos:[],anotacoes:[]};
   _ccData[ph].origemAtual=novaOrigem;
   _ccData[ph].editadoManualmente=true;
+  if(/indica/i.test(novaOrigem))indSalvar(ph,document.getElementById('cc-indicador').value);
+  indRenderTag(ph);
   document.getElementById('cc-origin-tag-text').textContent=novaOrigem;
   document.getElementById('cc-origin-edit-wrap').style.display='none';
   filterClientesTable();
@@ -12513,6 +12707,7 @@ function renderFluxoCards() {
       ${p.concluido ? `
       <div style="background:#153721;border:1px solid #8FCF9F;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="font-size:12px;color:#6ADC96;font-weight:600;">🎉 Tratamento concluído — NPS e pós-venda já enviados.</div>
+        ${npsLinhaHtml(p,pIdx)}
       </div>` : ''}
       ${aguardandoPosVenda ? `
       <div style="background:#12213F;border:1px solid #2A3D66;border-radius:10px;padding:10px 14px;margin-bottom:14px;">
@@ -12528,6 +12723,7 @@ function renderFluxoCards() {
           </label>
           ${p.tel ? `<a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Chamar no WhatsApp</a>` : ''}
         </div>
+        ${p.npsEnviado ? npsLinhaHtml(p,pIdx) : ''}
       </div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px;">
         <div>
@@ -12646,6 +12842,39 @@ function retomarFluxo(idx) {
   showToast('success', 'Tratamento retomado', (p.nome || 'Paciente') + ' voltou para Em tratamento.');
 }
 
+// (04/11/2026) NPS gravado na ficha do paciente: _ccData[ph].nps = {nota, motivo, data}
+// 9-10 promotor (pedir indicação), 7-8 neutro, 0-6 detrator (Dra. liga).
+function npsDadosTel(tel, criar){
+  const d=ccDataLookup(tel);if(d||!criar)return d;
+  const k=normalizePhone(tel);if(!k)return null;
+  _ccData[k]={orcamentos:[],anotacoes:[]};if(typeof _ccDataNormIndex!=='undefined')_ccDataNormIndex=null;
+  return _ccData[k];
+}
+function npsClasse(n){if(n===null||n===undefined||n==='')return '';n=Number(n);return n>=9?'promotor':(n>=7?'neutro':'detrator');}
+function npsLinhaHtml(p,pIdx){
+  if(!p.tel)return '';
+  const nps=(npsDadosTel(p.tel,false)||{}).nps||{};
+  const cl=npsClasse(nps.nota);
+  const cor={promotor:'#6ADC96',neutro:'#E2BE6A',detrator:'#E58A8A'}[cl]||'#C3CBDB';
+  const dica={promotor:'Promotor: hora de pedir indicação (Painel de Indicações).',neutro:'Neutro: vale entender o que faltou para ser 10.',detrator:'Detrator: a Dra. precisa ligar antes de qualquer pedido.'}[cl]||'Registre a nota que o paciente deu no formulário.';
+  let ops='<option value="">—</option>';for(let i=10;i>=0;i--)ops+=`<option value="${i}" ${String(nps.nota)===String(i)?'selected':''}>${i}</option>`;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;flex-basis:100%;">
+    <span style="font-size:12px;color:#C3CBDB;font-weight:600;">Nota NPS</span>
+    <select onchange="salvarNpsFluxo(${pIdx},'nota',this.value)" style="border:1px solid #2A3D66;border-radius:8px;padding:5px 8px;font-size:12px;background:#0D1A33;color:${cor};font-weight:700;">${ops}</select>
+    <input type="text" value="${String(nps.motivo||'').replace(/"/g,'&quot;')}" placeholder="O que o paciente comentou (opcional)" onchange="salvarNpsFluxo(${pIdx},'motivo',this.value)" style="flex:1;min-width:180px;border:1px solid #2A3D66;border-radius:8px;padding:5px 9px;font-size:12px;background:#0D1A33;">
+    <span style="font-size:11px;color:${cor};flex-basis:100%;">${dica}</span>
+  </div>`;
+}
+function salvarNpsFluxo(idx,campo,valor){
+  const p=_fluxoPacientes[idx];if(!p||!p.tel)return;
+  const d=npsDadosTel(p.tel,true);if(!d)return;
+  const nps=d.nps||{};
+  if(campo==='nota'){nps.nota=valor===''?null:Number(valor);nps.data=new Date().toISOString().slice(0,10);}
+  else nps.motivo=String(valor||'').trim();
+  d.nps=nps;
+  salvarCRMDebounced();
+  if(campo==='nota')renderFluxoCards();
+}
 function toggleNpsFluxo(idx, checked) {
   const p = _fluxoPacientes[idx];
   if (!p) return;
@@ -14231,6 +14460,9 @@ function openLeadCard(idx){
   for(let op of origSel.options){if(op.value===origVal){found=true;break;}}
   if(!found&&origVal){const op=new Option(origVal,origVal);origSel.add(op);}
   origSel.value=origVal;
+  document.getElementById('lc-indicador').value=(d_lc.indicadoPor&&d_lc.indicadoPor.nome)||'';
+  document.getElementById('lc-indicador-wrap').style.display=/indica/i.test(origVal)?'block':'none';
+  if(/indica/i.test(origVal))indPreencherDatalist();
   // Status — prioriza edição manual do CRM
   const stSel=document.getElementById('lc-status');
   const stVal=d_lc.statusAtual||r.stage||'Lead';
@@ -14289,6 +14521,7 @@ function salvarLeadCard(){
   if(!_ccData[ph])_ccData[ph]={anotacoes:[]};
   _ccData[ph].nomeAtual=novoNome||r.name;
   _ccData[ph].origemAtual=novaOrigem||r.origin;
+  if(/indica/i.test(novaOrigem||''))indSalvar(ph,document.getElementById('lc-indicador').value);
   _ccData[ph].statusAtual=novoStatus;
   _ccData[ph].statusAtualEditedAt=new Date().toISOString();
   _ccData[ph].telefoneAtual=novoTel||ph;
@@ -17990,6 +18223,10 @@ function abrirConversas(){
           <option>#Indicação</option>
           <option>#Facebook ADS</option>
         </select>
+        <div id="lc-indicador-wrap" style="display:none;margin-top:8px;">
+          <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Quem indicou</label>
+          <input id="lc-indicador" list="indicador-datalist" type="text" placeholder="Nome do paciente que indicou" style="width:100%;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#0D1A33;">
+        </div>
       </div>
       <!-- Status -->
       <div style="margin-bottom:11px;">
