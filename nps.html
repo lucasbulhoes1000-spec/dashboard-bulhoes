@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bulhões Odontologia · Sua experiência</title>
+<link rel="icon" href="/icone-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fahkwang:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--areia:#CCBCA6;--bronze:#A18B6C;--fundo:#EFEFED;--texto:#3B342C;--suave:#7A6F62;--branco:#FFFFFF;}
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;background:var(--fundo);color:var(--texto);font-family:'Plus Jakarta Sans',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+  .card{width:100%;max-width:520px;background:var(--branco);border-radius:20px;padding:36px 28px;box-shadow:0 10px 40px rgba(59,52,44,.08);}
+  .marca{font-family:'Fahkwang',serif;letter-spacing:3px;text-transform:uppercase;font-size:12px;color:var(--bronze);text-align:center;margin-bottom:22px;}
+  h1{font-family:'Fahkwang',serif;font-weight:500;font-size:24px;line-height:1.35;margin:0 0 10px;text-align:center;}
+  p.sub{color:var(--suave);font-size:14px;line-height:1.6;text-align:center;margin:0 0 26px;}
+  .pergunta{font-size:15px;font-weight:600;line-height:1.5;margin:0 0 14px;}
+  .notas{display:grid;grid-template-columns:repeat(11,1fr);gap:6px;}
+  .notas button{aspect-ratio:1;border:1px solid var(--areia);background:var(--branco);color:var(--texto);border-radius:10px;font:600 14px 'Plus Jakarta Sans',sans-serif;cursor:pointer;padding:0;transition:background .15s,color .15s,border-color .15s;}
+  .notas button:hover{border-color:var(--bronze);}
+  .notas button.sel{background:var(--bronze);border-color:var(--bronze);color:var(--branco);}
+  .legenda{display:flex;justify-content:space-between;font-size:11px;color:var(--suave);margin:8px 2px 26px;}
+  textarea{width:100%;min-height:110px;border:1px solid var(--areia);border-radius:12px;padding:12px 14px;font:14px/1.5 'Plus Jakarta Sans',sans-serif;color:var(--texto);resize:vertical;outline:none;}
+  textarea:focus{border-color:var(--bronze);}
+  .enviar{margin-top:22px;width:100%;border:none;border-radius:999px;background:var(--bronze);color:var(--branco);font:600 15px 'Plus Jakarta Sans',sans-serif;padding:15px;cursor:pointer;}
+  .enviar:disabled{opacity:.45;cursor:default;}
+  .erro{color:#A4493D;font-size:13px;margin-top:12px;text-align:center;min-height:18px;}
+  .ok{text-align:center;}
+  .ok .coracao{font-size:34px;margin-bottom:10px;}
+  @media (max-width:420px){.card{padding:28px 18px;}.notas{gap:4px;}.notas button{font-size:12px;border-radius:8px;}}
+</style>
+</head>
+<body>
+<main class="card" id="card">
+  <div class="marca">Bulhões Odontologia</div>
+  <div id="conteudo"><p class="sub">Carregando…</p></div>
+</main>
+<script>
+const SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
+const SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
+const token=new URLSearchParams(location.search).get('t')||'';
+const el=document.getElementById('conteudo');
+let nota=null;
+async function rpc(nome,corpo){
+  const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/'+nome,{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY},body:JSON.stringify(corpo)});
+  if(!r.ok)throw new Error('erro '+r.status);
+  return r.json();
+}
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function obrigado(){
+  el.innerHTML='<div class="ok"><div class="coracao">💙</div><h1>Muito obrigada!</h1><p class="sub" style="margin:0">A sua resposta chegou direto para a nossa equipe. Ela ajuda a gente a cuidar cada vez melhor de quem passa por aqui.</p></div>';
+}
+function formulario(nome){
+  el.innerHTML=
+    '<h1>'+(nome?'Oi, '+esc(nome)+'!':'Oi!')+'<br>Como foi a sua experiência?</h1>'+
+    '<p class="sub">Leva menos de 1 minuto. A sua resposta ajuda a Dra. Larissa e toda a equipe a cuidar cada vez melhor de quem passa por aqui.</p>'+
+    '<div class="pergunta">De 0 a 10, o quanto você recomendaria a Bulhões Odontologia para um amigo ou familiar?</div>'+
+    '<div class="notas" id="notas">'+Array.from({length:11},(_,i)=>'<button type="button" data-n="'+i+'" aria-label="Nota '+i+'">'+i+'</button>').join('')+'</div>'+
+    '<div class="legenda"><span>Não recomendaria</span><span>Recomendaria com certeza</span></div>'+
+    '<div class="pergunta">O que mais pesou na sua nota? Pode contar com sinceridade.</div>'+
+    '<textarea id="motivo" maxlength="2000" placeholder="Escreva aqui"></textarea>'+
+    '<button class="enviar" id="enviar" disabled>Enviar</button><div class="erro" id="erro"></div>';
+  const enviar=document.getElementById('enviar'),motivo=document.getElementById('motivo');
+  const atualizar=()=>{enviar.disabled=!(nota!==null&&motivo.value.trim().length>=2);};
+  document.getElementById('notas').addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    nota=Number(b.dataset.n);
+    document.querySelectorAll('#notas button').forEach(x=>x.classList.toggle('sel',x===b));
+    atualizar();
+  });
+  motivo.addEventListener('input',atualizar);
+  enviar.addEventListener('click',async()=>{
+    enviar.disabled=true;enviar.textContent='Enviando…';document.getElementById('erro').textContent='';
+    try{
+      const r=await rpc('nps_responder',{p_token:token,p_nota:nota,p_motivo:motivo.value.trim()});
+      if(r&&r.status==='ok')obrigado();
+      else throw new Error((r&&r.mensagem)||'erro');
+    }catch(e){
+      enviar.disabled=false;enviar.textContent='Enviar';
+      document.getElementById('erro').textContent='Não conseguimos enviar agora. Pode tentar de novo em instantes?';
+    }
+  });
+}
+(async()=>{
+  if(!token){el.innerHTML='<p class="sub">Este link está incompleto. Peça um novo link para a nossa equipe pelo WhatsApp. 💙</p>';return;}
+  try{
+    const info=await rpc('nps_convite_info',{p_token:token});
+    if(!info){el.innerHTML='<p class="sub">Este link não é válido. Peça um novo link para a nossa equipe pelo WhatsApp. 💙</p>';return;}
+    if(info.respondido){obrigado();return;}
+    formulario(info.nome?info.nome.charAt(0).toUpperCase()+info.nome.slice(1).toLowerCase():'');
+  }catch(e){formulario('');}
+})();
+</script>
+</body>
+</html>

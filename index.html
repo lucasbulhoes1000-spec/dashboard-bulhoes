@@ -12729,7 +12729,7 @@ function renderFluxoCards() {
             Pós-venda enviada
           </label>
           ${p.tel ? `<a href="https://wa.me/${p.tel.replace(/\D/g,'')}" target="_blank" style="background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">💬 Chamar no WhatsApp</a>` : ''}
-          ${p.tel && !p.npsEnviado ? `<a href="${indWa(p.tel,IND_TEXTOS.nps(_primeiroNome(p.nome),npsLinkPaciente(p.nome,p.tel)))}" target="_blank" rel="noopener" title="Abre o WhatsApp com a mensagem e o link do formulário (já com o nome do paciente)" style="background:#B08A3E;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap;">⭐ Enviar NPS</a>` : ''}
+          ${p.tel ? `<button onclick="enviarNpsFluxo(${pIdx})" title="Gera o link do formulário deste paciente e abre o WhatsApp com a mensagem pronta. A nota volta sozinha para o Lume." style="background:#B08A3E;color:#FFFFFF;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;border:none;cursor:pointer;white-space:nowrap;">⭐ ${p.npsEnviado?'Reenviar NPS':'Enviar NPS'}</button>` : ''}
         </div>
         ${p.npsEnviado ? npsLinhaHtml(p,pIdx) : ''}
       </div>` : ''}
@@ -12853,9 +12853,29 @@ function retomarFluxo(idx) {
 // (04/11/2026) NPS gravado na ficha do paciente: _ccData[ph].nps = {nota, motivo, data}
 // 9-10 promotor (pedir indicação), 7-8 neutro, 0-6 detrator (Dra. liga).
 // (04/11/2026) Textos do método Noll (doc "Indicação ativa e NPS: scripts e rotina")
-const NPS_FORM_URL='https://docs.google.com/forms/d/e/1FAIpQLSdFlSABXtXQAICH1-G12iAfkmbjeRpOobEo8kFDstapYbkkdA/viewform';
+// (04/11/2026) formulário próprio (nps.html): a nota grava direto na ficha (nps_responder)
+const NPS_PAGINA=location.origin+'/nps.html';
 function _primeiroNome(n){n=String(n||'').trim().split(/\s+/)[0]||'';return n?n.charAt(0).toUpperCase()+n.slice(1).toLowerCase():'';}
-function npsLinkPaciente(nome,tel){return NPS_FORM_URL+'?usp=pp_url&entry.1158559488='+encodeURIComponent((String(nome||'').trim()+(tel?' · '+normalizePhone(tel):'')).trim());}
+// chave da ficha no CRM para este telefone (a que já existe, senão a normalizada)
+function _npsChave(tel){
+  const d=ccDataLookup(tel);
+  if(d){for(const k in _ccData){if(_ccData[k]===d)return k;}}
+  return normalizePhone(tel);
+}
+async function enviarNpsFluxo(idx){
+  const p=_fluxoPacientes[idx];if(!p||!p.tel)return;
+  const janela=window.open('about:blank','_blank'); // abre já no clique (o navegador bloqueia janela aberta depois de esperar)
+  try{
+    const token=await _waRest('rpc/nps_criar_convite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_chave:_npsChave(p.tel),p_nome:p.nome||''})});
+    if(!token)throw new Error('sem link');
+    const url=indWa(p.tel,IND_TEXTOS.nps(_primeiroNome(p.nome),NPS_PAGINA+'?t='+token));
+    if(janela)janela.location.href=url;else location.href=url;
+    if(!p.npsEnviado){p.npsEnviado=true;atualizarConclusaoFluxo(p);salvarFluxoRemoto();renderFluxoCards();}
+  }catch(e){
+    if(janela)janela.close();
+    alert('Não consegui gerar o link do NPS: '+e.message);
+  }
+}
 const IND_TEXTOS={
   nps:(n,link)=>`Oii, ${n}! Aqui é a Lívia, da Bulhões 💙 Foi muito especial acompanhar você até o sorriso novo. Posso te pedir um favor rapidinho? Queremos saber como foi a sua experiência com a gente, leva menos de 1 minuto: ${link}`,
   promotor:n=>`${n}, que alegria ler isso! 💙 Mostrei pra equipe e todo mundo ficou feliz. Uma coisa que a gente percebe: quase sempre quem passa por aqui tem alguém por perto que também sonha em mudar o sorriso e não sabe por onde começar. Se você lembrar de alguém assim, pode me mandar o contato ou passar o meu número, que eu cuido dessa pessoa com o mesmo carinho que tivemos com você. Tem alguém que te vem à cabeça?`,
@@ -12876,7 +12896,7 @@ function npsLinhaHtml(p,pIdx){
   const nps=(npsDadosTel(p.tel,false)||{}).nps||{};
   const cl=npsClasse(nps.nota);
   const cor={promotor:'#6ADC96',neutro:'#E2BE6A',detrator:'#E58A8A'}[cl]||'#C3CBDB';
-  const dica={promotor:'Promotor: hora de pedir indicação (Painel de Indicações).',neutro:'Neutro: vale entender o que faltou para ser 10.',detrator:'Detrator: a Dra. precisa ligar antes de qualquer pedido.'}[cl]||'Registre a nota que o paciente deu no formulário.';
+  const dica={promotor:'Promotor: hora de pedir indicação (Painel de Indicações).',neutro:'Neutro: vale entender o que faltou para ser 10.',detrator:'Detrator: a Dra. precisa ligar antes de qualquer pedido.'}[cl]||'A nota chega sozinha quando o paciente responde o formulário (pode registrar à mão se ele responder por mensagem).';
   let ops='<option value="">—</option>';for(let i=10;i>=0;i--)ops+=`<option value="${i}" ${String(nps.nota)===String(i)?'selected':''}>${i}</option>`;
   return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;flex-basis:100%;">
     <span style="font-size:12px;color:#C3CBDB;font-weight:600;">Nota NPS</span>
