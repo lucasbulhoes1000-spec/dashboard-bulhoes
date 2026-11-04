@@ -1106,6 +1106,25 @@ body{letter-spacing:-.1px;}
 .kb-tag.atraso{background:rgba(224,103,90,.15);color:#F2A79C;}
 .kb-barra{height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin:6px 0 2px;overflow:hidden;}
 .kb-barra i{display:block;height:100%;background:linear-gradient(90deg,#B08A3E,#F0CB72);}
+.kb-fup-btn{display:block;width:100%;margin-top:8px;border:1px solid rgba(212,175,90,.45);background:rgba(212,175,90,.10);color:var(--gold-strong);font-size:11.5px;font-weight:600;border-radius:8px;padding:6px 8px;cursor:pointer;text-align:left;}
+.kb-fup-btn:hover{background:rgba(212,175,90,.2);}
+#fup-modal{position:fixed;inset:0;background:rgba(3,8,20,.62);z-index:1300;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;}
+#fup-modal .fup-box{background:#0D1A33;border:1px solid #2A3D66;border-radius:14px;max-width:620px;width:100%;padding:20px 20px 16px;color:#EEF1F7;box-shadow:0 20px 50px rgba(0,0,0,.4);}
+#fup-modal h3{margin:0 0 2px;font-size:16px;}
+#fup-modal .fup-sub{font-size:12px;color:#C3CBDB;margin-bottom:12px;}
+#fup-modal .fup-sec{background:#12213F;border:1px solid #2A3D66;border-radius:10px;padding:10px 12px;margin-bottom:10px;}
+#fup-modal .fup-sec label{display:block;font-size:11px;color:#C3CBDB;margin:6px 0 3px;}
+#fup-modal input,#fup-modal select,#fup-modal textarea{width:100%;box-sizing:border-box;background:#0D1A33;color:#EEF1F7;border:1px solid #2A3D66;border-radius:7px;padding:7px 9px;font-size:12.5px;font-family:inherit;}
+#fup-modal textarea{min-height:44px;resize:vertical;line-height:1.45;}
+#fup-modal .fup-bloco{margin-bottom:12px;}
+#fup-modal .fup-bt{font-size:11.5px;font-weight:700;color:#E2BE6A;margin-bottom:4px;}
+#fup-modal .fup-nota{font-size:11.5px;color:#F2C98A;background:rgba(226,190,106,.08);border-radius:7px;padding:6px 9px;margin:4px 0 6px;}
+#fup-modal .fup-acoes{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;}
+#fup-modal .fup-acoes button,#fup-modal .fup-acoes a{font-size:11.5px;border-radius:7px;padding:5px 11px;border:1px solid #2A3D66;background:#152748;color:#EEF1F7;cursor:pointer;text-decoration:none;}
+#fup-modal .fup-acoes .wa{border-color:#2f6b4a;color:#9BE3B5;}
+#fup-modal .fup-rodape{display:flex;justify-content:space-between;gap:8px;margin-top:12px;flex-wrap:wrap;}
+#fup-modal .fup-ok{background:#B08A3E;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer;font-size:13px;}
+#fup-modal .fup-sair{background:none;border:1px solid #2A3D66;color:#C3CBDB;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;}
 .kb-wa{display:inline-block;margin-top:7px;font-size:11px;font-weight:600;color:#7FD3A0;text-decoration:none;}
 .kb-wa:hover{text-decoration:underline;}
 .kb-mais{border:1px dashed var(--line2);background:transparent;color:var(--txt2);font-size:11.5px;border-radius:9px;padding:8px;cursor:pointer;}
@@ -2507,6 +2526,7 @@ body{letter-spacing:-.1px;}
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;">
       <div id="cc-tab-orcamentos">
+        <div id="cc-fup-notas"></div>
         <button onclick="openOrcForm(null)" style="width:100%;background:#B08A3E;color:#FFFFFF;border:none;border-radius:8px;padding:9px;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:14px;">+ Novo orçamento</button>
         <div id="cc-orc-list"></div>
       </div>
@@ -10218,6 +10238,7 @@ function openClienteCard(idx){
   refreshOrcamentos(d);
   refreshAtividades(r,d);
   refreshAnotacoes(d);
+  try{ccFupNotasRender(d);}catch(eFup){}
   switchCCTab('orcamentos',document.querySelector('.cc-tab'));
   document.getElementById('cc-orc-form').style.display='none';
   document.getElementById('cc-atv-form').style.display='none';
@@ -18315,17 +18336,19 @@ const KB_FASES_ORDEM=['Aguardando 1° contato','1° contato - Vídeo de agradeci
 const KB_ORC_ETAPAS=[
   {id:'Compareceu - orçamento realizado',dia:null,alias:[''],dica:'Fez a avaliação e recebeu o orçamento. A Lívia arrasta para a próxima etapa'},
   {id:'Retorno combinado (Pix)',dia:null,alias:['Agendou retorno','Aguardando entrada','Avaliação comercial'],dica:'Pediu para pensar: data de retorno combinada e Pix de compromisso de R$ 100'},
-  {id:'Aguardando 1° contato',dia:1,alias:[]},
-  {id:'1° contato - Vídeo de agradecimento',dia:1,alias:[]},
-  {id:'2° contato - Antes/Depois + lembrei de você',dia:3,alias:[]},
-  {id:'3° contato - Depoimento',dia:7,alias:[]},
-  {id:'Pergunta sincera',dia:10,alias:['Sem resposta']},
-  {id:'Nova proposta',dia:14,alias:[]},
-  {id:'Conseguiu ver?',dia:16,alias:[]},
-  {id:'Mensagem de despedida',dia:21,alias:[]},
+  {id:'Aguardando 1° contato',dia:0,alias:[]},
+  // (04/11/2026) processo novo: o card fica na etapa da última mensagem ENVIADA
+  {id:'1. Agradecimento',dia:0,alias:['1° contato - Vídeo de agradecimento'],dica:'Mensagem 1 hora depois da avaliação'},
+  {id:'2. Antes e depois',dia:1,alias:['2° contato - Antes/Depois + lembrei de você']},
+  {id:'3. Depoimento',dia:3,alias:['3° contato - Depoimento']},
+  {id:'4. Mais um depoimento',dia:4,alias:['Pergunta sincera','Sem resposta']},
+  {id:'5. Mensagens apagadas',dia:7,alias:['Nova proposta']},
+  {id:'6. Conseguiu ver?',dia:8,alias:['Conseguiu ver?']},
+  {id:'7. Despedida',dia:10,alias:['Mensagem de despedida']},
   {id:'Cadência mensal',dia:30,alias:[],dica:'Recebe um conteúdo por mês e as campanhas internas'},
   {id:'Fechou',dia:null,alias:['Pós venda']}
 ];
+const KB_ORC_ANTIGAS=['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','3° contato - Depoimento','Pergunta sincera','Nova proposta','Conseguiu ver?','Mensagem de despedida'];
 function _kbOrcEtapa(fase){
   const f=String(fase||'');
   const e=KB_ORC_ETAPAS.find(x=>x.id===f||x.alias.includes(f));
@@ -18342,7 +18365,7 @@ function _kbOrcBase(it){
 function _kbOrcProxima(it,etapa){
   const i=KB_ORC_ETAPAS.findIndex(x=>x.id===etapa);
   if(i<0||etapa==='Fechou'||etapa==='Cadência mensal'||etapa==='Retorno combinado (Pix)')return null;
-  const ix1=KB_ORC_ETAPAS.findIndex(x=>x.id==='1° contato - Vídeo de agradecimento');
+  const ix1=KB_ORC_ETAPAS.findIndex(x=>x.id==='1. Agradecimento');
   const prox=(etapa==='Aguardando 1° contato'||etapa==='Compareceu - orçamento realizado')?KB_ORC_ETAPAS[ix1]:KB_ORC_ETAPAS[i+1];
   if(!prox||prox.dia==null)return null;
   const b=_kbOrcBase(it);if(!b)return null;
@@ -18354,8 +18377,144 @@ function _kbGarantirFasesProcesso(){
     if(!_listas||!_listas.fases)return;
     const at=_listas.fases.ativos||(_listas.fases.ativos=[]);let mudou=false;
     KB_ORC_ETAPAS.forEach(e=>{if(e.id!=='Compareceu - orçamento realizado'&&!at.includes(e.id)){at.push(e.id);mudou=true;}});
+    // (04/11/2026) etapas do processo antigo saem da lista (os cards antigos continuam no quadro pelo alias)
+    const des=_listas.fases.desativos||(_listas.fases.desativos=[]);
+    KB_ORC_ANTIGAS.forEach(n=>{const k=at.indexOf(n);if(k>=0){at.splice(k,1);if(!des.includes(n))des.push(n);mudou=true;}});
     if(mudou&&typeof salvarListasDebounced==='function')salvarListasDebounced();
   }catch(e){}
+}
+// ===== Follow-up de orçamentos: script da Lívia dentro do card (04/11/2026) =====
+const FUP_MOTIVOS=['Financeiro','Medo do resultado','Momento','Conversar com alguém','Outro'];
+function fupProximaEtapa(col){
+  if(col==='Fechou'||col==='Cadência mensal'||col==='7. Despedida'||col==='Retorno combinado (Pix)'||col==='__outras')return null;
+  if(col==='Compareceu - orçamento realizado'||col==='Aguardando 1° contato')return '1. Agradecimento';
+  const i=KB_ORC_ETAPAS.findIndex(x=>x.id===col);
+  const p=KB_ORC_ETAPAS[i+1];
+  return p&&p.dia!=null?p.id:null;
+}
+function _fupPrimeiroNome(n){const p=String(n||'').trim().split(/\s+/)[0]||'';return p?p.charAt(0).toUpperCase()+p.slice(1).toLowerCase():'';}
+function fupBlocos(it,etapa){
+  const n=_fupPrimeiroNome(it.nome)||'[nome]';
+  const fn=(it.d&&it.d.fupNotas)||{};
+  const duvida=fn.queria||'[o que a paciente queria ou a dúvida da avaliação]';
+  const ben=(_listas&&_listas.fupBeneficio)||{};
+  const benTxt=ben.texto||'[benefício do mês]';
+  const benAte=ben.ate?new Date(ben.ate+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'[data]';
+  const autoriz='Use só casos de pacientes que autorizaram por escrito (regra do CFO).';
+  switch(etapa){
+    case '1. Agradecimento':return [{t:'Mensagem (1 hora depois da avaliação)',x:'Oii '+n+', tudo bem? Aqui é a Lívia, sou Gestora de Relacionamento da Bulhões Odontologia, e vou ser responsável por termos um relacionamento bem próximo aqui na clínica! 💙\n\nFoi um prazer atender você em nossa clínica. A Dra. Victória me contou que a avaliação foi super especial e que planejaram um sorriso lindo juntas!\n\nGostou da sua avaliação, '+n+'?'}];
+    case '2. Antes e depois':return [{t:'Mensagem',x:'Oii, '+n+'! Tudo bem?\n\nEstava olhando alguns casos junto com a Dra. Victoria e achamos um caso muito parecido com o seu. Vou te enviar!'},{t:'Depois de anexar a mídia',nota:'Anexe o antes e depois + o depoimento do mesmo caso. '+autoriz,x:'É mais ou menos nessa tonalidade de cor e formato que você tá buscando com as lentes?'}];
+    case '3. Depoimento':return [{t:'Mensagem',x:'Oii, '+n+'! Tudo bem? 💙\n\nQuero te mostrar um caso com depoimento de um dos nossos pacientes que também sonhava em transformar o sorriso e hoje vive uma nova fase.'},{t:'Depois de anexar o depoimento',nota:autoriz,x:'Me conta, o que achou?'}];
+    case '4. Mais um depoimento':return [{t:'Mensagem',nota:(fn.queria?'':'Falta a anotação da avaliação: preencha "O que a paciente mais queria" acima. ')+'Anexe um depoimento de alguém com dúvida parecida. '+autoriz,x:'Oii, '+n+'! Separei mais um relato pra você. Essa paciente chegou com uma dúvida bem parecida com a sua: '+duvida+'. Vale assistir até o final 💙'}];
+    case '5. Mensagens apagadas':return [
+      {t:'1ª (mande e apague em seguida)',nota:'As três precisam estar boas mesmo se forem lidas: a notificação pode mostrar o texto antes de apagar.',x:'Oi, '+n+'! Tava aqui conversando com a Dra. Victoria sobre o seu planejamento'},
+      {t:'2ª (mande e apague)',x:'Ela comentou uma coisa sobre o seu caso que eu acho que você vai gostar de saber'},
+      {t:'3ª (mande e apague)',x:'Mas acho melhor te perguntar antes'},
+      {t:'Se perguntar o que era',x:'Oii! Era um benefício que a Dra. liberou para quem fez avaliação este mês. Como você não me respondeu mais, acabei apagando 😊\n\nQuer saber qual é?'},
+      {t:'Se disser que sim',nota:ben.texto?'':'Benefício do mês ainda não definido: preencha abaixo.',x:'É '+benTxt+'! Só te aviso que ele vale até '+benAte+', porque é para a agenda deste mês.\n\nQuer que eu reserve para você?'}];
+    case '6. Conseguiu ver?':return [{t:'Mensagem',x:'Oii, conseguiu ver a minha mensagem acima? 😊'}];
+    case '7. Despedida':return [{t:'Mensagem',nota:'Depois desta, o card vai para Cadência mensal.',x:'Oii, '+n+', tudo bem? Como não tivemos mais retorno, vou encerrar meu acompanhamento por aqui, mas deixo o convite aberto. Quando estiver pronto, estaremos aqui pra te receber com o mesmo carinho e atenção! 💙'}];
+  }
+  return [];
+}
+let _fupAtual=null;
+function fupAbrir(i){
+  const it=(_kb.itens.clientes||[])[i];if(!it)return;
+  const col=it.fechou?'Fechou':_kbOrcEtapa(it.fase);
+  const etapa=fupProximaEtapa(col);if(!etapa)return;
+  _fupAtual={it,etapa,col};
+  fupRender();
+}
+function fupRender(){
+  const {it,etapa,col}=_fupAtual;
+  const fn=(it.d&&it.d.fupNotas)||{};
+  const base=_kbOrcBase(it);
+  const px=_kbOrcProxima(it,col);
+  const ben=(_listas&&_listas.fupBeneficio)||{};
+  const wa=linkWhatsapp(it.r&&it.r.phone);
+  const blocos=fupBlocos(it,etapa);
+  const seguinte=etapa;
+  let m=document.getElementById('fup-modal');
+  if(!m){m=document.createElement('div');m.id='fup-modal';document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)fupFechar();});}
+  m.innerHTML=`<div class="fup-box">
+    <h3>${_kbEsc(etapa)}</h3>
+    <div class="fup-sub">${_kbEsc(it.nome)}${base?' · avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${px?' · enviar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}${it.aberto>0?' · '+fmt(it.aberto):''}</div>
+    <div class="fup-sec">
+      <div class="fup-bt">Anotação da avaliação (Dra. Victoria)</div>
+      <label>O que a paciente mais queria ou a dúvida que ficou</label>
+      <input id="fup-queria" value="${_kbEsc(fn.queria||'')}" placeholder="ex.: um branco mais natural, fechar os espacinhos, medo de ficar artificial">
+      <label>Por que não fechou</label>
+      <select id="fup-motivo"><option value="">Escolha</option>${FUP_MOTIVOS.map(o=>'<option'+(fn.motivo===o?' selected':'')+'>'+o+'</option>').join('')}</select>
+      <div class="fup-acoes"><button type="button" onclick="fupSalvarNotas()">Salvar anotação</button></div>
+    </div>
+    ${blocos.map((b,k)=>`<div class="fup-bloco"><div class="fup-bt">${_kbEsc(b.t)}</div>${b.nota?'<div class="fup-nota">'+_kbEsc(b.nota)+'</div>':''}
+      <textarea id="fup-txt-${k}" rows="${Math.min(12,Math.max(2,Math.ceil(b.x.length/68)+b.x.split('\n').length-1))}">${_kbEsc(b.x)}</textarea>
+      <div class="fup-acoes"><button type="button" onclick="fupCopiar(${k},this)">Copiar</button>${wa?'<a class="wa" href="#" onclick="return fupWhats('+k+')">Abrir no WhatsApp</a>':''}</div></div>`).join('')}
+    ${etapa==='5. Mensagens apagadas'?`<div class="fup-sec"><div class="fup-bt">Benefício do mês (vale para todos que avaliaram no mês)</div>
+      <label>Benefício (real, dentro da margem)</label><input id="fup-ben" value="${_kbEsc(ben.texto||'')}" placeholder="ex.: a primeira manutenção incluída">
+      <label>Vale até</label><input id="fup-ben-ate" type="date" value="${_kbEsc(ben.ate||'')}">
+      <div class="fup-acoes"><button type="button" onclick="fupSalvarBeneficio()">Salvar benefício</button></div></div>`:''}
+    <div class="fup-rodape"><button type="button" class="fup-sair" onclick="fupFechar()">Fechar</button>
+      <button type="button" class="fup-ok" onclick="fupEnviei()">Enviei, mover para ${_kbEsc(seguinte)}</button></div>
+  </div>`;
+  m.style.display='flex';
+}
+function fupFechar(){const m=document.getElementById('fup-modal');if(m)m.style.display='none';_fupAtual=null;}
+function _fupTexto(k){const el=document.getElementById('fup-txt-'+k);return el?el.value:'';}
+function fupCopiar(k,btn){
+  const t=_fupTexto(k);
+  const ok=()=>{if(btn){const o=btn.textContent;btn.textContent='Copiado ✓';setTimeout(()=>{btn.textContent=o;},1500);}};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok).catch(()=>{const el=document.getElementById('fup-txt-'+k);el.select();document.execCommand('copy');ok();});
+  else{const el=document.getElementById('fup-txt-'+k);el.select();document.execCommand('copy');ok();}
+}
+function fupWhats(k){
+  const it=_fupAtual&&_fupAtual.it;const wa=it&&linkWhatsapp(it.r&&it.r.phone);
+  if(wa)window.open(wa+'?text='+encodeURIComponent(_fupTexto(k)),'_blank');
+  return false;
+}
+function fupSalvarNotas(){
+  const it=_fupAtual&&_fupAtual.it;if(!it||!it.r)return;
+  const key=ccKey(it.r);if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  _ccData[key].fupNotas={queria:(document.getElementById('fup-queria').value||'').trim(),motivo:document.getElementById('fup-motivo').value||'',em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''};
+  it.d=_ccData[key];
+  salvarCRMDebounced();
+  showToast('success','Anotação salva','Os textos já usam a anotação.');
+  fupRender();
+}
+function fupSalvarBeneficio(){
+  if(!_listas)return;
+  _listas.fupBeneficio={texto:(document.getElementById('fup-ben').value||'').trim(),ate:document.getElementById('fup-ben-ate').value||''};
+  salvarListasDebounced();
+  showToast('success','Benefício do mês salvo','Vale para todos os cards na etapa 5.');
+  fupRender();
+}
+function fupEnviei(){
+  const a=_fupAtual;if(!a||!a.it.r)return;
+  const destino=a.etapa;
+  const key=ccKey(a.it.r);
+  if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  const d=_ccData[key];
+  (d.fupLog||(d.fupLog=[])).push({etapa:destino,em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''});
+  fupFechar();
+  editarFaseAtivTabela(key,destino);
+  if(destino==='7. Despedida')showToast('success','Despedida enviada','Na próxima, arraste o card para Cadência mensal.');
+}
+// ficha do cliente: anotação da avaliação para o follow-up
+function ccFupNotasRender(d){
+  const el=document.getElementById('cc-fup-notas');if(!el)return;
+  const fn=(d&&d.fupNotas)||{};
+  el.innerHTML='<div style="background:#12213F;border:1px solid #2A3D66;border-radius:9px;padding:10px 12px;margin-bottom:12px;">'+
+    '<div style="font-size:12px;font-weight:700;color:#E2BE6A;margin-bottom:6px;">Para o follow-up (preencher depois da avaliação)</div>'+
+    '<input id="cc-fup-queria" value="'+_kbEsc(fn.queria||'')+'" placeholder="O que a paciente mais queria ou a dúvida que ficou" style="width:100%;box-sizing:border-box;border:1px solid #2A3D66;border-radius:7px;padding:7px 9px;font-size:12.5px;margin-bottom:6px;">'+
+    '<div style="display:flex;gap:6px;"><select id="cc-fup-motivo" style="flex:1;border:1px solid #2A3D66;border-radius:7px;padding:7px 9px;font-size:12.5px;"><option value="">Por que não fechou</option>'+FUP_MOTIVOS.map(o=>'<option'+(fn.motivo===o?' selected':'')+'>'+o+'</option>').join('')+'</select>'+
+    '<button type="button" onclick="ccFupNotasSalvar()" style="background:#B08A3E;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;">Salvar</button></div></div>';
+}
+function ccFupNotasSalvar(){
+  const r=clientesData[_currentClienteIdx];if(!r)return;
+  const key=ccKey(r);if(!_ccData[key])_ccData[key]={orcamentos:[],atividades:[],anotacoes:[]};
+  _ccData[key].fupNotas={queria:(document.getElementById('cc-fup-queria').value||'').trim(),motivo:document.getElementById('cc-fup-motivo').value||'',em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''};
+  salvarCRMDebounced();
+  showToast('success','Anotação salva','A Lívia vê isso no follow-up.');
 }
 const KB_LIMITE=40;
 const _kb={modo:{},limite:{},resp:{},env:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
@@ -18658,10 +18817,14 @@ const KB_QUADROS={
         if(px)prazo='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">'+_kbEsc(px.nome.replace(/ - .*/,''))+' até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
       }
       const base=_kbOrcBase(it);
+      const fn=(it.d&&it.d.fupNotas)||{};
+      const prox=fupProximaEtapa(col);
       return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
         ${trat?'<div class="kb-linha"><span>'+_kbEsc(trat)+'</span></div>':''}
         <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${base?'<span>avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':''}</div>
-        ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}`;
+        ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}
+        ${fn.motivo?'<div class="kb-linha"><span class="kb-tag">'+_kbEsc(fn.motivo)+'</span></div>':''}
+        ${prox&&!it.fechou?'<button type="button" class="kb-fup-btn" onclick="event.stopPropagation();fupAbrir('+it._i+')">✉ Mensagem: '+_kbEsc(prox)+'</button>':''}`;
     },
     abrir:(it)=>{const i=clientesData.indexOf(it.r);if(i>=0)openClienteCard(i);},
     soltar:(it,col)=>{
@@ -18672,7 +18835,7 @@ const KB_QUADROS={
       if(col==='Retorno combinado (Pix)')showToast('success','Marque a data do retorno','Abra o card e preencha o próximo contato com a data combinada.');
       return true;
     },
-    aviso:()=>'Etapas do follow-up de orçamentos do processo comercial. A Lívia envia a mensagem e arrasta o card; o prazo de cada etapa conta da data da avaliação (1° contato até o dia 1, 2° até o 3, 3° até o 7, pergunta sincera até o 10, nova proposta até o 14, conseguiu ver até o 16, despedida até o 21 e cadência mensal a partir do 30). Cada pessoa conta uma vez, pelo orçamento de maior valor.'
+    aviso:()=>'Follow-up de orçamentos (processo de 04/11/2026). O card fica na etapa da última mensagem enviada. Clique em ✉ Mensagem no card para ver o texto pronto, copiar ou abrir no WhatsApp, e depois em Enviei para mover o card. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10 e cadência mensal a partir do 30. Cada pessoa conta uma vez, pelo orçamento de maior valor.'
   },
   fluxo:{
     titulo:'Em Fluxo',
