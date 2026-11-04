@@ -18849,7 +18849,10 @@ const KB_QUADROS={
       const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
       const atv=(d.atividades&&d.atividades[0])||null;
       const recompra=orcs.length>0&&orcs.every(o=>o.pacienteAntigo===true);
-      return {r,ph,d,fechou,aberto,fechado,top,atv,recompra,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
+      // (04/11/2026) com novos e recompras juntos: um orçamento pequeno aprovado
+      // (ex.: limpeza) não tira do follow-up quem tem um orçamento maior em aberto
+      const fechouFup=fechou&&!(aberto>fechado);
+      return {r,ph,d,fechou:fechouFup,aberto,fechado,top,atv,recompra,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
     coluna:(it)=>_kbOrcColuna(it),
     // (04/11/2026) retorno combinado / Pix de compromisso primeiro (prioridade), depois o prazo mais antigo
