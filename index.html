@@ -9609,6 +9609,25 @@ const _PAC_TERMOS={
   clareamentoInferior:{ult:'último clareamento',ag:'Clareamento agendado',nunca:'Sem data do clareamento',acao:'refaz o clareamento'},
   lentesPorcelana:{ult:'última revisão',ag:'Revisão agendada',nunca:'Nunca fez revisão',acao:'faz a revisão'}
 };
+// (05/11/2026) base e recompra: mensagem pronta no "Chamar" de cada aba (Lívia)
+function _pacMensagem(cat,r,meses){
+  const n=(typeof _primeiroNome==='function'?_primeiroNome(r.nome):String(r.nome||'').split(' ')[0])||'';
+  const oi='Oii, '+n+'! Tudo bem? Aqui é a Lívia, da Bulhões 💙 ';
+  const tempo=meses?('já faz '+meses+' meses'):'já faz um tempinho';
+  if(r._precisaContato){
+    const o={lentesResina:'a sua manutenção',renovacao:'a avaliação das suas lentes',inferiores:'a avaliação das lentes de baixo',harmonizacao:'o seu retoque da harmonização',clareamento:'o retoque do clareamento',clareamentoInferior:'o retoque do clareamento',lentesPorcelana:'a revisão das suas lentes'}[cat]||'o seu horário';
+    return 'Oii, '+n+'! Passando de novo pra saber se quer que eu reserve '+o+'. Me fala o melhor dia e período que eu vejo pra você 😊';
+  }
+  switch(cat){
+    case 'lentesResina': return oi+(r._status==='nuncafez'?'Passando porque '+tempo+' que você colocou as lentes e ainda não fizemos a primeira manutenção. ':'Passando porque '+tempo+' da sua última manutenção das lentes. ')+'É ela que mantém o brilho, a cor e a gengiva saudável. Quer que eu veja um horário pra você?';
+    case 'renovacao': return oi+'Suas lentes já estão com você há '+(meses?Math.floor(meses/12)+' anos':'alguns anos')+'. Nessa fase vale uma avaliação pra ver como elas estão e o que dá pra renovar, inclusive as opções em porcelana. Quer que eu reserve um horário com a Dra.?';
+    case 'inferiores': return oi+'Muita paciente que fez as lentes de cima depois quer deixar o sorriso de baixo no mesmo tom. Você já pensou nisso? Se quiser, a Dra. avalia e te mostra como ficaria, sem compromisso.';
+    case 'clareamento': case 'clareamentoInferior': return oi+'Passando porque '+tempo+' do seu clareamento. É nessa época que vale fazer o retoque pra manter a cor. Quer que eu veja um horário pra você?';
+    case 'harmonizacao': return oi+'Passando porque '+tempo+' da sua harmonização, que é a fase em que costuma valer o retoque. Quer que eu veja um horário com a Dra.?';
+    case 'lentesPorcelana': return oi+'Passando porque '+tempo+' da última revisão das suas lentes de porcelana. A revisão com limpeza ajuda a manter tudo bonito e saudável. Quer que eu veja um horário?';
+  }
+  return oi+'Quer que eu veja um horário pra você?';
+}
 function _pacTermo(cat){return _PAC_TERMOS[cat||_catAtivaPacientes]||{ult:'último procedimento',ag:'Agendado',nunca:'Sem data',acao:'volta'};}
 
 // Mescla o seed (carga única vinda da planilha) com edições feitas no dashboard (_ccData[key].manutPlanilha).
@@ -10200,17 +10219,17 @@ function renderTabelaPacientes(){
 
   document.getElementById('pacientes-tbody').innerHTML=regs.map(r=>{
     const meses=cfg.intervalo;
-    let infoTempo='—';
+    let infoTempo='—',mesesPassados=0;
     if(r.dataBase){
       const base=new Date(r.dataBase+'T12:00');
-      if(!isNaN(base)){const dm=diffMeses(base,new Date());infoTempo=(cfg.virtual?'Instalou há ':'')+dm+' meses'+(cfg.virtual?'':' atrás');}
+      if(!isNaN(base)){const dm=diffMeses(base,new Date());mesesPassados=dm;infoTempo=(cfg.virtual?'Instalou há ':'')+dm+' meses'+(cfg.virtual?'':' atrás');}
     }else if(r.dataInstalacao){
       const inst=new Date(r.dataInstalacao+'T12:00');
-      if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());infoTempo=`Instalado há ${dmInst} meses (${_pacTermo(cat).nunca.toLowerCase()})`;}
+      if(!isNaN(inst)){const dmInst=diffMeses(inst,new Date());mesesPassados=dmInst;infoTempo=`Instalado há ${dmInst} meses (${_pacTermo(cat).nunca.toLowerCase()})`;}
     }
     const waLink=linkWhatsapp(r.telefone);
     const waBtn=waLink
-      ?`<a href="${waLink}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 Chamar</a>`
+      ?`<a href="${waLink}?text=${encodeURIComponent(_pacMensagem(cat,r,mesesPassados))}" target="_blank" rel="noopener" title="Abre o WhatsApp com a mensagem pronta" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;text-decoration:none;">💬 Chamar</a>`
       :`<button onclick="definirTelefonePaciente('${cat}','${r._key}','${r.nome.replace(/'/g,"\\'")}')" style="background:#12213F;color:#E2BE6A;font-size:11px;border:none;padding:3px 9px;border-radius:20px;cursor:pointer;">+ Telefone</button>`;
     const hojeStrCell=localDateStr(new Date());
     const agendadoCell=(r.agendado&&r.agendado>=hojeStrCell)
