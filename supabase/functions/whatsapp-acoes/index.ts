@@ -325,8 +325,15 @@ export async function handler(req: Request): Promise<Response> {
         return await enviar(req, quem, c, { type: "template", template }, "template", registro);
       }
       case "modelos": {
-        if (!WA_WABA_ID) return resposta(req, { ok: false, erro: "WA_WABA_ID não configurado" }, 500);
-        const r = await meta(`/${WA_WABA_ID}/message_templates?status=APPROVED&limit=200&fields=name,language,category,components,parameter_format`);
+        // (05/11/2026) cada número pode estar numa conta (WABA) diferente: os modelos são os da conta do número escolhido
+        let waba = WA_WABA_ID, tokenModelos = WA_TOKEN;
+        const numeroModelos = String(dados.numero ?? "").trim();
+        if (numeroModelos && numeroModelos !== WA_PHONE_NUMBER_ID) {
+          const n = (await bancoJson(`/rest/v1/whatsapp_numeros?phone_number_id=eq.${encodeURIComponent(numeroModelos)}&select=waba_id`).catch(() => []))?.[0];
+          if (n?.waba_id) { waba = String(n.waba_id); tokenModelos = await tokenDoNumero(numeroModelos); }
+        }
+        if (!waba) return resposta(req, { ok: false, erro: "WA_WABA_ID não configurado" }, 500);
+        const r = await meta(`/${waba}/message_templates?status=APPROVED&limit=200&fields=name,language,category,components,parameter_format`, undefined, tokenModelos);
         if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
         const modelos = (r.j?.data ?? []).map((t: any) => {
           const comps = t.components ?? [];

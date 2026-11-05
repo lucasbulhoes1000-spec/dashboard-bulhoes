@@ -15897,7 +15897,8 @@ async function waAbrirModelos(){
   fundo.innerHTML='<div class="wa-modal"><div class="wa-modal-cab">Enviar modelo para '+_waEsc(_waNome(c))+'<button class="wa-btn" onclick="waFecharModal()">✕</button></div><div class="wa-modal-corpo" id="wa-modal-corpo"><div class="wa-vazio">Carregando modelos aprovados…</div></div></div>';
   document.body.appendChild(fundo);
   try{
-    if(!_wa.modelos)_wa.modelos=(await _waAcao({acao:'modelos'})).modelos||[];
+    const _numM=(_wa.atual&&_wa.atual.numero_clinica_id)||'';
+    if(!_wa.modelos||_wa.modelosNumero!==_numM){_wa.modelos=(await _waAcao({acao:'modelos',numero:_numM||undefined})).modelos||[];_wa.modelosNumero=_numM;}
     waRenderModelos();
   }catch(e){
     document.getElementById('wa-modal-corpo').innerHTML='<div class="wa-vazio">Não foi possível buscar os modelos.<br><span style="font-size:11px">'+_waEsc(e.message)+'</span></div>';
@@ -17204,7 +17205,8 @@ const DP_RAPIDOS=[
   ['compareceram','Contatos que compareceram e não fecharam',{etapas:['Compareceu']}],
   ['fecharam','Contatos que fecharam',{etapas:['Ganho']}],
   ['perdidos','Contatos perdidos',{etapas:['Perdido']}],
-  ['semconversa','Contatos sem conversa no WhatsApp da clínica',{conversa:'nao'}]
+  ['semconversa','Contatos sem conversa no WhatsApp da clínica',{conversa:'nao'}],
+  ['cadencia','Cadência mensal do follow-up de orçamentos',{fup:'Cadência mensal'}]
 ];
 function _dpFiltroDefs(){
   return [
@@ -17218,8 +17220,30 @@ function _dpFiltroDefs(){
     {k:'atendente',nome:'Usuários atribuídos',tipo:'opcao',ops:[['_ninguem','Sem atendente']].concat((_wa.equipeLista||[]).map(p=>[p.email,p.nome]))},
     {k:'criado',nome:'Data e hora de criação do contato',tipo:'periodo'},
     {k:'msg',nome:'Data e hora da última mensagem',tipo:'periodo'},
-    {k:'conversa',nome:'Tem conversa no WhatsApp?',tipo:'opcao',ops:[['sim','Sim'],['nao','Não']]}
+    {k:'conversa',nome:'Tem conversa no WhatsApp?',tipo:'opcao',ops:[['sim','Sim'],['nao','Não']]},
+    {k:'fup',nome:'Etapa do follow-up de orçamentos',tipo:'opcao',ops:(typeof KB_ORC_ETAPAS!=='undefined'?KB_ORC_ETAPAS.map(e=>[e.id,e.id]):[['Cadência mensal','Cadência mensal']])}
   ];
+}
+// (05/11/2026) etapa do follow-up de orçamentos (mesma regra do quadro de Clientes, sem filtro de datas)
+function _dpEtapasFup(){
+  const out=new Map();
+  try{
+    _kbGarantirFasesProcesso();
+    Object.keys(_ccData||{}).forEach(k=>{
+      const d=_ccData[k];if(!d||!(d.orcamentos||[]).length)return;
+      const ph=normalizePhone(k);if(!ph||out.has(ph))return;
+      const orcs=d.orcamentos;
+      const fechou=orcs.some(o=>o.status==='Aprovado');
+      const aberto=orcs.filter(o=>o.status!=='Aprovado'&&o.status!=='Reprovado'&&o.status!=='Cancelado').reduce((m,o)=>Math.max(m,Number(o.valor||0)),0);
+      const fechado=orcs.filter(o=>o.status==='Aprovado').reduce((t,o)=>t+Number(o.fechValor||o.valor||0),0);
+      const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
+      const atv=(d.atividades&&d.atividades[0])||null;
+      const r=cloudiaRowPorTel(ph)||{phone:ph};
+      const it={r,ph,d,fechou:fechou&&!(aberto>fechado),aberto,fechado,top,atv,fase:atv&&atv.fase?atv.fase:''};
+      out.set(ph,_kbOrcColuna(it));
+    });
+  }catch(e){console.warn('[disparos] etapas do follow-up',e);}
+  return out;
 }
 function abrirDisparos(){
   iniciarWhatsApp();
@@ -17243,6 +17267,8 @@ function dpMontarBase(){
   Object.keys(_ccData||{}).forEach(k=>{if(/^\d{10,13}$/.test(k))add(k,(_ccData[k]&&(_ccData[k].nome||_ccData[k].name))||'');});
   conv.forEach((c,ph)=>add(ph,_waNome(c)));
   _dp.base=[...mapa.values()];
+  const fups=_dpEtapasFup();
+  _dp.base.forEach(x=>{x.fup=fups.get(x.ph)||'';});
 }
 function dpFiltrar(){
   const f=_dp.f;const b=String(_dp.busca||'').trim().toLowerCase();const bn=b.replace(/\D/g,'');
@@ -17252,6 +17278,7 @@ function dpFiltrar(){
     if(f.tel&&!x.ph.includes(String(f.tel).replace(/\D/g,'')))return false;
     if(f.etapas&&f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
     if(f.origem&&x.origem!==f.origem)return false;
+    if(f.fup&&x.fup!==f.fup)return false;
     if(f.anuncio&&!String(x.adName).toLowerCase().includes(f.anuncio.toLowerCase()))return false;
     if(f.campanha&&!String(x.campanha).toLowerCase().includes(f.campanha.toLowerCase()))return false;
     if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
@@ -17373,14 +17400,23 @@ function dpMenuEnvio(ev){
 // ---------- gaveta "Mensagens em massa via WhatsApp" ----------
 async function dpAbrirGaveta(aba){
   _dp.gaveta={aba};
-  if(aba==='envio'&&!_dp.envio)_dp.envio={agendar:false,agendado:'',numero:'',modelo:null,espera:3,repeticao:7,ciente:false,nome:'',previa:null};
+  if(aba==='envio'&&!_dp.envio)_dp.envio={agendar:false,agendado:'',numero:(_wa.numeros&&_wa.numeros[0]&&_wa.numeros[0].phone_number_id)||'',modelo:null,espera:3,repeticao:7,ciente:false,nome:'',previa:null};
   dpRenderGaveta();
   if(aba==='resultados')dpCarregarResultados();
-  if(aba==='envio'&&!_dp.modelos){
-    try{const r=await _waAcao({acao:'modelos'});_dp.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
-    catch(e){_dp.modelos=[];showToast('error','Não consegui carregar os modelos da Meta',e.message);}
-    if(_dp.gaveta&&_dp.gaveta.aba==='envio')dpRenderGaveta();
-  }
+  if(aba==='envio'&&(!_dp.modelos||_dp.modelosNumero!==(_dp.envio.numero||'')))await dpCarregarModelos();
+}
+// (05/11/2026) os modelos aprovados são os da conta do número escolhido
+async function dpCarregarModelos(){
+  const num=(_dp.envio&&_dp.envio.numero)||'';
+  _dp.modelos=null;_dp.modelosNumero=num;
+  try{const r=await _waAcao({acao:'modelos',numero:num||undefined});if(_dp.modelosNumero===num)_dp.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
+  catch(e){_dp.modelos=[];showToast('error','Não consegui carregar os modelos da Meta',e.message);}
+  if(_dp.gaveta&&_dp.gaveta.aba==='envio')dpRenderGaveta();
+}
+function dpTrocarNumero(v){
+  if(!_dp.envio)return;
+  _dp.envio.numero=v;_dp.envio.modelo=null;_dp.envio.previa=null;
+  dpRenderGaveta();dpCarregarModelos();
 }
 function dpFecharGaveta(){_dp.gaveta=null;const g=document.getElementById('dp-gaveta');if(g)g.remove();const f=document.getElementById('dp-gaveta-fundo');if(f)f.remove();}
 function _dpCusto(n){
@@ -17422,7 +17458,7 @@ function dpRenderGaveta(){
         '<label class="au-check"><input type="checkbox" '+(e.agendar?'checked':'')+' onchange="_dp.envio.agendar=this.checked;dpRenderGaveta()"> Deseja agendar a ação em massa?</label>'+
         (e.agendar?'<input class="dp-in" type="datetime-local" value="'+_waEsc(e.agendado)+'" onchange="_dp.envio.agendado=this.value;dpRenderGaveta()">':'')+'</div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Conexão de WhatsApp <span class="dp-q" title="Número da clínica que vai enviar.">?</span></div>'+
-        '<select class="dp-in" onchange="_dp.envio.numero=this.value">'+(_wa.numeros.length?_wa.numeros:[{phone_number_id:'',apelido:'Clínica'}]).map(x=>'<option value="'+_waEsc(x.phone_number_id)+'"'+(e.numero===x.phone_number_id?' selected':'')+'>● '+_waEsc(x.apelido||x.numero_exibicao)+'  ON</option>').join('')+'</select></div>'+
+        '<select class="dp-in" onchange="dpTrocarNumero(this.value)">'+(_wa.numeros.length?_wa.numeros:[{phone_number_id:'',apelido:'Clínica'}]).map(x=>'<option value="'+_waEsc(x.phone_number_id)+'"'+(e.numero===x.phone_number_id?' selected':'')+'>● '+_waEsc(x.apelido||x.numero_exibicao)+'  ON</option>').join('')+'</select></div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Modelo da mensagem</div>'+modeloHtml+'</div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Tempo de espera em segundos entre envio de cada mensagem <span class="dp-q" title="Mais tempo protege a qualidade do número na Meta.">?</span></div>'+
         '<div class="dp-slider"><input type="range" min="0.3" max="10" step="0.1" value="'+e.espera+'" oninput="_dp.envio.espera=Number(this.value);this.nextElementSibling.textContent=this.value+\' s\'"  onchange="dpRenderGaveta()"><span>'+e.espera+' s</span></div>'+
