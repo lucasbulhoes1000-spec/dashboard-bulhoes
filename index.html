@@ -14707,6 +14707,7 @@ function openLeadCard(idx){
   if(!found&&origVal){const op=new Option(origVal,origVal);origSel.add(op);}
   origSel.value=origVal;
   document.getElementById('lc-indicador').value=(d_lc.indicadoPor&&d_lc.indicadoPor.nome)||'';
+  lcCarregarAnuncios(d_lc.adIdManual||(r.ad_id?String(r.ad_id):''));
   document.getElementById('lc-indicador-wrap').style.display=/indica/i.test(origVal)?'block':'none';
   if(/indica/i.test(origVal))indPreencherDatalist();
   // Status — prioriza edição manual do CRM
@@ -14742,6 +14743,18 @@ function openLeadCard(idx){
   document.getElementById('lead-card-overlay').style.display='block';
 }
 
+// (05/11/2026) anúncio de origem manual: lista dos anúncios da Meta (meta_estrutura), mais recentes primeiro
+async function lcCarregarAnuncios(atual){
+  const sel=document.getElementById('lc-anuncio');if(!sel)return;
+  if(!window._lcAnuncios){
+    try{window._lcAnuncios=(await _waRest('meta_estrutura?select=ad_id,ad_nome,campaign_nome,ad_criado_em&order=ad_criado_em.desc.nullslast&limit=500'))||[];}catch(e){window._lcAnuncios=[];}
+  }
+  const ads=window._lcAnuncios;
+  const esc=t=>String(t||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let html='<option value="">—</option>'+ads.map(a=>'<option value="'+esc(a.ad_id)+'">'+esc(a.ad_nome||a.ad_id)+(a.campaign_nome?' · '+esc(a.campaign_nome):'')+'</option>').join('');
+  if(atual&&!ads.some(a=>String(a.ad_id)===String(atual)))html+='<option value="'+esc(atual)+'">Anúncio '+esc(atual)+'</option>';
+  sel.innerHTML=html;sel.value=atual||'';
+}
 function closeLeadCard(e){
   if(e.target===document.getElementById('lead-card-overlay'))
     document.getElementById('lead-card-overlay').style.display='none';
@@ -14768,6 +14781,8 @@ function salvarLeadCard(){
   _ccData[ph].nomeAtual=novoNome||r.name;
   _ccData[ph].origemAtual=novaOrigem||r.origin;
   if(/indica/i.test(novaOrigem||''))indSalvar(ph,document.getElementById('lc-indicador').value);
+  { const adSel=document.getElementById('lc-anuncio'); const adV=adSel?adSel.value:'';
+    if(adV&&adV!==String(r.ad_id||''))_ccData[ph].adIdManual=adV; else if(!adV&&_ccData[ph].adIdManual)delete _ccData[ph].adIdManual; }
   _ccData[ph].statusAtual=novoStatus;
   _ccData[ph].statusAtualEditedAt=new Date().toISOString();
   _ccData[ph].telefoneAtual=novoTel||ph;
@@ -18545,6 +18560,10 @@ function abrirConversas(){
           <option>#Indicação</option>
           <option>#Facebook ADS</option>
         </select>
+        <div style="margin-top:8px;">
+          <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Anúncio de origem <span style="color:#66738F;">(só se o lead veio de anúncio e o Lume não identificou)</span></label>
+          <select id="lc-anuncio" style="width:100%;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;font-size:13px;background:#0D1A33;"><option value="">—</option></select>
+        </div>
         <div id="lc-indicador-wrap" style="display:none;margin-top:8px;">
           <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Quem indicou</label>
           <input id="lc-indicador" list="indicador-datalist" type="text" placeholder="Nome do paciente que indicou" style="width:100%;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#0D1A33;">
