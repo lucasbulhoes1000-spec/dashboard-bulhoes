@@ -17221,6 +17221,7 @@ function _dpFiltroDefs(){
     {k:'criado',nome:'Data e hora de criação do contato',tipo:'periodo'},
     {k:'msg',nome:'Data e hora da última mensagem',tipo:'periodo'},
     {k:'conversa',nome:'Tem conversa no WhatsApp?',tipo:'opcao',ops:[['sim','Sim'],['nao','Não']]},
+    {k:'avaliacao',nome:'Data da avaliação (follow-up de orçamentos)',tipo:'periodo'},
     {k:'fup',nome:'Etapa do follow-up de orçamentos',tipo:'opcao',ops:(typeof KB_ORC_ETAPAS!=='undefined'?KB_ORC_ETAPAS.map(e=>[e.id,e.id]):[['Cadência mensal','Cadência mensal']])}
   ];
 }
@@ -17240,7 +17241,8 @@ function _dpEtapasFup(){
       const atv=(d.atividades&&d.atividades[0])||null;
       const r=cloudiaRowPorTel(ph)||{phone:ph};
       const it={r,ph,d,fechou:fechou&&!(aberto>fechado),aberto,fechado,top,atv,fase:atv&&atv.fase?atv.fase:''};
-      out.set(ph,_kbOrcColuna(it));
+      const base=_kbOrcBase(it);
+      out.set(ph,{col:_kbOrcColuna(it),aval:base?localDateStr(base):''});
     });
   }catch(e){console.warn('[disparos] etapas do follow-up',e);}
   return out;
@@ -17268,7 +17270,7 @@ function dpMontarBase(){
   conv.forEach((c,ph)=>add(ph,_waNome(c)));
   _dp.base=[...mapa.values()];
   const fups=_dpEtapasFup();
-  _dp.base.forEach(x=>{x.fup=fups.get(x.ph)||'';});
+  _dp.base.forEach(x=>{const f=fups.get(x.ph);x.fup=f?f.col:'';x.avaliacao=f?f.aval:'';});
 }
 function dpFiltrar(){
   const f=_dp.f;const b=String(_dp.busca||'').trim().toLowerCase();const bn=b.replace(/\D/g,'');
@@ -17279,6 +17281,8 @@ function dpFiltrar(){
     if(f.etapas&&f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
     if(f.origem&&x.origem!==f.origem)return false;
     if(f.fup&&x.fup!==f.fup)return false;
+    if(f.avaliacao&&f.avaliacao.de&&(!x.avaliacao||x.avaliacao<f.avaliacao.de))return false;
+    if(f.avaliacao&&f.avaliacao.ate&&(!x.avaliacao||x.avaliacao>f.avaliacao.ate))return false;
     if(f.anuncio&&!String(x.adName).toLowerCase().includes(f.anuncio.toLowerCase()))return false;
     if(f.campanha&&!String(x.campanha).toLowerCase().includes(f.campanha.toLowerCase()))return false;
     if(f.tag&&!(x.conversa&&_wa.convTags[x.conversa.id]&&_wa.convTags[x.conversa.id].has(Number(f.tag))))return false;
