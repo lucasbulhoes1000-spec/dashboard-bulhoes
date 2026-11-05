@@ -15267,6 +15267,10 @@ async function waCarregarNumeros(){
 }
 function waAbrirNumeros(){
   waFecharModal();
+  // (05/11/2026) deixa o login do Facebook pronto antes do clique: se o Lume esperar
+  // carregar no clique, o navegador bloqueia a janela do Facebook e nada acontece
+  _waConfigCadastro().then(c=>{window._waCfgCad=c;}).catch(()=>{});
+  _waCarregarSdkFacebook().catch(()=>{});
   const fundo=document.createElement('div');
   fundo.className='wa-modal-fundo';fundo.id='wa-modal';
   fundo.onclick=e=>{if(e.target===fundo)waFecharModal();};
@@ -15332,13 +15336,16 @@ function _waCarregarSdkFacebook(){
 }
 async function waConectarNumero(){
   const b=document.getElementById('wa-btn-conectar');
-  const cfg=await _waConfigCadastro();
-  if(!cfg){
-    _waStatusConexao('Ainda não disponível: a Meta está analisando o app Bulhões CRM (pedido enviado em 21/10/2026). Assim que aprovar, este botão passa a funcionar.',true);
+  let cfg=window._waCfgCad,FB=window.FB;
+  if(!cfg||!FB){
+    // ainda carregando: carrega agora e pede um novo clique (a janela do Facebook só abre direto no clique)
+    _waStatusConexao('Preparando a conexão com o Facebook…');
+    try{cfg=cfg||await _waConfigCadastro();window._waCfgCad=cfg;FB=FB||await _waCarregarSdkFacebook();}
+    catch(e){_waStatusConexao(e.message,true);return;}
+    if(!cfg){_waStatusConexao('A configuração do cadastro do WhatsApp não foi encontrada no Lume.',true);return;}
+    _waStatusConexao('Tudo pronto. Clique em "Conectar número do celular" de novo para abrir a janela do Facebook.');
     return;
   }
-  let FB;
-  try{FB=await _waCarregarSdkFacebook();}catch(e){_waStatusConexao(e.message,true);return;}
   const sessao={};
   const ouvir=ev=>{
     if(!/(^|\.)facebook\.com$/.test(new URL(ev.origin).hostname))return;
@@ -15355,6 +15362,7 @@ async function waConectarNumero(){
   window.addEventListener('message',ouvir);
   if(b){b.disabled=true;b.textContent='Conectando…';}
   _waStatusConexao('Siga as etapas na janela do Facebook. No celular, abra o WhatsApp Business e leia o QR Code quando pedir.');
+  setTimeout(()=>{if(b&&b.disabled&&!sessao.evento)_waStatusConexao('A janela do Facebook abre separada. Se ela não apareceu, procure atrás desta janela ou libere os pop-ups do dashboard-bulhoes.vercel.app no ícone da barra de endereço e clique de novo.',true);},5000);
   FB.login(async resp=>{
     try{
       const code=resp&&resp.authResponse&&resp.authResponse.code;
