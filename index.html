@@ -7581,7 +7581,7 @@ function ssRenderPorPerfil(rows){
 // meta diária de abordagens (definida pela gestão em configuracoes.ss_meta_abordagens_dia)
 async function ssCarregarMeta(){
   try{const r=await _waRest('configuracoes?chave=eq.ss_meta_abordagens_dia&select=valor');const v=r&&r[0]?r[0].valor:0;
-    if(v&&typeof v==='object'){_ss.metaPerfis=v;}else{const n=Math.round((Number(v)||0)/SS_PERFIS.length);_ss.metaPerfis={};SS_PERFIS.forEach(p=>_ss.metaPerfis[p]=n);}
+    if(v&&typeof v==='object'){_ss.metaPerfis=v;}else{const n=Number(v)||0;_ss.metaPerfis={};SS_PERFIS.forEach(p=>_ss.metaPerfis[p]=n);}
     _ss.meta=SS_PERFIS.reduce((t,p)=>t+(Number(_ss.metaPerfis[p])||0),0);}catch(e){_ss.meta=_ss.meta||0;_ss.metaPerfis=_ss.metaPerfis||{};}
 }
 async function ssSalvarMeta(){
@@ -7596,7 +7596,7 @@ function ssDiasUteisAteHoje(){
   const h=new Date();let n=0;for(let d=1;d<=h.getDate();d++){const x=new Date(h.getFullYear(),h.getMonth(),d).getDay();if(x!==0&&x!==6)n++;}return n;
 }
 // (05/11/2026) meta por perfil do Instagram: configuracoes.ss_meta_abordagens_dia = {"Dra. Larissa":N,"Clínica":M}
-// (valor antigo, um número só para os dois, é dividido igualmente até a gestão separar)
+// (valor antigo, um número só, vale para cada perfil: 40 abordagens em cada, decisão do Lucas em 05/11)
 function _ssMetaPerfil(p){const m=_ss.metaPerfis||{};return Number(m[p])||0;}
 function ssBlocoMeta(){
   const hoje=ssHoje();const mesIni=hoje.slice(0,8)+'01';const du=ssDiasUteisAteHoje();
