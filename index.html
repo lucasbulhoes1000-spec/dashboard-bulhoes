@@ -7371,7 +7371,8 @@ function ssKanban(){
         (l.conversa_id?'<span class="sskb-tag dm">💬 direct</span>':'')+
         (l.etapa==='agendou'&&l.agendado_para?'<span class="sskb-tag ouro">📅 '+ssFmt(l.agendado_para).slice(0,5)+'</span>':'')+
         (l.etapa==='venda'&&l.venda_valor?'<span class="sskb-tag verde">R$ '+Math.round(l.venda_valor).toLocaleString('pt-BR')+'</span>':'')+
-        (parado?'<span class="sskb-tag ouro">parado</span>':'')+'</div></div>';
+        (parado?'<span class="sskb-tag ouro">parado</span>':'')+
+        (()=>{const v=ssFollowVence(l);return v&&v<=ssHoje()?'<span class="sskb-tag ouro">follow hoje</span>':'';})()+'</div></div>';
   };
   el.innerHTML=
     '<div class="sskb-topo">'+
@@ -7382,6 +7383,7 @@ function ssKanban(){
         '<button class="wa-btn" onclick="ssColunasEditar()" title="Renomear, reordenar, criar ou apagar colunas">⚙ Colunas</button>'+
         '<button class="wa-btn primario" onclick="ssCardAbrir(null)">+ Novo card</button></div>'+
     '</div>'+
+    ssFollowHoje(cards)+
     '<div class="sskb-quadro">'+SS_ETAPAS.map(([k,nome,cor,tipo])=>{
       const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
       const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.venda_valor||0),0):0;
@@ -7390,6 +7392,36 @@ function ssKanban(){
         '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">'+(k==='entrada'?'Quem responder no direct aparece aqui':'Arraste um card para cá')+'</div>')+'</div></div>';
     }).join('')+'</div>'+
     '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Agendou</b>, coloque telefone e data da avaliação: daí <b>Compareceu</b> e <b>Venda</b> andam sozinhos pelo Clinicorp. <b>Amigo Lari</b> e <b>Dentista</b> ficam guardados, fora das contas.</div>';
+}
+// (05/11/2026) follow do social selling: só com quem respondeu (decisão do Lucas).
+// Prazo conta da última ação no card (mudança de etapa ou "Fiz o follow").
+const SS_FOLLOW_DIAS={entrada:0,conversa:1,material_1:2,material_2:3,faltou_horario:1};
+const SS_FOLLOW_O_QUE={entrada:'responder quem respondeu no direct',conversa:'retomar a conversa',material_1:'mandar o material 2',material_2:'última mensagem; sem resposta, Não tem interesse',faltou_horario:'remarcar a avaliação'};
+function ssFollowVence(l){
+  const d=SS_FOLLOW_DIAS[l.etapa];if(d==null||!l.etapa_em)return null;
+  const base=new Date(String(l.etapa_em).slice(0,10)+'T12:00');base.setDate(base.getDate()+d);return localDateStr(base);
+}
+function ssFollowHoje(cards){
+  const hoje=ssHoje();
+  const lista=cards.filter(l=>{const v=ssFollowVence(l);return v&&v<=hoje;}).sort((a,b)=>ssFollowVence(a).localeCompare(ssFollowVence(b)));
+  if(!lista.length)return '<div class="au-bloco" style="margin-bottom:12px;"><h4>Follow de hoje</h4><div class="au-dica">Ninguém para chamar hoje. Follow só com quem respondeu.</div></div>';
+  const porPerfil=SS_PERFIS.concat(['']).map(p=>[p,lista.filter(l=>(l.perfil||'')===p)]).filter(x=>x[1].length);
+  const item=l=>{const v=ssFollowVence(l);const atraso=Math.round((new Date(hoje+'T12:00')-new Date(v+'T12:00'))/864e5);
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid #1E2E52;">'+
+      '<a href="#" onclick="ssCardAbrir('+l.id+');return false;" style="flex:1;min-width:160px;color:#EEF1F7;text-decoration:none;font-size:12.5px;"><b>'+_waEsc(ssRotulo(l))+'</b> <span style="color:#8C98B1;">· '+_waEsc(SS_ETAPA_NOME[l.etapa]||l.etapa)+' · '+SS_FOLLOW_O_QUE[l.etapa]+'</span></a>'+
+      (atraso>0?'<span style="font-size:11px;color:#E2BE6A;">'+atraso+'d atrasado</span>':'')+
+      '<button class="wa-btn" style="height:26px;font-size:11px" onclick="ssFollowFeito('+l.id+')">✓ Fiz o follow</button>'+
+      (l.etapa==='material_2'?'<button class="wa-btn" style="height:26px;font-size:11px" onclick="ssMover('+l.id+',\'sem_interesse\')">Sem interesse</button>':'')+
+    '</div>';};
+  return '<div class="au-bloco" style="margin-bottom:12px;"><h4>Follow de hoje · '+lista.length+'</h4>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;">'+porPerfil.map(([p,ls])=>'<div style="flex:1;min-width:300px;"><div style="font-size:12px;font-weight:700;color:#E2BE6A;margin-bottom:4px;">'+_waEsc(p||'Sem perfil')+' · '+ls.length+'</div>'+ls.map(item).join('')+'</div>').join('')+'</div>'+
+    '<div class="au-dica" style="margin-top:6px;">Só entra quem respondeu. Mudou de etapa ou clicou em "Fiz o follow", o próximo prazo conta a partir de hoje.</div></div>';
+}
+async function ssFollowFeito(id){
+  const l=_ss.linhas.find(x=>x.id===id);if(!l)return;
+  await ssSalvar(id,'etapa_em',new Date().toISOString(),true);
+  await ssSalvar(id,'tentativas',(parseInt(l.tentativas)||0)+1,true);
+  ssKanban();
 }
 function ssSoltar(ev,el,k){
   ev.preventDefault();el.classList.remove('sobre');
