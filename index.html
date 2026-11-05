@@ -9621,7 +9621,7 @@ function _pacMensagem(cat,r,meses){
   switch(cat){
     case 'lentesResina': return oi+(r._status==='nuncafez'?'Passando porque '+tempo+' que você colocou as lentes e ainda não fizemos a primeira manutenção. ':'Passando porque '+tempo+' da sua última manutenção das lentes. ')+'É ela que mantém o brilho, a cor e a gengiva saudável. Quer que eu veja um horário pra você?';
     case 'renovacao': return oi+'Suas lentes já estão com você há '+(meses?Math.floor(meses/12)+' anos':'alguns anos')+'. Nessa fase vale uma avaliação pra ver como elas estão e o que dá pra renovar, inclusive as opções em porcelana. Quer que eu reserve um horário com a Dra.?';
-    case 'inferiores': return oi+'Muita paciente que fez as lentes de cima depois quer deixar o sorriso de baixo no mesmo tom. Você já pensou nisso? Se quiser, a Dra. avalia e te mostra como ficaria, sem compromisso.';
+    case 'inferiores': return oi+'Muita gente que fez as lentes de cima depois quer deixar o sorriso de baixo no mesmo tom. Você já pensou nisso? Se quiser, a Dra. avalia e te mostra como ficaria, sem compromisso.';
     case 'clareamento': case 'clareamentoInferior': return oi+'Passando porque '+tempo+' do seu clareamento. É nessa época que vale fazer o retoque pra manter a cor. Quer que eu veja um horário pra você?';
     case 'harmonizacao': return oi+'Passando porque '+tempo+' da sua harmonização, que é a fase em que costuma valer o retoque. Quer que eu veja um horário com a Dra.?';
     case 'lentesPorcelana': return oi+'Passando porque '+tempo+' da última revisão das suas lentes de porcelana. A revisão com limpeza ajuda a manter tudo bonito e saudável. Quer que eu veja um horário?';
