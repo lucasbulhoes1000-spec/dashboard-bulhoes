@@ -3385,14 +3385,36 @@ function _iniVar(a,b,dinheiro){
   const t=dinheiro?'R$ '+Math.abs(d).toLocaleString('pt-BR',{maximumFractionDigits:0}):Math.abs(d);
   return '<span class="'+(d>0?'up':'down')+'">'+(d>0?'▲ ':'▼ ')+t+'</span>'+vs;
 }
+function iniDetalhe(tipo,pag){
+  const D=window._iniDet;if(!D||!D[tipo]){irParaPagina(pag);return;}
+  const titulos={lead:'Novos leads',agenda:'Avaliações agendadas',presenca:'Compareceram',venda:'Vendas'};
+  const per={hoje:'hoje','7d':'nos últimos 7 dias',mes:'no mês'}[_iniPeriodo]||'';
+  const L=D[tipo];
+  const quando=x=>{if(!x.quando)return '';if(x.soDia)return String(x.quando).slice(0,10).split('-').reverse().join('/');const d=new Date(x.quando);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});};
+  const tel=t=>{const n=String(t||'').replace(/\D/g,'');return n?(typeof _waTelFormatado==='function'?_waTelFormatado(n):n):'';};
+  let ov=document.getElementById('ini-det-overlay');
+  if(!ov){ov=document.createElement('div');ov.id='ini-det-overlay';ov.style.cssText='position:fixed;inset:0;background:rgba(5,10,25,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.style.display='none';});}
+  const total=tipo==='venda'?' · R$ '+L.reduce((s,x)=>s+x.valor,0).toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
+  ov.innerHTML='<div style="background:#12213F;border:1px solid #2A3D66;border-radius:14px;width:100%;max-width:640px;max-height:85vh;display:flex;flex-direction:column;">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid #2A3D66;"><div><div style="font-size:15px;font-weight:700;color:#EEF1F7;">'+titulos[tipo]+' '+per+'</div><div style="font-size:12px;color:#8C98B1;margin-top:2px;">'+L.length+(L.length===1?' pessoa':' pessoas')+total+'</div></div>'+
+    '<button onclick="document.getElementById(\'ini-det-overlay\').style.display=\'none\'" style="background:none;border:none;color:#C3CBDB;font-size:18px;cursor:pointer;">✕</button></div>'+
+    '<div style="overflow:auto;padding:6px 18px 12px;">'+(L.length?L.map(x=>'<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #1E2E52;">'+
+      '<div style="flex:1;min-width:0;"><a href="#" onclick="document.getElementById(\'ini-det-overlay\').style.display=\'none\';abrirCardPorTelefone(\''+String(x.tel).replace(/\D/g,'')+'\');return false;" style="color:#EEF1F7;font-weight:600;text-decoration:none;font-size:13px;">'+_iniEsc(x.nome||'Sem nome')+'</a>'+
+      '<div style="font-size:11px;color:#8C98B1;margin-top:2px;">'+_iniEsc([tel(x.tel),x.info].filter(Boolean).join(' · '))+'</div></div>'+
+      (tipo==='venda'?'<div style="font-size:13px;font-weight:700;color:#6ADC96;white-space:nowrap;">R$ '+x.valor.toLocaleString('pt-BR',{maximumFractionDigits:0})+'</div>':'')+
+      '<div style="font-size:11px;color:#8C98B1;white-space:nowrap;">'+quando(x)+'</div></div>').join(''):'<div style="font-size:12px;color:#8C98B1;padding:14px 0;">Ninguém nesta etapa no período.</div>')+'</div>'+
+    '<div style="padding:12px 18px;border-top:1px solid #2A3D66;text-align:right;"><button onclick="document.getElementById(\'ini-det-overlay\').style.display=\'none\';irParaPagina(\''+pag+'\')" style="background:#12213F;color:#E2BE6A;border:1px solid #2A3D66;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">Abrir '+({leads:'Leads',clientes:'Clientes','rel-orcamentos':'Orçamentos Fechados'}[pag]||'página')+'</button></div></div>';
+  ov.style.display='flex';
+}
 async function carregarInicio(){
   if(!document.getElementById('ini-kpis')||_iniCarregando)return;
   if(typeof _sbAccessToken==='undefined'||!_sbAccessToken){setTimeout(carregarInicio,1500);return;}
   _iniCarregando=true;
   try{
     const J=_iniJanela(_iniPeriodo);
-    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
-    const orc=(await _waRest('orcamentos?select=fechamento_valor,valor,fechamento_data&status=eq.Aprovado&fechamento_data=gte.'+_iniDia(J.deAnt)))||[];
+    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
+    const orc=(await _waRest('orcamentos?select=fechamento_valor,valor,fechamento_data,tratamento,paciente_antigo,pacientes(nome,telefone)&status=eq.Aprovado&fechamento_data=gte.'+_iniDia(J.deAnt)))||[];
     let naoLidas=0;try{const cv=(await _waRest('conversas?select=id&nao_lidas=gt.0&limit=1000'))||[];naoLidas=cv.length;}catch(e){}
     // (03/11/2026) "Avaliações agendadas" pela data em que a avaliação foi MARCADA no Clinicorp
     // (CreateDate), e não pelo dia em que alguém mudou a etapa no CRM. Atualiza a cada 10 min.
@@ -3411,8 +3433,25 @@ async function carregarInicio(){
       return r;};
     const somaVendas=(a,b)=>{let v=0,n=0;const da=_iniDia(a),db=_iniDia(b);for(const o of orc){const d=String(o.fechamento_data||'');if(d>=da&&d<=db){v+=Number(o.fechamento_valor||o.valor||0);n++;}}return{v,n};};
     const atual=conta(J.de,J.ate),ant=conta(J.deAnt,J.ateAnt),vA=somaVendas(J.de,J.ate),vB=somaVendas(J.deAnt,J.ateAnt);
+    // (05/11/2026) lupa dos cards: quem são as pessoas de cada número do período
+    try{
+      const det={lead:new Map(),agenda:new Map(),presenca:new Map(),venda:[]};
+      const k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
+      for(const e of ev){if(!dentro(e.ocorrido_em,J.de,J.ate))continue;const et=String(e.etapa||'').toLowerCase();
+        const item={nome:e.nome||'',tel:e.telefone||'',quando:e.ocorrido_em,info:e.origem||''};
+        if(e.tipo==='CUSTOMER_CREATED'){if(!det.lead.has(k8(item.tel)))det.lead.set(k8(item.tel),item);}
+        else if(et==='compareceu'){if(!det.presenca.has(k8(item.tel)))det.presenca.set(k8(item.tel),item);}
+        else if(et==='agendou'&&!atosAg){if(!det.agenda.has(k8(item.tel)))det.agenda.set(k8(item.tel),item);}}
+      if(atosAg){const da=_iniDia(J.de),db=_iniDia(J.ate);
+        for(const x of atosAg){if(!(x.dataCriacao>=da&&x.dataCriacao<=db))continue;const kk=k8(x.tel);if(det.agenda.has(kk))continue;
+          det.agenda.set(kk,{nome:x.nome||'',tel:x.tel||'',quando:x.dataCriacao,info:x.data?'avaliação em '+String(x.data).slice(0,10).split('-').reverse().join('/'):'',soDia:true});}}
+      const da=_iniDia(J.de),db=_iniDia(J.ate);
+      for(const o of orc){const d=String(o.fechamento_data||'');if(!(d>=da&&d<=db))continue;const p=o.pacientes||{};
+        det.venda.push({nome:p.nome||'',tel:p.telefone||'',quando:d,soDia:true,valor:Number(o.fechamento_valor||o.valor||0),info:(o.tratamento||'')+(o.paciente_antigo?' · recompra':'')});}
+      window._iniDet={lead:[...det.lead.values()],agenda:[...det.agenda.values()],presenca:[...det.presenca.values()],venda:det.venda.sort((a,b)=>b.valor-a.valor)};
+    }catch(eDet){console.warn('[inicio] detalhes',eDet);window._iniDet=null;}
     const brl=v=>'R$ '+Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
-    const kpi=(ico,rot,val,extra,varTxt,pag)=>'<div class="ini-kpi" onclick="irParaPagina(\''+pag+'\')"><div class="ini-kpi-rot">'+_iniSvg(ico)+rot+'</div><div class="ini-kpi-val">'+val+(extra?'<small>'+extra+'</small>':'')+'</div><div class="ini-kpi-var">'+varTxt+'</div></div>';
+    const kpi=(ico,rot,val,extra,varTxt,pag)=>'<div class="ini-kpi" onclick="'+(ico==='conversa'?'irParaPagina(\''+pag+'\')':'iniDetalhe(\''+ico+'\',\''+pag+'\')')+'" title="'+(ico==='conversa'?'Abrir Conversas':'Ver quem são')+'"><div class="ini-kpi-rot">'+_iniSvg(ico)+rot+'</div><div class="ini-kpi-val">'+val+(extra?'<small>'+extra+'</small>':'')+'</div><div class="ini-kpi-var">'+varTxt+'</div></div>';
     document.getElementById('ini-kpis').innerHTML=
       kpi('lead','Novos leads',atual.lead,'',_iniVar(atual.lead,ant.lead),'leads')+
       kpi('agenda','Avaliações agendadas',atual.agendou,'',_iniVar(atual.agendou,ant.agendou),'leads')+
