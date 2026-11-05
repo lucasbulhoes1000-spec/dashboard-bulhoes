@@ -3390,6 +3390,9 @@ function iniDetalhe(tipo,pag){
   const titulos={lead:'Novos leads',agenda:'Avaliações agendadas',presenca:'Compareceram',venda:'Vendas'};
   const per={hoje:'hoje','7d':'nos últimos 7 dias',mes:'no mês'}[_iniPeriodo]||'';
   const L=D[tipo];
+  // (05/11/2026) origem também em agendadas e vendas (vem do CRM)
+  L.forEach(x=>{if(x.precisaOrigem&&!x._origem){let o='';try{o=origemAtualPaciente(String(x.tel||'').replace(/\D/g,''),x.nome)||'';}catch(e){}x._origem=o&&o!=='—'?o:'';
+    if(x._origem)x.info=x._origem+(x.info?' · '+x.info:'');x.precisaOrigem=false;}});
   const quando=x=>{if(!x.quando)return '';if(x.soDia)return String(x.quando).slice(0,10).split('-').reverse().join('/');const d=new Date(x.quando);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});};
   const tel=t=>{const n=String(t||'').replace(/\D/g,'');return n?(typeof _waTelFormatado==='function'?_waTelFormatado(n):n):'';};
   let ov=document.getElementById('ini-det-overlay');
@@ -3444,10 +3447,10 @@ async function carregarInicio(){
         else if(et==='agendou'&&!atosAg){if(!det.agenda.has(k8(item.tel)))det.agenda.set(k8(item.tel),item);}}
       if(atosAg){const da=_iniDia(J.de),db=_iniDia(J.ate);
         for(const x of atosAg){if(!(x.dataCriacao>=da&&x.dataCriacao<=db))continue;const kk=k8(x.tel);if(det.agenda.has(kk))continue;
-          det.agenda.set(kk,{nome:x.nome||'',tel:x.tel||'',quando:x.dataCriacao,info:x.data?'avaliação em '+String(x.data).slice(0,10).split('-').reverse().join('/'):'',soDia:true});}}
+          det.agenda.set(kk,{nome:x.nome||'',tel:x.tel||'',quando:x.dataCriacao,info:x.data?'avaliação em '+String(x.data).slice(0,10).split('-').reverse().join('/'):'',soDia:true,precisaOrigem:true});}}
       const da=_iniDia(J.de),db=_iniDia(J.ate);
       for(const o of orc){const d=String(o.fechamento_data||'');if(!(d>=da&&d<=db))continue;const p=o.pacientes||{};
-        det.venda.push({nome:p.nome||'',tel:p.telefone||'',quando:d,soDia:true,valor:Number(o.fechamento_valor||o.valor||0),info:(o.tratamento||'')+(o.paciente_antigo?' · recompra':'')});}
+        det.venda.push({nome:p.nome||'',tel:p.telefone||'',quando:d,soDia:true,valor:Number(o.fechamento_valor||o.valor||0),info:(o.tratamento||'')+(o.paciente_antigo?' · recompra':''),precisaOrigem:true});}
       window._iniDet={lead:[...det.lead.values()],agenda:[...det.agenda.values()],presenca:[...det.presenca.values()],venda:det.venda.sort((a,b)=>b.valor-a.valor)};
     }catch(eDet){console.warn('[inicio] detalhes',eDet);window._iniDet=null;}
     const brl=v=>'R$ '+Number(v).toLocaleString('pt-BR',{maximumFractionDigits:0});
