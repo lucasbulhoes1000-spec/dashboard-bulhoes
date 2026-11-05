@@ -15052,6 +15052,20 @@ function _waDiaRotulo(iso){
   if(d.toDateString()===ontem.toDateString())return 'Ontem';
   return d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
 }
+// (05/11/2026) número em coexistência (app do celular + API): com a janela fechada,
+// a mensagem sai pelo WhatsApp do aparelho, sem custo, e volta para o Lume pelo eco do app
+function _waCoexistencia(c){
+  if(!c||c.canal==='instagram'||!c.telefone||String(c.telefone).startsWith('ig:'))return false;
+  const n=(_wa.numeros||[]).find(x=>x.phone_number_id===c.numero_clinica_id);
+  return !!(n&&n.coexistencia);
+}
+function waEnviarPeloCelular(texto){
+  const c=_wa.atual;if(!c)return;
+  const ph=String(c.telefone||'').replace(/\D/g,'');
+  const num=ph.length>=12?ph:'55'+normalizePhone(ph);
+  window.open('https://wa.me/'+num+(texto?'?text='+encodeURIComponent(texto):''),'_blank','noopener');
+  showToast('success','Mensagem pronta no WhatsApp','Envie por lá (sem custo). Ela aparece aqui na conversa em seguida.');
+}
 function _waJanela(c){
   const agora=Date.now();
   const ult=c&&c.ultima_recebida_em?Date.parse(c.ultima_recebida_em):0;
@@ -15848,7 +15862,14 @@ async function waEnviarTexto(){
   const c=_wa.atual;const t=document.getElementById('wa-texto');
   if(!c||!t||_wa.enviando)return;
   const texto=t.value.trim();if(!texto)return;
-  if(!_waJanela(c).aberta){waAbrirModelos();return;}
+  if(!_waJanela(c).aberta){
+    if(_waCoexistencia(c)){
+      waEnviarPeloCelular(texto);
+      t.value='';if(_wa.rascunhos&&t.dataset.conv)delete _wa.rascunhos[t.dataset.conv];waAjustarTexto(t);try{waContar(t);}catch(e){}
+      return;
+    }
+    waAbrirModelos();return;
+  }
   _wa.enviando=true;
   const resp=_wa.respondendo&&_wa.respondendo.wa||null;
   const temp={id:'tmp-'+Date.now(),conversa_id:c.id,direcao:'enviada',tipo:'text',texto,responde_a:resp,status:'enviando',autor_email:usuarioAtualEmail(),enviada_em:new Date().toISOString()};
@@ -17817,13 +17838,18 @@ function waRenderJanela(){
     el.title='Dá para responder com texto livre até a janela fechar.';
   }else{
     el.className='cl-janela fechada';
+    if(_waCoexistencia(c)){
+      el.textContent='Janela fechada: envio sem custo pelo WhatsApp do aparelho';
+      el.title='Este número está no Lume e no app do celular. Com a janela de 24 h fechada, o Enviar abre o WhatsApp com a mensagem pronta: é só mandar por lá, sem custo, e ela aparece aqui. Modelos pela API continuam disponíveis (com custo).';
+    }else
     el.textContent=c.canal==='instagram'?'Mais de 7 dias sem resposta: chame pelo app do Instagram':(c.ultima_recebida_em?'Janela de 24 h fechada: envie um modelo':'Sem mensagem do paciente: envie um modelo');
     el.title=c.canal==='instagram'?'Pelo CRM (API da Meta) dá para responder até 7 dias depois da última mensagem da pessoa. Depois disso, mande pelo app do Instagram: a mensagem aparece aqui também.':'A Meta só permite modelo aprovado fora da janela de 24 h.';
   }
   const t=document.getElementById('wa-texto'),b=document.getElementById('wa-enviar'),a=document.getElementById('wa-btn-anexo');
-  if(t){t.disabled=!j.aberta;t.placeholder=j.aberta?'Digite uma mensagem...':(c.canal==='instagram'?'Mais de 7 dias: mande pelo app do Instagram (aparece aqui também)':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado');}
+  const coex=!j.aberta&&_waCoexistencia(c);
+  if(t){t.disabled=!j.aberta&&!coex;t.placeholder=j.aberta?'Digite uma mensagem...':coex?'Digite e envie: abre o WhatsApp do aparelho com a mensagem pronta (sem custo)':(c.canal==='instagram'?'Mais de 7 dias: mande pelo app do Instagram (aparece aqui também)':'Janela fechada: use o ícone de modelo para enviar um modelo aprovado');}
   const bm=document.querySelector('#wa-comp .cl-comp-barra .cl-ib');if(bm)bm.style.display=c.canal==='instagram'?'none':'';
-  if(b)b.disabled=!j.aberta||_wa.enviando;
+  if(b)b.disabled=(!j.aberta&&!coex)||_wa.enviando;
   if(a)a.disabled=!j.aberta;
   const mic=document.getElementById('wa-btn-mic');if(mic)mic.disabled=!j.aberta;
 }
