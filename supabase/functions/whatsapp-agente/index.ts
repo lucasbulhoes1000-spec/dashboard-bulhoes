@@ -230,6 +230,22 @@ export function duasOpcoes(livres: Horario[], periodo: string, data?: string): H
   return b ? [a, b] : [a];
 }
 
+/** (06/11/2026) Nome de pessoa? (descarta vazio, emoji, número, apelido de perfil tipo "DUKINHA10") */
+export function nomeConfiavel(n: unknown): boolean {
+  const p = String(n ?? "").trim().split(/\s+/)[0] ?? "";
+  if (!/^[A-Za-zÀ-ÿ'-]{2,}$/.test(p)) return false;
+  if (p.length >= 4 && p === p.toUpperCase()) return false;
+  return true;
+}
+
+/** (06/11/2026) Duas opções espaçadas (nunca horários colados): mostra agenda cheia, não vazia. */
+export function duasEspacadas(hs: Horario[]): Horario[] {
+  if (!hs.length) return [];
+  const a = hs[0];
+  const b = hs.find((h) => h.data !== a.data || minutos(h.hora) >= minutos(a.hora) + 120) ?? hs.find((h) => h.data !== a.data || minutos(h.hora) >= minutos(a.hora) + 60);
+  return b ? [a, b] : [a];
+}
+
 export function descreverHorario(h: Horario, agora: number): string {
   const [y, m, d] = h.data.split("-").map(Number);
   const sem = DIAS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
@@ -395,12 +411,15 @@ export function montarSistema(a: any, imagens: any[], ctx: { nome?: string; etap
   if (a.agendamento?.ligado) {
     partes.push("# Agendamento da avaliação\n" +
       `Você pode marcar a ${a.agendamento.procedimento || "avaliação"} direto na agenda${a.agendamento.profissional_nome ? " da " + a.agendamento.profissional_nome : ""}. ` +
-      "Para saber os horários, use a ferramenta ver_horarios (nunca invente horário). Ofereça exatamente as opções que ela devolver. " +
+      "Para saber os horários, use a ferramenta ver_horarios (nunca invente horário). Ofereça exatamente as opções que ela devolver, no máximo duas por vez, nunca uma lista de horários seguidos. " +
       "Quando o paciente pedir um dia ou um horário específico, consulte ver_horarios com esse dia (e a hora) antes de responder. Nunca diga que um horário está ou não está disponível sem conferir esse horário exato na ferramenta. " +
       "Antes de marcar, confirme o horário escolhido e o nome completo do paciente. Para marcar, use agendar_avaliacao e só diga que está marcado se ela confirmar.");
   }
   const info = [`Agora: ${agoraBrasilia(agora)} (horário de Brasília).`];
-  if (ctx.nome) info.push(`Nome do contato no WhatsApp/CRM: ${ctx.nome}.`);
+  // (06/11/2026) feedback da Raffa: a IA seguia a conversa sem saber o nome do lead
+  if (ctx.nome && nomeConfiavel(ctx.nome)) info.push(`Nome do contato no WhatsApp/CRM: ${ctx.nome}.`);
+  else info.push((ctx.nome ? `O contato aparece no WhatsApp como "${ctx.nome}", que não parece um nome de pessoa. ` : "O contato não tem nome no WhatsApp. ") +
+    "Você ainda NÃO sabe o nome da pessoa: pergunte o nome dela de forma leve logo na primeira resposta. Se ela responder sem dizer o nome, pergunte de novo na mensagem seguinte, com naturalidade, antes de seguir. Não ofereça horários sem saber pelo menos o primeiro nome. Quando souber, use o nome nas mensagens.");
   if (ctx.etapa) info.push(`Etapa no CRM: ${ctx.etapa}.`);
   if (ctx.origem) info.push(`Origem: ${ctx.origem}.`);
   partes.push("# Sobre esta conversa\n" + info.join("\n"));
@@ -766,8 +785,9 @@ export function agendaReal(a: any, conv: any, ctx: any, conversaId: string | nul
           return doDia.length ? `O horário ${hh} de ${data} não está livre. Livres nesse dia: ${lista(doDia)}.` : `Não há horário livre em ${data}. Ofereça outro dia.`;
         }
         const filtrados = doDia.filter((h) => periodo === "manha" ? minutos(h.hora) < 720 : periodo === "tarde" ? minutos(h.hora) >= 720 : true);
-        if (filtrados.length) return `Livres em ${data}${periodo !== "qualquer" ? " (" + (periodo === "manha" ? "manhã" : "tarde") + ")" : ""}: ${lista(filtrados)}. Ofereça os que combinam com o pedido.`;
-        if (doDia.length) return `Nesse período não há horário em ${data}, mas no dia há: ${lista(doDia)}.`;
+        // (06/11/2026) feedback da Raffa: oferecer 4 horários seguidos passa a ideia de agenda vazia. Só duas opções espaçadas.
+        if (filtrados.length) return `Opções em ${data}${periodo !== "qualquer" ? " (" + (periodo === "manha" ? "manhã" : "tarde") + ")" : ""} (ofereça só estas duas, nunca uma lista): ${lista(duasEspacadas(filtrados))}.`;
+        if (doDia.length) return `Nesse período não há horário em ${data}. No dia, ofereça só estas duas: ${lista(duasEspacadas(doDia))}.`;
         return `Sem horário livre em ${data}. Ofereça procurar outro dia.`;
       }
       const op = duasOpcoes(livres, periodo, data);
