@@ -3735,13 +3735,36 @@ function parseCloudiaDate(raw){
 // Filtra SEMPRE por created_at (data de entrada do lead no sistema)
 // Compara pela data LOCAL (não UTC) para evitar erro de fuso horário
 // Filtra leads pelo created_at (quando entrou no sistema)
+// (06/11/2026) Lucas: o lead conta UMA vez só, no dia em que chegou. Antes, qualquer linha do
+// período (mudança de etapa, recadastro) fazia o telefone contar de novo como lead do dia.
+// Data de entrada = primeiro CUSTOMER_CREATED do telefone (ou a primeira linha, se não houver).
+let _entradaCache={n:-1,src:null,map:null};
+function dataEntradaLead(ph){
+  const base=(typeof allCloudiaRows!=='undefined'&&allCloudiaRows&&allCloudiaRows.length)?allCloudiaRows:(_lastCloudiaRows||[]);
+  if(_entradaCache.src!==base||_entradaCache.n!==base.length){
+    const criado={},qualquer={};
+    base.forEach(row=>{
+      if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return;
+      const k=normalizePhone(row.phone);if(!k)return;
+      const d=parseCloudiaDate(row.created_at);if(!d)return;
+      const ds=localDateStr(d);
+      if(row.type==='CUSTOMER_CREATED'){if(!criado[k]||ds<criado[k])criado[k]=ds;}
+      if(!qualquer[k]||ds<qualquer[k])qualquer[k]=ds;
+    });
+    Object.keys(qualquer).forEach(k=>{if(!criado[k])criado[k]=qualquer[k];});
+    _entradaCache={n:base.length,src:base,map:criado};
+  }
+  return _entradaCache.map[normalizePhone(ph)]||'';
+}
 function filterByRange(rows,tab){
   const r=getRange(tab);
   return rows.filter(row=>{
     if(row.type==='CUSTOMER_ACQUISITION_ORI'||row.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const d=parseCloudiaDate(row.created_at);
     if(!d)return false;
-    return localDateStr(d)>=r.since&&localDateStr(d)<=r.until;
+    if(!(localDateStr(d)>=r.since&&localDateStr(d)<=r.until))return false;
+    const ent=dataEntradaLead(row.phone);
+    return !ent||(ent>=r.since&&ent<=r.until);
   });
 }
 // Filtra eventos pelo timestamp do CUSTOMER_STAGE_UPDATED
@@ -11843,7 +11866,8 @@ async function renderRelOrigem(){
   const rowsPeriodo=allCloudiaRows.filter(r=>{
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const dt=parseCloudiaDate(r.created_at); if(!dt)return false;
-    const ds=localDateStr(dt); return ds>=since&&ds<=until;
+    const ds=localDateStr(dt); if(!(ds>=since&&ds<=until))return false;
+    const ent=dataEntradaLead(r.phone); return !ent||(ent>=since&&ent<=until); // (06/11/2026) lead conta uma vez, no dia em que chegou
   });
   getLeadsUnicosComOrigem(rowsPeriodo).forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name;
