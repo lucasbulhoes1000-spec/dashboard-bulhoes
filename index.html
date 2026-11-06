@@ -624,6 +624,11 @@ tbody tr:hover td{background:#0D1A33;}
 .cl-busca .cl-ib{width:26px;height:26px;border:none;border-radius:50%;}
 .cl-busca .cl-ib.ativo{background:#B08A3E;color:#FFFFFF;}
 .cl-filtros-ativos{display:flex;flex-wrap:wrap;gap:4px;}
+#wa-ia-noite .ian{display:flex;align-items:center;gap:8px;margin-top:6px;padding:8px 10px;border-radius:10px;background:#FBF4E6;border:1px solid #E8D3A8;color:#6B5523;font-size:12px;line-height:1.35;cursor:pointer;}
+#wa-ia-noite .ian.on{background:#A18B6C;border-color:#A18B6C;color:#fff;}
+#wa-ia-noite .ian b{font-weight:700;}
+#wa-ia-noite .ian .ian-acao{margin-left:auto;font-weight:600;white-space:nowrap;text-decoration:underline;}
+.cl-ian-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;background:#FBF4E6;color:#8A6A2B;border:1px solid #E8D3A8;white-space:nowrap;}
 .cl-filtros-ativos:empty{display:none;}
 .cl-fchip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;background:#12213F;border:0.5px solid #2A3D66;color:#EEF1F7;border-radius:10px;padding:2px 4px 2px 8px;}
 .cl-fchip button{border:none;background:none;cursor:pointer;color:#C3CBDB;font-size:12px;line-height:1;padding:0 2px;}
@@ -1978,6 +1983,7 @@ body{letter-spacing:-.1px;}
               <button class="cl-ib sem-borda" title="Respostas rápidas" onclick="waGerenciarRapidas()"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg></button>
             </div>
             <div class="cl-filtros-ativos" id="wa-filtros-ativos"></div>
+            <div id="wa-ia-noite"></div>
           </div>
           <div class="wa-itens" id="wa-itens"><div class="wa-vazio">Carregando conversas…</div></div>
         </div>
@@ -15238,11 +15244,67 @@ function _waMsgs(resto){
     throw e;
   });
 }
+// ---------- (06/11/2026) leads da noite que a IA não agendou: aviso para a SDR ----------
+// Conversas em que a IA falou nos últimos 3 dias, sem agendamento, e em que ninguém da equipe
+// escreveu depois da última mensagem da IA. Sai da lista sozinho quando a equipe responde,
+// quando o lead vira agendado/paciente, quando é marcado como perdido ou quando a conversa é concluída.
+async function waCarregarIaNoite(forcar){
+  if(!forcar&&_wa.iaNoiteEm&&Date.now()-_wa.iaNoiteEm<180000)return;
+  _wa.iaNoiteEm=Date.now();
+  try{
+    const desde=new Date(Date.now()-72*3600e3).toISOString();
+    const ia=(await _waRest('mensagens?select=conversa_id,enviada_em&autor_email=ilike.'+encodeURIComponent('IA:*')+'&enviada_em=gte.'+encodeURIComponent(desde)+'&conversa_id=not.is.null&order=enviada_em.asc&limit=3000'))||[];
+    const por={};
+    ia.forEach(m=>{const o=por[m.conversa_id]||(por[m.conversa_id]={ini:m.enviada_em,ult:m.enviada_em});o.ult=m.enviada_em;});
+    const ids=Object.keys(por);
+    const fora=new Set();
+    for(let i=0;i<ids.length;i+=80){
+      const lote=ids.slice(i,i+80).join(',');
+      const [eq,reg]=await Promise.all([
+        _waRest('mensagens?select=conversa_id,enviada_em&direcao=eq.enviada&autor_email=like.'+encodeURIComponent('*@*')+'&enviada_em=gte.'+encodeURIComponent(desde)+'&conversa_id=in.('+lote+')').catch(()=>[]),
+        _waRest('agente_registros?select=conversa_id,tipo,autor,detalhe&criado_em=gte.'+encodeURIComponent(desde)+'&conversa_id=in.('+lote+')&tipo=in.(agendamento,perdido,transferencia)').catch(()=>[])
+      ]);
+      (eq||[]).forEach(m=>{const o=por[m.conversa_id];if(o&&Date.parse(m.enviada_em)>Date.parse(o.ult))fora.add(m.conversa_id);});
+      (reg||[]).forEach(r=>{
+        if((r.tipo==='agendamento'&&r.autor==='agente')||r.tipo==='perdido'||(r.tipo==='transferencia'&&/^Resposta automática/i.test(r.detalhe||'')))fora.add(r.conversa_id);
+      });
+    }
+    const AGENDADO=['agendou','agendado','compareceu','ganho','paciente','faltou/desmarcou'];
+    const res={};
+    ids.forEach(id=>{
+      if(fora.has(id))return;
+      const c=_wa.conversas.find(x=>x.id===id);if(!c)return;
+      if(c.status==='encerrada')return;
+      let et=String((c.pacientes&&c.pacientes.etapa)||'').toLowerCase();
+      if(!et){try{et=String(_waLead(c).etapa||'').toLowerCase();}catch(e){}}
+      if(AGENDADO.includes(et))return;
+      const o=por[id];
+      res[id]={ini:o.ini,ult:o.ult,respondeu:!!(c.ultima_recebida_em&&Date.parse(c.ultima_recebida_em)>Date.parse(o.ini))};
+    });
+    _wa.iaNoite=res;
+    if(_wa.iaNoiteFiltro&&!Object.keys(res).length)_wa.iaNoiteFiltro=false;
+    if(currentPage==='conversas')waRenderLista();
+  }catch(e){console.warn('[ia-noite]',e);}
+}
+function _waRenderIaNoite(){
+  const el=document.getElementById('wa-ia-noite');if(!el)return;
+  const v=Object.values(_wa.iaNoite||{});
+  if(!v.length){el.innerHTML='';return;}
+  const resp=v.filter(x=>x.respondeu).length,nao=v.length-resp;
+  const partes=[];if(resp)partes.push(resp+' conversou e não agendou');if(nao)partes.push(nao+' não respondeu');
+  el.innerHTML='<div class="ian'+(_wa.iaNoiteFiltro?' on':'')+'" onclick="waFiltroIaNoite()" title="A IA atendeu fora do horário e o lead não agendou. Some da lista quando alguém da equipe responde.">🌙 <span><b>'+v.length+' lead'+(v.length>1?'s':'')+' da IA sem agendamento</b><br>'+partes.join(' · ')+'</span><span class="ian-acao">'+(_wa.iaNoiteFiltro?'Ver todas':'Ver só eles')+'</span></div>';
+}
+function waFiltroIaNoite(){
+  _wa.iaNoiteFiltro=!_wa.iaNoiteFiltro;
+  if(_wa.iaNoiteFiltro){_wa.filtro='todas';document.querySelectorAll('#wa-abas .cl-aba').forEach(b=>b.classList.toggle('ativo',b.getAttribute('data-f')==='todas'));}
+  waRenderLista();
+}
 // ---------- carregar ----------
 async function waCarregarConversas(silencioso){
   try{
     const lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');
     _wa.conversas=lista||[];_wa.carregou=true;
+    waCarregarIaNoite();
     if(_wa.atual){const n=_wa.conversas.find(c=>c.id===_wa.atual.id);if(n)_wa.atual=n;}
     waAtualizarBadge();
     if(currentPage==='conversas'){waRenderLista();if(_wa.atual){waRenderCabecalho();waRenderPainel();}}
@@ -17756,6 +17818,7 @@ function waFiltrar(f,btn){
 }
 function waLimparFiltros(){
   _wa.f={etapa:'',tag:'',origem:'',atendente:'',lida:'',janela:'',robo:''};
+  _wa.iaNoiteFiltro=false;
   waRenderLista();
 }
 function _clFiltroDefs(){
@@ -17839,7 +17902,7 @@ function waRenderLista(){
   const busca=_wa.busca.trim().toLowerCase();
   const buscaNum=busca.replace(/\D/g,'');
   const f=_wa.f;
-  _clRenderFiltrosAtivos();
+  _clRenderFiltrosAtivos();_waRenderIaNoite();
   const base=_wa.conversas.filter(c=>{
     if(c.canal==='instagram'&&!c.ultima_recebida_em)return false; // abordagem sem resposta não entra
     if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
@@ -17847,6 +17910,7 @@ function waRenderLista(){
       const nome=_waNome(c).toLowerCase();
       if(!(nome.includes(busca)||(buscaNum.length>=3&&String(c.telefone).includes(buscaNum))))return false;
     }
+    if(_wa.iaNoiteFiltro&&!(_wa.iaNoite&&_wa.iaNoite[c.id]))return false;
     if(f.tag&&!(_wa.convTags[c.id]&&_wa.convTags[c.id].has(Number(f.tag))))return false;
     if(f.atendente&&(f.atendente==='_ninguem'?!!c.atribuida_a:c.atribuida_a!==f.atendente))return false;
     if(f.lida&&(f.lida==='nao'?!(c.nao_lidas>0):c.nao_lidas>0))return false;
@@ -17881,7 +17945,7 @@ function waRenderLista(){
       _clAvatar(c,nome)+
       '<div class="wa-item-meio"><div class="wa-item-linha"><span class="cl-item-nome">'+_waEsc(nome)+'</span><span class="wa-item-hora">'+_waHora(c.ultima_mensagem_em)+'</span></div>'+
       '<div class="wa-item-linha"><span class="cl-item-prev">'+(enviadaPorUltimo?'<svg class="cl-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+_CL_IC.tick+'</svg>':'')+'<span>'+_waEsc(c.ultima_mensagem_texto||'')+'</span></span>'+(c.nao_lidas>0?'<span class="cl-dot-nl">'+c.nao_lidas+'</span>':'')+'<button class="cl-item-seta" type="button" title="Mais opções" onclick="waMenuItem(event,\''+c.id+'\')">&#8964;</button></div>'+
-      '<div class="cl-item-baixo">'+resp+tags+num+'<span class="cl-pill '+est+'">'+_CL_ESTADO_ROT[est]+'</span></div></div></div>';
+      '<div class="cl-item-baixo">'+resp+tags+num+(_wa.iaNoite&&_wa.iaNoite[c.id]?'<span class="cl-ian-tag" title="A IA atendeu fora do horário e não agendou. Falta a equipe assumir.">🌙 '+(_wa.iaNoite[c.id].respondeu?'IA não agendou':'não respondeu a IA')+'</span>':'')+'<span class="cl-pill '+est+'">'+_CL_ESTADO_ROT[est]+'</span></div></div></div>';
   }).join('');
 }
 
