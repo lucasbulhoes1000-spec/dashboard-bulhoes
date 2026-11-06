@@ -3416,7 +3416,7 @@ async function carregarInicio(){
   _iniCarregando=true;
   try{
     const J=_iniJanela(_iniPeriodo);
-    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED,CUSTOMER_ACQUISITION_ORIGIN_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
+    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone,ad_id&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED,CUSTOMER_ACQUISITION_ORIGIN_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
     const orc=(await _waRest('orcamentos?select=fechamento_valor,valor,fechamento_data,tratamento,paciente_antigo,pacientes(nome,telefone)&status=eq.Aprovado&fechamento_data=gte.'+_iniDia(J.deAnt)))||[];
     let naoLidas=0;try{const cv=(await _waRest('conversas?select=id&nao_lidas=gt.0&limit=1000'))||[];naoLidas=cv.length;}catch(e){}
     // (03/11/2026) "Avaliações agendadas" pela data em que a avaliação foi MARCADA no Clinicorp
@@ -3431,7 +3431,8 @@ async function carregarInicio(){
     const dentro=(t,a,b)=>{const x=Date.parse(t);return x>=a.getTime()&&x<=b.getTime();};
     // (06/11/2026) lead conta uma vez só, no dia em que chegou: recadastro de quem já era lead não conta de novo
     const _k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
-    const _ehEntrada=e=>e.tipo==='CUSTOMER_CREATED'||e.tipo==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED';
+    // entrada de lead = criação, ou troca de origem por anúncio (mesma regra do Dashboard)
+    const _ehEntrada=e=>e.tipo==='CUSTOMER_CREATED'||(e.tipo==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED'&&String(e.ad_id||'').trim()!=='');
     const _primEv={}; // primeiro evento de qualquer tipo do telefone na janela
     ev.forEach(e=>{const k=_k8(e.telefone);if(!k)return;if(!_primEv[k]||Date.parse(e.ocorrido_em)<Date.parse(_primEv[k].ocorrido_em))_primEv[k]=e;});
     const _jaEra=new Set(); // telefones com qualquer evento antes da janela
@@ -3768,9 +3769,10 @@ function dataEntradaLead(ph){
       if(row.type==='CUSTOMER_CREATED'){if(!criado[k]||ds<criado[k])criado[k]=ds;}
       if(!qualquer[k]||ds<qualquer[k])qualquer[k]=ds;
     });
-    _entradaCache={n:base.length,src:base,map:criado};
+    const k8={};Object.keys(criado).forEach(k=>{const c=String(k).slice(-8);if(!k8[c]||criado[k]<k8[c])k8[c]=criado[k];});
+    _entradaCache={n:base.length,src:base,map:criado,k8};
   }
-  return _entradaCache.map[normalizePhone(ph)]||'';
+  return _entradaCache.map[normalizePhone(ph)]||_entradaCache.k8[String(ph||'').replace(/\D/g,'').slice(-8)]||'';
 }
 function filterByRange(rows,tab){
   const r=getRange(tab);
