@@ -15958,8 +15958,36 @@ async function galEnviar(){
 }
 
 // ---------- mensagens ----------
+// (06/11/2026) modelo com foto/vídeo no cabeçalho (ex.: FUP 24 horas, FUP 2 dias): a foto vai para o
+// paciente junto com o modelo, mas a mensagem gravada no CRM só tinha o texto. Mostra o cabeçalho
+// configurado no passo de modelo da automação que enviou.
+function _waCabecalhoModelo(m){
+  const autor=String(m.autor_email||'');
+  if(m.tipo!=='template'||autor.indexOf('automação: ')!==0)return null;
+  if(!_wa.cabAuto){
+    if(!_wa.cabAutoCarregando){
+      _wa.cabAutoCarregando=true;
+      _waRest('automacoes?select=nome,passos').then(ls=>{
+        const mp={};
+        (ls||[]).forEach(a=>{const ps=(a.passos||[]).filter(p=>p&&p.tipo==='modelo'&&p.cabecalho&&p.cabecalho.link);
+          if(ps.length)mp[a.nome]={link:ps[0].cabecalho.link,formato:String(ps[0].cabecalho.formato||'IMAGE').toUpperCase(),porModelo:Object.fromEntries(ps.map(p=>[p.nome,p.cabecalho]))};});
+        _wa.cabAuto=mp;try{waRenderMsgs();}catch(e){}
+      }).catch(()=>{_wa.cabAuto={};});
+    }
+    return null;
+  }
+  return _wa.cabAuto[autor.slice('automação: '.length)]||null;
+}
 function _waMidiaHtml(m){
   const tipo=m.tipo;
+  if(tipo==='template'){
+    const cab=_waCabecalhoModelo(m);
+    if(!cab||!/^https:\/\//.test(cab.link))return '';
+    const u=_waEsc(cab.link);
+    if(cab.formato==='VIDEO')return '<div class="wa-midia"><video controls preload="metadata" src="'+u+'"></video></div>';
+    if(cab.formato==='DOCUMENT')return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" href="'+u+'">📄 Documento</a></div>';
+    return '<div class="wa-midia"><img src="'+u+'" alt="Foto" onclick="waAbrirMidia(this)"></div>';
+  }
   if(!['image','sticker','audio','voice','video','document'].includes(tipo))return '';
   if(!m.midia_caminho&&m.midia_url&&m.direcao==='enviada'&&/^https:\/\//.test(m.midia_url)){
     const u=_waEsc(m.midia_url);
