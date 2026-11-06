@@ -9735,7 +9735,8 @@ function _pacVirtuais(cat){
 function statusPacienteCat(r,cat){
   const cfg=_categoriasPacientes[cat]||{};
   if(cat==='renovacao'){
-    if(r.dataBase==null||!r.dataBase)return 'ren_semdata';
+    // (06/11/2026) Lucas: sem data = instalou em 2022 ou antes (antes do sistema), então já tem 4+ anos
+    if(r.dataBase==null||!r.dataBase)return 'ren_renovar';
     const dm=diffMeses(new Date(r.dataBase+'T12:00'),new Date());
     return dm>=48?'ren_renovar':(dm>=36?'ren_proximo':'ren_recente');
   }
@@ -9748,7 +9749,7 @@ function statusPacienteCat(r,cat){
   return statusPaciente(r,cfg.intervalo);
 }
 const PAC_STATUS_VIRTUAL={
-  renovacao:[['ren_renovar','Instalou há 4 anos ou mais'],['ren_semdata','Sem data de instalação (provável 4+ anos)']],
+  renovacao:[['ren_renovar','Instalou há 4 anos ou mais']],
   inferiores:[['inf_0_6','Instalou há menos de 6 meses'],['inf_6_12','6 a 12 meses'],['inf_1_2','1 a 2 anos'],['inf_mais2','Mais de 2 anos'],['inf_semdata','Sem data de instalação']]
 };
 function getRegistrosPaciente(cat){
