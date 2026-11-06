@@ -3416,7 +3416,7 @@ async function carregarInicio(){
   _iniCarregando=true;
   try{
     const J=_iniJanela(_iniPeriodo);
-    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
+    const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED,CUSTOMER_ACQUISITION_ORIGIN_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
     const orc=(await _waRest('orcamentos?select=fechamento_valor,valor,fechamento_data,tratamento,paciente_antigo,pacientes(nome,telefone)&status=eq.Aprovado&fechamento_data=gte.'+_iniDia(J.deAnt)))||[];
     let naoLidas=0;try{const cv=(await _waRest('conversas?select=id&nao_lidas=gt.0&limit=1000'))||[];naoLidas=cv.length;}catch(e){}
     // (03/11/2026) "Avaliações agendadas" pela data em que a avaliação foi MARCADA no Clinicorp
@@ -3431,22 +3431,23 @@ async function carregarInicio(){
     const dentro=(t,a,b)=>{const x=Date.parse(t);return x>=a.getTime()&&x<=b.getTime();};
     // (06/11/2026) lead conta uma vez só, no dia em que chegou: recadastro de quem já era lead não conta de novo
     const _k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
-    const _primCriado={};
-    ev.forEach(e=>{if(e.tipo!=='CUSTOMER_CREATED')return;const k=_k8(e.telefone);if(!k)return;if(!_primCriado[k]||Date.parse(e.ocorrido_em)<Date.parse(_primCriado[k]))_primCriado[k]=e.ocorrido_em;});
-    const _jaEra=new Set();
+    const _ehEntrada=e=>e.tipo==='CUSTOMER_CREATED'||e.tipo==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED';
+    const _primEv={}; // primeiro evento de qualquer tipo do telefone na janela
+    ev.forEach(e=>{const k=_k8(e.telefone);if(!k)return;if(!_primEv[k]||Date.parse(e.ocorrido_em)<Date.parse(_primEv[k].ocorrido_em))_primEv[k]=e;});
+    const _jaEra=new Set(); // telefones com qualquer evento antes da janela
     try{
-      const tels=[...new Set(ev.filter(e=>e.tipo==='CUSTOMER_CREATED'&&e.telefone).map(e=>String(e.telefone)))];
+      const tels=[...new Set(ev.filter(e=>_ehEntrada(e)&&e.telefone).map(e=>String(e.telefone)))];
       for(let i=0;i<tels.length;i+=100){
         const lote=tels.slice(i,i+100).map(t=>'"'+t.replace(/"/g,'')+'"').join(',');
-        const old=(await _waRest('eventos_proprios?select=telefone&tipo=eq.CUSTOMER_CREATED&ocorrido_em=lt.'+encodeURIComponent(J.deAnt.toISOString())+'&telefone=in.('+encodeURIComponent(lote)+')&limit=5000'))||[];
+        const old=(await _waRest('eventos_proprios?select=telefone&ocorrido_em=lt.'+encodeURIComponent(J.deAnt.toISOString())+'&telefone=in.('+encodeURIComponent(lote)+')&limit=5000'))||[];
         old.forEach(o=>_jaEra.add(_k8(o.telefone)));
       }
     }catch(e){}
     const _entradaAntes=(e)=>{try{const ent=typeof dataEntradaLead==='function'?dataEntradaLead(e.telefone):'';return !!ent&&ent<_iniDia(new Date(e.ocorrido_em));}catch(x){return false;}};
-    const leadNovo=e=>e.tipo==='CUSTOMER_CREATED'&&!_jaEra.has(_k8(e.telefone))&&_primCriado[_k8(e.telefone)]===e.ocorrido_em&&!_entradaAntes(e);
+    const leadNovo=e=>_ehEntrada(e)&&!_jaEra.has(_k8(e.telefone))&&_primEv[_k8(e.telefone)]===e&&!_entradaAntes(e);
     const conta=(a,b)=>{const r={lead:0,agendou:0,compareceu:0,ganho:0,faltou:0};
       for(const e of ev){if(!dentro(e.ocorrido_em,a,b))continue;const et=String(e.etapa||'').toLowerCase();
-        if(e.tipo==='CUSTOMER_CREATED'){if(leadNovo(e))r.lead++;}else if(et==='agendou')r.agendou++;else if(et==='compareceu')r.compareceu++;else if(et==='ganho')r.ganho++;else if(et.startsWith('faltou'))r.faltou++;}
+        if(_ehEntrada(e)){if(leadNovo(e))r.lead++;}else if(et==='agendou')r.agendou++;else if(et==='compareceu')r.compareceu++;else if(et==='ganho')r.ganho++;else if(et.startsWith('faltou'))r.faltou++;}
       if(atosAg){const da=_iniDia(a),db=_iniDia(b);r.agendou=new Set(atosAg.filter(x=>x.dataCriacao>=da&&x.dataCriacao<=db).map(x=>String(x.tel||'').replace(/\D/g,'').slice(-8))).size;}
       return r;};
     const somaVendas=(a,b)=>{let v=0,n=0;const da=_iniDia(a),db=_iniDia(b);for(const o of orc){const d=String(o.fechamento_data||'');if(d>=da&&d<=db){v+=Number(o.fechamento_valor||o.valor||0);n++;}}return{v,n};};
@@ -3457,7 +3458,7 @@ async function carregarInicio(){
       const k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
       for(const e of ev){if(!dentro(e.ocorrido_em,J.de,J.ate))continue;const et=String(e.etapa||'').toLowerCase();
         const item={nome:e.nome||'',tel:e.telefone||'',quando:e.ocorrido_em,info:e.origem||''};
-        if(e.tipo==='CUSTOMER_CREATED'){if(leadNovo(e)&&!det.lead.has(k8(item.tel)))det.lead.set(k8(item.tel),item);}
+        if(_ehEntrada(e)){if(leadNovo(e)&&!det.lead.has(k8(item.tel)))det.lead.set(k8(item.tel),item);}
         else if(et==='compareceu'){if(!det.presenca.has(k8(item.tel)))det.presenca.set(k8(item.tel),item);}
         else if(et==='agendou'&&!atosAg){if(!det.agenda.has(k8(item.tel)))det.agenda.set(k8(item.tel),item);}}
       if(atosAg){const da=_iniDia(J.de),db=_iniDia(J.ate);
@@ -3490,7 +3491,7 @@ async function carregarInicio(){
       '<div class="ini-nota" style="margin-top:10px">Taxas do período, contando os eventos de cada etapa (não acompanha o mesmo lead do começo ao fim).</div>';
     // últimos acontecimentos
     const tipoEv=e=>{const et=String(e.etapa||'').toLowerCase();
-      if(e.tipo==='CUSTOMER_CREATED')return leadNovo(e)?['lead','novo lead']:['lead','voltou a chamar'];if(et==='agendou')return['agenda','agendou avaliação'];if(et==='compareceu')return['presenca','compareceu à avaliação'];
+      if(e.tipo==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return leadNovo(e)?['lead','novo lead']:null;if(e.tipo==='CUSTOMER_CREATED')return leadNovo(e)?['lead','novo lead']:['lead','voltou a chamar'];if(et==='agendou')return['agenda','agendou avaliação'];if(et==='compareceu')return['presenca','compareceu à avaliação'];
       if(et==='ganho')return['venda','fechou tratamento'];if(et.startsWith('faltou'))return['falta','faltou ou desmarcou'];return null;};
     const hora=t=>{const d=new Date(t),hoje=new Date();const mesmo=d.toDateString()===hoje.toDateString();const ont=new Date(hoje.getTime()-864e5).toDateString()===d.toDateString();
       return (mesmo?'':ont?'ontem ':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' ')+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});};
@@ -3752,7 +3753,8 @@ function parseCloudiaDate(raw){
 // Filtra leads pelo created_at (quando entrou no sistema)
 // (06/11/2026) Lucas: o lead conta UMA vez só, no dia em que chegou. Antes, qualquer linha do
 // período (mudança de etapa, recadastro) fazia o telefone contar de novo como lead do dia.
-// Data de entrada = primeiro CUSTOMER_CREATED do telefone (ou a primeira linha, se não houver).
+// Data de entrada = primeiro CUSTOMER_CREATED do telefone. Telefone sem nenhuma criação
+// (ex.: paciente que fechou direto no Clinicorp) não é lead.
 let _entradaCache={n:-1,src:null,map:null};
 function dataEntradaLead(ph){
   const base=(typeof allCloudiaRows!=='undefined'&&allCloudiaRows&&allCloudiaRows.length)?allCloudiaRows:(_lastCloudiaRows||[]);
@@ -3766,7 +3768,6 @@ function dataEntradaLead(ph){
       if(row.type==='CUSTOMER_CREATED'){if(!criado[k]||ds<criado[k])criado[k]=ds;}
       if(!qualquer[k]||ds<qualquer[k])qualquer[k]=ds;
     });
-    Object.keys(qualquer).forEach(k=>{if(!criado[k])criado[k]=qualquer[k];});
     _entradaCache={n:base.length,src:base,map:criado};
   }
   return _entradaCache.map[normalizePhone(ph)]||'';
@@ -3778,8 +3779,9 @@ function filterByRange(rows,tab){
     const d=parseCloudiaDate(row.created_at);
     if(!d)return false;
     if(!(localDateStr(d)>=r.since&&localDateStr(d)<=r.until))return false;
+    if(!normalizePhone(row.phone))return true;
     const ent=dataEntradaLead(row.phone);
-    return !ent||(ent>=r.since&&ent<=r.until);
+    return !!ent&&ent>=r.since&&ent<=r.until;
   });
 }
 // Filtra eventos pelo timestamp do CUSTOMER_STAGE_UPDATED
@@ -11883,7 +11885,8 @@ async function renderRelOrigem(){
     if(r.type==='CUSTOMER_ACQUISITION_ORI'||r.type==='CUSTOMER_ACQUISITION_ORIGIN_UPDATED')return false;
     const dt=parseCloudiaDate(r.created_at); if(!dt)return false;
     const ds=localDateStr(dt); if(!(ds>=since&&ds<=until))return false;
-    const ent=dataEntradaLead(r.phone); return !ent||(ent>=since&&ent<=until); // (06/11/2026) lead conta uma vez, no dia em que chegou
+    if(!normalizePhone(r.phone))return true;
+    const ent=dataEntradaLead(r.phone); return !!ent&&ent>=since&&ent<=until; // (06/11/2026) lead conta uma vez, no dia em que chegou
   });
   getLeadsUnicosComOrigem(rowsPeriodo).forEach(r=>{
     const ph=normalizePhone(r.phone)||r.name;
