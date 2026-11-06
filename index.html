@@ -3429,9 +3429,24 @@ async function carregarInicio(){
         const j=await r.json();if(j&&j.status==='ok'&&Array.isArray(j.detalheAtos)){atosAg=j.detalheAtos;window._iniAgCache={chave:chaveAg,t:Date.now(),atos:atosAg};}}
     }catch(e){atosAg=null;}
     const dentro=(t,a,b)=>{const x=Date.parse(t);return x>=a.getTime()&&x<=b.getTime();};
+    // (06/11/2026) lead conta uma vez só, no dia em que chegou: recadastro de quem já era lead não conta de novo
+    const _k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
+    const _primCriado={};
+    ev.forEach(e=>{if(e.tipo!=='CUSTOMER_CREATED')return;const k=_k8(e.telefone);if(!k)return;if(!_primCriado[k]||Date.parse(e.ocorrido_em)<Date.parse(_primCriado[k]))_primCriado[k]=e.ocorrido_em;});
+    const _jaEra=new Set();
+    try{
+      const tels=[...new Set(ev.filter(e=>e.tipo==='CUSTOMER_CREATED'&&e.telefone).map(e=>String(e.telefone)))];
+      for(let i=0;i<tels.length;i+=100){
+        const lote=tels.slice(i,i+100).map(t=>'"'+t.replace(/"/g,'')+'"').join(',');
+        const old=(await _waRest('eventos_proprios?select=telefone&tipo=eq.CUSTOMER_CREATED&ocorrido_em=lt.'+encodeURIComponent(J.deAnt.toISOString())+'&telefone=in.('+encodeURIComponent(lote)+')&limit=5000'))||[];
+        old.forEach(o=>_jaEra.add(_k8(o.telefone)));
+      }
+    }catch(e){}
+    const _entradaAntes=(e)=>{try{const ent=typeof dataEntradaLead==='function'?dataEntradaLead(e.telefone):'';return !!ent&&ent<_iniDia(new Date(e.ocorrido_em));}catch(x){return false;}};
+    const leadNovo=e=>e.tipo==='CUSTOMER_CREATED'&&!_jaEra.has(_k8(e.telefone))&&_primCriado[_k8(e.telefone)]===e.ocorrido_em&&!_entradaAntes(e);
     const conta=(a,b)=>{const r={lead:0,agendou:0,compareceu:0,ganho:0,faltou:0};
       for(const e of ev){if(!dentro(e.ocorrido_em,a,b))continue;const et=String(e.etapa||'').toLowerCase();
-        if(e.tipo==='CUSTOMER_CREATED')r.lead++;else if(et==='agendou')r.agendou++;else if(et==='compareceu')r.compareceu++;else if(et==='ganho')r.ganho++;else if(et.startsWith('faltou'))r.faltou++;}
+        if(e.tipo==='CUSTOMER_CREATED'){if(leadNovo(e))r.lead++;}else if(et==='agendou')r.agendou++;else if(et==='compareceu')r.compareceu++;else if(et==='ganho')r.ganho++;else if(et.startsWith('faltou'))r.faltou++;}
       if(atosAg){const da=_iniDia(a),db=_iniDia(b);r.agendou=new Set(atosAg.filter(x=>x.dataCriacao>=da&&x.dataCriacao<=db).map(x=>String(x.tel||'').replace(/\D/g,'').slice(-8))).size;}
       return r;};
     const somaVendas=(a,b)=>{let v=0,n=0;const da=_iniDia(a),db=_iniDia(b);for(const o of orc){const d=String(o.fechamento_data||'');if(d>=da&&d<=db){v+=Number(o.fechamento_valor||o.valor||0);n++;}}return{v,n};};
@@ -3442,7 +3457,7 @@ async function carregarInicio(){
       const k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
       for(const e of ev){if(!dentro(e.ocorrido_em,J.de,J.ate))continue;const et=String(e.etapa||'').toLowerCase();
         const item={nome:e.nome||'',tel:e.telefone||'',quando:e.ocorrido_em,info:e.origem||''};
-        if(e.tipo==='CUSTOMER_CREATED'){if(!det.lead.has(k8(item.tel)))det.lead.set(k8(item.tel),item);}
+        if(e.tipo==='CUSTOMER_CREATED'){if(leadNovo(e)&&!det.lead.has(k8(item.tel)))det.lead.set(k8(item.tel),item);}
         else if(et==='compareceu'){if(!det.presenca.has(k8(item.tel)))det.presenca.set(k8(item.tel),item);}
         else if(et==='agendou'&&!atosAg){if(!det.agenda.has(k8(item.tel)))det.agenda.set(k8(item.tel),item);}}
       if(atosAg){const da=_iniDia(J.de),db=_iniDia(J.ate);
@@ -3475,7 +3490,7 @@ async function carregarInicio(){
       '<div class="ini-nota" style="margin-top:10px">Taxas do período, contando os eventos de cada etapa (não acompanha o mesmo lead do começo ao fim).</div>';
     // últimos acontecimentos
     const tipoEv=e=>{const et=String(e.etapa||'').toLowerCase();
-      if(e.tipo==='CUSTOMER_CREATED')return['lead','novo lead'];if(et==='agendou')return['agenda','agendou avaliação'];if(et==='compareceu')return['presenca','compareceu à avaliação'];
+      if(e.tipo==='CUSTOMER_CREATED')return leadNovo(e)?['lead','novo lead']:['lead','voltou a chamar'];if(et==='agendou')return['agenda','agendou avaliação'];if(et==='compareceu')return['presenca','compareceu à avaliação'];
       if(et==='ganho')return['venda','fechou tratamento'];if(et.startsWith('faltou'))return['falta','faltou ou desmarcou'];return null;};
     const hora=t=>{const d=new Date(t),hoje=new Date();const mesmo=d.toDateString()===hoje.toDateString();const ont=new Date(hoje.getTime()-864e5).toDateString()===d.toDateString();
       return (mesmo?'':ont?'ontem ':d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' ')+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});};
@@ -4964,8 +4979,9 @@ function montarFunilMetaLocal(range,linhas,agenda,vendas,meta){
     const pagos=ev.filter(x=>pagaCanonica(x.origin));
     const manual=manualDe(p);
     if(manual?!pagaCanonica(manual):!pagos.length)return;
-    const criados=ev.filter(x=>x.type==='CUSTOMER_CREATED'&&noPeriodo(dia(x.created_at)));
-    const lead=criados.length>0;
+    // (06/11/2026) lead conta uma vez só: vale a PRIMEIRA criação do telefone (recadastro não conta de novo)
+    const primeiraCriacao=ev.filter(x=>x.type==='CUSTOMER_CREATED').map(x=>dia(x.created_at)).filter(Boolean).sort()[0]||'';
+    const lead=noPeriodo(primeiraCriacao);
     const rs=vend[p]||[];
     const ag=agend.has(p),co=comp.has(p),fe=rs.length>0;
     if(!(lead||ag||co||fe))return;
@@ -8069,7 +8085,7 @@ function filterLeadsTable(){
     let dateMatch=true;
     if((fromV||toV)&&statusFil!=='agendado'){
       const d=parseCloudiaDate(r.created_at||r.timestamp);
-      const ds=d?localDateStr(d):'';
+      const ds=dataEntradaLead(r.phone)||(d?localDateStr(d):''); // (06/11/2026) data em que o lead chegou, não a última movimentação
       if(fromV&&ds&&ds<fromV)dateMatch=false;
       if(toV&&ds&&ds>toV)dateMatch=false;
       if(!ds)dateMatch=false;
