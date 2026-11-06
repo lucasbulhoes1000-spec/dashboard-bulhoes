@@ -5013,7 +5013,7 @@ function montarFunilMetaLocal(range,linhas,agenda,vendas,meta){
       'QTD CONTRATOS':rs.filter(x=>x.classe==='Novo'||x.descricao==='Lançamento de Tratamento').length,
       'QTD LANÇAMENTOS':rs.length,
       'VALOR VENDAS':Math.round(valor*100)/100,
-      'DATA CRIAÇÃO LEAD':lead?dia(criados[0].created_at):'',
+      'DATA CRIAÇÃO LEAD':lead?primeiraCriacao:'',
       'DETALHES VENDAS':rs.map(x=>x.data+' | '+x.classe+' | R$ '+Number(x.valor||0).toFixed(2)+' | '+x.descricao).join(' || ')
     });
   });
