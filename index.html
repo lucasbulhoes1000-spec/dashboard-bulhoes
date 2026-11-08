@@ -2227,6 +2227,14 @@ body{letter-spacing:-.1px;}
           </table>
         </div>
       </div>
+      <div class="table-card" id="ro-org-perfil-card" style="margin-top:14px;display:none">
+        <div style="font-size:13px;font-weight:600;color:#EEF1F7;margin:2px 0 4px">Orgânico por perfil e canal</div>
+        <div style="font-size:11px;color:#8C98B1;margin-bottom:8px">Pelo clique nas páginas de link (bio, stories e site), ligado à conversa pelo código invisível da mensagem. "Não identificado" = chegou sem passar pelos links (mensagem digitada, número salvo, Direct…).</div>
+        <div class="tw"><table>
+          <thead><tr><th>Perfil · canal</th><th style="text-align:right">Leads</th><th style="text-align:right">Agendados</th><th style="text-align:right">% Agend.</th><th style="text-align:right">Compareceu</th><th style="text-align:right">Fechados</th><th style="text-align:right">Valor Fechado</th></tr></thead>
+          <tbody id="ro-org-perfil"></tbody>
+        </table></div>
+      </div>
     </div>
 
     <!-- ===== INDICAÇÕES E NPS (04/11/2026, método Noll) ===== -->
@@ -11850,7 +11858,41 @@ function getOrigemFinalLancamento(ph,nome){
   return '—';
 }
 
+// (08/11/2026) de onde veio o lead orgânico: clique nas páginas de link (Dra. Larissa, clínica, site),
+// ligado à conversa pelo código invisível da mensagem (ou pelo horário). Tabela cliques_links.
+window._lumeLinks=null;
+async function carregarLinksLeads(forcar){
+  if(window._lumeLinks&&!forcar&&Date.now()-window._lumeLinks.t<300000)return window._lumeLinks.mapa;
+  const mapa={};
+  try{
+    let de=0;
+    for(;;){
+      const r=(await _waRest('cliques_links?select=telefone,perfil,destino,utm_medium,utm_campaign,ligado_por,clicado_em,pagina&telefone=not.is.null&order=clicado_em.asc&limit=1000&offset='+de))||[];
+      r.forEach(x=>{const k=String(x.telefone||'').replace(/\D/g,'').slice(-8);if(k&&!mapa[k])mapa[k]=x;});
+      if(r.length<1000)break;de+=1000;
+    }
+  }catch(e){console.warn('[links]',e);}
+  window._lumeLinks={t:Date.now(),mapa};
+  return mapa;
+}
+function linkDoLead(tel){
+  const m=window._lumeLinks&&window._lumeLinks.mapa;if(!m)return null;
+  return m[String(tel||'').replace(/\D/g,'').slice(-8)]||null;
+}
+function rotuloLink(x){
+  if(!x)return '';
+  const perfil={larissa:'Dra. Larissa',clinica:'Clínica',site:'Site'}[x.perfil]||'Link';
+  const med=String(x.utm_medium||'').toLowerCase();
+  const canal=x.perfil==='site'?'':(/stor/.test(med)||/avaliacao\.html/.test(x.pagina||'')?'Story':(med==='bio'?'Bio':'Link direto'));
+  return perfil+(canal?' · '+canal:'');
+}
+function rotuloLinkCompleto(x){
+  if(!x)return '';
+  const camp=x.utm_campaign&&!/^(none|link_bio|perfil_larissa)$/i.test(x.utm_campaign)?' (campanha '+x.utm_campaign+')':'';
+  return rotuloLink(x)+camp+(x.ligado_por==='horario'?' · ligado pelo horário':'');
+}
 async function renderRelOrigem(){
+  await carregarLinksLeads();
   const since=document.getElementById('ro-from').value;
   const until=document.getElementById('ro-to').value;
   const origFilt=document.getElementById('ro-origem').value;
@@ -12038,6 +12080,25 @@ async function renderRelOrigem(){
     <td style="text-align:right" class="ta">${tO?fmt(tO):'—'}</td><td style="text-align:right" class="tg">${tV?fmt(tV):'—'}</td>
     <td style="text-align:right" class="tm">${pc(tFN,tL)}</td><td style="text-align:right" class="tg">${tF?fmt(tV/tF):'—'}</td>
   </tr>`;
+  // (08/11/2026) orgânico aberto por perfil e canal (cliques das páginas de link)
+  try{
+    const card=document.getElementById('ro-org-perfil-card'),tb=document.getElementById('ro-org-perfil');
+    const orgB=entries.filter(([o])=>/org[aâ]nico/i.test(o)).map(([,d])=>d);
+    if(card&&tb&&orgB.length){
+      const g={};const grupo=ph=>{const x=linkDoLead(ph);return x?rotuloLink(x):'Não identificado';};
+      const G=k=>g[k]||(g[k]={leads:new Set(),agend:new Set(),comp:new Set(),fech:new Set(),valor:0});
+      orgB.forEach(d=>{
+        d.leads.forEach(ph=>G(grupo(ph)).leads.add(ph));
+        d.agend.forEach(ph=>G(grupo(ph)).agend.add(ph));
+        d.comp.forEach(ph=>G(grupo(ph)).comp.add(ph));
+        d.fechados.forEach(ph=>G(grupo(ph)).fech.add(ph));
+        (d.fechRows||[]).forEach(r=>{G(grupo(r.phone)).valor+=Number(r.value||0);});
+      });
+      const ord=Object.entries(g).sort((a,b)=>(a[0]==='Não identificado')-(b[0]==='Não identificado')||b[1].leads.size-a[1].leads.size);
+      tb.innerHTML=ord.map(([k,v])=>`<tr><td><span class="origem-pill">${k}</span></td><td style="text-align:right">${v.leads.size}</td><td style="text-align:right">${v.agend.size}</td><td style="text-align:right" class="tm">${pc(v.agend.size,v.leads.size)}</td><td style="text-align:right">${v.comp.size}</td><td style="text-align:right" class="tg">${v.fech.size}</td><td style="text-align:right" class="tg">${v.valor?fmt(v.valor):'—'}</td></tr>`).join('');
+      card.style.display='';
+    }else if(card)card.style.display='none';
+  }catch(e){console.warn('[origem por perfil]',e);}
 }
 // ── COMPARECIDOS x AGENDAMENTO ────────────────────────────
 function initRelComparecidos(){
@@ -14787,6 +14848,10 @@ function openLeadCard(idx){
   refreshLeadAnotacoes(d);
   document.getElementById('lc-anot-input').value='';
   document.getElementById('lead-card-overlay').style.display='block';
+  // (08/11/2026) de qual link (perfil, bio/story) a pessoa veio
+  (async()=>{const el=document.getElementById('lc-veio-de');if(!el)return;el.style.display='none';
+    await carregarLinksLeads();const x=linkDoLead(ph);
+    if(x){el.innerHTML='🔗 Veio pelo link: <b>'+rotuloLinkCompleto(x).replace(/[<>&]/g,'')+'</b>';el.style.display='block';}})();
 }
 
 // (05/11/2026) anúncio de origem manual: lista dos anúncios da Meta (meta_estrutura), mais recentes primeiro
@@ -15316,6 +15381,7 @@ async function waCarregarConversas(silencioso){
   try{
     const lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');
     _wa.conversas=lista||[];_wa.carregou=true;
+    if(!window._lumeLinks)carregarLinksLeads().then(()=>{try{if(_wa.atual&&currentPage==='conversas')waRenderPainel();}catch(e){}});
     if(_wa.atual){const n=_wa.conversas.find(c=>c.id===_wa.atual.id);if(n)_wa.atual=n;}
     waAtualizarBadge();
     if(currentPage==='conversas'){waRenderLista();if(_wa.atual){waRenderCabecalho();waRenderPainel();}}
@@ -18344,6 +18410,7 @@ function waRenderPainel(){
       '<button class="wa-btn primario" style="align-self:stretch;margin:2px 0 6px" onclick="waAbrirAgendar()">📅 Agendar no Clinicorp</button>'+
       (L.existe
         ?'<div class="cl-campo">'+_clIc('mega')+'<span>Origem:</span><select onchange="waMudarOrigem(this.value)">'+opt('','Selecione…',L.origem)+origens.map(o=>opt(o,o,L.origem)).join('')+'</select></div>'+
+         (linkDoLead(c.telefone)?'<div class="cl-campo" title="Clique nas páginas de link (bio, stories, site) ligado a esta conversa">🔗<span>Veio pelo link:</span><b style="font-size:12px">'+_waEsc(rotuloLinkCompleto(linkDoLead(c.telefone)))+'</b></div>':'')+
          '<div class="cl-campo">'+_clIc('funil')+'<span>Etapa do contato:</span><select onchange="waMudarEtapa(this.value)">'+(etapaAtual&&!WA_ETAPAS.includes(etapaAtual)?opt(etapaAtual,etapaAtual,etapaAtual):'')+WA_ETAPAS.map(x=>opt(x,WA_ETAPA_ROTULO[x],etapaAtual)).join('')+'</select></div>'
         :'')+
       anuncio+
@@ -18670,6 +18737,7 @@ function abrirConversas(){
         <div style="margin-top:8px;">
           <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Anúncio de origem <span style="color:#66738F;">(só se o lead veio de anúncio e o Lume não identificou)</span></label>
           <select id="lc-anuncio" style="width:100%;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;font-size:13px;background:#0D1A33;"><option value="">—</option></select>
+          <div id="lc-veio-de" style="display:none;font-size:11px;color:#C3CBDB;margin-top:6px"></div>
         </div>
         <div id="lc-indicador-wrap" style="display:none;margin-top:8px;">
           <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Quem indicou</label>
