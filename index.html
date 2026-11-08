@@ -1411,6 +1411,7 @@ body{letter-spacing:-.1px;}
               <option value="instagram ads">#Instagram ADS</option>
               <option value="organico">#Orgânico</option>
               <option value="indicacao">#Indicação</option>
+              <option value="base">#Base</option>
               <option value="social selling">#Social Selling</option>
               <option value="formulario">#Formulário</option>
             </select>
@@ -4081,6 +4082,7 @@ function origemGrupoCanonico(origem){
   if(n.includes('clinicorp direto'))return 'clinicorp_direto';
   if(n.includes('cloudia') && n.includes('whatsapp'))return 'cloudia_whatsapp';
   if(n.includes('whatsapp') && n.includes('icombot'))return 'whatsapp_icombot';
+  if(n==='base'||n==='paciente da base')return 'base';
   if(n==='#paciente'||n==='paciente')return 'paciente';
 
   return 'outra:'+n;
@@ -4100,6 +4102,7 @@ function origemLabelCanonico(origem){
     cloudia_whatsapp:'Cloudia - Whatsapp',
     whatsapp_icombot:'WhatsApp - ICOMBOT',
     paciente:'#Paciente',
+    base:'#Base',
     sem_origem:'—'
   };
   if(labels[g])return labels[g];
@@ -4111,7 +4114,20 @@ function origemBateFiltro(origem,filtro){
   return origemGrupoCanonico(origem)===origemGrupoCanonico(filtro);
 }
 
+// (08/11/2026) regra #Base (Lucas): quem já é paciente da clínica (orçamento marcado como paciente
+// antigo/recompra) e estaria como Orgânico ou sem origem passa a ser #Base, sempre.
+function pacienteDaBase(ph){
+  try{const d=ccDataLookup(normalizePhone(ph));return !!(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(o=>o&&o.pacienteAntigo));}catch(e){return false;}
+}
+function _regraBase(ph,origem){
+  const g=origemGrupoCanonico(origem);
+  if((g==='organico'||g==='sem_origem')&&pacienteDaBase(ph))return '#Base';
+  return origem;
+}
 function origemAtualPaciente(ph,nomeFallback){
+  return _regraBase(ph,_origemAtualPacienteBruta(ph,nomeFallback));
+}
+function _origemAtualPacienteBruta(ph,nomeFallback){
   const p=normalizePhone(ph);
   if(p){
     const d=ccDataLookup(p);
@@ -11534,7 +11550,7 @@ function updateEntradas(){
 
 // GERENCIAR LISTAS
 var _listas={
-  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling','#Clinicorp Direto','#Formulário Facebook'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS','#Base']},
+  origens:{padroes:['Clínica','Facebook','Google','Indicação','Instagram','Telefone','Website','Whatsapp'],ativos:['#Indicação','#Organico','#Instagram ADS','#Social Selling','#Clinicorp Direto','#Formulário Facebook','#Base'],desativos:['#META ADS','#GOOGLE ADS','#Instagram','#Facebook','#Facebook ADS']},
   status:{ativos:['Em aberto','Aprovado','Reprovado','Cancelado'],desativos:[]},
   tratamentos:{ativos:['#Alinhador Ortodontico','#Aparelho Ortodontico','#Clareamento Conjugado','#Clareamento inferior Conjugado','#Clínico','#Endodontia','#Extração','#Gengivoplastia','#HOF','#Implantes','#Lentes em Porcelana','#Lentes em Resina','#Lentes inferiores','#Lentes unitárias','#Paciente modelo','#Protocolo sobre Implantes','#Reabilitação Oral','#Retrabalho'],desativos:[]},
   fases:{ativos:['1° contato - Vídeo de agradecimento','2° contato - Antes/Depois + lembrei de você','Agendou retorno','Aguardando 1° contato','Aguardando entrada','Avaliação comercial','Fechou','Pós venda','Sem resposta'],desativos:[]},
@@ -11834,6 +11850,10 @@ function calcularFechamentosComoDashboard(range, avalFilt, tratFilt){
 // Resolve a origem ATUAL do paciente para distribuir lançamentos financeiros.
 // A linha financeira não decide a origem: edição manual/reconciliação do CRM vence.
 function getOrigemFinalLancamento(ph,nome){
+  const o=_getOrigemFinalLancamentoBruta(ph,nome);
+  return normalizePhone(ph)?_regraBase(ph,o):o;
+}
+function _getOrigemFinalLancamentoBruta(ph,nome){
   ph=normalizePhone(ph);
   if(ph){
     const d=ccDataLookup(ph);
@@ -12840,6 +12860,8 @@ async function carregarCRMRemoto(opcoes){
           if(listasParsed&&typeof listasParsed==='object'){
             // Merge: preserva estrutura default e sobrescreve com salvo
             Object.keys(listasParsed).forEach(k=>{if(_listas[k])_listas[k]=listasParsed[k];});
+            // (08/11/2026) #Base é origem ativa (regra da base)
+            try{const o=_listas.origens;if(o&&!(o.ativos||[]).includes('#Base')){o.ativos=(o.ativos||[]).concat('#Base');o.desativos=(o.desativos||[]).filter(t=>t!=='#Base');}}catch(e){}
             console.log('[CRM] Listas carregadas do Supabase ✅');
             populateDynamicSelects();
           }
@@ -18766,6 +18788,7 @@ function abrirConversas(){
           <option>#Social Selling</option>
           <option>#Indicação</option>
           <option>#Facebook ADS</option>
+          <option>#Base</option>
         </select>
         <div style="margin-top:8px;">
           <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;">Anúncio de origem <span style="color:#66738F;">(só se o lead veio de anúncio e o Lume não identificou)</span></label>
