@@ -2228,7 +2228,7 @@ body{letter-spacing:-.1px;}
         </div>
       </div>
       <div class="table-card" id="ro-org-perfil-card" style="margin-top:14px;display:none">
-        <div style="font-size:13px;font-weight:600;color:#EEF1F7;margin:2px 0 4px">Orgânico por perfil e canal</div>
+        <div style="font-size:13px;font-weight:600;color:#EEF1F7;margin:2px 0 4px">Orgânico por perfil</div>
         <div style="font-size:11px;color:#8C98B1;margin-bottom:8px">Pelo clique nas páginas de link (bio, stories e site), ligado à conversa pelo código invisível da mensagem. "Não identificado" = chegou sem passar pelos links (mensagem digitada, número salvo, Direct…).</div>
         <div class="tw"><table>
           <thead><tr><th>Perfil · canal</th><th style="text-align:right">Leads</th><th style="text-align:right">Agendados</th><th style="text-align:right">% Agend.</th><th style="text-align:right">Compareceu</th><th style="text-align:right">Fechados</th><th style="text-align:right">Valor Fechado</th></tr></thead>
@@ -11879,12 +11879,10 @@ function linkDoLead(tel){
   const m=window._lumeLinks&&window._lumeLinks.mapa;if(!m)return null;
   return m[String(tel||'').replace(/\D/g,'').slice(-8)]||null;
 }
+// (08/11/2026) Lucas: por enquanto só por perfil (bio e stories da clínica usam o mesmo link)
 function rotuloLink(x){
   if(!x)return '';
-  const perfil={larissa:'Dra. Larissa',clinica:'Clínica',site:'Site'}[x.perfil]||'Link';
-  const med=String(x.utm_medium||'').toLowerCase();
-  const canal=x.perfil==='site'?'':(/stor/.test(med)||/avaliacao\.html/.test(x.pagina||'')?'Story':(med==='bio'?'Bio':'Link direto'));
-  return perfil+(canal?' · '+canal:'');
+  return {larissa:'Instagram Dra. Larissa',clinica:'Instagram Clínica',site:'Site'}[x.perfil]||'Link';
 }
 function rotuloLinkCompleto(x){
   if(!x)return '';
