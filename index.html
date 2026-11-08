@@ -4741,6 +4741,14 @@ function usarCacheVendasReais(range){
 // resultado em CACHE (quando a API está indisponível) — a lógica de
 // processar/exibir é idêntica nos dois casos, só muda se mostra o aviso de
 // "dado em cache" ou não.
+// (08/11/2026) venda oficial marcada "Novo" de quem tem origem #Base/#Paciente/CRM antigo vira Recompra,
+// a não ser que a equipe tenha marcado Novo à mão no orçamento.
+function _classeVendaOficial(classe,ph){
+  if(classe!=='Novo'||!ph||!ehRecompraPorOrigem(ph))return classe;
+  const d=ccDataLookup(ph);
+  if(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(o=>o.classeManual&&o.pacienteAntigo!==true))return classe;
+  return 'Recompra';
+}
 function processarResultadoVendasReais(r,range,doCache,salvoEm){
   // Normaliza TODAS as linhas oficiais uma única vez e já associa a origem
   // FINAL do paciente. Essa origem é a mesma usada no CRM: edição manual >
@@ -4754,7 +4762,7 @@ function processarResultadoVendasReais(r,range,doCache,salvoEm){
       name,
       ph,
       value:Number(reg.valor||0),
-      classe:reg.classe||'Novo',
+      classe:_classeVendaOficial(reg.classe||'Novo',ph),
       descricao:reg.descricao||'',
       data:reg.data||'',
       origemFinal
