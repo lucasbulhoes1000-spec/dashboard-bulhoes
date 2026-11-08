@@ -4080,6 +4080,7 @@ function origemGrupoCanonico(origem){
   if(n.includes('indicacao'))return 'indicacao';
   if(n.includes('social selling')||n==='social')return 'social_selling';
   if(n.includes('clinicorp direto'))return 'clinicorp_direto';
+  if(n==='clinicorp'||n.startsWith('clinicorp -'))return 'clinicorp_direto'; // (08/11/2026) Clinicorp e Clinicorp - Importação = cadastro direto
   if(n.includes('cloudia') && n.includes('whatsapp'))return 'cloudia_whatsapp';
   if(n.includes('whatsapp') && n.includes('icombot'))return 'whatsapp_icombot';
   if(n==='base'||n==='paciente da base')return 'base';
@@ -4119,8 +4120,31 @@ function origemBateFiltro(origem,filtro){
 function pacienteDaBase(ph){
   try{const d=ccDataLookup(normalizePhone(ph));return !!(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(o=>o&&o.pacienteAntigo));}catch(e){return false;}
 }
+// (08/11/2026) origens antigas do CRM da ICOM/Cloudia (ninguém trocava a origem): ficam no histórico,
+// mas quem voltou a chegar desde out/2026 com origem de verdade (anúncio, orgânico) usa a nova.
+const _ORIGEM_LEGADO=/^(whatsapp - icombot|cloudia - whatsapp|cloudia - facebook|whatsapp - discador)$/i;
+function _origemNovaSobreLegado(ph,origem){
+  if(!_ORIGEM_LEGADO.test(String(origem||'').trim()))return origem;
+  const k=normalizePhone(ph);if(!k)return origem;
+  const base=allCloudiaRows||[];
+  if(!window._origNovaCache||window._origNovaCache.src!==base||window._origNovaCache.n!==base.length){
+    const m={};
+    base.forEach(r=>{
+      const o=String(r.origin||'').trim();if(!o||_ORIGEM_LEGADO.test(o))return;
+      const d=parseCloudiaDate(r.created_at);if(!d)return;const ds=localDateStr(d);if(ds<'2026-10-01')return;
+      const p=normalizePhone(r.phone);if(!p)return;
+      if(!m[p]||ds>m[p].ds)m[p]={ds,o};
+    });
+    window._origNovaCache={src:base,n:base.length,m};
+  }
+  const melhor=window._origNovaCache.m[k];
+  return melhor?origemLabelCanonico(melhor.o):origem;
+}
 function _regraBase(ph,origem){
+  origem=_origemNovaSobreLegado(ph,origem);
   const g=origemGrupoCanonico(origem);
+  // (08/11/2026) Lucas: cadastro direto no Clinicorp geralmente é base
+  if(g==='clinicorp_direto'&&!(typeof linkDoLead==='function'&&linkDoLead(ph)))return '#Base';
   // (08/11/2026) Lucas: se o Lume identificou o clique no link (perfil do Instagram/site), vale a identificação
   if((g==='organico'||g==='sem_origem')&&pacienteDaBase(ph)&&!(typeof linkDoLead==='function'&&linkDoLead(ph)))return '#Base';
   return origem;
