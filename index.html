@@ -1974,7 +1974,7 @@ body{letter-spacing:-.1px;}
             </div>
             <div class="cl-linha">
               <button class="cl-ib sem-borda" title="Nova conversa (enviar modelo para um número)" onclick="waNovaConversa()"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-              <div class="cl-busca"><svg class="cl-ic" style="color:#C3CBDB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h11M3 12h7M3 18h4M17 8V20M14 17l3 3 3-3"/></svg><input id="wa-busca" placeholder="Pesquisar contato..." oninput="_wa.busca=this.value;waRenderLista()"><button class="cl-ib" id="cl-btn-filtro" title="Filtros" onclick="waAbrirFiltro(event)"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg></button></div>
+              <div class="cl-busca"><svg class="cl-ic" style="color:#C3CBDB" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h11M3 12h7M3 18h4M17 8V20M14 17l3 3 3-3"/></svg><input id="wa-busca" placeholder="Pesquisar contato..." oninput="_wa.busca=this.value;waRenderLista();_waBuscarNoBanco()"><button class="cl-ib" id="cl-btn-filtro" title="Filtros" onclick="waAbrirFiltro(event)"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54z"/></svg></button></div>
               <button class="cl-ib sem-borda" title="Respostas rápidas" onclick="waGerenciarRapidas()"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg></button>
             </div>
             <div class="cl-filtros-ativos" id="wa-filtros-ativos"></div>
@@ -15284,6 +15284,33 @@ function _waMsgs(resto){
     throw e;
   });
 }
+// (08/11/2026) abre a conversa do telefone na Central (busca no banco se não estiver entre as 400 da lista)
+async function _waConversaPorTelefone(tel){
+  const d=String(tel||'').replace(/\D/g,'');if(d.length<8)return null;
+  const k8=d.slice(-8);
+  let c=(_wa.conversas||[]).find(x=>String(x.telefone||'').replace(/\D/g,'').slice(-8)===k8&&x.canal!=='instagram');
+  if(c)return c;
+  try{
+    const r=(await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&telefone=like.*'+k8+'&order=ultima_mensagem_em.desc.nullslast&limit=5'))||[];
+    c=r.find(x=>x.canal!=='instagram')||r[0]||null;
+    if(c&&!_wa.conversas.find(x=>x.id===c.id))_wa.conversas.push(c);
+  }catch(e){}
+  return c;
+}
+async function abrirNaCentral(tel){
+  const nav=[...document.querySelectorAll('.nav-item')].find(n=>String(n.getAttribute('onclick')||'').includes("'conversas'"));
+  switchPage('conversas',nav||document.createElement('div'));
+  for(let i=0;i<30&&!_wa.carregou;i++)await new Promise(r=>setTimeout(r,300));
+  const c=await _waConversaPorTelefone(tel);
+  if(c){waRenderLista();waAbrir(c.id);return;}
+  showToast('info','Ainda sem conversa na Central','Este número ainda não mandou nem recebeu mensagem pelo Lume. Use o + (Nova conversa) para chamar.');
+}
+let _waBuscaBancoT=null;
+function _waBuscarNoBanco(){
+  clearTimeout(_waBuscaBancoT);
+  const d=String(_wa.busca||'').replace(/\D/g,'');if(d.length<8)return;
+  _waBuscaBancoT=setTimeout(async()=>{const antes=_wa.conversas.length;await _waConversaPorTelefone(d);if(_wa.conversas.length!==antes)waRenderLista();},400);
+}
 // ---------- carregar ----------
 async function waCarregarConversas(silencioso){
   try{
@@ -17919,7 +17946,10 @@ function waRenderLista(){
     if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
     if(busca){
       const nome=_waNome(c).toLowerCase();
-      if(!(nome.includes(busca)||(buscaNum.length>=3&&String(c.telefone).includes(buscaNum))))return false;
+      // (08/11/2026) número com 55, com ou sem o 9: compara pelos últimos 8 dígitos
+      const telC=String(c.telefone||'').replace(/\D/g,'');
+      const numOk=buscaNum.length>=3&&(telC.includes(buscaNum)||(buscaNum.length>=8&&telC.slice(-8)===buscaNum.slice(-8)));
+      if(!(nome.includes(busca)||numOk))return false;
     }
     if(f.tag&&!(_wa.convTags[c.id]&&_wa.convTags[c.id].has(Number(f.tag))))return false;
     if(f.atendente&&(f.atendente==='_ninguem'?!!c.atribuida_a:c.atribuida_a!==f.atendente))return false;
@@ -18619,7 +18649,10 @@ function abrirConversas(){
       <div style="margin-bottom:11px;">
         <label style="font-size:11px;color:#C3CBDB;display:block;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;">
           <span>Telefone</span>
+          <span style="display:inline-flex;gap:6px;">
+          <a href="#" onclick="document.getElementById('lead-card-overlay').style.display='none';abrirNaCentral(document.getElementById('lc-telefone').value);return false;" style="display:inline-flex;align-items:center;gap:4px;background:#3D5AFE;color:#FFFFFF;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;text-decoration:none;" title="Abrir a conversa na Central de mensagens do Lume">🗨️ Central</a>
           <a id="lc-whatsapp-btn" href="#" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;background:#25D366;color:#FFFFFF;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;text-decoration:none;">💬 WhatsApp</a>
+          </span>
         </label>
         <input id="lc-telefone" type="text" oninput="atualizarLcWhatsappBtn()" style="width:100%;border:1px solid #2A3D66;border-radius:8px;padding:8px 10px;font-size:13px;box-sizing:border-box;background:#0D1A33;">
       </div>
