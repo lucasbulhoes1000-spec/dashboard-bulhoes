@@ -4149,6 +4149,23 @@ function _regraBase(ph,origem){
   if((g==='organico'||g==='sem_origem')&&pacienteDaBase(ph)&&!(typeof linkDoLead==='function'&&linkDoLead(ph)))return '#Base';
   return origem;
 }
+// (08/11/2026) Lucas: "42 contratos de novos pacientes? tem caroço nesse angu". Quem tem origem
+// #Base / #Paciente / CRM antigo (ICOM, Cloudia, discador) já é paciente da casa: o contrato é
+// recompra mesmo se o orçamento não foi marcado como "paciente antigo".
+function ehRecompraPorOrigem(ph){
+  const k=normalizePhone(ph);if(!k)return false;
+  const c=window._recOrigCache||(window._recOrigCache={t:0,m:{}});
+  if(Date.now()-c.t>5000){c.t=Date.now();c.m={};}
+  if(k in c.m)return c.m[k];
+  let r=false;
+  try{const o=origemAtualPaciente(k,'');const g=origemGrupoCanonico(o);r=g==='base'||g==='paciente'||_ORIGEM_LEGADO.test(String(o||'').trim());}catch(e){}
+  return c.m[k]=r;
+}
+function orcEhRecompra(o,ph){
+  if(!o)return false;
+  if(o.classeManual)return o.pacienteAntigo===true; // equipe trocou na lupa: vale a escolha dela
+  return o.pacienteAntigo===true||ehRecompraPorOrigem(ph);
+}
 function origemAtualPaciente(ph,nomeFallback){
   return _regraBase(ph,_origemAtualPacienteBruta(ph,nomeFallback));
 }
@@ -6173,7 +6190,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
     let ehAntigo=false, temAprovadoNoPeriodo=false;
     let temHistoricoRecompra=false;
     if(d&&d.orcamentos){
-      temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+      temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
       const aprovNoPeriodo=d.orcamentos.filter(o=>{
         if(o.status!=='Aprovado')return false;
         const dataRef=o.fechData||o.data||'';
@@ -6181,7 +6198,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       });
       if(aprovNoPeriodo.length>0){
         temAprovadoNoPeriodo=true;
-        ehAntigo=aprovNoPeriodo.every(o=>o.pacienteAntigo);
+        ehAntigo=aprovNoPeriodo.every(o=>orcEhRecompra(o,ph));
       }
     }
     if(temAprovadoNoPeriodo){
@@ -6233,11 +6250,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       orcsAprov.forEach(o=>{
         const v=Number(o.fechValor||o.valor||0);
         totalVendasCRM+=v;
-        if(o.pacienteAntigo)valorVendasRecompra+=v; else valorVendasNovas+=v;
+        if(orcEhRecompra(o,ph))valorVendasRecompra+=v; else valorVendasNovas+=v;
       });
       if(orcsAprov.length>0){
         contratosComValor++;
-        if(!orcsAprov.every(o=>o.pacienteAntigo))contratosComValorNovos++;
+        if(!orcsAprov.every(o=>orcEhRecompra(o,ph)))contratosComValorNovos++;
         // ⚠️ CORRIGIDO (19/08/2026, caso "Rui Dantas Pereira de Lima" — tinha
         // um orçamento Novo (R$2.200) e um Recompra (R$4.600) no mesmo
         // período, e apareciam somados numa linha só (R$6.800, "Novo"),
@@ -6245,7 +6262,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         // por ORÇAMENTO (igual o financeiro real do Clinicorp já faz),
         // não mais uma linha somada por PESSOA.
         orcsAprov.forEach(o=>{
-          _vendaRows.push({name:nome,ph,value:Number(o.fechValor||o.valor||0),classe:o.pacienteAntigo?'Recompra':'Novo',descricao:o.tratamento||''});
+          _vendaRows.push({name:nome,ph,value:Number(o.fechValor||o.valor||0),classe:orcEhRecompra(o,ph)?'Recompra':'Novo',descricao:o.tratamento||''});
         });
       }else{
         // Tem orçamento no CRM, mas nenhum com data de fechamento dentro do período —
@@ -6257,7 +6274,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
         const vFallback=getValorGanhoReal(ph,_range)||parseFloat((row&&row.value)||0);
         if(vFallback>0){
           totalVendasCRM+=vFallback;
-          const ehRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+          const ehRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
           if(ehRecompra)valorVendasRecompra+=vFallback;
           else{valorVendasNovas+=vFallback;contratosComValorNovos++;}
           contratosComValor++;_vendaRows.push({name:nome,ph,value:vFallback,classe:ehRecompra?'Recompra':'Novo'});
@@ -6416,10 +6433,10 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
       const entVal=Number(o.entrada||0);
       if(entVal>0){
         totalEntradas+=entVal;
-        if(o.pacienteAntigo)entradasRecompra+=entVal;else entradasNovas+=entVal;
+        if(orcEhRecompra(o,ph))entradasRecompra+=entVal;else entradasNovas+=entVal;
         const row=cloudiaRowPorTel(ph);
         const nome=(d.nomeAtual)||(row&&row.name)||'—';
-        _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||'',classe:o.pacienteAntigo?'Recompra':'Novo'});
+        _entradaRows.push({name:nome,ph,value:entVal,data:o.entradaData||o.fechData||o.data||'',pgto:o.entradaPgto||'',classe:orcEhRecompra(o,ph)?'Recompra':'Novo'});
       }
     }));
     window._lastEntradaRows=_entradaRows;
@@ -9021,7 +9038,7 @@ function filterClientesTable(){
 
     // Novo paciente x Recompra.
     const orcsPeriodo=tipoOrc==='todos'?orcsPeriodoTodos:orcsPeriodoTodos.filter(o=>
-      tipoOrc==='recompra' ? o.pacienteAntigo===true : o.pacienteAntigo!==true
+      tipoOrc==='recompra' ? orcEhRecompra(o,ph) : !orcEhRecompra(o,ph)
     );
     if(orcsPeriodo.length===0)return false;
 
@@ -9271,14 +9288,14 @@ function lupaOport(){
 function classificarNovoOuRecompra(ph,range){
   const d=ccDataLookup(ph);
   if(!d||!d.orcamentos)return 'Novo';
-  const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+  const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
   if(range){
     const aprovNoPeriodo=d.orcamentos.filter(o=>{
       if(o.status!=='Aprovado')return false;
       const dataRef=o.fechData||o.data||'';
       return dataRef>=range.since&&dataRef<=range.until;
     });
-    if(aprovNoPeriodo.length>0)return aprovNoPeriodo.every(o=>o.pacienteAntigo)?'Recompra':'Novo';
+    if(aprovNoPeriodo.length>0)return aprovNoPeriodo.every(o=>orcEhRecompra(o,ph))?'Recompra':'Novo';
   }
   return temHistoricoRecompra?'Recompra':'Novo';
 }
@@ -9356,7 +9373,8 @@ function toggleNovoRecompraManual(ph, valorFechado, botaoEl){
   if(!d||!d.orcamentos){showToast('error','Não encontrado','Não achei o orçamento correspondente pra editar.');return;}
   const orc=d.orcamentos.find(o=>o.status==='Aprovado'&&Math.abs(Number(o.fechValor||o.valor||0)-valorFechado)<0.01);
   if(!orc){showToast('error','Não encontrado','Não achei um orçamento Aprovado com esse valor exato pra marcar manualmente. Edite o orçamento diretamente pelo card do cliente.');return;}
-  orc.pacienteAntigo=!orc.pacienteAntigo;
+  orc.pacienteAntigo=!orcEhRecompra(orc,ph);
+  orc.classeManual=true;
   orc.entradaManual=true; // sempre prevalece daqui pra frente, inclusive no financeiro real do backend
   salvarCRMDebounced();
   const novaClasse=orc.pacienteAntigo?'Recompra':'Novo';
@@ -10606,7 +10624,7 @@ function renderIndicacoes(){
   let vendasProg=0;
   let vendas=0,vendasInd=0,valor=0,valorInd=0,indFechados=0,indFechadosComQuem=0;
   pac.forEach(({ph,d})=>{
-    const aprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&!o.pacienteAntigo&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
+    const aprov=(d.orcamentos||[]).filter(o=>o.status==='Aprovado'&&!orcEhRecompra(o,ph)&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
     if(!aprov.length)return;
     const v=aprov.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
     vendas++;valor+=v;
@@ -10960,7 +10978,7 @@ function openOrcForm(editIdx){
     document.getElementById('orc-entrada').value=o.entrada||'';
     document.getElementById('orc-entrada-data').value=o.entradaData||'';
     document.getElementById('orc-entrada-pgto').value=o.entradaPgto||'';
-    document.getElementById('orc-tipo-paciente').value=o.pacienteAntigo?'antigo':'novo';
+    document.getElementById('orc-tipo-paciente').value=orcEhRecompra(o,_orcR.phone)?'antigo':'novo';
     document.getElementById('orc-crc-particip').value=o.crcParticip||'nao';
     document.getElementById('orc-crc-nome').value=o.crcNome||'';
     document.getElementById('orc-obs').value=o.obs||'';
@@ -11278,6 +11296,8 @@ async function salvarOrcamento(){
       if(norm(antes)!==norm(depois))manualFields[campo]=true;
     });
     orc._manualFields=manualFields;
+    // (08/11/2026) escolha diferente da classificação automática (origem #Base etc.) vale sempre
+    if(orc.pacienteAntigo!==orcEhRecompra(orcExistente,r.phone))orc.classeManual=true;
 
     // Mantém compatibilidade com a proteção antiga dos campos de pagamento.
     if(manualFields.pagamento||manualFields.parcelas||manualFields.entrada||
@@ -11369,7 +11389,7 @@ function refreshOrcamentos(d){
       // clicando em "Editar", o que ninguém via de cara (pedido do
       // usuário, 30/07/2026).
       var seloTipoPaciente=o.status==='Aprovado'
-        ?(o.pacienteAntigo
+        ?(orcEhRecompra(o,(d&&(d.telefone||d.phone))||(typeof _currentClienteIdx!=='undefined'&&_currentClienteIdx>=0&&clientesData[_currentClienteIdx]?clientesData[_currentClienteIdx].phone:(_currentLeadIdx>=0&&leadsData[_currentLeadIdx]?leadsData[_currentLeadIdx].phone:'')))
           ?'<span style="background:#A18B6C22;color:#E2BE6A;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:6px;">🔄 Recompra</span>'
           :'<span style="background:#5a8a9a22;color:#83B4C4;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-left:6px;">🆕 Novo</span>')
         :'';
@@ -11836,14 +11856,14 @@ function calcularFechamentosComoDashboard(range, avalFilt, tratFilt){
         // EXATAMENTE como o Dashboard desta versão:
         // soma os aprovados do telefone que fecharam dentro do período.
         valor=aprovNoPeriodo.reduce((s,o)=>s+Number(o.fechValor||o.valor||0),0);
-        classe=aprovNoPeriodo.every(o=>o.pacienteAntigo)?'Recompra':'Novo';
+        classe=aprovNoPeriodo.every(o=>orcEhRecompra(o,ph))?'Recompra':'Novo';
         const datas=aprovNoPeriodo.map(o=>o.fechData||o.data||'').filter(Boolean).sort();
         dataFech=datas[datas.length-1]||'';
       }else{
         // Mesmo fallback do Dashboard quando o telefone está em fechadosPhones
         // mas não há orçamento com data exata no período.
         valor=Number(getValorGanhoReal(ph,range)||parseFloat((row&&row.value)||0)||0);
-        const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+        const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
         classe=temHistoricoRecompra?'Recompra':'Novo';
         const g=eventoGanhoPorTel[ph];
         if(g){
@@ -12050,12 +12070,12 @@ async function renderRelOrigem(){
     if(!passaOrig(org))return;
     let antigo=false,temPeriodo=false,histRecompra=false;
     if(d&&Array.isArray(d.orcamentos)){
-      histRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&o.pacienteAntigo);
+      histRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
       const ap=d.orcamentos.filter(o=>{
         if(o.status!=='Aprovado'||!orcBate(o))return false;
         const dr=o.fechData||o.data||'';return dr>=since&&dr<=until;
       });
-      if(ap.length){temPeriodo=true;antigo=ap.every(o=>o.pacienteAntigo);}
+      if(ap.length){temPeriodo=true;antigo=ap.every(o=>orcEhRecompra(o,ph));}
     }
     const b=bucket(org);b.fechados.add(ph);
     if(!(temPeriodo?antigo:histRecompra))b.fechadosNovos.add(ph);
@@ -12165,7 +12185,7 @@ async function renderRelOrigem(){
           const cd=ccDataLookup(ph)||{};const row=rowTel(ph);
           const ap=(cd.orcamentos||[]).filter(o=>o.status==='Aprovado'&&orcBate(o)&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
           const v=ap.reduce((s,o)=>s+Number(o.valor||0),0);x.valor+=v;
-          x.fechRows.push({phone:ph,name:(row&&row.name)||cd.nome||'—',dataFechamento:(ap[0]&&(ap[0].fechData||ap[0].data))||'',value:v,classe:ap.length&&ap.every(o=>o.pacienteAntigo)?'Recompra':'Novo'});
+          x.fechRows.push({phone:ph,name:(row&&row.name)||cd.nome||'—',dataFechamento:(ap[0]&&(ap[0].fechData||ap[0].data))||'',value:v,classe:ap.length&&ap.every(o=>orcEhRecompra(o,ph))?'Recompra':'Novo'});
         });
       });
       const fim=['Não identificado','Antes do rastreio (até 24/08)','Paciente da base'];
