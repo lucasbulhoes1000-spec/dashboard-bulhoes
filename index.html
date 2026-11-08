@@ -11687,6 +11687,19 @@ function initRelOrigem(){
   };
   if(!allCloudiaRows.length){fetchCloudia().then(rows=>{rebuildStageIndex(rows);doRender();});}else{doRender();}
 }
+function openROPerfil(i,type){
+  const x=window._roPerfil&&window._roPerfil[i];if(!x){alert('Clique em Filtrar e tente novamente.');return;}
+  const d=x.d;
+  const titles={leads:'Leads',agend:'Agendados',comp:'Comparecimentos',fechou:'Vendas'};
+  const rowsMap={
+    leads:(d.leadRows||[]).map(r=>[fmtDate(r.created_at||r.timestamp),r.name||'—',r.phone||'—']),
+    agend:(d.agendRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
+    comp:(d.compRows||[]).map(r=>[fmtDateOnly(r.created_at||r.data),r.name||'—',r.phone||'—']),
+    fechou:(d.fechRows||[]).map(r=>[fmtDateOnly(r.dataFechamento||r.created_at),r.name||'—',r.phone||'—',r.classe||'—',fmt(Number(r.value||0))])
+  };
+  const hdrs={leads:['Data','Nome','Telefone'],agend:['Data','Nome','Telefone'],comp:['Data','Nome','Telefone'],fechou:['Data','Nome','Telefone','Classe','Valor']};
+  openModal(titles[type]+' — Orgânico · '+x.org, hdrs[type], rowsMap[type]);
+}
 function openROModal(i,type){
   if(!window._roData||!window._roData[i]){alert('Dados não encontrados. Clique em Filtrar e tente novamente.');return;}
   const {org,d}=window._roData[i];
@@ -12078,22 +12091,34 @@ async function renderRelOrigem(){
     <td style="text-align:right" class="ta">${tO?fmt(tO):'—'}</td><td style="text-align:right" class="tg">${tV?fmt(tV):'—'}</td>
     <td style="text-align:right" class="tm">${pc(tFN,tL)}</td><td style="text-align:right" class="tg">${tF?fmt(tV/tF):'—'}</td>
   </tr>`;
-  // (08/11/2026) orgânico aberto por perfil e canal (cliques das páginas de link)
+  // (08/11/2026) orgânico aberto por perfil (cliques das páginas de link), com lupa em cada etapa
   try{
     const card=document.getElementById('ro-org-perfil-card'),tb=document.getElementById('ro-org-perfil');
     const orgB=entries.filter(([o])=>/org[aâ]nico/i.test(o)).map(([,d])=>d);
     if(card&&tb&&orgB.length){
       const g={};const grupo=ph=>{const x=linkDoLead(ph);return x?rotuloLink(x):'Não identificado';};
-      const G=k=>g[k]||(g[k]={leads:new Set(),agend:new Set(),comp:new Set(),fech:new Set(),valor:0});
+      const G=k=>g[k]||(g[k]={leads:new Set(),agend:new Set(),comp:new Set(),fech:new Set(),valor:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]});
+      const k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
       orgB.forEach(d=>{
-        d.leads.forEach(ph=>G(grupo(ph)).leads.add(ph));
-        d.agend.forEach(ph=>G(grupo(ph)).agend.add(ph));
-        d.comp.forEach(ph=>G(grupo(ph)).comp.add(ph));
-        d.fechados.forEach(ph=>G(grupo(ph)).fech.add(ph));
-        (d.fechRows||[]).forEach(r=>{G(grupo(r.phone)).valor+=Number(r.value||0);});
+        (d.leadRows||[]).forEach(r=>{const ph=normalizePhone(r.phone)||r.name;const x=G(grupo(ph));if(!x.leads.has(ph)){x.leads.add(ph);x.leadRows.push(r);}});
+        (d.agendRows||[]).forEach(r=>{const x=G(grupo(r.phone));if(!x.agend.has(r.phone)){x.agend.add(r.phone);x.agendRows.push(r);}});
+        (d.compRows||[]).forEach(r=>{const x=G(grupo(r.phone));if(!x.comp.has(r.phone)){x.comp.add(r.phone);x.compRows.push(r);}});
+        d.fechados.forEach(ph=>{
+          const x=G(grupo(ph));if(x.fech.has(ph))return;x.fech.add(ph);
+          // valor: venda oficial do Dashboard quando houver; senão, orçamentos aprovados no período
+          const oficiais=(d.fechRows||[]).filter(r=>k8(r.phone)===k8(ph));
+          if(oficiais.length){oficiais.forEach(r=>{x.valor+=Number(r.value||0);x.fechRows.push(r);});return;}
+          const cd=ccDataLookup(ph)||{};const row=rowTel(ph);
+          const ap=(cd.orcamentos||[]).filter(o=>o.status==='Aprovado'&&orcBate(o)&&(o.fechData||o.data||'')>=since&&(o.fechData||o.data||'')<=until);
+          const v=ap.reduce((s,o)=>s+Number(o.valor||0),0);x.valor+=v;
+          x.fechRows.push({phone:ph,name:(row&&row.name)||cd.nome||'—',dataFechamento:(ap[0]&&(ap[0].fechData||ap[0].data))||'',value:v,classe:ap.length&&ap.every(o=>o.pacienteAntigo)?'Recompra':'Novo'});
+        });
       });
       const ord=Object.entries(g).sort((a,b)=>(a[0]==='Não identificado')-(b[0]==='Não identificado')||b[1].leads.size-a[1].leads.size);
-      tb.innerHTML=ord.map(([k,v])=>`<tr><td><span class="origem-pill">${k}</span></td><td style="text-align:right">${v.leads.size}</td><td style="text-align:right">${v.agend.size}</td><td style="text-align:right" class="tm">${pc(v.agend.size,v.leads.size)}</td><td style="text-align:right">${v.comp.size}</td><td style="text-align:right" class="tg">${v.fech.size}</td><td style="text-align:right" class="tg">${v.valor?fmt(v.valor):'—'}</td></tr>`).join('');
+      window._roPerfil={};
+      tb.innerHTML=ord.map(([k,v],i)=>{window._roPerfil[i]={org:k,d:v};
+        const lp=t=>` <button class="lupa" onclick="openROPerfil(${i},'${t}')">🔍</button>`;
+        return `<tr><td><span class="origem-pill">${k}</span></td><td style="text-align:right">${v.leads.size}${lp('leads')}</td><td style="text-align:right">${v.agend.size}${lp('agend')}</td><td style="text-align:right" class="tm">${pc(v.agend.size,v.leads.size)}</td><td style="text-align:right">${v.comp.size}${lp('comp')}</td><td style="text-align:right" class="tg">${v.fech.size}${lp('fechou')}</td><td style="text-align:right" class="tg">${v.valor?fmt(v.valor):'—'}${v.fech.size?lp('fechou'):''}</td></tr>`;}).join('');
       card.style.display='';
     }else if(card)card.style.display='none';
   }catch(e){console.warn('[origem por perfil]',e);}
