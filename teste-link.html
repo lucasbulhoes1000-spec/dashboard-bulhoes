@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Teste do link rastreável</title>
+<style>
+  body{margin:0;min-height:100vh;background:#EFEFED;color:#3B342C;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+  .card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:28px 22px;box-shadow:0 10px 40px rgba(59,52,44,.08);text-align:center;}
+  h1{font-size:20px;margin:0 0 10px;}
+  p{font-size:14px;line-height:1.55;color:#7A6F62;margin:0 0 18px;}
+  a.bt{display:block;background:#25D366;color:#fff;text-decoration:none;font-weight:600;padding:15px;border-radius:999px;font-size:15px;}
+  code{font-size:12px;color:#A18B6C;}
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Teste do código invisível</h1>
+  <p>Toque no botão, o WhatsApp abre com a mensagem pronta. <b>Não mude nada</b>, só envie para o número da clínica.</p>
+  <a class="bt" id="bt" href="#">Abrir WhatsApp</a>
+  <p style="margin-top:16px"><code id="cod"></code></p>
+</main>
+<script>
+// (08/11/2026) teste: 3 formas de código invisível no fim da mensagem, para ver qual o WhatsApp entrega inteira.
+// Código de teste: 7K2QX (5 letras em base32 = 25 bits). Marcador de início/fim: U+2060.
+const CODIGO='7K2QX';
+const B32='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const bits=[...CODIGO].map(c=>B32.indexOf(c).toString(2).padStart(5,'0')).join('');
+const M='⁠';
+const enc=(zero,um)=>M+[...bits].map(b=>b==='0'?zero:um).join('')+M;
+const A=enc('​','‌'); // espaço de largura zero / não-juntor
+const B=enc('‌','‍'); // não-juntor / juntor
+const C=enc('⁢','⁣'); // vezes invisível / separador invisível
+const texto='Olá! Este é um teste do link rastreável, pode ignorar.'+A+B+C;
+document.getElementById('bt').href='https://wa.me/5513996300176?text='+encodeURIComponent(texto);
+document.getElementById('cod').textContent='código de teste '+CODIGO;
+</script>
+</body>
+</html>
