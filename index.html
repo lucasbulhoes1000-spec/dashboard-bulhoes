@@ -4121,7 +4121,8 @@ function pacienteDaBase(ph){
 }
 function _regraBase(ph,origem){
   const g=origemGrupoCanonico(origem);
-  if((g==='organico'||g==='sem_origem')&&pacienteDaBase(ph))return '#Base';
+  // (08/11/2026) Lucas: se o Lume identificou o clique no link (perfil do Instagram/site), vale a identificação
+  if((g==='organico'||g==='sem_origem')&&pacienteDaBase(ph)&&!(typeof linkDoLead==='function'&&linkDoLead(ph)))return '#Base';
   return origem;
 }
 function origemAtualPaciente(ph,nomeFallback){
@@ -5375,7 +5376,7 @@ async function _loadTrafegoImpl(op){
   }
   document.getElementById('error-trafego').style.display='none';
   try{
-    const[metaAds,cloudiaRows,funilMetaFinal]=await Promise.all([fetchMeta(),fetchCloudia(),fetchFunilMetaFinal()]);
+    const[metaAds,cloudiaRows,funilMetaFinal]=await Promise.all([fetchMeta(),fetchCloudia(),fetchFunilMetaFinal(),carregarLinksLeads().catch(()=>null)]);
     _lastMetaAds=metaAds;
     _lastCloudiaRows=cloudiaRows;
     // Índice por telefone dos CUSTOMER_STAGE_UPDATED com stage não-vazio, já ordenados por timestamp desc.
