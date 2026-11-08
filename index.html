@@ -2229,7 +2229,7 @@ body{letter-spacing:-.1px;}
       </div>
       <div class="table-card" id="ro-org-perfil-card" style="margin-top:14px;display:none">
         <div style="font-size:13px;font-weight:600;color:#EEF1F7;margin:2px 0 4px">Orgânico por perfil</div>
-        <div style="font-size:11px;color:#8C98B1;margin-bottom:8px">Pelo clique nas páginas de link (bio, stories e site), ligado à conversa pelo código invisível da mensagem. "Não identificado" = chegou sem passar pelos links (mensagem digitada, número salvo, Direct…).</div>
+        <div style="font-size:11px;color:#8C98B1;margin-bottom:8px">Pelo clique nas páginas de link (bio, stories e site), ligado à conversa pelo código invisível da mensagem. "Paciente da base" = já era paciente (recompra). "Antes do rastreio" = chegou antes de 25/08, quando os cliques começaram a ser gravados. "Não identificado" = chegou depois disso sem passar pelos links.</div>
         <div class="tw"><table>
           <thead><tr><th>Perfil · canal</th><th style="text-align:right">Leads</th><th style="text-align:right">Agendados</th><th style="text-align:right">% Agend.</th><th style="text-align:right">Compareceu</th><th style="text-align:right">Fechados</th><th style="text-align:right">Valor Fechado</th></tr></thead>
           <tbody id="ro-org-perfil"></tbody>
@@ -12096,7 +12096,16 @@ async function renderRelOrigem(){
     const card=document.getElementById('ro-org-perfil-card'),tb=document.getElementById('ro-org-perfil');
     const orgB=entries.filter(([o])=>/org[aâ]nico/i.test(o)).map(([,d])=>d);
     if(card&&tb&&orgB.length){
-      const g={};const grupo=ph=>{const x=linkDoLead(ph);return x?rotuloLink(x):'Não identificado';};
+      // (08/11/2026) sem clique ligado: separa paciente da base e quem chegou antes do rastreio (25/08)
+      const grupo=ph=>{
+        const x=linkDoLead(ph);if(x)return rotuloLink(x);
+        const cd=ccDataLookup(ph)||{};
+        if((cd.orcamentos||[]).some(o=>o.pacienteAntigo))return 'Paciente da base';
+        const ent=dataEntradaLead(ph);
+        if(!ent||ent<'2026-08-25')return 'Antes do rastreio (até 24/08)';
+        return 'Não identificado';
+      };
+      const g={};
       const G=k=>g[k]||(g[k]={leads:new Set(),agend:new Set(),comp:new Set(),fech:new Set(),valor:0,leadRows:[],agendRows:[],compRows:[],fechRows:[]});
       const k8=t=>String(t||'').replace(/\D/g,'').slice(-8);
       orgB.forEach(d=>{
@@ -12114,7 +12123,8 @@ async function renderRelOrigem(){
           x.fechRows.push({phone:ph,name:(row&&row.name)||cd.nome||'—',dataFechamento:(ap[0]&&(ap[0].fechData||ap[0].data))||'',value:v,classe:ap.length&&ap.every(o=>o.pacienteAntigo)?'Recompra':'Novo'});
         });
       });
-      const ord=Object.entries(g).sort((a,b)=>(a[0]==='Não identificado')-(b[0]==='Não identificado')||b[1].leads.size-a[1].leads.size);
+      const fim=['Não identificado','Antes do rastreio (até 24/08)','Paciente da base'];
+      const ord=Object.entries(g).sort((a,b)=>fim.indexOf(a[0])-fim.indexOf(b[0])||b[1].leads.size-a[1].leads.size);
       window._roPerfil={};
       tb.innerHTML=ord.map(([k,v],i)=>{window._roPerfil[i]={org:k,d:v};
         const lp=t=>` <button class="lupa" onclick="openROPerfil(${i},'${t}')">🔍</button>`;
