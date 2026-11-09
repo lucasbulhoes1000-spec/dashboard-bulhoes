@@ -9295,8 +9295,8 @@ function lupaOport(){
 // certo (pedido do usuário, 12/08/2026).
 function classificarNovoOuRecompra(ph,range){
   const d=ccDataLookup(ph);
-  if(!d||!d.orcamentos)return 'Novo';
-  const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph));
+  if(!d||!d.orcamentos)return ehRecompraPorOrigem(ph)?'Recompra':'Novo';
+  const temHistoricoRecompra=d.orcamentos.some(o=>o.status==='Aprovado'&&orcEhRecompra(o,ph))||(ehRecompraPorOrigem(ph)&&!d.orcamentos.some(o=>o.classeManual&&o.pacienteAntigo!==true));
   if(range){
     const aprovNoPeriodo=d.orcamentos.filter(o=>{
       if(o.status!=='Aprovado')return false;
