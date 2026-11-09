@@ -19732,9 +19732,10 @@ const KB_QUADROS={
       const top=orcs.slice().sort((a,b)=>Number(b.valor||0)-Number(a.valor||0))[0];
       const atv=(d.atividades&&d.atividades[0])||null;
       const recompra=orcs.length>0&&orcs.every(o=>o.pacienteAntigo===true);
-      // (04/11/2026) com novos e recompras juntos: um orçamento pequeno aprovado
-      // (ex.: limpeza) não tira do follow-up quem tem um orçamento maior em aberto
-      const fechouFup=fechou&&!(aberto>fechado);
+      // (09/11/2026) Lucas: "cadência mensal tem vários caras que fecharam, não pode estar lá".
+      // Os orçamentos em aberto costumam ser as outras opções de tratamento: fechou qualquer um
+      // (ou está como Ganho), sai do follow-up.
+      const fechouFup=fechou||/^ganho$/i.test(String(r.stage||'').trim());
       return {r,ph,d,fechou:fechouFup,aberto,fechado,top,atv,recompra,nome:r.name||'—',fase:atv&&atv.fase?atv.fase:''};
     }),
     coluna:(it)=>_kbOrcColuna(it),
