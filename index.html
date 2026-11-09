@@ -19535,11 +19535,20 @@ function kbExportar(q,colId,ev){
   const norm=t=>{let d=String(t||'').replace(/\D/g,'');if(d.startsWith('55')&&(d.length===12||d.length===13))d=d.slice(2);return d;};
   const esc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
   const tag='kanban '+cfg.titulo.toLowerCase()+' - '+info.nome;
-  const vistos=new Set();const linhas=['"Nome","Email","Telefone","Cpf","DataNascimento","Etapa","Observação","Tags"'];
+  // (09/11/2026) Lucas: a planilha sai com os procedimentos (orçados em aberto e fechados), no fim para não mexer na importação do Cloudia
+  const procs=(it,tel,aprov)=>{
+    let orcs=(it.r&&Array.isArray(it.r._orcamentosPeriodo)&&it.r._orcamentosPeriodo.length)?it.r._orcamentosPeriodo:null;
+    if(!orcs){const d=ccDataLookup(tel)||ccDataLookup(it.ph||'')||{};orcs=Array.isArray(d.orcamentos)?d.orcamentos:[];}
+    const set=new Set();
+    orcs.filter(o=>aprov?o.status==='Aprovado':!['Aprovado','Reprovado','Cancelado'].includes(o.status))
+      .forEach(o=>String(o.tratamento||'').split(/\s*[,+;]\s*/).forEach(t=>{t=t.trim();if(t&&!/^n[aã]o informado$/i.test(t))set.add(t);}));
+    return [...set].join(', ');
+  };
+  const vistos=new Set();const linhas=['"Nome","Email","Telefone","Cpf","DataNascimento","Etapa","Observação","Tags","Procedimentos em aberto","Procedimentos fechados"'];
   l.forEach(it=>{
     const tel=norm(it.ph||(it.r&&(it.r.phone||it.r.telefone))||it.tel||(it.p&&it.p.tel));
     if(!tel||vistos.has(tel))return;vistos.add(tel);
-    linhas.push([esc(it.nome),'""',esc(tel),'""','""','""',esc(cfg.titulo+': '+info.nome),esc(tag)].join(','));
+    linhas.push([esc(it.nome),'""',esc(tel),'""','""','""',esc(cfg.titulo+': '+info.nome),esc(tag),esc(procs(it,tel,false)),esc(procs(it,tel,true))].join(','));
   });
   if(linhas.length<=1){showToast('error','Nada para exportar','Essa coluna não tem contatos com telefone.');return;}
   const nomeArq=('disparo-'+cfg.titulo+'-'+info.nome).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+new Date().toISOString().slice(0,10)+'.csv';
