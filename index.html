@@ -18111,7 +18111,7 @@ function waMenuGerencia(ev){
 }
 
 // ---------- lista ----------
-function _waOrdemT(c){return Date.parse(c&&(c.ultima_atividade_em||c.ultima_mensagem_em))||0;}
+function _waOrdemT(c){if(!c||!c.ultima_mensagem_em)return 0;return Date.parse(c.ultima_atividade_em||c.ultima_mensagem_em)||0;} // conversa sem mensagem nenhuma vai para o fim
 function waRenderLista(){
   const el=document.getElementById('wa-itens');if(!el)return;
   const eu=usuarioAtualEmail();

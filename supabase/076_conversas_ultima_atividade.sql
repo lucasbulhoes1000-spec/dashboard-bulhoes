@@ -46,7 +46,7 @@ update public.conversas c
   ) x
  where c.id = x.conversa_id;
 
-update public.conversas set ultima_atividade_em = coalesce(ultima_mensagem_em, now()) where ultima_atividade_em is null;
+update public.conversas set ultima_atividade_em = ultima_mensagem_em where ultima_atividade_em is null;
 
 create index if not exists conversas_ultima_atividade_idx on public.conversas (ultima_atividade_em desc nulls last);
 
