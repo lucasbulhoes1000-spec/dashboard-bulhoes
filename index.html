@@ -15487,7 +15487,10 @@ function _waBuscarNoBanco(){
 // ---------- carregar ----------
 async function waCarregarConversas(silencioso){
   try{
-    const lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');
+    // (09/11/2026) ordem pela última atividade de verdade (paciente, equipe ou IA): automação não sobe a conversa
+    let lista;
+    try{lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_atividade_em.desc.nullslast&limit=400');}
+    catch(e){lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');}
     _wa.conversas=lista||[];_wa.carregou=true;
     if(!window._lumeLinks)carregarLinksLeads().then(()=>{try{if(_wa.atual&&currentPage==='conversas')waRenderPainel();}catch(e){}});
     if(_wa.atual){const n=_wa.conversas.find(c=>c.id===_wa.atual.id);if(n)_wa.atual=n;}
@@ -16488,7 +16491,7 @@ function _waAoMudarConversa(p){
     waCarregarConversas(true); // traz o nome do paciente vinculado
     _waAvisarNova(n);
   }
-  _wa.conversas.sort((a,b)=>(Date.parse(b.ultima_mensagem_em)||0)-(Date.parse(a.ultima_mensagem_em)||0));
+  _wa.conversas.sort((a,b)=>_waOrdemT(b)-_waOrdemT(a));
   if(_wa.atual&&_wa.atual.id===n.id){_wa.atual=_wa.conversas.find(c=>c.id===n.id)||_wa.atual;if(currentPage==='conversas')waRenderJanela();}
   waAtualizarBadge();
   if(currentPage==='conversas')waRenderLista();
@@ -18108,6 +18111,7 @@ function waMenuGerencia(ev){
 }
 
 // ---------- lista ----------
+function _waOrdemT(c){return Date.parse(c&&(c.ultima_atividade_em||c.ultima_mensagem_em))||0;}
 function waRenderLista(){
   const el=document.getElementById('wa-itens');if(!el)return;
   const eu=usuarioAtualEmail();
@@ -18142,7 +18146,7 @@ function waRenderLista(){
     const n=k==='todas'?base.filter(c=>_clEstado(c)!=='concluido'&&c.nao_lidas>0).length:base.filter(c=>_waPassaAba(c,k,eu)&&c.nao_lidas>0).length;
     const s=b.querySelector('.n');if(s){s.textContent=n>99?'99+':n;s.style.display=n?'block':'none';}
   });
-  const lista=base.filter(c=>_waPassaAba(c,_wa.filtro,eu));
+  const lista=base.filter(c=>_waPassaAba(c,_wa.filtro,eu)).sort((a,b)=>_waOrdemT(b)-_waOrdemT(a));
   if(!lista.length){
     const msg=!_wa.carregou?'Carregando conversas…':_wa.conversas.length?'Nenhuma conversa neste filtro.':'Nenhuma conversa ainda.<br><span style="font-size:11px">As mensagens novas dos pacientes aparecem aqui assim que chegam.</span>';
     el.innerHTML='<div class="wa-vazio">'+msg+'</div>';return;
