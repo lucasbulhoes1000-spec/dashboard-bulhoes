@@ -15868,6 +15868,8 @@ function waMenuItem(ev,id){
     ?'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',false)">'+_clIc('check')+' Marcar como lida</button>'
     :'<button onclick="_clFecharPop();waMarcarLidaItem(\''+id+'\',true)">'+_clIc('chat')+' Marcar como não lida</button>';
   if(c.canal==='instagram')m.innerHTML+='<button onclick="_clFecharPop();waIgIgnorar(\''+id+'\')">'+_clIc('x')+' Ignorar contato</button>';
+  m.innerHTML+=c.oculta_em?'<button onclick="_clFecharPop();waOcultarConversa(\''+id+'\',false)">'+_clIc('sort')+' Voltar para a lista</button>'
+    :'<button onclick="_clFecharPop();waOcultarConversa(\''+id+'\',true)">'+_clIc('x')+' Apagar conversa</button>';
   _clPosicionar(m,ev.currentTarget,true);
 }
 async function waMarcarLidaItem(id,naoLida){
@@ -18292,6 +18294,7 @@ function waRenderLista(){
   _clRenderFiltrosAtivos();
   const base=_wa.conversas.filter(c=>{
     if(c.canal==='instagram'&&!c.ultima_recebida_em)return false; // abordagem sem resposta não entra
+    if(c.oculta_em&&!busca)return false; // (10/11/2026) apagada da lista: só aparece buscando pelo nome/número
     if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
     if(busca){
       const nome=_waNome(c).toLowerCase();
@@ -18434,8 +18437,24 @@ function waMenuMais(ev){
     '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
     '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
     (_wa.agente&&_wa.agente.resumos?'<button onclick="_clFecharPop();waResumirIA()">'+_clIc('bot')+' Resumir com IA</button>':'')+
-    (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':'');
+    (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':'')+
+    (_wa.atual?'<div class="sep"></div>'+(_wa.atual.oculta_em?'<button onclick="_clFecharPop();waOcultarConversa(null,false)">'+_clIc('sort')+' Voltar para a lista</button>'
+      :'<button onclick="_clFecharPop();waOcultarConversa(null,true)" style="color:#E07A7A">'+_clIc('x')+' Apagar conversa</button>'):'');
   _clPosicionar(m,ev.currentTarget,true);
+}
+// (10/11/2026, pedido do Lucas) apagar conversa = some da lista da Central, o histórico fica guardado.
+// Se o paciente escrever de novo, volta sozinha (SQL 078). Buscando pelo nome ou número ela aparece.
+async function waOcultarConversa(id,ocultar){
+  const c=id?(_wa.conversas||[]).find(x=>x.id===id):_wa.atual;if(!c)return;
+  if(ocultar&&!confirm('Apagar a conversa com '+_waNome(c)+' da Central?\n\nO histórico fica guardado. Se a pessoa mandar mensagem de novo, a conversa volta para a lista. Buscando pelo nome ou número você também encontra.'))return;
+  const antes=c.oculta_em;c.oculta_em=ocultar?new Date().toISOString():null;
+  if(ocultar){c.nao_lidas=0;waAtualizarBadge();}
+  if(ocultar&&_wa.atual&&_wa.atual.id===c.id){try{waVoltarLista();}catch(e){}}
+  waRenderLista();if(_wa.atual&&_wa.atual.id===c.id)waRenderCabecalho();
+  try{
+    await _waRest('conversas?id=eq.'+c.id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(ocultar?{oculta_em:c.oculta_em,nao_lidas:0}:{oculta_em:null})});
+    showToast('success',ocultar?'Conversa apagada da lista':'Conversa de volta na lista');
+  }catch(e){c.oculta_em=antes;waRenderLista();showToast('error','Não foi possível '+(ocultar?'apagar':'voltar'),e.message);}
 }
 async function waIgIgnorar(id){
   const c=id?_wa.conversas.find(x=>x.id===id):_wa.atual;if(!c||c.canal!=='instagram')return;
