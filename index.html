@@ -4824,6 +4824,11 @@ function processarResultadoVendasReais(r,range,doCache,salvoEm){
 
   window._ultimoVendasReaisArgs=[r,range,doCache,salvoEm];
   const linhas=_complementarVendasComFechados(todasLinhas.filter(bateFiltroOrigem),range);
+  if(!_origemFilter&&linhas.length>todasLinhas.length){
+    // sem filtro de origem: Métricas de Origem / Funil por Anúncio / ROAS também enxergam quem fechou sem lançamento
+    window._dashVendasFonteMestraRows=linhas.map(v=>({...v}));
+    window._dashVendasFonteMestraTotal=linhas.reduce((s,v)=>s+v.value,0);
+  }
   const total=linhas.reduce((s,v)=>s+v.value,0);
   const totalNovo=linhas.filter(v=>v.classe==='Novo').reduce((s,v)=>s+v.value,0);
   const totalRecompra=linhas.filter(v=>v.classe==='Recompra').reduce((s,v)=>s+v.value,0);
@@ -6271,7 +6276,7 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   // só de novos, o subtítulo mostra só a pill de RECOMPRA (clicável, mesma
   // lupa de sempre) — não repete o novo, que já está em destaque acima.
   const pillRecompraContratos=contratosAntigos>0?`<div style="margin-top:5px;"><span onclick="lupaNovoRecompra('contratos','Recompra')" title="Clique para ver quem são" style="background:#A18B6C14;color:#E2BE6A;border:1px solid #A18B6C3a;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">🔄 ${fmtInt(contratosAntigos)} recompra${contratosAntigos!==1?'s':''}</span></div>`:'';
-  document.getElementById('t-contratos-sub').innerHTML=pct(contratos,comp)+' de fechamento'+pillRecompraContratos;
+  document.getElementById('t-contratos-sub').innerHTML='novos pacientes · % sobre comparecimentos'+pillRecompraContratos;
   document.getElementById('t-conv').textContent=pct(contratosNovos,leadsBase);
   document.getElementById('t-conv-sub').innerHTML='lead → contrato'+splitNovoRecompraHTML(contratosNovos,contratosAntigos,fmtInt,'contratos');
   document.getElementById('t-cpc2').textContent=contratos>0?fmt(cpc2Final):'—';
