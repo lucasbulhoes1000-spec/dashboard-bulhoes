@@ -4749,6 +4749,46 @@ function _classeVendaOficial(classe,ph){
   if(d&&Array.isArray(d.orcamentos)&&d.orcamentos.some(o=>o.classeManual&&o.pacienteAntigo!==true))return classe;
   return 'Recompra';
 }
+// 10/11/2026 (pedido do Lucas: "todas as lupas precisam estar perfeitas"):
+// quem conta em "Fechamentos" (orçamento aprovado no período) mas não tem
+// lançamento no financeiro do Clinicorp entra na lupa de Vendas pelo valor
+// do orçamento aprovado, marcado como "sem lançamento no financeiro".
+// Assim card de fechamentos, valor, ticket e lupas mostram as mesmas pessoas.
+function _complementarVendasComFechados(linhas,range){
+  const per=window._dashFechadosPeriodo;
+  if(!range||!per||per.from!==range.since||per.to!==range.until)return linhas;
+  const temLinha=new Set(linhas.map(v=>normalizePhone(v.ph)).filter(Boolean));
+  const extras=[];
+  const add=(ph,classe)=>{
+    ph=normalizePhone(ph);
+    if(!ph||temLinha.has(ph))return;
+    const d=ccDataLookup(ph)||{};
+    const aprov=(d.orcamentos||[]).filter(o=>{
+      if(o.status!=='Aprovado')return false;
+      const dt=o.fechData||o.data||'';
+      return dt>=range.since&&dt<=range.until;
+    });
+    const row=(typeof cloudiaRowPorTel==='function'?cloudiaRowPorTel(ph):null)||{};
+    const name=d.nomeAtual||row.name||'—';
+    const origemFinal=typeof getOrigemFinalLancamento==='function'?getOrigemFinalLancamento(ph,name):'';
+    const lista=aprov.length?aprov:[null];
+    lista.forEach(o=>{
+      const trat=o?(o.tratamento||o.procedimento||o.descricao||''):'';
+      extras.push({
+        name,ph,
+        value:o?Number(o.fechValor||o.valor||0):0,
+        classe,
+        descricao:(trat?trat+' ':'')+'(sem lançamento no financeiro do Clinicorp)',
+        data:o?(o.fechData||o.data||''):'',
+        origemFinal,
+        semLancamento:true
+      });
+    });
+  };
+  (window._dashFechadosNovosPhones||new Set()).forEach(ph=>add(ph,'Novo'));
+  (window._dashFechadosRecompraPhones||new Set()).forEach(ph=>add(ph,'Recompra'));
+  return extras.length?linhas.concat(extras):linhas;
+}
 function processarResultadoVendasReais(r,range,doCache,salvoEm){
   // Normaliza TODAS as linhas oficiais uma única vez e já associa a origem
   // FINAL do paciente. Essa origem é a mesma usada no CRM: edição manual >
@@ -4781,7 +4821,8 @@ function processarResultadoVendasReais(r,range,doCache,salvoEm){
   // somente vendas realmente atribuídas a #Orgânico.
   const bateFiltroOrigem=v=>origemBateFiltro(v.origemFinal||'',_origemFilter);
 
-  const linhas=todasLinhas.filter(bateFiltroOrigem);
+  window._ultimoVendasReaisArgs=[r,range,doCache,salvoEm];
+  const linhas=_complementarVendasComFechados(todasLinhas.filter(bateFiltroOrigem),range);
   const total=linhas.reduce((s,v)=>s+v.value,0);
   const totalNovo=linhas.filter(v=>v.classe==='Novo').reduce((s,v)=>s+v.value,0);
   const totalRecompra=linhas.filter(v=>v.classe==='Recompra').reduce((s,v)=>s+v.value,0);
@@ -6407,6 +6448,11 @@ function renderTrafego(metaAds,filtered,filteredEvents,filteredAgend){
   window._lastTotalOport=totalOport;
   window._lastTicketCRM=ticketCRM;
   window._lastTicketCRMNovos=ticketNovos;
+  // fechamentos já calculados: refaz o valor oficial incluindo quem fechou sem lançamento
+  if(vendasReaisValidasParaEstePeriodo&&window._ultimoVendasReaisArgs){
+    const a=window._ultimoVendasReaisArgs;
+    if(a[1]&&a[1].since===_range.since&&a[1].until===_range.until)processarResultadoVendasReais(...a);
+  }
 
   // Entradas — manual com senha
   const _entradaManual=getManualOverride('entrada');
