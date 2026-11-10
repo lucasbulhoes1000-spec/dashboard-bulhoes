@@ -363,6 +363,8 @@ tbody tr:hover td{background:#0D1A33;}
 .wa-erro{font-size:11px;color:#CF8077;margin-top:3px;}
 .wa-midia img,.wa-midia video{max-width:260px;max-height:300px;border-radius:7px;display:block;cursor:pointer;}
 .wa-midia audio{width:250px;max-width:100%;}
+.wa-baixar{display:inline-block;margin-top:4px;background:none;border:0.5px solid #2A3D66;border-radius:6px;color:#C3CBDB;font-size:11px;padding:2px 8px;cursor:pointer;}
+.wa-baixar:hover{border-color:#D4AF5A;color:#D4AF5A;}
 .wa-midia-carregando{font-size:11px;color:#8C98B1;font-style:italic;}
 .wa-doc{display:inline-flex;gap:6px;align-items:center;background:#0D1A33;border:0.5px solid #2A3D66;border-radius:7px;padding:7px 10px;font-size:12px;text-decoration:none;}
 .wa-anuncio{font-size:10px;color:#E2BE6A;background:#12213F;border-radius:6px;padding:4px 7px;margin-bottom:5px;}
@@ -16297,9 +16299,9 @@ function _waMidiaHtml(m){
   if(!['image','sticker','audio','voice','video','document'].includes(tipo))return '';
   if(!m.midia_caminho&&m.midia_url&&m.direcao==='enviada'&&/^https:\/\//.test(m.midia_url)){
     const u=_waEsc(m.midia_url);
-    if(tipo==='image')return '<div class="wa-midia"><img src="'+u+'" alt="Foto" onclick="waAbrirMidia(this)"></div>';
-    if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" src="'+u+'"></video></div>';
-    if(tipo==='document')return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" href="'+u+'">📄 '+_waEsc(m.midia_nome||'Documento')+'</a></div>';
+    if(tipo==='image')return '<div class="wa-midia"><img src="'+u+'" alt="Foto" onclick="waAbrirMidia(this)">'+_waBtBaixar(m)+'</div>';
+    if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" src="'+u+'"></video>'+_waBtBaixar(m)+'</div>';
+    if(tipo==='document')return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" href="'+u+'">📄 '+_waEsc(m.midia_nome||'Documento')+'</a>'+_waBtBaixar(m)+'</div>';
   }
   if(!m.midia_caminho){
     if(m.erro)return '';
@@ -16307,12 +16309,40 @@ function _waMidiaHtml(m){
     return '';
   }
   const p=_waEsc(m.midia_caminho);
-  if(tipo==='image'||tipo==='sticker')return '<div class="wa-midia"><img data-wa-midia="'+p+'" alt="Foto" onclick="waAbrirMidia(this)" style="'+(tipo==='sticker'?'max-width:140px;':'')+'"></div>';
-  if(tipo==='audio'||tipo==='voice')return '<div class="wa-midia"><audio controls preload="none" data-wa-midia="'+p+'"></audio></div>'+
+  const bx=_waBtBaixar(m);
+  if(tipo==='image'||tipo==='sticker')return '<div class="wa-midia"><img data-wa-midia="'+p+'" alt="Foto" onclick="waAbrirMidia(this)" style="'+(tipo==='sticker'?'max-width:140px;':'')+'">'+bx+'</div>';
+  if(tipo==='audio'||tipo==='voice')return '<div class="wa-midia"><audio controls preload="none" data-wa-midia="'+p+'"></audio>'+bx+'</div>'+
     (m.transcricao?'<div class="wa-transc"><span>📝 Transcrição</span>'+_waEsc(m.transcricao)+'</div>':
       (m.direcao==='recebida'?'<button class="wa-transc-bt" onclick="waTranscrever(\''+m.id+'\',this)">📝 Transcrever</button>':''));
-  if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" data-wa-midia="'+p+'"></video></div>';
-  return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" data-wa-midia="'+p+'" data-wa-link="1">📄 '+_waEsc(m.midia_nome||'Documento')+'</a></div>';
+  if(tipo==='video')return '<div class="wa-midia"><video controls preload="metadata" data-wa-midia="'+p+'"></video>'+bx+'</div>';
+  return '<div class="wa-midia"><a class="wa-doc" target="_blank" rel="noopener" data-wa-midia="'+p+'" data-wa-link="1">📄 '+_waEsc(m.midia_nome||'Documento')+'</a>'+bx+'</div>';
+}
+// (10/11/2026, pedido do Lucas) baixar foto/vídeo/áudio/documento que chegou pela Lume
+function _waBtBaixar(m){return '<button class="wa-baixar" title="Baixar" onclick="event.stopPropagation();waBaixarMidia(\''+m.id+'\',this)">⬇ Baixar</button>';}
+async function waBaixarMidia(id,bt){
+  const m=(_wa.msgs||[]).find(x=>String(x.id)===String(id));if(!m)return;
+  const txt=bt?bt.textContent:'';if(bt){bt.disabled=true;bt.textContent='⏳';}
+  try{
+    let url=m.midia_url&&/^https:\/\//.test(m.midia_url)&&!m.midia_caminho?m.midia_url:null;
+    if(!url){const r=await _sb.storage.from('whatsapp-midia').createSignedUrl(m.midia_caminho,600);if(r.error)throw r.error;url=r.data.signedUrl;}
+    const blob=await (await fetch(url)).blob();
+    const extTipo=(blob.type.split('/')[1]||'').split(';')[0].replace('jpeg','jpg').replace('mpeg','mp3').replace('quicktime','mov');
+    const extCam=String(m.midia_caminho||m.midia_url||'').split('?')[0].match(/\.([a-z0-9]{2,5})$/i);
+    const ext=(extCam&&extCam[1])||extTipo||'bin';
+    const rot={image:'foto',sticker:'figurinha',audio:'audio',voice:'audio',video:'video',document:'documento'}[m.tipo]||'arquivo';
+    const d=new Date(m.enviada_em||Date.now());const pad=n=>String(n).padStart(2,'0');
+    let nome=m.midia_nome&&m.tipo==='document'?String(m.midia_nome):(rot+'-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.'+ext);
+    nome=nome.replace(/[\\/:*?"<>|]+/g,'_');
+    const arq=new File([blob],nome,{type:blob.type||'application/octet-stream'});
+    // no celular abre o menu de compartilhar (salvar na galeria ou mandar direto); no computador baixa
+    if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[arq]})){
+      try{await navigator.share({files:[arq]});}catch(e){if(e&&e.name!=='AbortError')throw e;}
+    }else{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);
+    }
+  }catch(e){console.warn('[baixar mídia]',e);showToast('error','Não consegui baixar',String(e&&e.message||e));}
+  finally{if(bt){bt.disabled=false;bt.textContent=txt;}}
 }
 function waRenderMsgs(rolarFim){
   const el=document.getElementById('wa-msgs');if(!el)return;
