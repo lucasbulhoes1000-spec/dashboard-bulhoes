@@ -17680,6 +17680,7 @@ function dpFiltrar(){
   const f=_dp.f;const b=String(_dp.busca||'').trim().toLowerCase();const bn=b.replace(/\D/g,'');
   _dp.publico=(_dp.base||[]).filter(x=>{
     if(b&&!(String(x.nome).toLowerCase().includes(b)||(bn.length>=3&&x.ph.includes(bn))))return false;
+    if(f.lista&&!(_dp.listaSet&&_dp.listaSet.has(x.ph)))return false;
     if(f.nome&&!String(x.nome).toLowerCase().includes(f.nome.toLowerCase()))return false;
     if(f.tel&&!x.ph.includes(String(f.tel).replace(/\D/g,'')))return false;
     if(f.etapas&&f.etapas.length&&!f.etapas.some(e=>e.toLowerCase()===String(x.etapa||'_sem').toLowerCase()))return false;
@@ -17709,7 +17710,8 @@ function dpRenderPagina(){
   const pag=_dp.publico.slice(_dp.pag*DP_POR_PAG,(_dp.pag+1)*DP_POR_PAG);
   const todosPag=pag.length&&pag.every(x=>_dp.sel.has(x.ph));
   const defs=_dpFiltroDefs();
-  const chips=Object.keys(_dp.f).filter(k=>{const v=_dp.f[k];return v&&(!Array.isArray(v)||v.length)&&(typeof v!=='object'||Array.isArray(v)||v.de||v.ate);}).map(k=>{
+  const chipLista=_dp.f.lista?'<span class="cl-fchip">Planilha: '+_waEsc(_dp.f.lista.arquivo)+' ('+_dp.f.lista.n+')<button onclick="dpTirarFiltro(\'lista\')">×</button></span>':'';
+  const chips=chipLista+Object.keys(_dp.f).filter(k=>{if(k==='lista')return false;const v=_dp.f[k];return v&&(!Array.isArray(v)||v.length)&&(typeof v!=='object'||Array.isArray(v)||v.de||v.ate);}).map(k=>{
     const d=defs.find(x=>x.k===k)||{nome:k};const v=_dp.f[k];
     let t=Array.isArray(v)?v.map(e=>e==='_sem'?'Sem etapa':(WA_ETAPA_ROTULO[e]||e)).join(', '):typeof v==='object'?(v.de?'de '+v.de.split('-').reverse().join('/'):'')+(v.ate?' até '+v.ate.split('-').reverse().join('/'):''):(d.ops?((d.ops.find(o=>o[0]===v)||[])[1]||v):'contém “'+v+'”');
     return '<span class="cl-fchip">'+_waEsc(d.nome)+': '+_waEsc(t)+'<button onclick="dpTirarFiltro(\''+k+'\')">×</button></span>';
@@ -17719,7 +17721,7 @@ function dpRenderPagina(){
   el.innerHTML=
     '<div class="dp-card">'+
       '<div class="dp-busca">'+_clIc('sort')+'<input placeholder="Nome, telefone ou observações" value="'+_waEsc(_dp.busca)+'" oninput="_dp.busca=this.value;_dp.pag=0;dpFiltrar();dpRenderTabela()"></div>'+
-      '<div class="dp-linha"><button class="dp-bt" onclick="dpMenuRapidos(event)">'+_clIc('filter')+' Filtros rápidos</button><button class="dp-bt" onclick="dpMenuFiltro(event)">'+_clIc('plus')+' Adicionar Filtro</button>'+
+      '<div class="dp-linha"><button class="dp-bt" onclick="dpMenuRapidos(event)">'+_clIc('filter')+' Filtros rápidos</button><button class="dp-bt" onclick="dpMenuFiltro(event)">'+_clIc('plus')+' Adicionar Filtro</button><button class="dp-bt" title="Disparar só para os números de uma planilha (.xlsx ou .csv)" onclick="document.getElementById(\'dp-planilha\').click()">📄 Importar planilha</button><input type="file" id="dp-planilha" accept=".xlsx,.xls,.csv" style="display:none" onchange="dpImportarPlanilha(this.files[0]);this.value=\'\'">'+
         '<span class="dp-chips">'+chips+'</span><button class="cl-link" style="margin-left:auto" onclick="_dp.f={};_dp.busca=\'\';_dp.pag=0;dpFiltrar();dpRenderPagina()">Limpar filtros</button></div>'+
     '</div>'+
     '<div class="dp-acoes">'+
@@ -17761,7 +17763,44 @@ function dpAbrirContato(ph){
   if(c){switchPage('conversas',[...document.querySelectorAll('.nav-item')].find(n=>n.textContent.includes('Conversas')));setTimeout(()=>waAbrir(c.id),100);return;}
   try{abrirCardPorTelefone(ph);}catch(e){showToast('info','Contato sem card','Este número ainda não tem conversa nem card no CRM.');}
 }
-function dpTirarFiltro(k){delete _dp.f[k];_dp.pag=0;dpFiltrar();dpRenderPagina();}
+// (10/11/2026) Lucas: disparar para os números de uma planilha. A planilha vira um filtro;
+// número que não está no Lume entra na lista do disparo só com o nome da planilha.
+async function _dpLerPlanilha(file){
+  if(/\.csv$/i.test(file.name)){
+    const t=await file.text();const sep=(t.split('\n')[0].match(/;/g)||[]).length>(t.split('\n')[0].match(/,/g)||[]).length?';':',';
+    return t.split(/\r?\n/).filter(l=>l.trim()).map(l=>{const out=[];let cur='',q=false;for(const ch of l){if(ch==='"'){q=!q;continue;}if(ch===sep&&!q){out.push(cur);cur='';}else cur+=ch;}out.push(cur);return out;});
+  }
+  if(!window.XLSX)await new Promise((ok,err)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=ok;sc.onerror=()=>err(new Error('não consegui carregar o leitor de planilhas'));document.head.appendChild(sc);});
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''});
+}
+async function dpImportarPlanilha(file){
+  if(!file)return;
+  try{
+    const linhas=(await _dpLerPlanilha(file)).filter(r=>r&&r.some(c=>String(c).trim()));
+    if(!linhas.length)throw new Error('a planilha está vazia');
+    const cab=linhas[0].map(c=>String(c).toLowerCase());
+    let ct=cab.findIndex(c=>/telefone|celular|whats|fone|n[uú]mero/.test(c));
+    const temCab=ct>=0||cab.some(c=>/nome/.test(c));
+    const corpo=temCab?linhas.slice(1):linhas;
+    if(ct<0){let melhor=-1,mx=0;(linhas[0]||[]).forEach((_,i)=>{const n=corpo.filter(r=>/^\d{10,13}$/.test(String(r[i]||'').replace(/\D/g,''))).length;if(n>mx){mx=n;melhor=i;}});ct=melhor;}
+    if(ct<0)throw new Error('não achei a coluna de telefone');
+    const cn=temCab?cab.findIndex(c=>/nome/.test(c)):-1;
+    if(!_dp.base||!_dp.base.length)dpMontarBase();
+    const porPh=new Map(_dp.base.map(x=>[x.ph,x]));
+    const set=new Set();let novos=0,invalidos=0;
+    corpo.forEach(r=>{
+      const ph=normalizePhone(String(r[ct]||''));if(!ph){if(String(r[ct]||'').trim())invalidos++;return;}
+      set.add(ph);
+      if(!porPh.has(ph)){const x={ph,bruto:ph,nome:cn>=0?String(r[cn]||'').trim():'',etapa:'',origem:'',adName:'',campanha:'',criado:'',conversa:null,ultMsg:'',fup:'',avaliacao:'',planilha:true};_dp.base.push(x);porPh.set(ph,x);novos++;}
+    });
+    if(!set.size)throw new Error('nenhum telefone válido na planilha');
+    _dp.listaSet=set;_dp.f={lista:{arquivo:file.name,n:set.size}};_dp.sel.clear();_dp.pag=0;
+    dpFiltrar();dpRenderPagina();
+    showToast('success','Planilha carregada',set.size+' contato(s) no filtro'+(novos?'. '+novos+' não estão no Lume':'')+(invalidos?'. '+invalidos+' telefone(s) inválido(s) ignorado(s)':'')+'.');
+  }catch(e){showToast('error','Não deu para ler a planilha',String(e.message||e));}
+}
+function dpTirarFiltro(k){if(k==='lista')_dp.listaSet=null;delete _dp.f[k];_dp.pag=0;dpFiltrar();dpRenderPagina();}
 function dpMenuRapidos(ev){
   ev.stopPropagation();_clFecharPop();
   const m=document.createElement('div');m.className='cl-menu';
