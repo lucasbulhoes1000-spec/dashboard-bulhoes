@@ -12925,6 +12925,54 @@ async function _crmMudouNoServidor(){
     return atual!==_crmAtualizadoEmCarregado;
   }catch(e){return true;}
 }
+// (10/11/2026, caso Rosana) DATA REAL DA APROVAÇÃO.
+// O Clinicorp não tem campo "data de aprovação" no orçamento: a sincronização usa a
+// data da ÚLTIMA ALTERAÇÃO, então qualquer mexida depois (ex.: lançar o PIX da entrada)
+// muda o mês do fechamento. A venda que o Clinicorp gera no financeiro no momento da
+// aprovação tem a data real. Aqui: orçamento aprovado cuja data de fechamento não foi
+// editada à mão + venda do mesmo paciente com o mesmo valor, lançada entre a criação
+// do orçamento e a data atual de fechamento → fechamento passa a ser a data da venda.
+// Marca o campo como fixo (_manualFields) para a sincronização não desfazer.
+async function corrigirDatasAprovacaoPeloFinanceiro(desde,opts){
+  opts=opts||{};
+  const CH='lume_corrige_aprov_em';
+  if(!desde){
+    try{const u=Number(localStorage.getItem(CH)||0);if(Date.now()-u<6*3600e3)return {pulado:true};}catch(e){}
+    desde=new Date(Date.now()-120*86400e3).toISOString().slice(0,10);
+  }
+  const hoje=new Date().toISOString().slice(0,10);
+  const r=await (await fetch(CLOUDIA_URL+'?action=analyticsVendasReaisClinicorp&from='+desde+'&to='+hoje)).json();
+  if(!r||r.status!=='ok'||!Array.isArray(r.registros))return {erro:r&&r.mensagem};
+  const porTel={};
+  r.registros.forEach(x=>{const ph=normalizePhone(x.telefone);const dl=String(x.dataLancamento||x.data||'').slice(0,10);if(!ph||!dl)return;(porTel[ph]=porTel[ph]||[]).push({valor:Number(x.valor||0),data:dl,usado:false});});
+  const mudou=[];
+  Object.keys(porTel).forEach(ph=>{
+    const d=ccDataLookup(ph);if(!d||!Array.isArray(d.orcamentos))return;
+    const vendas=porTel[ph];
+    const aprov=d.orcamentos.filter(o=>o.status==='Aprovado'&&o.fechData);
+    const val=o=>Number(o.fechValor||o.valor||0);
+    // 1º: vendas que já batem com a data atual ficam reservadas
+    aprov.forEach(o=>{const v=vendas.find(v=>!v.usado&&Math.abs(v.valor-val(o))<0.01&&v.data===o.fechData);if(v){v.usado=true;o.__ok=true;}});
+    aprov.forEach(o=>{
+      if(o.__ok){delete o.__ok;return;}
+      if(o._manualFields&&o._manualFields.fechData)return;
+      const criado=String(o.data||'').slice(0,10);
+      const cand=vendas.filter(v=>!v.usado&&Math.abs(v.valor-val(o))<0.01&&v.data<o.fechData&&(!criado||v.data>=criado)).sort((a,b)=>a.data.localeCompare(b.data));
+      if(!cand.length)return;
+      cand[0].usado=true;
+      mudou.push({ph,de:o.fechData,para:cand[0].data,valor:val(o)});
+      if(opts.simular)return;
+      o.fechData=cand[0].data;
+      o._manualFields=Object.assign({},o._manualFields||{},{fechData:true});
+      o._fechDataFonte='venda no financeiro do Clinicorp';
+    });
+  });
+  if(!opts.simular){
+    try{localStorage.setItem(CH,String(Date.now()));}catch(e){}
+    if(mudou.length){console.log('[APROVAÇÃO REAL] datas de fechamento corrigidas:',mudou);salvarCRMDebounced();}
+  }
+  return {mudou};
+}
 async function carregarCRMRemoto(opcoes){
   const silencioso=!!(opcoes&&opcoes.silencioso);
   if(silencioso&&_crmAtualizadoEmCarregado&&!(await _crmMudouNoServidor())){
@@ -12946,6 +12994,7 @@ async function carregarCRMRemoto(opcoes){
           _crmBaseSnapshot=JSON.parse(JSON.stringify(_ccData));
           localStorage.setItem('bulhoes_crm',JSON.stringify(_ccData));
           console.log('[CRM] Carregado do Supabase ✅',Object.keys(_ccData).length,'clientes');
+          if(!silencioso)setTimeout(()=>{try{corrigirDatasAprovacaoPeloFinanceiro();}catch(e){}},15000);
           if(!silencioso&&currentPage==='clientes')renderClientesTable();
         }
       }
