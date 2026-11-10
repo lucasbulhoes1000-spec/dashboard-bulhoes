@@ -4823,7 +4823,7 @@ function processarResultadoVendasReais(r,range,doCache,salvoEm){
   const bateFiltroOrigem=v=>origemBateFiltro(v.origemFinal||'',_origemFilter);
 
   window._ultimoVendasReaisArgs=[r,range,doCache,salvoEm];
-  const linhas=_complementarVendasComFechados(todasLinhas.filter(bateFiltroOrigem),range);
+  const linhas=todasLinhas.filter(bateFiltroOrigem);
   if(!_origemFilter&&linhas.length>todasLinhas.length){
     // sem filtro de origem: Métricas de Origem / Funil por Anúncio / ROAS também enxergam quem fechou sem lançamento
     window._dashVendasFonteMestraRows=linhas.map(v=>({...v}));
