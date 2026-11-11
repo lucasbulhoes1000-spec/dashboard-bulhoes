@@ -17262,6 +17262,22 @@ async function auFunilComparar(){
   document.body.appendChild(fundo);
 }
 const AU_LEMB_TIPOS={vespera:{nome:'Véspera (1ª)',dica:'Consultas do dia seguinte. Sábado avisa as de segunda (com o modelo de sábado); domingo não manda.'},vespera2:{nome:'Véspera (2ª)',dica:'Só para quem não confirmou nem respondeu a 1ª. Não sai no sábado.'},vespera3:{nome:'Véspera (3ª)',dica:'Só para quem não confirmou nem respondeu a 1ª e a 2ª. Não sai no sábado.'},dia:{nome:'No dia',dica:'Consultas do próprio dia que ainda não começaram.'},aquecimento:{nome:'Aquecimento (2 dias antes)',dica:'Vídeo de desejo 2 dias antes da consulta (sexta avisa as de segunda, sábado as de terça). Quem agendar depois disso ganha o vídeo na 1ª confirmação.'}};
+// (11/11/2026) envia a mídia do cabeçalho do modelo (ex.: vídeo do aquecimento) e preenche o link público
+async function auLembSubirMidia(inp,alvo){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  if(f.size>16*1048576){showToast('error','Arquivo grande demais','Máximo de 16 MB.');return;}
+  if(!_sb){showToast('error','Entre no CRM de novo para enviar arquivos','');return;}
+  const caminho='lembretes/'+Date.now()+'-'+f.name.replace(/[^\w.\-]+/g,'_').slice(-80);
+  showToast('info','Enviando arquivo…','');
+  try{
+    const {error}=await _sb.storage.from('automacoes-midia').upload(caminho,f,{contentType:f.type||undefined,upsert:false});
+    if(error)throw error;
+    const link=SUPABASE_URL+'/storage/v1/object/public/automacoes-midia/'+caminho.split('/').map(encodeURIComponent).join('/');
+    const m=alvo==='video'?_au.lembEd.vespera.modelo_video:_au.lembEd[alvo].modelo;
+    m.cabecalho=Object.assign({},m.cabecalho||{},{link});
+    auRenderExtras();showToast('success','Arquivo enviado','Falta salvar os lembretes.');
+  }catch(e){showToast('error','Não foi possível enviar o arquivo',e.message||String(e));}
+}
 function _auLembHtml(){
   const L=_au.lemb;if(!L)return '';
   const g=_waEhGestao();const E=_au.lembEd||L;
@@ -17288,7 +17304,7 @@ function _auLembHtml(){
           (p&&!m?'<option selected value="'+_auEsc(p.nome)+'">'+_auEsc(p.nome)+'</option>':'')+'</select>';
       if(p){
         if(p.texto_preview)h+='<div class="au-preview">'+_auEsc(p.texto_preview)+'</div>';
-        if(p.cabecalho)h+='<div style="font-size:11px;color:#E2BE6A">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[p.cabecalho.formato]||'mídia')+' (link público):</div><input class="wa-var" value="'+_auEsc(p.cabecalho.link||'')+'" oninput="_au.lembEd.'+t+'.modelo.cabecalho.link=this.value.trim()">';
+        if(p.cabecalho)h+='<div style="font-size:11px;color:#E2BE6A">Cabeçalho com '+({IMAGE:'imagem',VIDEO:'vídeo',DOCUMENT:'documento'}[p.cabecalho.formato]||'mídia')+' (link público):</div><input class="wa-var" value="'+_auEsc(p.cabecalho.link||'')+'" oninput="_au.lembEd.'+t+'.modelo.cabecalho.link=this.value.trim()"><label class="wa-btn" style="font-size:11px;padding:3px 8px;cursor:pointer;margin-top:4px;display:inline-block">📎 Enviar arquivo<input type="file" accept="video/mp4,image/jpeg,image/png,application/pdf" style="display:none" onchange="auLembSubirMidia(this,\''+t+'\')"></label>';
         (p.variaveis||[]).forEach((v,k)=>{h+='<div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#E2BE6A">'+_auEsc(p.formato==='NAMED'?'{{'+((p.campos||[])[k]||k+1)+'}}':'{{'+(k+1)+'}}')+'<input class="wa-var" style="flex:1" value="'+_auEsc(v)+'" placeholder="ex.: {hora}" oninput="_au.lembEd.'+t+'.modelo.variaveis['+k+']=this.value"></div>';});
       }
       return h+'</div>';
@@ -17300,7 +17316,7 @@ function _auLembHtml(){
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+tipo('vespera')+tipo('vespera2')+tipo('vespera3')+tipo('dia')+tipo('aquecimento')+'</div>'+
       '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Modelo da 1ª no sábado (consultas de segunda): <select class="wa-sel" style="height:30px" onchange="auLembSabado(this.value)"><option value="">o mesmo da 1ª</option>'+(_au.modelos||[]).map(x=>'<option value="'+_auEsc(x.nome)+'"'+(E.vespera&&E.vespera.modelo_sabado&&E.vespera.modelo_sabado.nome===x.nome?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+(E.vespera&&E.vespera.modelo_sabado&&!(_au.modelos||[]).some(x=>x.nome===E.vespera.modelo_sabado.nome)?'<option selected>'+_auEsc(E.vespera.modelo_sabado.nome)+'</option>':'')+'</select></label>'+
       '<label style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Modelo da 1ª com vídeo (quem agendou em cima da hora e não recebeu o aquecimento): <select class="wa-sel" style="height:30px" onchange="auLembVideo(this.value)"><option value="">nenhum (todos recebem a 1ª normal)</option>'+(_au.modelos||[]).map(x=>'<option value="'+_auEsc(x.nome)+'"'+(E.vespera&&E.vespera.modelo_video&&E.vespera.modelo_video.nome===x.nome?' selected':'')+'>'+_auEsc(x.nome)+'</option>').join('')+(E.vespera&&E.vespera.modelo_video&&!(_au.modelos||[]).some(x=>x.nome===E.vespera.modelo_video.nome)?'<option selected>'+_auEsc(E.vespera.modelo_video.nome)+'</option>':'')+'</select></label>'+
-      (E.vespera&&E.vespera.modelo_video&&E.vespera.modelo_video.cabecalho?'<input class="wa-var" placeholder="Link público do vídeo (https://…)" value="'+_auEsc(E.vespera.modelo_video.cabecalho.link||'')+'" oninput="_au.lembEd.vespera.modelo_video.cabecalho.link=this.value">':'')+
+      (E.vespera&&E.vespera.modelo_video&&E.vespera.modelo_video.cabecalho?'<input class="wa-var" placeholder="Link público do vídeo (https://…)" value="'+_auEsc(E.vespera.modelo_video.cabecalho.link||'')+'" oninput="_au.lembEd.vespera.modelo_video.cabecalho.link=this.value"><label class="wa-btn" style="font-size:11px;padding:3px 8px;cursor:pointer;margin-left:6px">📎 Enviar vídeo<input type="file" accept="video/mp4" style="display:none" onchange="auLembSubirMidia(this,\'video\')"></label>':'')+
       '<div style="border-top:0.5px solid #2A3D66;padding-top:10px;display:flex;flex-direction:column;gap:6px"><b style="font-size:12.5px">Quando o paciente responde</b>'+
         '<div style="font-size:11px;color:#E2BE6A">Botão do modelo ou resposta curta (“sim”, “confirmo”) confirma. “Cancelar”, “remarcar”, “não vou conseguir” põe a tag e manda para a fila da equipe remarcar (nada é desmarcado sozinho).</div>'+
         '<label style="display:flex;gap:6px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" '+(E.confirmar_no_clinicorp!==false?'checked':'')+' onchange="_au.lembEd.confirmar_no_clinicorp=this.checked"> Confirmar a consulta no Clinicorp</label>'+
