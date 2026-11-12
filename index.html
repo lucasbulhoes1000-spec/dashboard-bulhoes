@@ -16271,9 +16271,31 @@ async function galEnviar(){
 // (06/11/2026) modelo com foto/vídeo no cabeçalho (ex.: FUP 24 horas, FUP 2 dias): a foto vai para o
 // paciente junto com o modelo, mas a mensagem gravada no CRM só tinha o texto. Mostra o cabeçalho
 // configurado no passo de modelo da automação que enviou.
+// (12/11/2026) lembretes de consulta com mídia (aquecimento e 1ª confirmação com vídeo)
+function _waCabecalhoLembrete(m,autor){
+  if(!_wa.cabLemb){
+    if(!_wa.cabLembCarregando){
+      _wa.cabLembCarregando=true;
+      _waRest('configuracoes?select=valor&chave=eq.lembretes_consulta').then(r=>{
+        _wa.cabLemb=(r&&r[0]&&r[0].valor)||{};try{waRenderMsgs();}catch(e){}
+      }).catch(()=>{_wa.cabLemb={};});
+    }
+    return null;
+  }
+  const L=_wa.cabLemb,cab=x=>x&&x.cabecalho&&x.cabecalho.link?{link:x.cabecalho.link,formato:String(x.cabecalho.formato||'IMAGE').toUpperCase()}:null;
+  const tipo=autor==='Aquecimento (2 dias antes)'?'aquecimento':autor==='Lembrete do dia'?'dia':autor==='Lembrete de véspera'?'vespera':autor==='Lembrete de véspera (2ª)'?'vespera2':autor==='Lembrete de véspera (3ª)'?'vespera3':null;
+  if(!tipo)return null;
+  const c=L[tipo]||{};
+  if(tipo==='vespera'){
+    const t=String(m.texto||'').toLowerCase();
+    if(c.modelo_video&&/esse v[ií]deo/.test(t))return cab(c.modelo_video);
+  }
+  return cab(c.modelo);
+}
 function _waCabecalhoModelo(m){
   const autor=String(m.autor_email||'');
-  if(m.tipo!=='template'||autor.indexOf('automação: ')!==0)return null;
+  if(m.tipo!=='template')return null;
+  if(autor.indexOf('automação: ')!==0)return _waCabecalhoLembrete(m,autor);
   if(!_wa.cabAuto){
     if(!_wa.cabAutoCarregando){
       _wa.cabAutoCarregando=true;
