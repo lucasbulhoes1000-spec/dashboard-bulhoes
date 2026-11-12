@@ -17365,6 +17365,11 @@ async function auLembSalvar(){
   if(!String(E.categorias==null?'avaliação':E.categorias).trim()&&!confirm('Sem categoria, TODOS os pacientes agendados recebem lembrete (retornos, manutenção, cirurgia…). Continuar?'))return;
   if(E.ligado&&E.modo_teste!==false&&!(E.telefones_teste||[]).length){showToast('error','Coloque um telefone de teste','No modo teste só esses telefones recebem.');return;}
   if(E.ligado&&E.modo_teste===false&&!(_au.lemb.ligado&&_au.lemb.modo_teste===false)&&!confirm('Ligar os lembretes para todos os pacientes agendados?\n\nSe o Cloudia ainda manda lembretes, o paciente recebe em dobro.'))return;
+  // (12/11/2026) modelo com variáveis numeradas ({{1}}, {{2}}…): o texto que fica registrado na
+  // conversa usa as mesmas variáveis do envio, senão a Central mostra "{{1}}" no lugar do nome e da data.
+  const _prevVars=m=>{if(!m||!m.texto_preview||!Array.isArray(m.variaveis))return;
+    m.texto_preview=String(m.texto_preview).replace(/\{\{\s*(\d+)\s*\}\}/g,(x,n)=>m.variaveis[Number(n)-1]||x);};
+  ['vespera','vespera2','vespera3','dia','aquecimento'].forEach(t=>{const c=E[t]||{};_prevVars(c.modelo);_prevVars(c.modelo_sabado);_prevVars(c.modelo_video);});
   try{
     await _waRest('configuracoes?chave=eq.lembretes_consulta',{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({valor:E})});
     _au.lemb=JSON.parse(JSON.stringify(E));_au.lembAberto=false;auRenderExtras();
