@@ -15748,52 +15748,41 @@ function _waCarregarSdkFacebook(){
     document.head.appendChild(s);
   });
 }
+// (13/11/2026) cadastro do número NA MESMA ABA: a janela do Facebook (FB.login) não abria no
+// computador da clínica. A página vai para o Facebook e volta para a Lume com o código; a Lume
+// descobre a conta do WhatsApp pela permissão concedida (whatsapp-acoes, conectar_numero).
+const WA_CADASTRO_VOLTA='https://dashboard-bulhoes.vercel.app/';
 async function waConectarNumero(){
-  const b=document.getElementById('wa-btn-conectar');
-  let cfg=window._waCfgCad,FB=window.FB;
-  if(!cfg||!FB){
-    // ainda carregando: carrega agora e pede um novo clique (a janela do Facebook só abre direto no clique)
-    _waStatusConexao('Preparando a conexão com o Facebook…');
-    try{cfg=cfg||await _waConfigCadastro();window._waCfgCad=cfg;FB=FB||await _waCarregarSdkFacebook();}
-    catch(e){_waStatusConexao(e.message,true);return;}
-    if(!cfg){_waStatusConexao('A configuração do cadastro do WhatsApp não foi encontrada no Lume.',true);return;}
-    _waStatusConexao('Tudo pronto. Clique em "Conectar número do celular" de novo para abrir a janela do Facebook.');
-    return;
-  }
-  const sessao={};
-  const ouvir=ev=>{
-    if(!/(^|\.)facebook\.com$/.test(new URL(ev.origin).hostname))return;
-    try{
-      const d=typeof ev.data==='string'?JSON.parse(ev.data):ev.data;
-      if(d&&d.type==='WA_EMBEDDED_SIGNUP'){
-        sessao.evento=d.event;
-        if(d.data){sessao.waba_id=d.data.waba_id||sessao.waba_id;sessao.phone_number_id=d.data.phone_number_id||sessao.phone_number_id;}
-        if(d.event==='CANCEL')_waStatusConexao('Conexão cancelada'+(d.data&&d.data.current_step?' na etapa '+d.data.current_step:'')+'.',true);
-        if(d.event==='ERROR')_waStatusConexao('A Meta informou um erro: '+((d.data&&d.data.error_message)||'sem detalhes'),true);
-      }
-    }catch(e){}
-  };
-  window.addEventListener('message',ouvir);
-  if(b){b.disabled=true;b.textContent='Conectando…';}
-  _waStatusConexao('Siga as etapas na janela do Facebook. No celular, abra o WhatsApp Business e leia o QR Code quando pedir.');
-  setTimeout(()=>{if(b&&b.disabled&&!sessao.evento)_waStatusConexao('A janela do Facebook abre separada. Se ela não apareceu, procure atrás desta janela ou libere os pop-ups do dashboard-bulhoes.vercel.app no ícone da barra de endereço e clique de novo.',true);},5000);
-  FB.login(async resp=>{
-    try{
-      const code=resp&&resp.authResponse&&resp.authResponse.code;
-      if(!code){_waStatusConexao('A janela foi fechada antes de terminar.',true);return;}
-      for(let i=0;i<20&&!sessao.waba_id;i++)await new Promise(r=>setTimeout(r,250));
-      if(!sessao.waba_id){_waStatusConexao('A Meta não informou a conta do WhatsApp. Tente de novo.',true);return;}
-      _waStatusConexao('Ligando o número ao CRM e pedindo o histórico…');
-      const apelido=(document.getElementById('wa-apelido-novo')||{}).value||'';
-      const r=await _waAcao({acao:'conectar_numero',code,waba_id:sessao.waba_id,phone_number_id:sessao.phone_number_id||'',apelido,coexistencia:true});
-      const p=r.passos||{};
-      _waStatusConexao('Pronto! '+(p.numero||'Número')+' conectado.'+(p.historico==='pedido'?' O histórico está sendo importado e aparece aos poucos.':' Histórico: '+(p.historico||'não pedido')));
-      waCarregarNumeros();
-    }catch(e){_waStatusConexao('Não foi possível concluir: '+e.message,true);}
-    finally{window.removeEventListener('message',ouvir);if(b){b.disabled=false;b.textContent='Conectar número do celular';}}
-  },{config_id:cfg.config_id,response_type:'code',override_default_response_type:true,
-     extras:{setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'}});
+  _waStatusConexao('Abrindo o cadastro do Facebook…');
+  const cfg=window._waCfgCad||await _waConfigCadastro();window._waCfgCad=cfg;
+  if(!cfg){_waStatusConexao('A configuração do cadastro do WhatsApp não foi encontrada no Lume.',true);return;}
+  const apelido=((document.getElementById('wa-apelido-novo')||{}).value||'').trim();
+  const st=Math.random().toString(36).slice(2)+Date.now().toString(36);
+  try{localStorage.setItem('lume_wa_cadastro',JSON.stringify({st,apelido,em:Date.now()}));}catch(e){}
+  const extras={setup:{},featureType:'whatsapp_business_app_onboarding',sessionInfoVersion:'3'};
+  location.href='https://www.facebook.com/v23.0/dialog/oauth?client_id='+WA_APP_ID+'&config_id='+encodeURIComponent(cfg.config_id)+
+    '&response_type=code&override_default_response_type=true&redirect_uri='+encodeURIComponent(WA_CADASTRO_VOLTA)+
+    '&state='+st+'&extras='+encodeURIComponent(JSON.stringify(extras));
 }
+async function _waRetornoCadastro(){
+  const q=new URLSearchParams(location.search);const code=q.get('code'),st=q.get('state');
+  if(!code&&!q.get('error'))return;
+  let sv={};try{sv=JSON.parse(localStorage.getItem('lume_wa_cadastro')||'{}');}catch(e){}
+  history.replaceState(null,'',location.pathname);
+  if(!sv.st)return; // não é retorno do cadastro do WhatsApp
+  try{localStorage.removeItem('lume_wa_cadastro');}catch(e){}
+  if(q.get('error')){showToast('error','Conexão cancelada',q.get('error_description')||q.get('error_reason')||'');return;}
+  if(sv.st!==st){showToast('error','Conexão não reconhecida','Clique em Conectar número do celular de novo.');return;}
+  for(let i=0;i<120&&!_sbAccessToken;i++)await new Promise(r=>setTimeout(r,1000));
+  showToast('info','Ligando o número à Lume…','Pode levar alguns segundos.');
+  try{
+    const r=await _waAcao({acao:'conectar_numero',code,redirect_uri:WA_CADASTRO_VOLTA,apelido:sv.apelido||'',coexistencia:true});
+    const p=r.passos||{};
+    showToast('success','Número conectado: '+(p.numero||''),p.historico==='pedido'?'O histórico está sendo importado e aparece aos poucos.':'Histórico: '+(p.historico||'não pedido'));
+    try{waCarregarNumeros();}catch(e){}
+  }catch(e){showToast('error','Não foi possível concluir a conexão',e.message||String(e));}
+}
+window.addEventListener('load',()=>setTimeout(()=>{_waRetornoCadastro().catch(e=>console.warn('[cadastro wa]',e));},2500));
 
 // ---------- conversa aberta ----------
 async function waAbrir(id){

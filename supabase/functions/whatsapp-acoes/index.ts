@@ -469,15 +469,31 @@ export async function handler(req: Request): Promise<Response> {
         // histórico (a Meta só deixa pedir uma vez e dentro de 24 h) e cadastra o número.
         if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão conecta números" }, 403);
         const code = String(dados.code ?? "").trim();
-        const wabaId = String(dados.waba_id ?? "").trim();
-        if (!code || !wabaId) return resposta(req, { ok: false, erro: "faltou o código ou a conta do WhatsApp" }, 400);
+        let wabaId = String(dados.waba_id ?? "").trim();
+        // (13/11/2026) cadastro na mesma aba (sem janela do Facebook): vem o redirect_uri e não vem a conta
+        const redirectUri = String(dados.redirect_uri ?? "").trim();
+        if (!code) return resposta(req, { ok: false, erro: "faltou o código da Meta" }, 400);
         if (!WA_APP_SECRET) return resposta(req, { ok: false, erro: "falta o segredo WA_APP_SECRET" }, 500);
         const passos: Record<string, unknown> = {};
 
-        const tk = await fetch(`${GRAPH}/oauth/access_token?client_id=${WA_APP_ID}&client_secret=${encodeURIComponent(WA_APP_SECRET)}&code=${encodeURIComponent(code)}`);
+        const tk = await fetch(`${GRAPH}/oauth/access_token?client_id=${WA_APP_ID}&client_secret=${encodeURIComponent(WA_APP_SECRET)}&code=${encodeURIComponent(code)}` + (redirectUri ? `&redirect_uri=${encodeURIComponent(redirectUri)}` : ""));
         const tj = await tk.json().catch(() => ({}));
         if (!tk.ok || !tj.access_token) return resposta(req, { ok: false, erro: "A Meta recusou o código: " + erroMeta(tj) }, 502);
         const token = String(tj.access_token);
+        if (!wabaId) {
+          // descobre a conta pela permissão concedida: a que tiver número ainda não cadastrado no CRM
+          const dbg = await (await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(WA_APP_ID + "|" + WA_APP_SECRET)}`)).json().catch(() => ({}));
+          const gs: any[] = dbg?.data?.granular_scopes ?? [];
+          const ids: string[] = [...new Set(gs.filter((g) => /whatsapp_business_(management|messaging)/.test(g.scope)).flatMap((g) => g.target_ids ?? []))].map(String);
+          const ja = await bancoJson(`/rest/v1/whatsapp_numeros?select=phone_number_id`);
+          const jaIds = new Set((Array.isArray(ja) ? ja : []).map((x: any) => String(x.phone_number_id)));
+          for (const id of ids.reverse()) {
+            const ns = await meta(`/${id}/phone_numbers?fields=id`, undefined, token);
+            const lst: any[] = ns.ok ? ns.j?.data ?? [] : [];
+            if (lst.some((n) => !jaIds.has(String(n.id)))) { wabaId = id; if (!dados.phone_number_id) dados.phone_number_id = (lst.find((n) => !jaIds.has(String(n.id))) || {}).id; break; }
+          }
+          if (!wabaId) return resposta(req, { ok: false, erro: "não encontrei a conta do WhatsApp liberada no cadastro" }, 502);
+        }
 
         let phoneId = String(dados.phone_number_id ?? "").trim();
         const nums = await meta(`/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,platform_type,status`, undefined, token);
