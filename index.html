@@ -1964,7 +1964,7 @@ body{letter-spacing:-.1px;}
         <div class="wa-lista">
           <div class="cl-topo">
             <div class="cl-linha">
-              <select class="cl-sel" id="wa-filtro-numero" title="Conexão de WhatsApp" onchange="_wa.numeroFiltro=this.value;waRenderLista()"><option value="">Todas</option></select>
+              <select class="cl-sel" id="wa-filtro-numero" style="display:none" onchange="_wa.numeroFiltro=this.value;waRenderLista()"><option value="">Todas</option></select><button class="cl-sel" id="wa-btn-conexoes" title="Quais números aparecem na sua lista" onclick="waEscolherConexoes(event)" style="text-align:left;cursor:pointer">📱 Todas as conexões</button>
               <button class="cl-ib" title="Menu de gerenciamento" onclick="waMenuGerencia(event)"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
               <button class="cl-ib" id="wa-btn-numeros" title="Configurações (números de WhatsApp)" onclick="waAbrirNumeros()"><svg class="cl-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
             </div>
@@ -15630,7 +15630,7 @@ async function waCarregarRapidas(){
   try{_wa.rapidas=(await _waRest('respostas_rapidas?select=id,atalho,texto,partes&order=atalho'))||[];}catch(e){_wa.rapidas=[];}
 }
 function waAtualizarBadge(){
-  const total=_wa.conversas.reduce((s,c)=>s+(c.nao_lidas>0?1:0),0);
+  const total=_wa.conversas.reduce((s,c)=>s+(c.nao_lidas>0&&_waConexaoVisivel(c)&&!c.oculta_em?1:0),0);
   const el=document.getElementById('wa-nav-badge');
   if(el){el.textContent=total>99?'99+':String(total);el.style.display=total?'inline-block':'none';}
 }
@@ -18308,11 +18308,48 @@ function _clRenderFiltrosAtivos(){
   el.innerHTML=chips.length?chips.join('')+'<button class="cl-link" style="font-size:11px" onclick="waLimparFiltros();_wa.numeroFiltro=\'\';waRenderLista()">Limpar</button>':'';
   const b=document.getElementById('cl-btn-filtro');if(b)b.classList.toggle('ativo',chips.length>0);
 }
+// (13/11/2026, pedido do Lucas) cada atendente escolhe quais números (conexões) aparecem na lista dela.
+// Fica salvo no navegador de cada pessoa. Nada marcado = todas as conexões.
+function _waConexoesKey(){return 'lume_wa_conexoes_'+String(usuarioAtualEmail()||'').toLowerCase();}
+function _waConexoesSel(){
+  if(!_wa.conexoesSel){try{_wa.conexoesSel=JSON.parse(localStorage.getItem(_waConexoesKey())||'[]')||[];}catch(e){_wa.conexoesSel=[];}}
+  return _wa.conexoesSel;
+}
+function _waConexaoVisivel(c){
+  const sel=_waConexoesSel();if(!sel.length)return true;
+  if(c.canal==='instagram')return sel.includes('_ig')||sel.includes(c.numero_clinica_id);
+  return sel.includes(c.numero_clinica_id);
+}
+function _waConexoesOpcoes(){
+  return (_wa.numeros||[]).map(n=>[n.phone_number_id,'📱 '+(n.apelido||n.numero_exibicao)+(n.numero_exibicao&&n.apelido?' · '+String(n.numero_exibicao).slice(-9):'')])
+    .concat((_wa.igContas||[]).length?[['_ig','📸 Instagram (todos os perfis)']]:[]);
+}
+function _waRotuloConexoes(){
+  const b=document.getElementById('wa-btn-conexoes');if(!b)return;
+  const sel=_waConexoesSel(),ops=_waConexoesOpcoes();
+  const val=sel.filter(v=>ops.some(o=>o[0]===v));
+  b.textContent=!val.length?'📱 Todas as conexões':val.length===1?(ops.find(o=>o[0]===val[0])[1]):'📱 '+val.length+' conexões';
+}
+function waEscolherConexoes(ev){
+  ev.stopPropagation();_clFecharPop();
+  const sel=_waConexoesSel(),ops=_waConexoesOpcoes();
+  const m=document.createElement('div');m.className='cl-menu';m.style.minWidth='240px';
+  m.innerHTML='<div style="font-size:11px;color:#8C98B1;padding:6px 10px">Quais números aparecem na sua lista</div>'+
+    ops.map(o=>'<label onclick="event.stopPropagation()" style="display:flex;gap:8px;align-items:center;padding:6px 10px;cursor:pointer;font-size:13px"><input type="checkbox" '+(sel.includes(o[0])?'checked':'')+' onchange="waMarcarConexao(\''+String(o[0]).replace(/'/g,"\\'")+'\',this.checked)"><span>'+_waEsc(o[1])+'</span></label>').join('')+
+    '<div class="sep"></div><button onclick="waMarcarConexao(null,false);_clFecharPop()">Mostrar todas</button>';
+  _clPosicionar(m,ev.currentTarget,false);
+}
+function waMarcarConexao(id,on){
+  let sel=_waConexoesSel().slice();
+  if(id===null)sel=[];else if(on){if(!sel.includes(id))sel.push(id);}else sel=sel.filter(x=>x!==id);
+  _wa.conexoesSel=sel;try{localStorage.setItem(_waConexoesKey(),JSON.stringify(sel));}catch(e){}
+  _waRotuloConexoes();waRenderLista();waAtualizarBadge();
+}
 function waPreencherFiltros(){
   const sel=document.getElementById('wa-filtro-numero');
   if(sel)sel.innerHTML='<option value="">Todas</option>'+(_wa.numeros||[]).map(n=>'<option value="'+_waEsc(n.phone_number_id)+'"'+(_wa.numeroFiltro===n.phone_number_id?' selected':'')+'>'+_waEsc(n.apelido||n.numero_exibicao)+'</option>').join('')+
     ((_wa.igContas||[]).length?'<option value="_ig"'+(_wa.numeroFiltro==='_ig'?' selected':'')+'>Instagram (todos)</option>'+(_wa.igContas||[]).map(n=>'<option value="'+_waEsc(n.ig_id)+'"'+(_wa.numeroFiltro===n.ig_id?' selected':'')+'>Instagram '+_waEsc(n.apelido||'@'+n.usuario)+'</option>').join(''):'');
-  _clRenderFiltrosAtivos();
+  _clRenderFiltrosAtivos();_waRotuloConexoes();
 }
 function waMenuGerencia(ev){
   ev.stopPropagation();_clFecharPop();
@@ -18339,6 +18376,7 @@ function waRenderLista(){
     if(c.canal==='instagram'&&!c.ultima_recebida_em)return false; // abordagem sem resposta não entra
     if(c.oculta_em&&!busca)return false; // (10/11/2026) apagada da lista: só aparece buscando pelo nome/número
     if(_wa.numeroFiltro&&(_wa.numeroFiltro==='_ig'?c.canal!=='instagram':c.numero_clinica_id!==_wa.numeroFiltro))return false;
+    if(!_waConexaoVisivel(c))return false;
     if(busca){
       const nome=_waNome(c).toLowerCase();
       // (08/11/2026) número com 55, com ou sem o 9: compara pelos últimos 8 dígitos
