@@ -255,8 +255,12 @@ export async function handler(req: Request): Promise<Response> {
   let corpo: unknown;
   try { corpo = JSON.parse(corpoTexto); } catch { return new Response("json inválido", { status: 400 }); }
 
+  // (14/11/2026) histórico importado do celular (coexistência): chega em lotes enormes. Não guarda o
+  // aviso bruto nem baixa/transcreve as mídias antigas (isso travou o banco ao conectar a recepção).
+  const ehHistorico = /"field"\s*:\s*"history"/.test(corpoTexto);
+
   // guarda o aviso bruto (ajuda a investigar qualquer problema)
-  await banco("/rest/v1/whatsapp_eventos_brutos", {
+  if (!ehHistorico) await banco("/rest/v1/whatsapp_eventos_brutos", {
     method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ corpo }),
   }).catch((e) => console.error("[whatsapp-webhook] bruto", String(e)));
 
@@ -283,7 +287,7 @@ export async function handler(req: Request): Promise<Response> {
   }
   const resultado = await r.json();
   const midias: Midia[] = Array.isArray(resultado?.midias) ? resultado.midias : [];
-  if (midias.length) emSegundoPlano(Promise.allSettled(midias.map(baixarMidia)));
+  if (midias.length && !ehHistorico) emSegundoPlano(Promise.allSettled(midias.map(baixarMidia)));
   // Agente de IA: se a mensagem entrou na fila dele, chama na hora (o agendador é só reserva)
   if (corpoTexto.includes('"messages"')) emSegundoPlano(chamarAgente());
 
