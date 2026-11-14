@@ -990,6 +990,9 @@ async function aleEstado(c: any, estado: string | null) {
   await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ale_estado: estado, ale_em: new Date().toISOString() }) });
 }
 async function aleLink(c: any, cfg: any, op: any): Promise<string> {
+  const num = String(cfg.whatsapp_comercial ?? "").replace(/\D/g, "");
+  // (14/11/2026) Lucas: sem origem; a SDR descobre de onde veio. Código invisível só se op.rastrear = true
+  if (op.rastrear !== true) return `https://wa.me/${num}?text=${encodeURIComponent(String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 💙"))}`;
   let cod = "";
   for (let i = 0; i < 6; i++) cod += B32[Math.floor(Math.random() * 32)];
   await banco(`/rest/v1/cliques_links`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({

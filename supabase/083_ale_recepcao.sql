@@ -3,8 +3,7 @@
 --   Quem manda mensagem para a recepção e não falou com ninguém da equipe nas últimas
 --   12 horas recebe o menu da Ale (texto aprovado pelo Lucas em 14/11). A resposta
 --   (1 a 6) põe a tag do assunto e manda para a fila da recepção; a opção 5 (agendar
---   avaliação) manda um link para o WhatsApp do comercial com o código invisível,
---   e o lead aparece com origem "Recepção".
+--   avaliação) manda o link do WhatsApp da Clínica API (sem origem: a SDR descobre de onde veio).
 --   A Ale NÃO usa robo_ligado (isso acordaria a IA do comercial): o estado fica em
 --   conversas.ale_estado. Quem envia é o motor (whatsapp-automacoes), a cada minuto.
 --   Entra LIGADA em MODO TESTE, só com o celular do Lucas.
@@ -99,13 +98,13 @@ select 'ale_recepcao', jsonb_build_object(
   'menu', E'Oii, tudo bem? Que bom ter você por aqui 💙\n\nSou a Ale, assistente virtual da Bulhões Odontologia. Me conta, como posso te ajudar hoje?\n\n1. Remarcar ou cancelar uma consulta\n2. Dúvida sobre um tratamento que já estou fazendo\n3. Estou com dor ou alguma urgência\n\n4. Pagamentos e financeiro\n\n5. Agendar avaliação\n6. Outro assunto\n\nÉ só responder com o número, que vamos te auxiliar 😊',
   'nao_entendi', 'Não consegui entender 😊 Pode me responder só com o número da opção, de 1 a 6?',
   'opcoes', jsonb_build_object(
-    '1', jsonb_build_object('tag', 'remarcar ou cancelar', 'resposta', 'Claro! Já avisei a nossa equipe da recepção, e logo alguém te chama por aqui para te ajudar com a sua consulta 💙'),
-    '2', jsonb_build_object('tag', 'dúvida de tratamento', 'resposta', 'Certo! Pode me contar sua dúvida por aqui, que a nossa equipe já te responde 💙'),
-    '3', jsonb_build_object('tag', 'urgência', 'resposta', 'Sinto muito que você esteja passando por isso. Já avisei a nossa equipe para te atender com prioridade 💙' || E'\n\n' || 'Se for uma dor muito forte, sangramento que não para, inchaço que aumenta, febre ou dificuldade para respirar ou engolir, procure um pronto atendimento agora, sem esperar a gente, tá bom?'),
-    '4', jsonb_build_object('tag', 'financeiro', 'resposta', 'Certo! Já passei para a nossa equipe, e logo alguém te chama por aqui para te ajudar 💙'),
-    '5', jsonb_build_object('tag', 'agendar avaliação', 'link', true, 'mensagem_link', 'Olá! Vim pela recepção e gostaria de agendar uma avaliação 💙',
+    '1', jsonb_build_object('tag', 'remarcar ou cancelar', 'resposta', 'Perfeito! Em breve nossa equipe vai te atender por aqui 💙'),
+    '2', jsonb_build_object('tag', 'dúvida de tratamento', 'resposta', 'Perfeito! Em breve nossa equipe vai te atender por aqui 💙'),
+    '3', jsonb_build_object('tag', 'urgência', 'resposta', 'Perfeito! Em breve nossa equipe vai te atender por aqui 💙'),
+    '4', jsonb_build_object('tag', 'financeiro', 'resposta', 'Perfeito! Em breve nossa equipe vai te atender por aqui 💙'),
+    '5', jsonb_build_object('tag', 'agendar avaliação', 'link', true, 'mensagem_link', 'Olá! Gostaria de agendar uma avaliação 💙',
           'resposta', 'Que alegria! 💙 Para agendar sua avaliação, é só tocar no link abaixo e enviar a mensagem que vai aparecer. Nossa equipe de agendamento te atende por lá:' || E'\n\n' || '{link}'),
-    '6', jsonb_build_object('tag', 'outro assunto', 'resposta', 'Certo! Pode me contar o que você precisa, que a nossa equipe já te responde por aqui 💙')
+    '6', jsonb_build_object('tag', 'outro assunto', 'resposta', 'Perfeito! Em breve nossa equipe vai te atender por aqui 💙')
   )
 )
 where not exists (select 1 from public.configuracoes where chave = 'ale_recepcao');
