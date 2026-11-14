@@ -927,7 +927,7 @@ export async function responder(conversaId: string, versao: number, pausa = espe
     const res = await gerarResposta(a, imagens, montarSistema(a, imagens, ctx), hist, executar, a.agendamento?.ligado ? agendaReal(a, c, ctx, conversaId) : undefined);
     // passou para a equipe sem dizer nada: avisa o paciente (nunca deixar sem resposta)
     if (res.transferiu && !encerrou && !enviados.length && !res.parou) {
-      const aviso = "Vou passar sua mensagem para a nossa equipe te orientar certinho, tá bom? 💙";
+      const aviso = "Vou passar sua mensagem para a nossa equipe te orientar certinho, tá bom? 🤎";
       const r = await enviarMetaTentando(c, { type: "text", text: { body: aviso, preview_url: false } });
       await registrarEnviada(c, r.id, "text", aviso, autor, r.erro, r.j);
       enviados.push(aviso);

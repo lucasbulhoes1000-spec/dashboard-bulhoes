@@ -284,7 +284,7 @@ export async function textoDaIA(c: any, nome?: string | null, esperaMin = 0, ins
     limite = 90;
     estagio = "ESTE É SÓ UM TOQUE RÁPIDO. A pessoa pode só não ter visto a mensagem. Escreva UMA frase curta, de no máximo 90 caracteres, que só chame a atenção dela de volta para a conversa. " +
       "Não faça pergunta sobre o sorriso, não fale de avaliação, cortesia, valores, Dra., agenda ou tratamento, não explique nada e não repita o que já foi dito. " +
-      "Exemplos do tamanho e do jeito certos: \"Oi, Fabiana! Conseguiu ver minha mensagem? 😊\" ou \"Oiii, ainda tá por aí? 💙\" (varie, não copie).";
+      "Exemplos do tamanho e do jeito certos: \"Oi, Fabiana! Conseguiu ver minha mensagem? 😊\" ou \"Oiii, ainda tá por aí? 🤎\" (varie, não copie).";
   } else if (esperaMin > 0 && esperaMin <= 180) {
     limite = 160;
     estagio = "É o segundo contato do dia. Escreva no máximo 2 frases curtas (até 160 caracteres) que retomem o ponto exato em que a conversa parou, com uma pergunta simples e fácil de responder. Não traga assunto novo.";
@@ -992,13 +992,13 @@ async function aleEstado(c: any, estado: string | null) {
 async function aleLink(c: any, cfg: any, op: any): Promise<string> {
   const num = String(cfg.whatsapp_comercial ?? "").replace(/\D/g, "");
   // (14/11/2026) Lucas: sem origem; a SDR descobre de onde veio. Código invisível só se op.rastrear = true
-  if (op.rastrear !== true) return `https://wa.me/${num}?text=${encodeURIComponent(String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 💙"))}`;
+  if (op.rastrear !== true) return `https://wa.me/${num}?text=${encodeURIComponent(String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 🤎"))}`;
   let cod = "";
   for (let i = 0; i < 6; i++) cod += B32[Math.floor(Math.random() * 32)];
   await banco(`/rest/v1/cliques_links`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
     click_id: "RECEPCAO-" + cod, codigo: cod, perfil: "recepcao", destino: "whatsapp_avaliacao", utm_source: "recepcao", utm_medium: "ale", pagina: "ale_recepcao",
   }) });
-  const txt = String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 💙") + codigoInvisivel(cod);
+  const txt = String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 🤎") + codigoInvisivel(cod);
   return `https://wa.me/${String(cfg.whatsapp_comercial ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(txt)}`;
 }
 export async function rodarAle(inicio: number, cont: Record<string, number>) {

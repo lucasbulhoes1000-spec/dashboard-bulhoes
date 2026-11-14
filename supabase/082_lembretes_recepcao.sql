@@ -119,18 +119,18 @@ select 'lembretes_recepcao', jsonb_build_object(
   'categorias', '[]'::jsonb,                 -- vazio = todas as categorias...
   'categorias_excluir', '["avaliação"]'::jsonb, -- ...menos avaliação
   'confirmar_no_clinicorp', true,
-  'resposta_confirmou', 'Perfeito, sua presença está confirmada. Até breve! 💙',
+  'resposta_confirmou', 'Perfeito, sua presença está confirmada. Até breve! 🤎',
   'resposta_cancelar', 'Tudo bem! Vou pedir para a nossa equipe te ajudar a encontrar um novo horário.',
   'tag_confirmou', 'confirmou lembrete',
   'tag_cancelar', 'cancelar consulta',
   'vespera', jsonb_build_object('hora', '09:00', 'janela_min', 240,
      'modelo', jsonb_build_object('nome', 'lembrete_vespera_recepcao', 'idioma', 'pt_BR',
         'variaveis', '["{primeiro_nome}", "{quando}, {data}", "{hora}"]'::jsonb,
-        'texto_preview', 'Oi, {primeiro_nome}! Passando para lembrar da sua consulta {quando}, {data}, às {hora}, aqui na Bulhões Odontologia 💙 Podemos confirmar sua presença?')),
+        'texto_preview', 'Oi, {primeiro_nome}! Passando para lembrar da sua consulta {quando}, {data}, às {hora}, aqui na Bulhões Odontologia 🤎 Podemos confirmar sua presença?')),
   'vespera2', jsonb_build_object('hora', '15:00', 'janela_min', 180, 'no_sabado', true,
      'modelo', jsonb_build_object('nome', 'lembrete_vespera2_recepcao', 'idioma', 'pt_BR',
         'variaveis', '["{primeiro_nome}", "{quando}", "{hora}"]'::jsonb,
-        'texto_preview', 'Oi, {primeiro_nome}! Estamos organizando a agenda de {quando} e seu horário das {hora} está reservado para você 💙 Consegue confirmar para a gente?'))
+        'texto_preview', 'Oi, {primeiro_nome}! Estamos organizando a agenda de {quando} e seu horário das {hora} está reservado para você 🤎 Consegue confirmar para a gente?'))
 )
 where not exists (select 1 from public.configuracoes where chave = 'lembretes_recepcao');
 

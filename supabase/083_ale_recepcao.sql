@@ -95,15 +95,15 @@ select 'ale_recepcao', jsonb_build_object(
   'numero_clinica_id', (select phone_number_id from public.whatsapp_numeros where apelido = 'Recepção' and ativo limit 1),
   'horas_silencio', 12,
   'whatsapp_comercial', '5513996300176',
-  'menu', E'Oii, tudo bem? Que bom ter você por aqui 💙\n\nSou a Ale, assistente virtual da Bulhões Odontologia. Me conta, como posso te ajudar hoje?\n\n1. Remarcar ou cancelar uma consulta\n2. Dúvida sobre um tratamento que já estou fazendo\n3. Estou com dor ou alguma urgência\n4. Pagamentos e financeiro\n5. Agendar avaliação\n6. Outro assunto\n\nÉ só responder com o número, que vamos te auxiliar 😊',
+  'menu', E'Oii, tudo bem? Que bom ter você por aqui 🤎\n\nSou a Ale, assistente virtual da Bulhões Odontologia. Me conta, como posso te ajudar hoje?\n\n1. Remarcar ou cancelar uma consulta\n2. Dúvida sobre um tratamento que já estou fazendo\n3. Estou com dor ou alguma urgência\n4. Pagamentos e financeiro\n5. Agendar avaliação\n6. Outro assunto\n\nÉ só responder com o número, que vamos te auxiliar 😊',
   'nao_entendi', 'Não consegui entender 😊 Pode me responder só com o número da opção, de 1 a 6?',
   'opcoes', jsonb_build_object(
     '1', jsonb_build_object('tag', 'remarcar ou cancelar', 'resposta', 'Perfeito! Em breve vamos te auxiliar 😊'),
     '2', jsonb_build_object('tag', 'dúvida de tratamento', 'resposta', 'Perfeito! Em breve vamos te auxiliar 😊'),
     '3', jsonb_build_object('tag', 'urgência', 'resposta', 'Perfeito! Em breve vamos te auxiliar 😊'),
     '4', jsonb_build_object('tag', 'financeiro', 'resposta', 'Perfeito! Em breve vamos te auxiliar 😊'),
-    '5', jsonb_build_object('tag', 'agendar avaliação', 'link', true, 'mensagem_link', 'Olá! Gostaria de agendar uma avaliação 💙',
-          'resposta', 'Que alegria! 💙 Para agendar sua avaliação, é só tocar no link abaixo e enviar a mensagem que vai aparecer. Nossa equipe de agendamento te atende por lá:' || E'\n\n' || '{link}'),
+    '5', jsonb_build_object('tag', 'agendar avaliação', 'link', true, 'mensagem_link', 'Olá! Gostaria de agendar uma avaliação 🤎',
+          'resposta', 'Que alegria! 🤎 Para agendar sua avaliação, é só tocar no link abaixo e enviar a mensagem que vai aparecer. Nossa equipe de agendamento te atende por lá:' || E'\n\n' || '{link}'),
     '6', jsonb_build_object('tag', 'outro assunto', 'resposta', 'Perfeito! Em breve vamos te auxiliar 😊')
   )
 )

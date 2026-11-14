@@ -9830,7 +9830,7 @@ const _PAC_TERMOS={
 // (05/11/2026) base e recompra: mensagem pronta no "Chamar" de cada aba (Lívia)
 function _pacMensagem(cat,r,meses){
   const n=(typeof _primeiroNome==='function'?_primeiroNome(r.nome):String(r.nome||'').split(' ')[0])||'';
-  const oi='Oii, '+n+'! Tudo bem? Aqui é a Lívia, da Bulhões 💙 ';
+  const oi='Oii, '+n+'! Tudo bem? Aqui é a Lívia, da Bulhões 🤎 ';
   const tempo=meses?('já faz '+meses+' meses'):'já faz um tempinho';
   if(r._precisaContato){
     const o={lentesResina:'a sua manutenção',renovacao:'a avaliação das suas lentes',inferiores:'a avaliação das lentes de baixo',harmonizacao:'o seu retoque da harmonização',clareamento:'o retoque do clareamento',clareamentoInferior:'o retoque do clareamento',lentesPorcelana:'a revisão das suas lentes'}[cat]||'o seu horário';
@@ -13397,15 +13397,15 @@ async function enviarNpsFluxo(idx){
   }
 }
 const IND_TEXTOS={
-  nps:(n,link)=>`Oii, ${n}! Aqui é a Lívia, da Bulhões 💙 Foi muito especial acompanhar você até o sorriso novo. Posso te pedir um favor rapidinho? Queremos saber como foi a sua experiência com a gente, leva menos de 1 minuto: ${link}`,
+  nps:(n,link)=>`Oii, ${n}! Aqui é a Lívia, da Bulhões 🤎 Foi muito especial acompanhar você até o sorriso novo. Posso te pedir um favor rapidinho? Queremos saber como foi a sua experiência com a gente, leva menos de 1 minuto: ${link}`,
   // (04/11/2026) pedido de 5 indicações (decisão do Lucas): no fechamento, na entrega das lentes e no NPS 9 ou 10
-  promotor:n=>`${n}, que alegria ler isso! 💙 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
-  pedir5:n=>`Oii, ${n}! 💙 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
-  avisarAmigos:n=>`Muito obrigada, ${n}! 💙 Pra ninguém estranhar o nosso contato, você pode mandar a mensagem abaixo pra cada um? Amanhã a gente chama.\n\nOi! Lembrei de você 💙 Passei seu contato para a equipe da Bulhões Odontologia, aqui em Santos. Eles vão te chamar no WhatsApp para contar como funciona, e é sem compromisso nenhum!`,
-  chamarIndicado:(n,ind,trat)=>`Oii, ${n}! Aqui é da equipe da Bulhões Odontologia 💙 ${ind} ${trat?'fez '+trat+' aqui com a gente':'é paciente aqui da clínica'} e passou seu contato com muito carinho, achou que você ia gostar de conhecer a clínica também. Você já pensou em mudar alguma coisa no seu sorriso?`,
-  neutro:n=>`Obrigada pela sinceridade, ${n} 💙 A gente quer que a sua experiência seja nota 10. O que faltou pra chegar lá? Pode falar à vontade, isso chega direto na Dra.`,
+  promotor:n=>`${n}, que alegria ler isso! 🤎 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
+  pedir5:n=>`Oii, ${n}! 🤎 Posso te pedir uma ajuda? Pensa em 5 pessoas que você gosta e que você acha que iam amar cuidar do sorriso também. Me manda o nome e o WhatsApp delas aqui? A gente vai cuidar de cada uma com o mesmo carinho que teve com você.`,
+  avisarAmigos:n=>`Muito obrigada, ${n}! 🤎 Pra ninguém estranhar o nosso contato, você pode mandar a mensagem abaixo pra cada um? Amanhã a gente chama.\n\nOi! Lembrei de você 🤎 Passei seu contato para a equipe da Bulhões Odontologia, aqui em Santos. Eles vão te chamar no WhatsApp para contar como funciona, e é sem compromisso nenhum!`,
+  chamarIndicado:(n,ind,trat)=>`Oii, ${n}! Aqui é da equipe da Bulhões Odontologia 🤎 ${ind} ${trat?'fez '+trat+' aqui com a gente':'é paciente aqui da clínica'} e passou seu contato com muito carinho, achou que você ia gostar de conhecer a clínica também. Você já pensou em mudar alguma coisa no seu sorriso?`,
+  neutro:n=>`Obrigada pela sinceridade, ${n} 🤎 A gente quer que a sua experiência seja nota 10. O que faltou pra chegar lá? Pode falar à vontade, isso chega direto na Dra.`,
   detrator:n=>`${n}, obrigada por contar com tanta sinceridade. Sinto muito que a experiência não foi como você esperava. A Dra. quer entender com calma o que aconteceu. Ela pode te ligar? Qual horário fica melhor pra você?`,
-  agradecer:n=>`Oii, ${n}! Passando pra te agradecer de coração: uma pessoa querida chegou até a gente por indicação sua 💙 Obrigada pela confiança de falar da Bulhões pra alguém tão próximo. Isso tem um valor enorme pra nós.`
+  agradecer:n=>`Oii, ${n}! Passando pra te agradecer de coração: uma pessoa querida chegou até a gente por indicação sua 🤎 Obrigada pela confiança de falar da Bulhões pra alguém tão próximo. Isso tem um valor enorme pra nós.`
 };
 function indWa(tel,texto){const l=linkWhatsapp(tel);return l?l+'?text='+encodeURIComponent(texto):'#';}
 function npsDadosTel(tel, criar){
@@ -16538,7 +16538,7 @@ async function waAgdSalvar(forcar){
     try{if(c){const L=_waLead(c);if(L&&L.ph&&String(L.etapa||'').toLowerCase()!=='agendou')_definirEtapaDireto(L.ph,'Agendou');}}catch(e){}
     // confirmação pronta na caixa de mensagem (a Raffa revisa e envia)
     const dt=new Date(_agd.data+'T12:00:00').toLocaleDateString('pt-BR');
-    const conf=_agd.nome.trim()+', sua avaliação está confirmada com exclusividade aqui na Bulhões Odontologia 💙\n\n📆 Data: '+dt+'\n⏰ Horário: '+_agd.ini+'\n📍 Av. Senador Feijó, 686, sala 923, Vila Mathias, Santos (Edifício The Blue Officemall)\n\nA consulta dura de 50 minutos a 1 hora. Um dia antes te mando uma mensagem para confirmar, tá bom?';
+    const conf=_agd.nome.trim()+', sua avaliação está confirmada com exclusividade aqui na Bulhões Odontologia 🤎\n\n📆 Data: '+dt+'\n⏰ Horário: '+_agd.ini+'\n📍 Av. Senador Feijó, 686, sala 923, Vila Mathias, Santos (Edifício The Blue Officemall)\n\nA consulta dura de 50 minutos a 1 hora. Um dia antes te mando uma mensagem para confirmar, tá bom?';
     waFecharModal();
     const t=document.getElementById('wa-texto');if(t&&!t.disabled){t.value=conf;_wa.rascunhos=_wa.rascunhos||{};if(t.dataset.conv)_wa.rascunhos[t.dataset.conv]=conf;if(typeof waAjustarTexto==='function')waAjustarTexto(t);t.focus();}
     showToast('success','Agendado no Clinicorp',dt+' às '+_agd.ini+(j.cadastro==='novo'?' · cadastro novo':' · cadastro já existia'));
@@ -17637,7 +17637,7 @@ function sqVars(ev,i){
 function sqEmoji(ev,i){
   ev.stopPropagation();document.querySelectorAll('.sq-menu').forEach(m=>m.remove());
   const m=document.createElement('div');m.className='sq-menu sq-menu-dir sq-emojis';
-  m.innerHTML='😊 😍 🥰 😉 🙏 💙 💛 🤍 ✨ 😁 🤩 👏 👋 🦷 📅 📍 ✅ 🙌 💬 ❤️'.split(' ').map(e=>'<button onclick="_sqInserir('+i+',\''+e+'\')">'+e+'</button>').join('');
+  m.innerHTML='😊 😍 🥰 😉 🙏 🤎 💛 🤍 ✨ 😁 🤩 👏 👋 🦷 📅 📍 ✅ 🙌 💬 ❤️'.split(' ').map(e=>'<button onclick="_sqInserir('+i+',\''+e+'\')">'+e+'</button>').join('');
   ev.currentTarget.parentNode.appendChild(m);
   setTimeout(()=>document.addEventListener('click',function f(){m.remove();document.removeEventListener('click',f);}),0);
 }
@@ -18572,7 +18572,7 @@ function waRenderJanela(){
   if(a)a.disabled=!j.aberta;
   const mic=document.getElementById('wa-btn-mic');if(mic)mic.disabled=!j.aberta;
 }
-const _CL_EMOJIS='😀 😃 😄 😁 😊 🙂 😉 😍 🥰 😘 😅 😂 🤗 🤩 😌 🙏 👏 👍 👌 💪 ✨ 💙 💛 🤍 ❤️ 🦷 😁 🗓️ 📍 ⏰ ✅ ☺️ 😇 🥹 😬 🤔 🙌 💫 🌟 💎'.split(' ');
+const _CL_EMOJIS='😀 😃 😄 😁 😊 🙂 😉 😍 🥰 😘 😅 😂 🤗 🤩 😌 🙏 👏 👍 👌 💪 ✨ 🤎 💛 🤍 ❤️ 🦷 😁 🗓️ 📍 ⏰ ✅ ☺️ 😇 🥹 😬 🤔 🙌 💫 🌟 💎'.split(' ');
 function waEmojis(ev){
   ev.stopPropagation();
   const ja=document.getElementById('cl-emojis');if(ja){ja.remove();return;}
@@ -18673,7 +18673,7 @@ function waReagirMenu(ev,id){
   const m=_waMsgPorId(id);if(!m)return;
   const pop=document.createElement('div');pop.className='wa-emoji-pop';
   const minha=((_wa._reac||{})[m.wa_message_id]||{}).enviada;
-  pop.innerHTML=['👍','❤️','😂','😮','😢','🙏','💙','🥰'].map(e=>'<button data-e="'+e+'" title="'+(minha===e?'Tirar reação':'Reagir')+'"'+(minha===e?' style="background:rgba(226,190,106,.3)"':'')+'>'+e+'</button>').join('');
+  pop.innerHTML=['👍','❤️','😂','😮','😢','🙏','🤎','🥰'].map(e=>'<button data-e="'+e+'" title="'+(minha===e?'Tirar reação':'Reagir')+'"'+(minha===e?' style="background:rgba(226,190,106,.3)"':'')+'>'+e+'</button>').join('');
   document.body.appendChild(pop);
   const r=ev.target.getBoundingClientRect();
   pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,r.left-pop.offsetWidth/2))+'px';
@@ -19599,10 +19599,10 @@ function fupBlocos(it,etapa){
   const benAte=ben.ate?new Date(ben.ate+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'[data]';
   const autoriz='Use só casos de pacientes que autorizaram por escrito (regra do CFO).';
   switch(etapa){
-    case '1. Agradecimento':return [{t:'Mensagem (1 hora depois da avaliação)',x:'Oii '+n+', tudo bem? Aqui é a Lívia, sou Gestora de Relacionamento da Bulhões Odontologia, e vou ser responsável por termos um relacionamento bem próximo aqui na clínica! 💙\n\nFoi um prazer atender você em nossa clínica. A Dra. Victória me contou que a avaliação foi super especial e que planejaram um sorriso lindo juntas!\n\nGostou da sua avaliação, '+n+'?'}];
+    case '1. Agradecimento':return [{t:'Mensagem (1 hora depois da avaliação)',x:'Oii '+n+', tudo bem? Aqui é a Lívia, sou Gestora de Relacionamento da Bulhões Odontologia, e vou ser responsável por termos um relacionamento bem próximo aqui na clínica! 🤎\n\nFoi um prazer atender você em nossa clínica. A Dra. Victória me contou que a avaliação foi super especial e que planejaram um sorriso lindo juntas!\n\nGostou da sua avaliação, '+n+'?'}];
     case '2. Antes e depois':return [{t:'Mensagem',x:'Oii, '+n+'! Tudo bem?\n\nEstava olhando alguns casos junto com a Dra. Victoria e achamos um caso muito parecido com o seu. Vou te enviar!'},{t:'Depois de anexar a mídia',nota:'Anexe o antes e depois + o depoimento do mesmo caso. '+autoriz,x:'É mais ou menos nessa tonalidade de cor e formato que você tá buscando com as lentes?'}];
-    case '3. Depoimento':return [{t:'Mensagem',x:'Oii, '+n+'! Tudo bem? 💙\n\nQuero te mostrar um caso com depoimento de um dos nossos pacientes que também sonhava em transformar o sorriso e hoje vive uma nova fase.'},{t:'Depois de anexar o depoimento',nota:autoriz,x:'Me conta, o que achou?'}];
-    case '4. Mais um depoimento':return [{t:'Mensagem',nota:(fn.queria?'':'Falta a anotação da avaliação: preencha "O que a paciente mais queria" acima. ')+'Anexe um depoimento de alguém com dúvida parecida. '+autoriz,x:'Oii, '+n+'! Separei mais um relato pra você. Essa paciente chegou com uma dúvida bem parecida com a sua: '+duvida+'. Vale assistir até o final 💙'}];
+    case '3. Depoimento':return [{t:'Mensagem',x:'Oii, '+n+'! Tudo bem? 🤎\n\nQuero te mostrar um caso com depoimento de um dos nossos pacientes que também sonhava em transformar o sorriso e hoje vive uma nova fase.'},{t:'Depois de anexar o depoimento',nota:autoriz,x:'Me conta, o que achou?'}];
+    case '4. Mais um depoimento':return [{t:'Mensagem',nota:(fn.queria?'':'Falta a anotação da avaliação: preencha "O que a paciente mais queria" acima. ')+'Anexe um depoimento de alguém com dúvida parecida. '+autoriz,x:'Oii, '+n+'! Separei mais um relato pra você. Essa paciente chegou com uma dúvida bem parecida com a sua: '+duvida+'. Vale assistir até o final 🤎'}];
     case '5. Mensagens apagadas':return [
       {t:'1ª (mande e apague em seguida)',nota:'As três precisam estar boas mesmo se forem lidas: a notificação pode mostrar o texto antes de apagar.',x:'Oi, '+n+'! Tava aqui conversando com a Dra. Victoria sobre o seu planejamento'},
       {t:'2ª (mande e apague)',x:'Ela comentou uma coisa sobre o seu caso que eu acho que você vai gostar de saber'},
@@ -19610,7 +19610,7 @@ function fupBlocos(it,etapa){
       {t:'Se perguntar o que era',x:'Oii! Era um benefício que a Dra. liberou para quem fez avaliação este mês. Como você não me respondeu mais, acabei apagando 😊\n\nQuer saber qual é?'},
       {t:'Se disser que sim',nota:ben.texto?'':'Benefício do mês ainda não definido: preencha abaixo.',x:'É '+benTxt+'! Só te aviso que ele vale até '+benAte+', porque é para a agenda deste mês.\n\nQuer que eu reserve para você?'}];
     case '6. Conseguiu ver?':return [{t:'Mensagem',x:'Oii, conseguiu ver a minha mensagem acima? 😊'}];
-    case '7. Despedida':return [{t:'Mensagem',nota:'Depois desta, o card vai para Cadência mensal.',x:'Oii, '+n+', tudo bem? Como não tivemos mais retorno, vou encerrar meu acompanhamento por aqui, mas deixo o convite aberto. Quando estiver pronto, estaremos aqui pra te receber com o mesmo carinho e atenção! 💙'}];
+    case '7. Despedida':return [{t:'Mensagem',nota:'Depois desta, o card vai para Cadência mensal.',x:'Oii, '+n+', tudo bem? Como não tivemos mais retorno, vou encerrar meu acompanhamento por aqui, mas deixo o convite aberto. Quando estiver pronto, estaremos aqui pra te receber com o mesmo carinho e atenção! 🤎'}];
   }
   return [];
 }
