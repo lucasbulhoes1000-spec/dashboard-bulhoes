@@ -472,14 +472,23 @@ export async function handler(req: Request): Promise<Response> {
         let wabaId = String(dados.waba_id ?? "").trim();
         // (13/11/2026) cadastro na mesma aba (sem janela do Facebook): vem o redirect_uri e não vem a conta
         const redirectUri = String(dados.redirect_uri ?? "").trim();
-        if (!code) return resposta(req, { ok: false, erro: "faltou o código da Meta" }, 400);
-        if (!WA_APP_SECRET) return resposta(req, { ok: false, erro: "falta o segredo WA_APP_SECRET" }, 500);
+        // (14/11/2026) número da PRÓPRIA empresa dona do app (Lari Bulhões): o cadastro da Meta conecta
+        // o app do celular (coexistência) mas recusa "compartilhar com o parceiro" porque é a mesma
+        // empresa. Nesse caso a Lume usa a chave do usuário do sistema da clínica (WA_TOKEN) e a conta
+        // informada em waba_id, sem código.
+        const propria = !code && dados.propria === true && !!wabaId;
+        if (!code && !propria) return resposta(req, { ok: false, erro: "faltou o código da Meta" }, 400);
+        if (!propria && !WA_APP_SECRET) return resposta(req, { ok: false, erro: "falta o segredo WA_APP_SECRET" }, 500);
+        if (propria && !WA_TOKEN) return resposta(req, { ok: false, erro: "falta o segredo WA_TOKEN" }, 500);
         const passos: Record<string, unknown> = {};
 
-        const tk = await fetch(`${GRAPH}/oauth/access_token?client_id=${WA_APP_ID}&client_secret=${encodeURIComponent(WA_APP_SECRET)}&code=${encodeURIComponent(code)}` + (redirectUri ? `&redirect_uri=${encodeURIComponent(redirectUri)}` : ""));
-        const tj = await tk.json().catch(() => ({}));
-        if (!tk.ok || !tj.access_token) return resposta(req, { ok: false, erro: "A Meta recusou o código: " + erroMeta(tj) }, 502);
-        const token = String(tj.access_token);
+        let token = WA_TOKEN;
+        if (!propria) {
+          const tk = await fetch(`${GRAPH}/oauth/access_token?client_id=${WA_APP_ID}&client_secret=${encodeURIComponent(WA_APP_SECRET)}&code=${encodeURIComponent(code)}` + (redirectUri ? `&redirect_uri=${encodeURIComponent(redirectUri)}` : ""));
+          const tj = await tk.json().catch(() => ({}));
+          if (!tk.ok || !tj.access_token) return resposta(req, { ok: false, erro: "A Meta recusou o código: " + erroMeta(tj) }, 502);
+          token = String(tj.access_token);
+        }
         if (!wabaId) {
           // descobre a conta pela permissão concedida: a que tiver número ainda não cadastrado no CRM
           const dbg = await (await fetch(`${GRAPH}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(WA_APP_ID + "|" + WA_APP_SECRET)}`)).json().catch(() => ({}));
