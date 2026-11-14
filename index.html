@@ -17226,7 +17226,7 @@ async function auCarregarExtras(){
   try{
     const [cfg,rod]=await Promise.all([
       _waRest('configuracoes?chave=in.(funil_proprio_desde,lembretes_consulta)&select=chave,valor'),
-      _waRest('lembretes_rodadas?select=*&order=dia.desc,tipo&limit=6').catch(()=>[])
+      _waRest('lembretes_rodadas?select=*&programa=eq.avaliacao&order=dia.desc,tipo&limit=6').catch(()=>[])
     ]);
     const v=k=>{const c=(cfg||[]).find(x=>x.chave===k);return c?c.valor:undefined;};
     _au.funilDesde=typeof v('funil_proprio_desde')==='string'?v('funil_proprio_desde'):null;
@@ -17396,7 +17396,7 @@ async function auLembSalvar(){
 }
 async function auLembVer(){
   let ls=[];
-  try{ls=await _waRest('lembretes_consulta?select=data,tipo,nome,hora,status,erro,criado_em,conversa_id,resposta,confirmado_no_clinicorp&order=criado_em.desc&limit=60');}
+  try{ls=await _waRest('lembretes_consulta?select=data,tipo,nome,hora,status,erro,criado_em,conversa_id,resposta,confirmado_no_clinicorp&programa=eq.avaliacao&order=criado_em.desc&limit=60');}
   catch(e){showToast('error','Não foi possível carregar',e.message);return;}
   const st={enviando:'Enviando',enviado:'Enviado',falhou:'Falhou'};
   waFecharModal();
