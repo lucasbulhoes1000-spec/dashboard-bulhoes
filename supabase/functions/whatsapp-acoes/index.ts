@@ -362,6 +362,7 @@ export async function handler(req: Request): Promise<Response> {
         return resposta(req, { ok: true });
       }
       case "criar_modelo": {
+        // (14/11/2026) dados.numero (phone_number_id) escolhe a conta: modelos da recepção ficam na conta dela
         // Só gestão: cria um modelo na Meta (vai para a análise dela).
         // { nome, categoria: "UTILITY"|"MARKETING", corpo, exemplos: [], rodape?, botoes?: ["Confirmar avaliação"] }
         if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão cria modelos" }, 403);
@@ -373,16 +374,18 @@ export async function handler(req: Request): Promise<Response> {
         if (dados.rodape) components.push({ type: "FOOTER", text: String(dados.rodape).slice(0, 60) });
         const botoes: string[] = Array.isArray(dados.botoes) ? dados.botoes.map(String).filter(Boolean) : [];
         if (botoes.length) components.push({ type: "BUTTONS", buttons: botoes.map((t) => ({ type: "QUICK_REPLY", text: t.slice(0, 25) })) });
-        const r = await meta(`/${WA_WABA_ID}/message_templates`, {
+        const cm = await contaDoNumero(dados.numero);
+        const r = await meta(`/${cm.waba}/message_templates`, {
           name: nome, language: String(dados.idioma ?? "pt_BR"), category: String(dados.categoria ?? "UTILITY").toUpperCase(), components,
-        });
+        }, cm.token);
         if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
         return resposta(req, { ok: true, id: r.j?.id, status: r.j?.status, categoria: r.j?.category });
       }
       case "status_modelos": {
         // situação de alguns modelos (aprovado, em análise, recusado e o motivo)
         const nomes: string[] = Array.isArray(dados.nomes) ? dados.nomes.map(String) : [];
-        const r = await meta(`/${WA_WABA_ID}/message_templates?limit=200&fields=name,status,category,rejected_reason,language`);
+        const cs = await contaDoNumero(dados.numero);
+        const r = await meta(`/${cs.waba}/message_templates?limit=200&fields=name,status,category,rejected_reason,language`, undefined, cs.token);
         if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
         const lista = (r.j?.data ?? []).filter((t: any) => !nomes.length || nomes.includes(t.name));
         return resposta(req, { ok: true, modelos: lista });
@@ -552,4 +555,14 @@ export async function handler(req: Request): Promise<Response> {
   }
 }
 
-if (!Deno.env.get("WA_TESTE")) Deno.serve(handler);
+if (!Deno.env.get("WA_TESTE")) // (14/11/2026) conta (WABA) e token de um número; sem número, a conta da Clínica API
+async function contaDoNumero(numero: unknown): Promise<{ waba: string; token: string }> {
+  const id = String(numero ?? "").trim();
+  if (id && id !== WA_PHONE_NUMBER_ID) {
+    const n = (await bancoJson(`/rest/v1/whatsapp_numeros?phone_number_id=eq.${encodeURIComponent(id)}&select=waba_id`).catch(() => []))?.[0];
+    if (n?.waba_id) return { waba: String(n.waba_id), token: await tokenDoNumero(id) };
+  }
+  return { waba: WA_WABA_ID, token: WA_TOKEN };
+}
+
+Deno.serve(handler);
