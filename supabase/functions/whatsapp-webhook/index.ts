@@ -259,6 +259,16 @@ export async function handler(req: Request): Promise<Response> {
   // aviso bruto nem baixa/transcreve as mídias antigas (isso travou o banco ao conectar a recepção).
   const ehHistorico = /"field"\s*:\s*"history"/.test(corpoTexto);
 
+  // Histórico: só guarda o lote (uma gravação leve) para processar depois, devagar. Processar na hora
+  // derrubava o banco e a Lume ficava sem carregar nada.
+  if (ehHistorico) {
+    const g = await banco("/rest/v1/whatsapp_historico_fila", {
+      method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ corpo }),
+    }).catch((e) => { console.error("[whatsapp-webhook] fila histórico", String(e)); return null; });
+    if (g && !g.ok) console.error("[whatsapp-webhook] fila histórico", g.status, (await g.text()).slice(0, 300));
+    return new Response("ok", { status: 200 });
+  }
+
   // guarda o aviso bruto (ajuda a investigar qualquer problema)
   if (!ehHistorico) await banco("/rest/v1/whatsapp_eventos_brutos", {
     method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ corpo }),
