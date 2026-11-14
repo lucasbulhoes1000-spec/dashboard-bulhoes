@@ -3429,7 +3429,7 @@ async function carregarInicio(){
     const J=_iniJanela(_iniPeriodo);
     const ev=(await _waRest('eventos_proprios?select=tipo,etapa,nome,origem,ocorrido_em,telefone,ad_id&tipo=in.(CUSTOMER_CREATED,CUSTOMER_STAGE_UPDATED,CUSTOMER_ACQUISITION_ORIGIN_UPDATED)&ocorrido_em=gte.'+encodeURIComponent(J.deAnt.toISOString())+'&order=ocorrido_em.desc&limit=5000'))||[];
     const orc=(await _waRest('orcamentos?select=fechamento_valor,valor,fechamento_data,tratamento,paciente_antigo,pacientes(nome,telefone)&status=eq.Aprovado&fechamento_data=gte.'+_iniDia(J.deAnt)))||[];
-    let naoLidas=0;try{const cv=(await _waRest('conversas?select=id&nao_lidas=gt.0&limit=1000'))||[];naoLidas=cv.length;}catch(e){}
+    let naoLidas=0;try{const cv=(await _waRest('conversas?select=id,numero_clinica_id&nao_lidas=gt.0&limit=1000'))||[];naoLidas=cv.filter(x=>!_waForaClinica(x.numero_clinica_id)).length;}catch(e){}
     // (03/11/2026) "Avaliações agendadas" pela data em que a avaliação foi MARCADA no Clinicorp
     // (CreateDate), e não pelo dia em que alguém mudou a etapa no CRM. Atualiza a cada 10 min.
     let atosAg=null;
@@ -16643,6 +16643,7 @@ function _waAoMudarConversa(p){
 }
 function _waAvisarNova(c){
   if(currentPage==='conversas'&&document.visibilityState==='visible')return;
+  if(!_waConexaoVisivel(c))return; // número que a pessoa não acompanha (ex.: Instituto) não avisa
   showToast('success','💬 '+_waNome(c),c.ultima_mensagem_texto||'Nova mensagem no WhatsApp');
 }
 function waLigarTempoReal(){
@@ -18304,8 +18305,12 @@ function _waConexoesSel(){
   if(!_wa.conexoesSel){try{_wa.conexoesSel=JSON.parse(localStorage.getItem(_waConexoesKey())||'[]')||[];}catch(e){_wa.conexoesSel=[];}}
   return _wa.conexoesSel;
 }
+// (14/11/2026, pedido do Lucas) números que NÃO são da clínica (Instituto): ficam fora da Central da
+// clínica por padrão e fora de qualquer contagem. Só aparecem se a pessoa marcar o número no filtro.
+const WA_NUMEROS_FORA_CLINICA=['431996333326052']; // Instituto Bulhões (13) 4042-7082
+function _waForaClinica(id){return WA_NUMEROS_FORA_CLINICA.includes(String(id||''));}
 function _waConexaoVisivel(c){
-  const sel=_waConexoesSel();if(!sel.length)return true;
+  const sel=_waConexoesSel();if(!sel.length)return !_waForaClinica(c.numero_clinica_id);
   if(c.canal==='instagram')return sel.includes('_ig')||sel.includes(c.numero_clinica_id);
   return sel.includes(c.numero_clinica_id);
 }
@@ -18317,7 +18322,7 @@ function _waRotuloConexoes(){
   const b=document.getElementById('wa-btn-conexoes');if(!b)return;
   const sel=_waConexoesSel(),ops=_waConexoesOpcoes();
   const val=sel.filter(v=>ops.some(o=>o[0]===v));
-  b.textContent=!val.length?'📱 Todas as conexões':val.length===1?(ops.find(o=>o[0]===val[0])[1]):'📱 '+val.length+' conexões';
+  b.textContent=!val.length?'📱 Todas da clínica':val.length===1?(ops.find(o=>o[0]===val[0])[1]):'📱 '+val.length+' conexões';
 }
 function waEscolherConexoes(ev){
   ev.stopPropagation();_clFecharPop();
