@@ -958,6 +958,97 @@ export async function rodarRespostasLembrete(cont: Record<string, number>) {
   }
 }
 
+// ---------- Ale: triagem da recepção (14/11/2026) ----------
+// Mensagem nova na recepção entra em ale_fila (gatilho t_ale_mensagem). Aqui: manda o menu
+// para quem não falou com a equipe nas últimas horas_silencio horas, entende a opção (1 a 6),
+// põe a tag e deixa na fila da recepção. A opção com "link" manda o WhatsApp do comercial
+// com o código invisível (cliques_links, perfil "recepcao").
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+export function codigoInvisivel(cod: string): string {
+  let bits = "";
+  for (const ch of cod) bits += B32.indexOf(ch).toString(2).padStart(5, "0");
+  return "⁠" + bits.replace(/0/g, "⁢").replace(/1/g, "⁣") + "⁠";
+}
+export function opcaoDaAle(texto: unknown): string | null {
+  const t = semAcento(texto).replace(/[^\w\s]/g, " ").trim();
+  const m = t.match(/^(?:opcao\s*)?([1-6])\b/);
+  if (m) return m[1];
+  if (/^(um|uma)$/.test(t)) return "1";
+  if (/^dois$/.test(t)) return "2";
+  if (/^tres$/.test(t)) return "3";
+  if (/^quatro$/.test(t)) return "4";
+  if (/^cinco$/.test(t)) return "5";
+  if (/^seis$/.test(t)) return "6";
+  return null;
+}
+async function aleEnviar(c: any, texto: string): Promise<boolean> {
+  const r = await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to: c.wa_id, type: "text", text: { body: texto, preview_url: true } }, await tokenDoNumero(c.numero_clinica_id));
+  await registrar(c, r.ok ? (r.j?.messages?.[0]?.id ?? null) : null, "text", texto, "Ale (assistente virtual)", r.ok ? "enviada" : "falhou", r.ok ? null : erroMeta(r.j), r.j);
+  return r.ok;
+}
+async function aleEstado(c: any, estado: string | null) {
+  await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ale_estado: estado, ale_em: new Date().toISOString() }) });
+}
+async function aleLink(c: any, cfg: any, op: any): Promise<string> {
+  let cod = "";
+  for (let i = 0; i < 6; i++) cod += B32[Math.floor(Math.random() * 32)];
+  await banco(`/rest/v1/cliques_links`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
+    click_id: "RECEPCAO-" + cod, codigo: cod, perfil: "recepcao", destino: "whatsapp_avaliacao", utm_source: "recepcao", utm_medium: "ale", pagina: "ale_recepcao",
+  }) });
+  const txt = String(op.mensagem_link ?? "Olá! Gostaria de agendar uma avaliação 💙") + codigoInvisivel(cod);
+  return `https://wa.me/${String(cfg.whatsapp_comercial ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(txt)}`;
+}
+export async function rodarAle(inicio: number, cont: Record<string, number>) {
+  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.ale_recepcao&select=valor`).catch(() => null))?.[0]?.valor;
+  if (!cfg?.ligado) return;
+  const lote: any[] = (await rpc("ale_pegar", {}).catch(() => [])) ?? [];
+  const telsTeste = new Set((Array.isArray(cfg.telefones_teste) ? cfg.telefones_teste : []).map((t: unknown) => String(t).replace(/\D/g, "").slice(-9)));
+  const silencioMs = (Number(cfg.horas_silencio) || 12) * 3_600_000;
+  const feito = (id: number, status: string, motivo: string | null) =>
+    banco(`/rest/v1/ale_fila?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status, motivo, feito_em: new Date().toISOString() }) });
+  for (const x of lote) {
+    if (Date.now() - inicio > TEMPO_MAX_MS) { await feito(x.id, "pendente", null); continue; }
+    try {
+      const c = (await bancoJson(`/rest/v1/conversas?id=eq.${x.conversa_id}&select=*`))?.[0];
+      if (!c) { await feito(x.id, "ignorado", "sem conversa"); continue; }
+      if (cfg.modo_teste !== false && !telsTeste.has(String(c.telefone ?? "").replace(/\D/g, "").slice(-9))) { await feito(x.id, "ignorado", "modo teste"); continue; }
+      // resposta a lembrete de consulta: a Ale não entra
+      const lr = (await bancoJson(`/rest/v1/lembrete_respostas?mensagem_id=eq.${x.mensagem_id}&select=id`).catch(() => [])) ?? [];
+      if (lr.length) { await feito(x.id, "ignorado", "resposta de lembrete"); continue; }
+      const em = c.ale_em ? Date.parse(c.ale_em) : 0;
+      const recente = em && Date.now() - em < silencioMs;
+      if ((c.ale_estado === "menu" || c.ale_estado === "menu2") && recente) {
+        const n = opcaoDaAle(x.texto);
+        const op = n ? cfg.opcoes?.[n] : null;
+        if (!op) {
+          if (c.ale_estado === "menu") { await aleEnviar(c, String(cfg.nao_entendi)); await aleEstado(c, "menu2"); await feito(x.id, "feito", "nao entendi"); }
+          else { await porTag(c.id, "outro assunto"); await aleEstado(c, "encaminhado"); await feito(x.id, "feito", "fila sem opcao"); }
+          continue;
+        }
+        let resp = String(op.resposta ?? "");
+        if (op.link) resp = resp.replace("{link}", await aleLink(c, cfg, op));
+        await porTag(c.id, String(op.tag ?? ""));
+        await aleEnviar(c, resp);
+        await aleEstado(c, "encaminhado");
+        await feito(x.id, "feito", "opcao " + n);
+        cont["ale_opcao_" + n] = (cont["ale_opcao_" + n] ?? 0) + 1;
+        continue;
+      }
+      if (c.ale_estado === "encaminhado" && recente) { await feito(x.id, "ignorado", "ja encaminhado"); continue; }
+      // alguém da clínica falou com a pessoa nas últimas horas (equipe, celular ou lembrete)? então não manda menu
+      const desde = new Date(Date.now() - silencioMs).toISOString();
+      const env: any[] = (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.enviada&enviada_em=gt.${desde}&select=id&limit=1`).catch(() => [])) ?? [];
+      if (env.length) { await feito(x.id, "ignorado", "conversa em andamento"); continue; }
+      const ok = await aleEnviar(c, String(cfg.menu));
+      if (ok) await aleEstado(c, "menu");
+      await feito(x.id, ok ? "feito" : "erro", ok ? "menu" : "falhou envio do menu");
+      cont.ale_menu = (cont.ale_menu ?? 0) + 1;
+    } catch (e) {
+      await feito(x.id, "erro", String((e as Error)?.message ?? e).slice(0, 300)).catch(() => {});
+    }
+  }
+}
+
 export async function handler(req: Request): Promise<Response> {
   const json = (c: unknown, s = 200) => new Response(JSON.stringify(c), { status: s, headers: { "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ ok: false, erro: "use POST" }, 405);
@@ -991,6 +1082,7 @@ export async function handler(req: Request): Promise<Response> {
   await rodarPush(cont).catch((e) => { cont.push_erro_motor = 1; console.error("push", e); });
   await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
   await rodarRespostasLembrete(cont).catch((e) => { cont.lembrete_resposta_erro_motor = 1; console.error("respostas lembrete", e); });
+  await rodarAle(inicio, cont).catch((e) => { cont.ale_erro_motor = 1; console.error("ale", e); });
   await rodarLembretes(inicio, cont).catch((e) => { cont.lembrete_erro_motor = 1; console.error("lembretes", e); });
   await rodarLembretes(inicio, cont, Date.now(), "recepcao").catch((e) => { cont.lembrete_recepcao_erro_motor = 1; console.error("lembretes recepção", e); });
   await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
