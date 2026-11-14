@@ -726,7 +726,8 @@ export function categoriaValida(desc: unknown, termos: unknown): boolean {
   const d = semAcento(desc);
   return lista.some((t) => d.includes(t));
 }
-export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vespera" | "dia", agora: number, categorias: unknown = "avaliação"): Consulta[] {
+export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vespera" | "dia", agora: number, categorias: unknown = "avaliação", excluir: unknown = []): Consulta[] {
+  const temExcluir = (Array.isArray(excluir) ? excluir : String(excluir ?? "").split(/[,;\n]+/)).map(semAcento).filter(Boolean).length > 0;
   const minutosAgora = Math.floor(((agora + FUSO_MIN * 60_000) % 86_400_000) / 60_000);
   const hoje = diasDoLembrete("dia", agora)[0];
   const porChave = new Map<string, Consulta>();
@@ -734,6 +735,7 @@ export function consultasDoClinicorp(lista: any[], dias: string[], tipo: "vesper
     if (a?.ItemType && a.ItemType !== "APPOINTMENT") continue;
     if (String(a?.Canceled ?? "").toUpperCase() === "X" || String(a?.Deleted ?? "").toUpperCase() === "X") continue;
     if (!categoriaValida(a?.CategoryDescription, categorias)) continue;
+    if (temExcluir && categoriaValida(a?.CategoryDescription, excluir)) continue; // (14/11/2026) recepção: tudo menos avaliação
     const tel = String(a?.MobilePhone ?? "").replace(/\D/g, "");
     if (tel.length < 10) continue;
     const at = String(a?.AtomicDate ?? "");
@@ -769,8 +771,8 @@ async function agendaClinicorp(de: string, ate: string): Promise<any[]> {
   return Array.isArray(j) ? j : (j?.appointments ?? j?.data ?? []);
 }
 
-async function enviarLembrete(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number, modeloTipo?: any): Promise<string> {
-  const res = await rpc("lembrete_reservar", { p_data: c.data, p_tipo: tipo, p_tel: c.telefone, p_nome: c.nome, p_hora: c.hora, p_cid: c.id });
+async function enviarLembrete(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number, modeloTipo?: any, programa = "avaliacao"): Promise<string> {
+  const res = await rpc("lembrete_reservar", { p_data: c.data, p_tipo: tipo, p_tel: c.telefone, p_nome: c.nome, p_hora: c.hora, p_cid: c.id, p_programa: programa });
   if (!res) return "ja_enviado";
   const marcar = (st: string, erro: string | null, wa: string | null, conv: string | null) =>
     rpc("lembrete_marcar", { p_id: res.id, p_status: st, p_erro: erro, p_wa: wa, p_conversa: conv });
@@ -817,7 +819,7 @@ async function recebeuAquecimento(c: Consulta): Promise<boolean> {
 const telCurto = (t: string) => { let x = String(t ?? "").replace(/\D/g, ""); if (x.length >= 12 && x.startsWith("55")) x = x.slice(2); return x; };
 
 /** 2ª/3ª confirmação: já confirmou, pediu para cancelar ou respondeu depois da anterior? */
-async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number): Promise<boolean> {
+async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete, cfg: any, agora: number, programa = "avaliacao"): Promise<boolean> {
   if (tipo !== "vespera2" && tipo !== "vespera3") return false;
   // a 1ª confirmação pode ter saído por fora (ex.: Cloudia, enquanto não é desligado):
   // quem mandou mensagem hoje depois do horário da 1ª também não recebe a próxima
@@ -827,7 +829,7 @@ async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete, cfg: any, ago
   const cvs: any[] = (await bancoJson(`/rest/v1/conversas?telefone=like.*${telCurto(c.telefone).slice(-9)}&select=ultima_recebida_em`).catch(() => [])) ?? [];
   if (cvs.some((x) => x.ultima_recebida_em && Date.parse(x.ultima_recebida_em) > ref1 && ref1 < agora)) return true;
   const ant = tipo === "vespera3" ? "vespera,vespera2" : "vespera";
-  const ls: any[] = (await bancoJson(`/rest/v1/lembretes_consulta?data=eq.${c.data}&telefone=eq.${telCurto(c.telefone)}&tipo=in.(${ant})&status=eq.enviado&select=enviado_em,resposta,conversa_id`).catch(() => [])) ?? [];
+  const ls: any[] = (await bancoJson(`/rest/v1/lembretes_consulta?data=eq.${c.data}&telefone=eq.${telCurto(c.telefone)}&tipo=in.(${ant})&status=eq.enviado&programa=eq.${programa}&select=enviado_em,resposta,conversa_id`).catch(() => [])) ?? [];
   if (!ls.length) return false; // não recebeu a anterior (ex.: agendou depois): manda
   if (ls.some((l) => l.resposta)) return true;
   const primeiro = Math.min(...ls.map((l) => Date.parse(l.enviado_em) || Infinity));
@@ -837,8 +839,11 @@ async function jaRespondeuVespera(c: Consulta, tipo: TipoLembrete, cfg: any, ago
   return !!cv?.ultima_recebida_em && Date.parse(cv.ultima_recebida_em) > primeiro;
 }
 
-export async function rodarLembretes(inicio: number, cont: Record<string, number>, agora = Date.now()) {
-  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor;
+// (14/11/2026) programas: "avaliacao" (config lembretes_consulta) e "recepcao" (config lembretes_recepcao)
+export const PROGRAMAS_LEMBRETE: Record<string, string> = { avaliacao: "lembretes_consulta", recepcao: "lembretes_recepcao" };
+export async function rodarLembretes(inicio: number, cont: Record<string, number>, agora = Date.now(), programa = "avaliacao") {
+  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.${PROGRAMAS_LEMBRETE[programa]}&select=valor`).catch(() => null))?.[0]?.valor;
+  const rodada = (p: Record<string, unknown>) => rpc("lembrete_rodada", { ...p, p_programa: programa });
   if (!cfg?.ligado) return;
   await rpc("lembretes_limpar_presos", {}).catch(() => {});
   const local = new Date(agora + FUSO_MIN * 60_000);
@@ -857,21 +862,21 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     // roda nas horas depois do horário (se o motor atrasar, ainda manda), sem encostar na próxima confirmação
     const folga = Number(c.janela_min) || (tipo === "vespera" || tipo === "vespera2" ? 120 : 180);
     if (minutos < h || minutos > h + folga) continue;
-    const rod = (await bancoJson(`/rest/v1/lembretes_rodadas?dia=eq.${hoje}&tipo=eq.${tipo}&select=status`).catch(() => null))?.[0];
+    const rod = (await bancoJson(`/rest/v1/lembretes_rodadas?dia=eq.${hoje}&tipo=eq.${tipo}&programa=eq.${programa}&select=status`).catch(() => null))?.[0];
     if (rod?.status === "concluida") continue;
     let dias = tipo === "aquecimento" ? diasDoAquecimento(agora) : diasDoLembrete(base, agora);
     const fake = teste && cfg.consulta_teste?.telefone ? cfg.consulta_teste : null;
     if (!dias.length && fake && base === "vespera") dias = [ymd(new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1)))];
-    if (!dias.length) { await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "concluida", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: null }); continue; }
+    if (!dias.length) { await rodada({ p_dia: hoje, p_tipo: tipo, p_status: "concluida", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: null }); continue; }
     if (!CLINICORP_USUARIO || !CLINICORP_TOKEN) {
-      await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: "faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN na Supabase" });
+      await rodada({ p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: "faltam os segredos CLINICORP_USUARIO e CLINICORP_TOKEN na Supabase" });
       continue;
     }
     let lista: Consulta[];
     try {
-      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, base, agora, cfg.categorias ?? "avaliação");
+      lista = consultasDoClinicorp(await agendaClinicorp(dias[0], dias[dias.length - 1]), dias, base, agora, cfg.categorias ?? "avaliação", cfg.categorias_excluir ?? []);
     } catch (e) {
-      await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: String((e as Error)?.message ?? e).slice(0, 300) });
+      await rodada({ p_dia: hoje, p_tipo: tipo, p_status: "erro", p_consultas: 0, p_enviados: 0, p_falhas: 0, p_erro: String((e as Error)?.message ?? e).slice(0, 300) });
       continue;
     }
     if (teste) lista = lista.filter((x) => telsTeste.has(x.telefone.slice(-9)));
@@ -882,16 +887,16 @@ export async function rodarLembretes(inicio: number, cont: Record<string, number
     let enviados = 0, falhas = 0, completo = true;
     for (const x of lista) {
       if (Date.now() - inicio > TEMPO_MAX_MS) { completo = false; break; }
-      if (await jaRespondeuVespera(x, tipo, cfg, agora)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
+      if (await jaRespondeuVespera(x, tipo, cfg, agora, programa)) { cont["lembrete_ja_respondeu"] = (cont["lembrete_ja_respondeu"] ?? 0) + 1; continue; }
       // 1ª confirmação com vídeo para quem não recebeu o aquecimento (agendou em cima da hora)
       let modeloX = modeloTipo;
       if (tipo === "vespera" && c.modelo_video?.nome && c.video_pausado !== true && !(await recebeuAquecimento(x))) modeloX = c.modelo_video;
-      const r = await enviarLembrete(x, tipo, cfg, agora, modeloX);
+      const r = await enviarLembrete(x, tipo, cfg, agora, modeloX, programa);
       if (r === "enviado") enviados++;
       if (r === "falhou") falhas++;
-      cont["lembrete_" + r] = (cont["lembrete_" + r] ?? 0) + 1;
+      cont[(programa === "avaliacao" ? "lembrete_" : "lembrete_" + programa + "_") + r] = (cont[(programa === "avaliacao" ? "lembrete_" : "lembrete_" + programa + "_") + r] ?? 0) + 1;
     }
-    await rpc("lembrete_rodada", { p_dia: hoje, p_tipo: tipo, p_status: completo ? "concluida" : "rodando", p_consultas: lista.length, p_enviados: enviados, p_falhas: falhas, p_erro: null });
+    await rodada({ p_dia: hoje, p_tipo: tipo, p_status: completo ? "concluida" : "rodando", p_consultas: lista.length, p_enviados: enviados, p_falhas: falhas, p_erro: null });
   }
 }
 
@@ -920,8 +925,12 @@ async function porTag(conversa: string, nome: string) {
 export async function rodarRespostasLembrete(cont: Record<string, number>) {
   const lote: any[] = await rpc("lembrete_respostas_pegar", {}).catch(() => []);
   if (!lote?.length) return;
-  const cfg = (await bancoJson(`/rest/v1/configuracoes?chave=eq.lembretes_consulta&select=valor`).catch(() => null))?.[0]?.valor ?? {};
+  const cfgs: Record<string, any> = {};
+  for (const [prog, chave] of Object.entries(PROGRAMAS_LEMBRETE)) {
+    cfgs[prog] = (await bancoJson(`/rest/v1/configuracoes?chave=eq.${chave}&select=valor`).catch(() => null))?.[0]?.valor ?? {};
+  }
   for (const x of lote) {
+    const cfg = cfgs[x.programa ?? "avaliacao"] ?? cfgs.avaliacao;
     let ok = true, erro: string | null = null, confirmado: boolean | null = null;
     try {
       const c = (await bancoJson(`/rest/v1/conversas?id=eq.${x.conversa_id}&select=*`))?.[0];
@@ -983,6 +992,7 @@ export async function handler(req: Request): Promise<Response> {
   await rodarAgendadas(inicio, cont).catch((e) => { cont.agendada_erro_motor = 1; console.error("agendadas", e); });
   await rodarRespostasLembrete(cont).catch((e) => { cont.lembrete_resposta_erro_motor = 1; console.error("respostas lembrete", e); });
   await rodarLembretes(inicio, cont).catch((e) => { cont.lembrete_erro_motor = 1; console.error("lembretes", e); });
+  await rodarLembretes(inicio, cont, Date.now(), "recepcao").catch((e) => { cont.lembrete_recepcao_erro_motor = 1; console.error("lembretes recepção", e); });
   await rodarDisparos(inicio, cont).catch((e) => { cont.disparo_erro_motor = 1; console.error("disparos", e); });
   const autos = new Map<number, any>();
   while (Date.now() - inicio < TEMPO_MAX_MS) {
