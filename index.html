@@ -12023,7 +12023,7 @@ function linkDoLead(tel){
 // (08/11/2026) Lucas: por enquanto só por perfil (bio e stories da clínica usam o mesmo link)
 function rotuloLink(x){
   if(!x)return '';
-  return {larissa:'Instagram Dra. Larissa',clinica:'Instagram Clínica',site:'Site'}[x.perfil]||'Link';
+  return {larissa:'Instagram Dra. Larissa',clinica:'Instagram Clínica',site:'Site',recepcao:'Recepção'}[x.perfil]||'Link';
 }
 function rotuloLinkCompleto(x){
   if(!x)return '';
@@ -18224,7 +18224,7 @@ function _clCor(seed){let h=0;const s=String(seed||'');for(let i=0;i<s.length;i+
 function _clAvatar(c,nome){const ig=c&&c.canal==='instagram';return '<div class="cl-av" style="background:'+_clCor(c&&c.telefone||nome)+'">'+_waEsc(_waIniciais(nome))+(ig?'<span class="selo" title="Instagram" style="background:linear-gradient(45deg,#F58529,#DD2A7B,#8134AF)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17" cy="7" r=".6" fill="#fff"/></svg></span>':'<span class="selo" title="WhatsApp">'+'<svg viewBox="0 0 24 24">'+_CL_IC.wpp+'</svg></span>')+'</div>';}
 function _clEstado(c){
   if(c.status==='encerrada')return 'concluido';
-  if(c.robo_ligado)return 'chatbot';
+  if(c.robo_ligado||c.ale_estado==='menu'||c.ale_estado==='menu2')return 'chatbot'; // (14/11/2026) Ale da recepção esperando a opção
   return c.atribuida_a?'atendimento':'fila';
 }
 const _CL_ESTADO_ROT={atendimento:'ATENDIMENTO',fila:'NA FILA',chatbot:'CHATBOT',concluido:'CONCLUÍDO'};
