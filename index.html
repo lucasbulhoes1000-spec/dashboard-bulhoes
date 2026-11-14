@@ -16633,13 +16633,19 @@ function _waAoMudarConversa(p){
     _wa.conversas[i]=Object.assign({},antiga,n,{pacientes:antiga.pacientes});
   }else{
     if(!n.paciente_id)_wa.conversas.unshift(n);
-    waCarregarConversas(true); // traz o nome do paciente vinculado
-    _waAvisarNova(n);
+    // (14/11/2026) a importação do histórico cria centenas de conversas em segundos: recarregar a
+    // lista inteira a cada uma travava a Lume. Agora junta tudo e recarrega uma vez só.
+    clearTimeout(_wa._tRecarga);_wa._tRecarga=setTimeout(()=>waCarregarConversas(true),3000); // traz o nome do paciente vinculado
+    const recente=Date.now()-Date.parse(n.ultima_recebida_em||n.ultima_mensagem_em||0)<10*60*1000;
+    if(recente)_waAvisarNova(n);
   }
-  _wa.conversas.sort((a,b)=>_waOrdemT(b)-_waOrdemT(a));
   if(_wa.atual&&_wa.atual.id===n.id){_wa.atual=_wa.conversas.find(c=>c.id===n.id)||_wa.atual;if(currentPage==='conversas')waRenderJanela();}
-  waAtualizarBadge();
-  if(currentPage==='conversas')waRenderLista();
+  // ordena e redesenha a lista no máximo a cada 0,8 s (rajadas de eventos não travam a tela)
+  clearTimeout(_wa._tLista);_wa._tLista=setTimeout(()=>{
+    _wa.conversas.sort((a,b)=>_waOrdemT(b)-_waOrdemT(a));
+    waAtualizarBadge();
+    if(currentPage==='conversas')waRenderLista();
+  },800);
 }
 function _waAvisarNova(c){
   if(currentPage==='conversas'&&document.visibilityState==='visible')return;
