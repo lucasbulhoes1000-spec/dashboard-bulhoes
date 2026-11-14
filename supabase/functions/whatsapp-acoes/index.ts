@@ -555,7 +555,7 @@ export async function handler(req: Request): Promise<Response> {
   }
 }
 
-if (!Deno.env.get("WA_TESTE")) // (14/11/2026) conta (WABA) e token de um número; sem número, a conta da Clínica API
+// (14/11/2026) conta (WABA) e token de um número; sem número, a conta da Clínica API
 async function contaDoNumero(numero: unknown): Promise<{ waba: string; token: string }> {
   const id = String(numero ?? "").trim();
   if (id && id !== WA_PHONE_NUMBER_ID) {
@@ -565,4 +565,4 @@ async function contaDoNumero(numero: unknown): Promise<{ waba: string; token: st
   return { waba: WA_WABA_ID, token: WA_TOKEN };
 }
 
-Deno.serve(handler);
+if (!Deno.env.get("WA_TESTE")) Deno.serve(handler);
