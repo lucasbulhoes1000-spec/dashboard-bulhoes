@@ -1040,7 +1040,7 @@ export async function rodarAle(inicio: number, cont: Record<string, number>) {
       if (c.ale_estado === "encaminhado" && recente) { await feito(x.id, "ignorado", "ja encaminhado"); continue; }
       // alguém da clínica falou com a pessoa nas últimas horas (equipe, celular ou lembrete)? então não manda menu
       const desde = new Date(Date.now() - silencioMs).toISOString();
-      const env: any[] = (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.enviada&enviada_em=gt.${desde}&select=id&limit=1`).catch(() => [])) ?? [];
+      const env: any[] = (await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.enviada&enviada_em=gt.${desde}&autor_email=neq.${encodeURIComponent("Ale (assistente virtual)")}&select=id&limit=1`).catch(() => [])) ?? [];
       if (env.length) { await feito(x.id, "ignorado", "conversa em andamento"); continue; }
       const ok = await aleEnviar(c, String(cfg.menu));
       if (ok) await aleEstado(c, "menu");
