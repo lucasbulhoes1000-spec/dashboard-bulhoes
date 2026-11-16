@@ -1114,6 +1114,12 @@ body{letter-spacing:-.1px;}
 .kb-tag.atraso{background:rgba(224,103,90,.15);color:#F2A79C;}
 .kb-barra{height:4px;border-radius:4px;background:rgba(255,255,255,.06);margin:6px 0 2px;overflow:hidden;}
 .kb-barra i{display:block;height:100%;background:linear-gradient(90deg,#B08A3E,#F0CB72);}
+.kb-card.kb-retorno{border-left:4px solid #6FA8FF!important;}
+.kb-card.kb-retorno-hoje{border-left-color:#D4AF5A!important;}
+.kb-card.kb-retorno-atraso{border-left-color:#E08A7E!important;}
+.kb-retorno-faixa{font-size:11.5px;font-weight:700;color:#6FA8FF;margin:-2px 0 6px;}
+.kb-retorno-hoje .kb-retorno-faixa{color:#D4AF5A;}
+.kb-retorno-atraso .kb-retorno-faixa{color:#E08A7E;}
 .kb-card.kb-pix{background:linear-gradient(180deg,#4A3A12,#33280C);border:1px solid #D4AF5A;box-shadow:0 0 0 1px rgba(212,175,90,.25);}
 .kb-card.kb-pix .kb-nome::before{content:'★ ';color:#F0CB72;}
 .kb-card.kb-pix-claro{background:linear-gradient(180deg,#FFF1EB,#FFE2D6)!important;border:1px solid #E8845C!important;box-shadow:0 0 0 1px rgba(232,132,92,.25)!important;}
@@ -20143,6 +20149,8 @@ function _fupSalvarRetornoDe(key,data,pix){
   _ccData[key].fupRetorno={data:data||'',pix:pix||'',pixEm:(pix&&pix!==antPix)?new Date().toISOString():(ant.pixEm||''),por:localStorage.getItem('bulhoes_email')||''};
   if(!data&&!pix)_ccData[key].fupRetorno={limpo:true};
   salvarCRMDebounced();
+  // (16/11/2026) Lucas: "salvei e não mudou nada": o quadro redesenha na hora
+  try{if(_kb.modo.clientes==='kanban')kbRender('clientes');}catch(e){}
 }
 function _kbOrcColuna(it){
   if(it.fechou)return 'Fechou';
@@ -20349,8 +20357,8 @@ function ccFupNotasSalvar(){
   _ccData[key].fupNotas={queria:(document.getElementById('cc-fup-queria').value||'').trim(),motivo:document.getElementById('cc-fup-motivo').value||'',em:new Date().toISOString(),por:localStorage.getItem('bulhoes_email')||''};
   const rD=document.getElementById('cc-fup-ret').value||'',rP=document.getElementById('cc-fup-pix').value||'';
   const atual=_fupRetorno({d:_ccData[key],fase:'',atv:null});
-  if(rD||rP||atual)_fupSalvarRetornoDe(key,rD,rP);else salvarCRMDebounced();
-  showToast('success','Anotação salva','A Lívia vê isso no follow-up.');
+  if(rD||rP||atual)_fupSalvarRetornoDe(key,rD,rP);else{salvarCRMDebounced();try{if(_kb.modo.clientes==='kanban')kbRender('clientes');}catch(e){}}
+  showToast('success','Anotação salva',rD?'Retorno combinado em '+new Date(rD+'T12:00').toLocaleDateString('pt-BR')+': o card ficou marcado no quadro.':'A Lívia vê isso no follow-up.');
 }
 const KB_LIMITE=40;
 const _kb={modo:{},limite:{},resp:{},env:{},mensagensDesde:undefined,carregandoResp:false,arrastando:null,itens:{},grupos:{},agenda:null,carregandoAgenda:false,cols:{}};
@@ -20670,7 +20678,12 @@ const KB_QUADROS={
       const k=it=>{const r=it.fechou?null:_fupRetorno(it);const p=_kbOrcPrazo(it,col);return [_fupPrioridade(it)?0:1,r&&r.data?r.data:'9999',p?p.ate.getTime():9e15];};
       return l.slice().sort((a,b)=>{const x=k(a),y=k(b);for(let i=0;i<3;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1;}return 0;});
     },
-    classeCard:(it)=>_fupPrioridade(it)?('kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':'')):'',
+    classeCard:(it)=>{
+      if(_fupPrioridade(it))return 'kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':'');
+      const r=!it.fechou&&_fupRetorno(it);
+      if(r&&r.data){const hj=new Date(new Date().toDateString()),dd=new Date(r.data+'T00:00');return 'kb-retorno'+(dd<hj?' kb-retorno-atraso':(+dd===+hj?' kb-retorno-hoje':''));}
+      return '';
+    },
     valor:(it)=>it.fechou?it.fechado:it.aberto,
     metricas:(cols,todos,porCol)=>{
       const m={};const hoje=new Date(new Date().toDateString());
@@ -20696,14 +20709,15 @@ const KB_QUADROS={
         const dd=ret.data?new Date(ret.data+'T00:00'):null;
         if(ret.pix==='pago')prazo+='<span class="kb-tag ok">Pix de compromisso pago</span> ';
         if(ret.pix==='devolvido')prazo+='<span class="kb-tag">Pix devolvido</span> ';
-        if(dd)prazo+='<span class="kb-tag '+(dd<hoje?'atraso':(+dd===+hoje?'hoje':''))+'">retorno '+dd.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span> ';
+        if(dd)prazo='<div class="kb-retorno-faixa">📅 Retorno combinado: '+dd.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(dd<hoje?' · atrasado':(+dd===+hoje?' · hoje':''))+'</div>'+prazo;
       }
       const px=_kbOrcPrazo(it,col);
       if(px&&!px.retorno)prazo+='<span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">mandar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>';
       const base=_kbOrcBase(it);
       const fn=(it.d&&it.d.fupNotas)||{};
       const prox=fupProximaEtapa(col);
-      return `<div class="kb-nome">${_kbEsc(it.nome)}</div>
+      const faixa=(prazo.match(/^<div class="kb-retorno-faixa">.*?<\/div>/)||[''])[0];if(faixa)prazo=prazo.slice(faixa.length);
+      return `${faixa}<div class="kb-nome">${_kbEsc(it.nome)}</div>
         ${trat?'<div class="kb-linha"><span>'+_kbEsc(trat)+'</span></div>':''}
         <div class="kb-linha">${valor>0?'<b class="kb-valor'+(it.fechou?' ok':'')+'">'+fmt(valor)+'</b>':''}${base?'<span>avaliação '+base.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':''}</div>
         ${prazo?'<div class="kb-linha">'+prazo+'</div>':''}
