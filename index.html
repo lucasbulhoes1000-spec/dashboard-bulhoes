@@ -1305,14 +1305,35 @@ body{letter-spacing:-.1px;}
       <span class="nav-label">Mensagens em Massa</span>
     </div>
     <div class="nav-section nav-inst">Instituto</div>
-    <div class="nav-item nav-inst" onclick="switchPage('inst-funil',this)">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg></span>
-      <span class="nav-label">Funil comercial</span>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-dashboard',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+      <span class="nav-label">Dashboard</span>
     </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-trafego',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>
+      <span class="nav-label">Tráfego Pago</span>
+    </div>
+    <div class="nav-section nav-inst">CRM</div>
     <div class="nav-item nav-inst" onclick="switchPage('conversas',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/></svg></span>
-      <span class="nav-label">Conversas</span>
+      <span class="nav-label">Mensagens</span>
       <span class="wa-nav-badge" id="wa-nav-badge-inst" style="display:none"></span>
+    </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-automacoes',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
+      <span class="nav-label">Automações</span>
+    </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-agente',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3" r="1"/><path d="M9 13v1.5M15 13v1.5"/><path d="M2 13v3M22 13v3"/></svg></span>
+      <span class="nav-label">Agentes de IA</span>
+    </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-social',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></span>
+      <span class="nav-label">Social Selling</span>
+    </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-disparos',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg></span>
+      <span class="nav-label">Mensagens em Massa</span>
     </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
@@ -2009,6 +2030,12 @@ body{letter-spacing:-.1px;}
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
     <div class="page" id="page-inst-funil"><div class="au-wrap" id="if-conteudo"></div></div>
+    <div class="page" id="page-inst-dashboard"><div class="au-wrap" id="ip-dashboard"></div></div>
+    <div class="page" id="page-inst-trafego"><div class="au-wrap" id="ip-trafego"></div></div>
+    <div class="page" id="page-inst-automacoes"><div class="au-wrap" id="ip-automacoes"></div></div>
+    <div class="page" id="page-inst-agente"><div class="au-wrap" id="ip-agente"></div></div>
+    <div class="page" id="page-inst-social"><div class="au-wrap" id="ip-social"></div></div>
+    <div class="page" id="page-inst-disparos"><div class="au-wrap" id="ip-disparos"></div></div>
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
     <div class="page" id="page-social-selling">
       <div class="dash-tabs ss-tabs">
@@ -3620,7 +3647,7 @@ function _aplicarSoTrafego(){
 }
 function verificarAcessoPagina(page){
   if(window._soTrafego&&page!=='trafego-pago')return false;
-  if(page==='inst-funil'&&!_temEspaco('instituto'))return false;
+  if(/^inst-/.test(page)&&!_temEspaco('instituto'))return false;
   const email=usuarioAtualEmail();
   const liberar=(area,titulo)=>{pedirSenhaArea(area,titulo).then(ok=>{if(ok){_acessoDesbloqueado[page]=true;irParaPagina(page);}});return false;};
   // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi — pedido explícito do usuário.
@@ -3650,13 +3677,14 @@ function switchPage(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-indicacoes':'Indicações e NPS','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
-  document.getElementById('topbar-title').textContent=page==='inst-funil'?'Funil comercial · Instituto':(_espacoInst()&&page==='conversas'?'Conversas · Instituto':(titles[page]||page));
+  document.getElementById('topbar-title').textContent=(INST_TITULOS||{})[page]?INST_TITULOS[page]+' · Instituto':(_espacoInst()&&page==='conversas'?'Mensagens · Instituto':(titles[page]||page));
   if(page==='inicio') carregarInicio();
   else if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='pacientes') renderPacientesPage();
   else if(page==='conversas') abrirConversas();
   else if(page==='inst-funil') abrirInstFunil();
+  else if(/^inst-/.test(page)) abrirInstPagina(page);
   else if(page==='automacoes') abrirAutomacoes();
   else if(page==='agente') abrirAgente();
   else if(page==='disparos') abrirDisparos();
@@ -3703,6 +3731,7 @@ async function reloadCurrent(){
   if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
     if(currentPage==='inst-funil'){await abrirInstFunil(true);return;}
+    if(/^inst-/.test(currentPage)){await abrirInstPagina(currentPage,true);return;}
     if(currentPage==='social-selling'){
       if(_ss.aba==='painel')await loadSocial();else{_ss.clinChave='';await abrirSocialSelling();}
       return;
@@ -18545,7 +18574,7 @@ function waMenuMais(ev){
     (igc?'<button onclick="_clFecharPop();waIgIgnorar()">'+_clIc('x')+' Ignorar contato (não entra mais no CRM)</button>':'')+
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
     (window._espaco==='instituto'
-      ?'<button onclick="_clFecharPop();_wa.atual&&(_instCardDaConversa(_wa.atual)?instCardAbrir(_instCardDaConversa(_wa.atual).id):instCardDaConversaAtual())">'+_clIc('funil')+' Card no funil do Instituto</button>'+
+      ?(INST_FUNIL_LIGADO?'<button onclick="_clFecharPop();_wa.atual&&(_instCardDaConversa(_wa.atual)?instCardAbrir(_instCardDaConversa(_wa.atual).id):instCardDaConversaAtual())">'+_clIc('funil')+' Card no funil do Instituto</button>':'')+
        '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'
       :'<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
     (_wa.atual&&_wa.atual.canal!=='instagram'?'<button onclick="_clFecharPop();waAbrirAgendar()">'+_clIc('clock')+' Agendar no Clinicorp</button>':'')+
@@ -19098,7 +19127,7 @@ function trocarEspaco(e){
     _instAplicarEquipe();_waRotuloConexoes();
     if(_wa.iniciado)waCarregarConversas(true);else waAtualizarBadge();
   }catch(x){}
-  irParaPagina(e==='instituto'?'inst-funil':'inicio');
+  irParaPagina(e==='instituto'?'inst-dashboard':'inicio');
 }
 function _waChatVazioHtml(){
   return '<div class="wa-vazio"><div style="font-size:34px">💬</div>Escolha uma conversa para ver as mensagens e responder.<br><span style="font-size:11px">'+
@@ -19115,6 +19144,49 @@ async function _instCarregarEquipe(){
 function _instAplicarEquipe(){
   if(!_espacoInst()){if(_wa.equipeListaClinica)_wa.equipeLista=_wa.equipeListaClinica;return;}
   _instCarregarEquipe().then(l=>{if(_espacoInst()){_wa.equipeLista=l.map(p=>({email:p.email,nome:p.nome}));try{if(_wa.atual){waRenderPainel();}}catch(x){}}});
+}
+
+// ---------- páginas do Instituto (16/11/2026: estrutura pronta, cada uma vai ser modelada) ----------
+// O funil comercial fica guardado e fora do menu até o processo comercial ser fechado (decisão do Lucas).
+var INST_FUNIL_LIGADO=false;
+var INST_TITULOS={'inst-funil':'Funil comercial','inst-dashboard':'Dashboard','inst-trafego':'Tráfego Pago','inst-automacoes':'Automações','inst-agente':'Agentes de IA','inst-social':'Social Selling','inst-disparos':'Mensagens em Massa'};
+const INST_EM_BREVE={
+  'inst-trafego':['Os anúncios do Instituto, separados dos da clínica.',['Definir quais campanhas e qual conta de anúncios são do Instituto (hoje elas ficam na conta "CA - LARISSA BULHÕES").']],
+  'inst-automacoes':['Follow-ups e sequências do Instituto, pelo WhatsApp (13) 4042-7082.',['Cadência de follow-up de quem não agenda e de quem não fecha (processo comercial).','Cartão do Instituto na Meta, para as mensagens por modelo saírem.']],
+  'inst-agente':['A IA de SDR do Instituto, com instruções próprias para dentistas.',['Script da SDR e critérios de qualificação (processo comercial).']],
+  'inst-social':['Abordagens e acompanhamento do social selling do Instituto.',['Decidir como separar os Directs de dentistas que chegam no @dralaribulhoes.']],
+  'inst-disparos':['Envios em massa pelo WhatsApp do Instituto.',['Cartão do Instituto na Meta.','Modelos de mensagem do Instituto aprovados pela Meta.']]};
+async function abrirInstPagina(page,forcar){
+  const k=page.replace(/^inst-/,'');const el=document.getElementById('ip-'+k);if(!el)return;
+  if(!_temEspaco('instituto')){el.innerHTML='<div class="au-vazio">Você não tem acesso ao Instituto.</div>';return;}
+  if(page==='inst-dashboard'){await instDashboard(el,forcar);return;}
+  const d=INST_EM_BREVE[page];if(!d){el.innerHTML='';return;}
+  el.innerHTML='<div class="au-bloco" style="max-width:640px"><h4>'+_waEsc(INST_TITULOS[page])+' do Instituto</h4>'+
+    '<div style="font-size:13px;color:#EEF1F7;margin:4px 0 10px">'+_waEsc(d[0])+'</div>'+
+    '<div style="font-size:12px;color:#8C98B1;margin-bottom:4px">Para ligar, falta:</div>'+
+    '<ul style="margin:0 0 6px 18px;padding:0;font-size:12.5px;color:#C3CBDB;line-height:1.6">'+d[1].map(x=>'<li>'+_waEsc(x)+'</li>').join('')+'</ul>'+
+    '<div class="au-dica">Espaço separado da clínica: nada daqui aparece para a equipe da clínica nem soma nas métricas dela.</div></div>';
+}
+// Dashboard: por enquanto, o que já dá para medir com o WhatsApp do Instituto
+async function instDashboard(el,forcar){
+  if(!_inst.dash||forcar){
+    el.innerHTML='<div class="au-vazio">Carregando…</div>';
+    try{_inst.dash=(await _waRest('conversas?select=id,criada_em,status,atribuida_a,nao_lidas,ultima_recebida_em,oculta_em&canal=eq.whatsapp&numero_clinica_id=in.('+WA_NUMEROS_FORA_CLINICA.join(',')+')&limit=5000'))||[];}
+    catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar: '+_waEsc(e.message)+'</div>';return;}
+  }
+  const cs=_inst.dash.filter(c=>!c.oculta_em);
+  const h=new Date();const hoje=new Date(h.getFullYear(),h.getMonth(),h.getDate()).getTime();
+  const novas=dias=>cs.filter(c=>Date.parse(c.criada_em)>=hoje-(dias-1)*864e5).length;
+  const abertas=cs.filter(c=>c.status!=='encerrada');
+  const stat=(t,v,c)=>'<div class="sskb-stat"><div>'+t+'</div><b style="color:'+(c||'#EEF1F7')+'">'+v+'</b></div>';
+  // contatos novos por dia, últimos 14 dias
+  const serie=[...Array(14)].map((_,i)=>{const ini=hoje-(13-i)*864e5;return [new Date(ini),cs.filter(c=>{const t=Date.parse(c.criada_em);return t>=ini&&t<ini+864e5;}).length];});
+  const max=Math.max(1,...serie.map(x=>x[1]));
+  el.innerHTML='<div class="sskb-topo">'+stat('Contatos novos hoje',novas(1))+stat('Últimos 7 dias',novas(7))+stat('Últimos 30 dias',novas(30))+
+      stat('Conversas abertas',abertas.length,'#CCBCA6')+stat('Sem atendente',abertas.filter(c=>!c.atribuida_a).length,'#E2BE6A')+stat('Não lidas',cs.filter(c=>c.nao_lidas>0).length,'#E2BE6A')+'</div>'+
+    '<div class="au-bloco"><h4>Contatos novos por dia no WhatsApp do Instituto</h4>'+
+      '<div style="display:flex;gap:6px;align-items:flex-end;height:140px;padding-top:10px">'+serie.map(([d,n])=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end" title="'+d.toLocaleDateString('pt-BR')+': '+n+'"><span style="font-size:10.5px;color:#C3CBDB">'+(n||'')+'</span><div style="width:100%;max-width:28px;background:#A18B6C;border-radius:4px 4px 0 0;height:'+Math.max(2,Math.round(n/max*100))+'%"></div><span style="font-size:9.5px;color:#66738F">'+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>').join('')+'</div></div>'+
+    '<div class="au-dica" style="margin-top:8px">Por enquanto, o Dashboard mede só o WhatsApp do Instituto. Os números do funil, das vendas e dos anúncios entram quando essas partes forem modeladas.</div>';
 }
 
 // ---------- funil ----------
@@ -19414,8 +19486,9 @@ function _instPainelConversa(c){
   const opt=(v,t,sel)=>'<option value="'+_waEsc(v)+'"'+(v===sel?' selected':'')+'>'+_waEsc(t)+'</option>';
   const atendOpts='<option value="">Sem atendente</option>'+(_wa.equipeLista||[]).map(p=>opt(p.email,p.nome,c.atribuida_a||'')).join('')+
     (c.atribuida_a&&!(_wa.equipeLista||[]).some(p=>p.email===c.atribuida_a)?opt(c.atribuida_a,_waNomeEquipe(c.atribuida_a),c.atribuida_a):'');
-  let funil;
-  if(!_inst.carregado){
+  let funil='';
+  if(!INST_FUNIL_LIGADO){}
+  else if(!_inst.carregado){
     funil='<div class="au-dica">Carregando o funil…</div>';
     _instCarregar().then(()=>{if(_wa.atual&&_wa.atual.id===c.id)waRenderPainel();}).catch(()=>{});
   }else{
@@ -19438,7 +19511,7 @@ function _instPainelConversa(c){
     '<div class="cl-linha-num"><span class="q"></span><b>'+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</b><span style="color:#CCBCA6">Instituto</span></div>'+
     '<button class="cl-link" style="align-self:center;display:flex;gap:5px;align-items:center;color:#EEF1F7" onclick="waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
     '<div class="cl-campo">'+_clIc('pessoa')+'<span>Atribuído a:</span><select onchange="waAtribuir(this.value||null)">'+atendOpts+'</select></div>'+
-    '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Funil do Instituto</span></div>'+funil+'</div>'+
+    (funil?'<div class="cl-bloco"><div class="cl-bloco-tit"><span>Funil do Instituto</span></div>'+funil+'</div>':'')+
     '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Observações</span><span style="font-size:11px;color:#8C98B1" id="cl-obs-n">('+String(c.observacoes||'').length+'/16000)</span></div>'+
       '<textarea class="cl-obs" id="cl-obs" maxlength="16000" placeholder="Digite aqui..." oninput="document.getElementById(\'cl-obs-n\').textContent=\'(\'+this.value.length+\'/16000)\'" onblur="waSalvarObsConversa(this.value)">'+_waEsc(c.observacoes||'')+'</textarea></div>'+
     '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Tags do contato <button class="cl-ib" style="width:22px;height:22px;margin-left:4px" title="Adicionar tag" onclick="waMenuTags(event)">'+_clIc('plus')+'</button></span></div><div class="cl-tags">'+(tags||'<span style="font-size:11px;color:#66738F">Nenhuma tag</span>')+'</div></div>';
