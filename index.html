@@ -11196,11 +11196,9 @@ function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataIn
     pacientes.push(paciente);
     mudou=true;
   }else{
-    // reabre se já tinha sido marcado concluído — novo tratamento, novo ciclo de pós-venda/NPS
-    paciente.concluido=false;
-    paciente.npsEnviado=false;
-    paciente.posVendaEnviado=false;
-    paciente.dataConcluido=null;
+    // (16/11/2026) BUG "concluído volta": o sync do Clinicorp repassa o mesmo orçamento aprovado
+    // várias vezes e isto zerava NPS/pós-venda/concluído toda vez. Agora só reabre lá embaixo,
+    // se entrar um procedimento NOVO de verdade.
     if(!paciente.procedimentosRemovidos)paciente.procedimentosRemovidos=[];
     if(!paciente.subetapasRemovidas)paciente.subetapasRemovidas={};
   }
@@ -11260,6 +11258,11 @@ function mesclarOrcamentoNoFluxo(pacientes,modelos,tel,nome,tratamentoStr,dataIn
     const removidasDesse=paciente.subetapasRemovidas[nomeProc]||[];
     const subetapasFiltradas=subetapasBase.filter(s=>!removidasDesse.includes(s));
     paciente.procedimentos.push({nome:nomeProc,subetapas:subetapasFiltradas.map(s=>({nome:s,ok:false,data:null}))});
+    if(!mudou&&(paciente.concluido||paciente.npsEnviado||paciente.posVendaEnviado)){
+      // novo tratamento para quem já tinha concluído: novo ciclo de pós-venda e NPS
+      paciente.concluido=false;paciente.npsEnviado=false;paciente.posVendaEnviado=false;paciente.dataConcluido=null;
+      paciente.dataInicio=dataInicio||paciente.dataInicio;
+    }
     mudou=true;
   });
 
@@ -11270,6 +11273,10 @@ async function garantirNoFluxo(tel, nome, tratamentoStr, dataInicio){
   const telLimpo=String(tel||'').replace(/\D/g,'');
   if(!telLimpo||!tratamentoStr)return;
   try{
+    if(_fluxoIniciado){
+      if(mesclarOrcamentoNoFluxo(_fluxoPacientes,_fluxoModelos,tel,nome,tratamentoStr,dataInicio)){await salvarFluxoRemoto();renderFluxoCards();}
+      return;
+    }
     const resp=await fetch(CLOUDIA_URL+'?action=loadFluxo');
     const data=await resp.json();
     const modelos=data.modelos||{};
@@ -13155,6 +13162,7 @@ async function initFluxoTratamento() {
       _fluxoModelos = data.modelos || {};
       _fluxoPacientes = data.pacientes || [];
       _ortoPacientes = data.ortoPacientes || [];
+      _fluxoBase = _fluxoSnap();
     }
   } catch(e) { console.warn('[FLUXO] Erro ao carregar:', e); }
   renderFluxoCards();
@@ -13162,11 +13170,52 @@ async function initFluxoTratamento() {
   renderFluxoConcluidos();
 }
 
-async function salvarFluxoRemoto() {
-  try {
-    await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveFluxo', data: { modelos: _fluxoModelos, pacientes: _fluxoPacientes, ortoPacientes: _ortoPacientes } }) });
-  } catch(e) { console.warn('[FLUXO] Erro ao salvar:', e); }
+// (16/11/2026) BUG "volta depois": duas pessoas com o Fluxo aberto (ou o sync automático) salvavam
+// a lista INTEIRA e a última gravação apagava o que a outra tinha marcado. Agora cada gravação
+// busca a versão do servidor e só leva os pacientes que ESTA aba mudou; o resto vem do servidor.
+let _fluxoBase = null, _fluxoFila = Promise.resolve();
+function _fluxoSnap() {
+  const m = a => { const o = {}; (a || []).forEach(x => { if (x && x.id) o[x.id] = JSON.stringify(x); }); return o; };
+  return { pac: m(_fluxoPacientes), orto: m(_ortoPacientes), modelos: JSON.stringify(_fluxoModelos || {}) };
+}
+function _fluxoMesclar(base, local, remoto) {
+  const L = {}, R = {}; (local || []).forEach(x => { if (x && x.id) L[x.id] = x; }); (remoto || []).forEach(x => { if (x && x.id) R[x.id] = x; });
+  const out = [], vistos = new Set();
+  (remoto || []).forEach(r => {
+    if (!r || !r.id) return; vistos.add(r.id);
+    const l = L[r.id], b = base[r.id];
+    if (l === undefined) { if (b === undefined) out.push(r); return; } // apagado aqui: some; novo no servidor: entra
+    out.push(JSON.stringify(l) !== b ? l : r);
+  });
+  (local || []).forEach(l => { if (l && l.id && !vistos.has(l.id) && base[l.id] === undefined) out.push(l); }); // novo nesta aba
+  return out;
+}
+function salvarFluxoRemoto() {
+  _fluxoFila = _fluxoFila.then(async () => {
+    try {
+      let dados = { modelos: _fluxoModelos, pacientes: _fluxoPacientes, ortoPacientes: _ortoPacientes };
+      if (_fluxoBase) {
+        const r = await fetch(CLOUDIA_URL + '?action=loadFluxo');
+        if (!r.ok) throw new Error('loadFluxo HTTP ' + r.status);
+        const rem = await r.json();
+        dados = {
+          modelos: JSON.stringify(_fluxoModelos || {}) !== _fluxoBase.modelos ? _fluxoModelos : (rem.modelos || _fluxoModelos),
+          pacientes: _fluxoMesclar(_fluxoBase.pac, _fluxoPacientes, rem.pacientes || []),
+          ortoPacientes: _fluxoMesclar(_fluxoBase.orto, _ortoPacientes, rem.ortoPacientes || [])
+        };
+      }
+      const s = await fetch(CLOUDIA_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'saveFluxo', data: dados }) });
+      if (!s.ok) throw new Error('saveFluxo HTTP ' + s.status);
+      _fluxoModelos = dados.modelos; _fluxoPacientes = dados.pacientes; _ortoPacientes = dados.ortoPacientes;
+      _fluxoBase = _fluxoSnap();
+      renderFluxoCards(); try { renderOrtoCards(); renderFluxoConcluidos(); } catch (e) {}
+    } catch(e) {
+      console.warn('[FLUXO] Erro ao salvar:', e);
+      showToast && showToast('error', 'Fluxo não foi salvo', 'Confira a conexão e marque de novo.');
+    }
+  });
+  return _fluxoFila;
 }
 
 // ---- Render cards ----
@@ -13181,7 +13230,33 @@ function normalizarNomeProcedimentoFiltro(nome) {
     .replace(/\s*-\s*Dente\s+\d+\s*$/i, '')  // remove "- Dente 22" no final
     .trim();
 }
+// (16/11/2026) toda mudança no Fluxo redesenha a lista, o kanban e o painel aberto juntos
 function renderFluxoCards() {
+  try { _renderFluxoLista(); } catch (e) { console.warn('[FLUXO] lista', e); }
+  try { if (_kb.modo.fluxo === 'kanban') kbRender('fluxo'); } catch (e) {}
+  try { _fluxoPainelAtualizar(); } catch (e) {}
+}
+function _fluxoPainelAtualizar() {
+  const m = document.getElementById('fluxo-painel'); if (!m || m.style.display === 'none') return;
+  const p = (_fluxoPacientes || []).find(x => x.id === m.dataset.id);
+  if (!p) { fecharFluxoPainel(); return; }
+  document.getElementById('fluxo-painel-corpo').innerHTML = fluxoCardHtml(p);
+}
+function abrirFluxoPaciente(p) {
+  let m = document.getElementById('fluxo-painel');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'fluxo-painel';
+    m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:880;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
+    m.innerHTML = '<div style="width:760px;max-width:100%;position:relative;"><button onclick="fecharFluxoPainel()" title="Fechar" style="position:absolute;top:-14px;right:-6px;z-index:2;background:#12213F;border:1px solid #2A3D66;color:#EEF1F7;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:14px;">✕</button><div id="fluxo-painel-corpo"></div></div>';
+    m.addEventListener('click', e => { if (e.target === m) fecharFluxoPainel(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharFluxoPainel(); });
+    document.body.appendChild(m);
+  }
+  m.dataset.id = p.id; m.style.display = 'flex';
+  _fluxoPainelAtualizar();
+}
+function fecharFluxoPainel() { const m = document.getElementById('fluxo-painel'); if (m) m.style.display = 'none'; }
+function _renderFluxoLista() {
   const busca = (document.getElementById('fluxo-search')?.value || '').toLowerCase();
   const statusFil = document.getElementById('fluxo-status-filter')?.value || '';
   const semanaFil = document.getElementById('fluxo-semana-filter')?.value || '';
@@ -13241,7 +13316,10 @@ function renderFluxoCards() {
     return;
   }
 
-  container.innerHTML = filtrados.map(p => {
+  container.innerHTML = filtrados.map(p => fluxoCardHtml(p)).join('');
+}
+// (16/11/2026) HTML completo de um paciente do Fluxo: usado na lista e no painel que abre ao clicar no card do kanban
+function fluxoCardHtml(p) {
     const pIdx = _fluxoPacientes.indexOf(p);
     const totalSubs = p.procedimentos.reduce((s, pr) => s + pr.subetapas.length, 0);
     const feitasSubs = p.procedimentos.reduce((s, pr) => s + pr.subetapas.filter(e => e.ok).length, 0);
@@ -13329,7 +13407,6 @@ function renderFluxoCards() {
       </div>
       ${procsHtml}
     </div>`;
-  }).join('');
 }
 
 function renderFluxoConcluidos() {
@@ -20635,18 +20712,21 @@ const KB_QUADROS={
     titulo:'Em Fluxo',
     lista:()=>[document.getElementById('fluxo-cards')],
     colunas:()=>[
-      {id:'boasvindas',nome:'Boas-vindas',dica:'Entrou no fluxo e ainda não concluiu nenhuma subetapa'},
-      {id:'tratamento',nome:'Em tratamento',dica:'Mostra quem está sem consulta marcada no Clinicorp'},
-      {id:'parado',nome:'Parado (sem retorno)',dica:'Não voltou para o retorno ou não responde. Arraste para cá (ou use ⏸ Parou na lista); arraste de volta quando retomar'},
-      {id:'posvenda',nome:'Pós-venda e NPS',dica:'Terminou o tratamento: enviar o pós-venda e a pesquisa NPS no dia seguinte'},
-      {id:'concluido',nome:'Concluído',dica:'Pós-venda e NPS enviados'}
+      {id:'boasvindas',nome:'Boas-vindas (fechou hoje)',dica:'Fechou hoje: mensagem de boas-vindas da recepção e do financeiro. Amanhã o card passa sozinho para Aguardando início'},
+      {id:'aguardando',nome:'Aguardando início',dica:'Fechou, mas nenhuma etapa foi marcada ainda (até 30 dias). Confira se a primeira consulta está marcada'},
+      {id:'tratamento',nome:'Em tratamento',dica:'Pelo menos uma etapa marcada. Mostra quem está sem consulta marcada no Clinicorp'},
+      {id:'semregistro',nome:'Sem registro há +30 dias',dica:'Fechou há mais de 30 dias e nenhuma etapa foi marcada: abra o card e marque as etapas feitas, marque como parado ou conclua'},
+      {id:'parado',nome:'Parado (sem retorno)',dica:'Não voltou para o retorno ou não responde. Arraste para cá; arraste de volta quando retomar'},
+      {id:'posvenda',nome:'Pós-venda e NPS',dica:'Terminou a parte clínica: enviar o pós-venda e a pesquisa NPS. Arraste para Concluído quando os dois forem enviados'},
+      {id:'concluido',nome:'Concluído (últimos 30 dias)',dica:'Pós-venda e NPS enviados. Os mais antigos ficam na aba Concluídos'}
     ],
     itens:()=>{
       const busca=(document.getElementById('fluxo-search')?.value||'').toLowerCase();
       const procFil=document.getElementById('fluxo-procedimento-filter')?.value||'';
       if(!_kb.agenda&&!_kb.carregandoAgenda&&Date.now()-(_kb.agendaTentativa||0)>60000)_kbCarregarAgenda();
+      const lim=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
       return (_fluxoPacientes||[]).filter(p=>{
-        if(p.concluido)return false;
+        if(p.concluido&&!(p.dataConcluido&&p.dataConcluido>=lim))return false;
         if(busca){const dg=busca.replace(/\D/g,'');if(!(p.nome||'').toLowerCase().includes(busca)&&!(dg&&String(p.tel||'').replace(/\D/g,'').includes(dg)))return false;}
         if(procFil&&!(p.procedimentos||[]).some(pr=>normalizarNomeProcedimentoFiltro(pr.nome)===procFil))return false;
         return true;
@@ -20659,16 +20739,26 @@ const KB_QUADROS={
     },
     coluna:(it)=>{
       const p=it.p;
-      const clin=typeof clinicoConcluido==='function'&&clinicoConcluido(p);
-      if(clin)return p.posVendaEnviado?'concluido':'posvenda';
+      if(p.concluido)return 'concluido';
+      if(typeof clinicoConcluido==='function'&&clinicoConcluido(p))return 'posvenda';
       if(p.parado)return 'parado';
-      return it.feitas>0?'tratamento':'boasvindas';
+      if(it.feitas>0)return 'tratamento';
+      const hoje=new Date().toISOString().slice(0,10);
+      if(p.dataInicio===hoje)return 'boasvindas';
+      const dias=p.dataInicio?Math.floor((Date.now()-new Date(p.dataInicio+'T12:00').getTime())/864e5):0;
+      return dias>30?'semregistro':'aguardando';
     },
     soltar:(it,col)=>{
-      const idx=_fluxoPacientes.indexOf(it.p);if(idx<0)return false;
-      if(col==='parado'){if(it.p.parado)return false;marcarParadoFluxo(idx);return !!it.p.parado;}
-      if((col==='tratamento'||col==='boasvindas')&&it.p.parado){retomarFluxo(idx);return true;}
-      showToast('error','Esse card anda sozinho','Só dá para arrastar para Parado (sem retorno) e de volta. O resto muda pelas subetapas e pelo pós-venda.');return false;
+      const idx=_fluxoPacientes.indexOf(it.p);if(idx<0)return false;const p=it.p;
+      if(col==='parado'){if(p.parado)return false;marcarParadoFluxo(idx);return !!p.parado;}
+      if(['tratamento','aguardando','boasvindas','semregistro'].includes(col)&&p.parado){retomarFluxo(idx);return true;}
+      if(col==='concluido'){
+        if(!clinicoConcluido(p)){showToast('error','Ainda falta a parte clínica','Abra o card e marque as etapas feitas. Quando todas estiverem marcadas, ele vai para Pós-venda e NPS.');return false;}
+        if(!confirm('Concluir '+(p.nome||'o paciente')+'?\nIsso marca o pós-venda e o NPS como enviados.'))return false;
+        p.npsEnviado=true;p.posVendaEnviado=true;atualizarConclusaoFluxo(p);salvarFluxoRemoto();renderFluxoCards();return true;
+      }
+      if(col==='posvenda'&&p.concluido){p.posVendaEnviado=false;atualizarConclusaoFluxo(p);salvarFluxoRemoto();renderFluxoCards();return true;}
+      showToast('error','Esse card anda sozinho','Ele muda conforme as etapas são marcadas. Arraste só para Parado, de volta, ou de Pós-venda para Concluído.');return false;
     },
     metricas:(cols,todos,porCol)=>{
       if(!_kb.agenda)return {tratamento:_kb.carregandoAgenda?{txt:'conferindo a agenda…',fraco:true}:{txt:'agenda do Clinicorp indisponível agora',fraco:true}};
@@ -20682,10 +20772,17 @@ const KB_QUADROS={
       if(col==='parado'&&it.p.parado){
         ag='<div class="kb-linha"><span class="kb-tag atraso">parado desde '+new Date(it.p.parado.desde+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>'+(it.p.parado.motivo?'<div class="kb-linha"><span>'+_kbEsc(it.p.parado.motivo)+'</span></div>':'');
       }
-      if(col==='tratamento'||col==='boasvindas'){
+      if(col==='semregistro'||col==='aguardando'){
+        const d=it.p.dataInicio?Math.floor((Date.now()-new Date(it.p.dataInicio+'T12:00').getTime())/864e5):null;
+        if(d!==null)ag+='<div class="kb-linha"><span class="kb-tag'+(col==='semregistro'?' atraso':'')+'">fechou há '+d+' dia'+(d===1?'':'s')+'</span></div>';
+      }
+      if(col==='posvenda'){
+        ag+='<div class="kb-linha"><span class="kb-tag'+(it.p.posVendaEnviado?' ok':'')+'">pós-venda '+(it.p.posVendaEnviado?'✓':'pendente')+'</span><span class="kb-tag'+(it.p.npsEnviado?' ok':'')+'">NPS '+(it.p.npsEnviado?'✓':'pendente')+'</span></div>';
+      }
+      if(col==='tratamento'||col==='boasvindas'||col==='aguardando'||col==='semregistro'){
         if(_kb.agenda){
           const a=(it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
-          ag=a?'<div class="kb-agenda">'+_kbIcAgenda+new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(a.hora?' '+a.hora:'')+'</div>'
+          ag+=a?'<div class="kb-agenda">'+_kbIcAgenda+new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(a.hora?' '+a.hora:'')+'</div>'
              :'<span class="kb-tag atraso">sem consulta marcada</span>';
         }
       }
@@ -20695,8 +20792,8 @@ const KB_QUADROS={
         <div class="kb-linha"><span>${it.feitas}/${it.tot} subetapas</span><span>início ${it.p.dataInicio?new Date(it.p.dataInicio+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'—'}</span>${it.p.npsEnviado?'<span>NPS enviado</span>':''}</div>
         ${ag}`;
     },
-    abrir:(it)=>{kbModo('fluxo','lista');const s=document.getElementById('fluxo-search');if(s){s.value=it.nome;renderFluxoCards();}},
-    aviso:()=>'O card anda sozinho conforme as subetapas e o pós-venda são marcados na lista. Em tratamento mostra quem não tem consulta marcada no Clinicorp nos próximos 90 dias. Quem não voltou para o retorno ou não responde vai para Parado (sem retorno): arraste o card para lá ou use ⏸ Parou na lista; quando voltar, arraste de volta. Clique no card para abrir o paciente na lista.'
+    abrir:(it)=>abrirFluxoPaciente(it.p),
+    aviso:()=>'Clique no card para abrir o paciente aqui mesmo: marque as etapas, o pós-venda e o NPS sem sair do quadro. O card anda sozinho: fechou hoje fica em Boas-vindas; sem nenhuma etapa marcada vai para Aguardando início (e, depois de 30 dias, para Sem registro); com etapa marcada vai para Em tratamento; com todas marcadas, para Pós-venda e NPS. Arraste para Parado quando o paciente não voltar, e de Pós-venda para Concluído quando enviar as duas mensagens.'
   },
   pacientes:{
     titulo:'Pacientes',
