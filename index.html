@@ -20754,7 +20754,8 @@ const KB_QUADROS={
       if(typeof clinicoConcluido==='function'&&clinicoConcluido(p))return 'posvenda';
       if(p.parado)return 'parado';
       if(it.feitas>0)return 'tratamento';
-      return p.dataInicio===new Date().toISOString().slice(0,10)?'boasvindas':'aguardando';
+      const _h=new Date();const hojeLocal=_h.getFullYear()+'-'+String(_h.getMonth()+1).padStart(2,'0')+'-'+String(_h.getDate()).padStart(2,'0');
+      return p.dataInicio===hojeLocal?'boasvindas':'aguardando';
     },
     soltar:(it,col)=>{
       const idx=_fluxoPacientes.indexOf(it.p);if(idx<0)return false;const p=it.p;
