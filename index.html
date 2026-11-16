@@ -13247,7 +13247,7 @@ function abrirFluxoPaciente(p) {
   if (!m) {
     m = document.createElement('div'); m.id = 'fluxo-painel';
     m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:880;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;';
-    m.innerHTML = '<div style="width:760px;max-width:100%;position:relative;"><button onclick="fecharFluxoPainel()" title="Fechar" style="position:absolute;top:-14px;right:-6px;z-index:2;background:#12213F;border:1px solid #2A3D66;color:#EEF1F7;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:14px;">✕</button><div id="fluxo-painel-corpo"></div></div>';
+    m.innerHTML = '<div style="width:760px;max-width:100%;position:relative;"><div style="display:flex;justify-content:flex-end;margin-bottom:8px;"><button onclick="fecharFluxoPainel()" style="background:#12213F;border:1px solid #2A3D66;color:#EEF1F7;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600;">← Voltar ao quadro</button></div><div id="fluxo-painel-corpo"></div></div>';
     m.addEventListener('click', e => { if (e.target === m) fecharFluxoPainel(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharFluxoPainel(); });
     document.body.appendChild(m);
