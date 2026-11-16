@@ -36,7 +36,7 @@ const IG_TOKEN = Deno.env.get("IG_TOKEN") ?? "";
 const GRAPH = "https://graph.facebook.com/" + (Deno.env.get("WA_GRAPH_VERSION") ?? "v23.0");
 const ORIGENS = (Deno.env.get("CRM_ORIGENS") ?? "https://dashboard-bulhoes.vercel.app").split(",").map((s) => s.trim());
 
-const PAPEIS_ATENDIMENTO = ["gestao", "avaliacao", "comercial"];
+const PAPEIS_ATENDIMENTO = ["gestao", "avaliacao", "comercial", "clinica"]; // clínica (Dra. Gabi) desde 16/11
 const JANELA_MS = 24 * 60 * 60 * 1000;
 
 function cors(req: Request): Record<string, string> {
