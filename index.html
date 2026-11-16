@@ -1319,7 +1319,7 @@ body{letter-spacing:-.1px;}
       <span class="nav-label">Mensagens</span>
       <span class="wa-nav-badge" id="wa-nav-badge-inst" style="display:none"></span>
     </div>
-    <div class="nav-item nav-inst" onclick="switchPage('inst-automacoes',this)">
+    <div class="nav-item nav-inst" onclick="switchPage('automacoes',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span>
       <span class="nav-label">Automações</span>
     </div>
@@ -1331,7 +1331,7 @@ body{letter-spacing:-.1px;}
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></span>
       <span class="nav-label">Social Selling</span>
     </div>
-    <div class="nav-item nav-inst" onclick="switchPage('inst-disparos',this)">
+    <div class="nav-item nav-inst" onclick="switchPage('disparos',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg></span>
       <span class="nav-label">Mensagens em Massa</span>
     </div>
@@ -3677,7 +3677,7 @@ function switchPage(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-indicacoes':'Indicações e NPS','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
-  document.getElementById('topbar-title').textContent=(INST_TITULOS||{})[page]?INST_TITULOS[page]+' · Instituto':(_espacoInst()&&page==='conversas'?'Mensagens · Instituto':(titles[page]||page));
+  document.getElementById('topbar-title').textContent=(INST_TITULOS||{})[page]?INST_TITULOS[page]+' · Instituto':(_espacoInst()&&page==='conversas'?'Mensagens · Instituto':(_espacoInst()?(titles[page]||page)+' · Instituto':(titles[page]||page)));
   if(page==='inicio') carregarInicio();
   else if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
@@ -17170,7 +17170,7 @@ async function auCarregar(){
       _waRest('configuracoes?chave=eq.automacoes_ligadas&select=valor').catch(()=>[]),
       _waRest('automacao_execucoes?select=automacao_id&status=eq.ativa&limit=10000').catch(()=>[])
     ]);
-    _au.lista=lista||[];
+    _au.lista=(lista||[]).filter(a=>(a.espaco||'clinica')===window._espaco); // (202) cada espaço vê as suas
     _au.chaveGeral=!!(chave&&chave[0]&&chave[0].valor===true);
     _au.ativos={};(ativos||[]).forEach(x=>{_au.ativos[x.automacao_id]=(_au.ativos[x.automacao_id]||0)+1;});
     _au.erro=null;
@@ -17180,6 +17180,7 @@ async function auCarregar(){
   if(currentPage==='automacoes'&&_au.modo==='lista')auRender();
 }
 async function auChaveGeral(ligar){
+  if(window._espaco==='instituto'){showToast('error','Chave geral só no modo Clínica','Ela liga e pausa as automações dos dois espaços. Troque para Clínica para mexer nela.');return;}
   if(ligar&&!confirm('Ligar a chave geral?\n\nAs automações ligadas fora do modo teste começam a enviar para todos os contatos. Se o Cloudia ainda estiver com sequências ativas, o paciente pode receber em dobro.'))return;
   try{
     await _waRest('configuracoes?chave=eq.automacoes_ligadas',{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({valor:!!ligar})});
@@ -17250,7 +17251,7 @@ function auRender(){
     '<div style="font-size:12px;margin-top:3px">'+(_au.chaveGeral
       ?'O motor roda a cada minuto. Funcionam as sequências com “Ligada” marcada.'
       :'Sequências em modo teste já funcionam, só para os telefones de teste. As outras ficam paradas até ligar a chave geral, no dia em que o Cloudia for desligado (para o paciente não receber em dobro).')+'</div></div>'+
-    (_waEhGestao()?'<button class="wa-btn'+(_au.chaveGeral?'':' primario')+'" onclick="auChaveGeral('+(!_au.chaveGeral)+')">'+(_au.chaveGeral?'Pausar tudo':'Ligar chave geral')+'</button>':'')+
+    (_waEhGestao()&&window._espaco!=='instituto'?'<button class="wa-btn'+(_au.chaveGeral?'':' primario')+'" onclick="auChaveGeral('+(!_au.chaveGeral)+')">'+(_au.chaveGeral?'Pausar tudo':'Ligar chave geral')+'</button>':'')+
   '</div>';
   const linhas=lista.map(a=>{
     const n=_au.ativos[a.id]||0;
@@ -17265,7 +17266,7 @@ function auRender(){
         (_waEhGestao()?'<button title="Apagar" class="sq-lixo" onclick="auApagar('+a.id+')">🗑</button>':'')+'</td>'+
     '</tr>';
   }).join('');
-  el.innerHTML=geral+'<div id="au-extras">'+auExtrasHtml()+'</div>'+
+  el.innerHTML=geral+(window._espaco==='instituto'?'<div class="au-dica" style="margin:-4px 0 12px">A chave geral vale para os dois espaços e só muda no modo Clínica. As sequências daqui saem pelo WhatsApp do Instituto, (13) 4042-7082.</div>':'<div id="au-extras">'+auExtrasHtml()+'</div>')+
     '<div class="sq-info"><span>ℹ</span><div><b>Limitação da WhatsApp Business API</b><br><b>Importante:</b> Para contatos que utilizam a WhatsApp Business API, <b>somente mensagens de template são enviadas fora da janela de interação de 24 horas com o contato</b>, contabilizadas a partir da última mensagem recebida.</div></div>'+
     '<div class="dp-card">'+
       '<div class="sq-topo"><div class="dp-busca" style="max-width:240px"><input placeholder="Digite para buscar..." value="'+_auEsc(_au.busca||'')+'" oninput="_au.busca=this.value;auRender();this.focus();this.setSelectionRange(this.value.length,this.value.length)" style="border:none;outline:none;flex:1;font-size:12.5px;background:transparent;min-width:0"><span>🔍</span></div>'+
@@ -17473,8 +17474,9 @@ function _sqAbrir(a){
   auRenderEditor();
 }
 function auNova(){
-  _sqAbrir({id:null,nome:'',descricao:'',ligada:false,modo_teste:true,telefones_teste:[],numero_clinica_id:null,
-    gatilho:{lista:[{tipo:'etapa',etapa:'Lead'}]},regras:Object.assign({},AU_REGRAS_PADRAO,{saida:{tipo:'qualquer'}}),passos:[{tipo:'esperar',minutos:120}]});
+  const inst=window._espaco==='instituto';
+  _sqAbrir({id:null,nome:'',descricao:'',ligada:false,modo_teste:true,telefones_teste:[],numero_clinica_id:inst?WA_NUMEROS_FORA_CLINICA[0]:null,
+    gatilho:{lista:[inst?{tipo:'mensagem_recebida',palavras:[]}:{tipo:'etapa',etapa:'Lead'}]},regras:Object.assign({},AU_REGRAS_PADRAO,{saida:{tipo:'qualquer'}}),passos:[{tipo:'esperar',minutos:120}]});
 }
 function auEditar(id){const a=_au.lista.find(x=>x.id===id);if(a)_sqAbrir(JSON.parse(JSON.stringify(a)));}
 function auDuplicar(id){
@@ -17504,7 +17506,7 @@ function auRenderEditor(){
   const rolagem=g?g.querySelector('.dp-g-corpo').scrollTop:0;
   if(!g){g=document.createElement('div');g.id='sq-gaveta';document.body.appendChild(g);}
   const r=a.regras;const sa=r.saida||{tipo:'qualquer'};
-  const nums=_wa.numeros||[];
+  const nums=(_wa.numeros||[]).filter(n=>(window._espaco==='instituto')===_waForaClinica(n.phone_number_id));
   const gats=a.gatilho.lista.map((x,i)=>{
     let val='';
     if(x.tipo==='etapa')val='<select class="dp-in" onchange="sqGat('+i+',\'etapa\',this.value)">'+_auOpt('','Selecione o valor',x.etapa)+AU_ETAPAS.map(e=>_auOpt(e,WA_ETAPA_ROTULO[e]||e,x.etapa)).join('')+'</select>';
@@ -17512,7 +17514,7 @@ function auRenderEditor(){
     else if(x.tipo==='estado')val='<select class="dp-in" onchange="sqGat('+i+',\'estado\',this.value)">'+_auOpt('','Selecione o valor',x.estado)+Object.keys(SQ_ESTADOS).map(k=>_auOpt(k,SQ_ESTADOS[k],x.estado)).join('')+'</select>';
     else if(x.tipo==='mensagem_recebida')val='<input class="dp-in" placeholder="Palavras, separadas por vírgula (vazio = qualquer)" value="'+_auEsc((x.palavras||[]).join(', '))+'" oninput="sqGat('+i+',\'palavras\',this.value.split(\',\').map(s=>s.trim()).filter(Boolean),true)">';
     else if(x.tipo==='lead_criado')val='<select class="dp-in" onchange="sqGat('+i+',\'origem\',this.value||null)">'+_auOpt('','Qualquer origem',x.origem)+_waOrigens().map(o=>_auOpt(o,o,x.origem)).join('')+'</select>';
-    return '<div class="sq-gat-linha"><select class="dp-in" onchange="sqGatTipo('+i+',this.value)">'+Object.keys(SQ_GAT_TIPOS).map(k=>_auOpt(k,SQ_GAT_TIPOS[k],x.tipo)).join('')+'</select>'+val+
+    return '<div class="sq-gat-linha"><select class="dp-in" onchange="sqGatTipo('+i+',this.value)">'+Object.keys(SQ_GAT_TIPOS).filter(k=>window._espaco!=='instituto'||!['etapa','lead_criado'].includes(k)||k===x.tipo).map(k=>_auOpt(k,SQ_GAT_TIPOS[k],x.tipo)).join('')+'</select>'+val+
       '<b class="sq-ou">'+(i<a.gatilho.lista.length-1?'OU':'')+'</b><button class="sq-x" title="Remover gatilho" onclick="sqGatTirar('+i+')">✕</button></div>';
   }).join('');
   let saidaVal='';
@@ -17530,7 +17532,7 @@ function auRenderEditor(){
         (_au.secCfg?'<div class="sq-cfg-corpo">'+
           '<div class="dp-g-sec"><div class="dp-g-tit">Título *</div><input class="dp-in" maxlength="80" value="'+_auEsc(a.nome)+'" oninput="sqSet(\'nome\',this.value)"></div>'+
           '<div class="dp-g-sec"><div class="dp-g-tit">Descrição</div><textarea class="dp-in sq-ta" oninput="sqSet(\'descricao\',this.value)">'+_auEsc(a.descricao||'')+'</textarea></div>'+
-          '<div class="dp-g-sec"><div class="dp-g-tit">Conexão do WhatsApp '+_sqQ('De qual número da clínica as mensagens saem.')+'</div><select class="dp-in" onchange="sqSet(\'numero_clinica_id\',this.value||null)">'+_auOpt('','Todas as conexões',a.numero_clinica_id)+nums.map(n=>_auOpt(n.phone_number_id,n.apelido||n.numero_exibicao,a.numero_clinica_id)).join('')+'</select></div>'+
+          '<div class="dp-g-sec"><div class="dp-g-tit">Conexão do WhatsApp '+_sqQ('De qual número da clínica as mensagens saem.')+'</div><select class="dp-in" onchange="sqSet(\'numero_clinica_id\',this.value||null)">'+(window._espaco==='instituto'?'':_auOpt('','Todas as conexões',a.numero_clinica_id))+nums.map(n=>_auOpt(n.phone_number_id,n.apelido||n.numero_exibicao,a.numero_clinica_id)).join('')+'</select></div>'+
           '<div class="dp-g-sec"><div class="dp-g-tit">Gatilho de entrada '+_sqQ('O que faz o contato entrar na sequência. Basta um dos gatilhos acontecer.')+'</div><div class="sq-sub">Adicione os gatilhos de entrada desejados para iniciar a sequência automaticamente.</div>'+
             '<div class="sq-gats"><div class="sq-gats-cab" onclick="sqAlternar(\'secGat\')">Gatilhos de entrada <span>'+(_au.secGat?'⌃':'⌄')+'</span></div>'+
             (_au.secGat?'<div class="sq-gats-corpo">'+(gats||'<div class="sq-sub" style="text-align:center">Sem gatilho: só entra quem a equipe colocar.</div>')+'<button class="sq-add-gat" onclick="sqGatNovo()">＋ Adicionar gatilho de entrada</button></div>':'')+'</div></div>'+
@@ -17715,7 +17717,7 @@ async function sqSubirMidia(i,inp){
 async function auCarregarModelos(){
   if(_au.modelos||_au.carregandoModelos)return;
   _au.carregandoModelos=true;
-  try{const r=await _waAcao({acao:'modelos'});_au.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
+  try{const r=await _waAcao(window._espaco==='instituto'?{acao:'modelos',numero:WA_NUMEROS_FORA_CLINICA[0]}:{acao:'modelos'});_au.modelos=(r.modelos||[]).sort((a,b)=>a.nome.localeCompare(b.nome));}
   catch(e){_au.modelos=[];showToast('error','Não consegui carregar os templates da Meta',e.message);}
   _au.carregandoModelos=false;
   if(_au.modo==='editor')auRenderEditor();
@@ -17765,7 +17767,7 @@ async function auSalvar(){
   }
   const gl=a.gatilho.lista;
   const campos={nome:a.nome.trim(),descricao:a.descricao||null,ligada:!!a.ligada,modo_teste:!!a.modo_teste,telefones_teste:a.telefones_teste||[],
-    numero_clinica_id:a.numero_clinica_id||null,gatilho:gl.length?{tipo:gl[0].tipo,lista:gl}:{tipo:'manual',lista:[]},regras:a.regras,passos:a.passos};
+    numero_clinica_id:a.numero_clinica_id||(window._espaco==='instituto'?WA_NUMEROS_FORA_CLINICA[0]:null),gatilho:gl.length?{tipo:gl[0].tipo,lista:gl}:{tipo:'manual',lista:[]},regras:a.regras,passos:a.passos};
   const b=document.getElementById('au-salvar');if(b){b.disabled=true;b.textContent='Salvando…';}
   try{
     if(a.id)await _waRest('automacoes?id=eq.'+a.id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(campos)});
@@ -17890,15 +17892,18 @@ function abrirDisparos(){
 // base de contatos (CRM + conversas)
 function dpMontarBase(){
   const mapa=new Map();const conv=new Map();
-  (_wa.conversas||[]).forEach(c=>{const ph=normalizePhone(c.telefone);if(ph&&!conv.has(ph))conv.set(ph,c);});
+  (_wa.conversas||[]).filter(c=>window._espaco!=='instituto'||_waConexaoVisivel(c)).forEach(c=>{const ph=normalizePhone(c.telefone);if(ph&&!conv.has(ph))conv.set(ph,c);});
   const add=(bruto,nome)=>{
     const ph=normalizePhone(bruto);if(!ph||mapa.has(ph))return;
     const c=conv.get(ph)||null;
     const L=_waLead({telefone:ph,pacientes:c&&c.pacientes});
     mapa.set(ph,{ph,bruto:String(bruto||''),nome:nome||(c?_waNome(c):''),etapa:L.etapa||'',origem:L.origem||'',adName:L.adName||'',campanha:L.campanha||'',criado:L.criadoEm||'',conversa:c,ultMsg:c&&c.ultima_recebida_em||''});
   };
+  // (202) no Instituto, a base são só as conversas do Instituto (nada do CRM da clínica)
+  if(window._espaco!=='instituto'){
   (allCloudiaRows||[]).forEach(r=>add(r.phone,r.name));
   Object.keys(_ccData||{}).forEach(k=>{if(/^\d{10,13}$/.test(k))add(k,(_ccData[k]&&(_ccData[k].nome||_ccData[k].name))||'');});
+  }
   conv.forEach((c,ph)=>add(ph,_waNome(c)));
   _dp.base=[...mapa.values()];
   const fups=_dpEtapasFup();
@@ -18075,7 +18080,7 @@ function dpMenuEnvio(ev){
 // ---------- gaveta "Mensagens em massa via WhatsApp" ----------
 async function dpAbrirGaveta(aba){
   _dp.gaveta={aba};
-  if(aba==='envio'&&!_dp.envio)_dp.envio={agendar:false,agendado:'',numero:(_wa.numeros&&_wa.numeros[0]&&_wa.numeros[0].phone_number_id)||'',modelo:null,espera:3,repeticao:7,ciente:false,nome:'',previa:null};
+  if(aba==='envio'&&!_dp.envio)_dp.envio={agendar:false,agendado:'',numero:window._espaco==='instituto'?WA_NUMEROS_FORA_CLINICA[0]:((_wa.numeros||[]).filter(n=>!_waForaClinica(n.phone_number_id))[0]||{}).phone_number_id||'',modelo:null,espera:3,repeticao:7,ciente:false,nome:'',previa:null};
   dpRenderGaveta();
   if(aba==='resultados')dpCarregarResultados();
   if(aba==='envio'&&(!_dp.modelos||_dp.modelosNumero!==(_dp.envio.numero||'')))await dpCarregarModelos();
@@ -18133,7 +18138,7 @@ function dpRenderGaveta(){
         '<label class="au-check"><input type="checkbox" '+(e.agendar?'checked':'')+' onchange="_dp.envio.agendar=this.checked;dpRenderGaveta()"> Deseja agendar a ação em massa?</label>'+
         (e.agendar?'<input class="dp-in" type="datetime-local" value="'+_waEsc(e.agendado)+'" onchange="_dp.envio.agendado=this.value;dpRenderGaveta()">':'')+'</div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Conexão de WhatsApp <span class="dp-q" title="Número da clínica que vai enviar.">?</span></div>'+
-        '<select class="dp-in" onchange="dpTrocarNumero(this.value)">'+(_wa.numeros.length?_wa.numeros:[{phone_number_id:'',apelido:'Clínica'}]).map(x=>'<option value="'+_waEsc(x.phone_number_id)+'"'+(e.numero===x.phone_number_id?' selected':'')+'>● '+_waEsc(x.apelido||x.numero_exibicao)+'  ON</option>').join('')+'</select></div>'+
+        '<select class="dp-in" onchange="dpTrocarNumero(this.value)">'+(()=>{const ns=(_wa.numeros||[]).filter(n=>(window._espaco==='instituto')===_waForaClinica(n.phone_number_id));return ns.length?ns:[{phone_number_id:window._espaco==='instituto'?WA_NUMEROS_FORA_CLINICA[0]:'',apelido:window._espaco==='instituto'?'Instituto':'Clínica'}];})().map(x=>'<option value="'+_waEsc(x.phone_number_id)+'"'+(e.numero===x.phone_number_id?' selected':'')+'>● '+_waEsc(x.apelido||x.numero_exibicao)+'  ON</option>').join('')+'</select></div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Modelo da mensagem</div>'+modeloHtml+'</div>'+
       '<div class="dp-g-sec"><div class="dp-g-tit">Tempo de espera em segundos entre envio de cada mensagem <span class="dp-q" title="Mais tempo protege a qualidade do número na Meta.">?</span></div>'+
         '<div class="dp-slider"><input type="range" min="0.3" max="10" step="0.1" value="'+e.espera+'" oninput="_dp.envio.espera=Number(this.value);this.nextElementSibling.textContent=this.value+\' s\'"  onchange="dpRenderGaveta()"><span>'+e.espera+' s</span></div>'+
@@ -18200,7 +18205,7 @@ async function dpDisparar(){
 }
 async function dpCarregarResultados(){
   try{
-    _dp.lista=(await _waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em&order=criado_em.desc&limit=50'))||[];
+    _dp.lista=((await _waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em,espaco&order=criado_em.desc&limit=50').catch(()=>_waRest('disparos?select=id,nome,modelo,status,agendado_para,ritmo_por_minuto,total,criado_em,criado_por,iniciado_em,concluido_em&order=criado_em.desc&limit=50')))||[]).filter(d=>(d.espaco||'clinica')===window._espaco);
     await Promise.all(_dp.lista.slice(0,20).map(async d=>{try{_dp.resumos[d.id]=await _waRest('rpc/disparo_resumo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_disparo:d.id})});}catch(e){}}));
   }catch(e){_dp.lista=[];}
   if(_dp.gaveta&&_dp.gaveta.aba==='resultados')dpRenderGaveta();
@@ -18576,6 +18581,7 @@ function waMenuMais(ev){
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
     (window._espaco==='instituto'
       ?(INST_FUNIL_LIGADO?'<button onclick="_clFecharPop();_wa.atual&&(_instCardDaConversa(_wa.atual)?instCardAbrir(_instCardDaConversa(_wa.atual).id):instCardDaConversaAtual())">'+_clIc('funil')+' Card no funil do Instituto</button>':'')+
+       '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
        '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'
       :'<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
     (_wa.atual&&_wa.atual.canal!=='instagram'?'<button onclick="_clFecharPop();waAbrirAgendar()">'+_clIc('clock')+' Agendar no Clinicorp</button>':'')+
@@ -18774,8 +18780,9 @@ async function waSeqAbrir(){
   try{
     [ex,autos]=await Promise.all([
       _waRest('automacao_execucoes?select=id,passo,proxima_em,automacao_id&status=eq.ativa&telefone=eq.'+encodeURIComponent(c.telefone)+'&order=proxima_em'),
-      _waRest('automacoes?select=id,nome,descricao,ligada,modo_teste&order=nome')
+      _waRest('automacoes?select=id,nome,descricao,ligada,modo_teste,espaco&order=nome').catch(()=>_waRest('automacoes?select=id,nome,descricao,ligada,modo_teste&order=nome'))
     ]);
+    autos=(autos||[]).filter(a=>(a.espaco||'clinica')===window._espaco);
   }catch(e){p.innerHTML='<div class="cl-seq-cab">Sequências ativas</div><div class="wa-vazio">'+_waEsc(e.message)+'</div>';return;}
   const porId={};(autos||[]).forEach(a=>porId[a.id]=a);
   const ligadas=(autos||[]).filter(a=>a.ligada);
@@ -19127,6 +19134,8 @@ function trocarEspaco(e){
     const w=document.getElementById('wa-wrap');if(w)w.classList.remove('painel-aberto');
     _instAplicarEquipe();_waRotuloConexoes();
     if(_wa.iniciado){waCarregarTags();waCarregarRapidas();}
+    Object.assign(_au,{lista:[],ativos:{},atual:null,modelos:null,modo:'lista'});
+    Object.assign(_dp,{lista:[],resumos:{},base:null,publico:[],sel:new Set(),modelos:null,modelosNumero:null,gaveta:null,envio:null});
     if(_wa.iniciado)waCarregarConversas(true);else waAtualizarBadge();
   }catch(x){}
   irParaPagina(e==='instituto'?'inst-dashboard':'inicio');
