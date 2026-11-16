@@ -13163,6 +13163,18 @@ async function initFluxoTratamento() {
       _fluxoPacientes = data.pacientes || [];
       _ortoPacientes = data.ortoPacientes || [];
       _fluxoBase = _fluxoSnap();
+      // (16/11/2026) rede de segurança: orçamento aprovado nos últimos 3 dias que ainda não está
+      // no Fluxo (o sync automático pode falhar se o banco estiver lento) entra ao abrir a aba
+      try {
+        const lim = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10); let mudou = false;
+        Object.entries(_ccData || {}).forEach(([ph, d]) => (d.orcamentos || []).forEach(o => {
+          const f = String(o.fechData || '').slice(0, 10);
+          if (o.status !== 'Aprovado' || !f || f < lim || !o.tratamento) return;
+          if (_fluxoPacientes.some(x => normalizePhone(x.tel || '') === normalizePhone(ph))) return;
+          if (mesclarOrcamentoNoFluxo(_fluxoPacientes, _fluxoModelos, normalizePhone(ph), d.nomeAtual, o.tratamento, f)) mudou = true;
+        }));
+        if (mudou) salvarFluxoRemoto();
+      } catch (e) { console.warn('[FLUXO] rede de segurança', e); }
     }
   } catch(e) { console.warn('[FLUXO] Erro ao carregar:', e); }
   renderFluxoCards();
