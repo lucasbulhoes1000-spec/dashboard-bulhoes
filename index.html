@@ -20718,7 +20718,7 @@ const KB_QUADROS={
       editarFaseAtivTabela(ccKey(it.r),col);
       return true;
     },
-    aviso:()=>'Follow-up de orçamentos. Quem fez a avaliação e não fechou entra direto no 1. Agradecimento. O card fica na etapa da mensagem a mandar: clique em ✉ Abrir mensagem, mande (copiar ou abrir no WhatsApp) e clique em Enviei para o card ir para a próxima. Prazos contados da avaliação: agradecimento no dia, antes e depois no dia 1, depoimento no 3, mais um depoimento no 4, mensagens apagadas no 7, conseguiu ver no 8, despedida no 10; depois vai para a Cadência mensal. Novos pacientes e recompras ficam juntos (a recompra tem selo no card). Quem não vai receber follow-up: arraste para Descarte, no fim do quadro. Pix de compromisso e retorno combinado: a Dra. Victoria marca na ficha do cliente (aba Orçamentos) ou a Lívia na mensagem do card; Pix pago deixa o card no topo e destacado, Devolvido tira o destaque; com retorno combinado o prazo passa a ser a data combinada. Avaliação há mais de 30 dias sem fechar vai sozinha para a Cadência mensal.',
+    aviso:()=>'',
   },
   fluxo:{
     titulo:'Em Fluxo',
@@ -20943,7 +20943,7 @@ function kbRender(q){
   });
   const chaves=Object.keys(grupos).map(g=>{const n=cols.filter(c=>c.grupo===g).reduce((s,c)=>s+(porCol[c.id]||[]).length,0);
     return `<button type="button" class="kb-chave${aberto(g)?' on':''}" role="switch" aria-checked="${aberto(g)}" onclick="kbGrupo('${q}','${g}')"><i></i>${_kbEsc(grupos[g])} <b>${n}</b></button>`;}).join('');
-  host.innerHTML=`${chaves?'<div class="kb-chaves">'+chaves+'</div>':''}<div class="kb-aviso">${_kbEsc(cfg.aviso?cfg.aviso():'')}</div>
+  host.innerHTML=`${chaves?'<div class="kb-chaves">'+chaves+'</div>':''}${cfg.aviso&&cfg.aviso()?'<div class="kb-aviso">'+_kbEsc(cfg.aviso())+'</div>':''}
     <div class="kb-trilho">${partes.join('')}</div>`;
   const tr=host.querySelector('.kb-trilho');if(tr&&scroll)tr.scrollLeft=scroll;
   // Leads: busca as respostas e redesenha uma vez quando chegarem
