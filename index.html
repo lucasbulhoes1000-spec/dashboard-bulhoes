@@ -1120,6 +1120,10 @@ body{letter-spacing:-.1px;}
 .kb-card.kb-prazo-atraso{background:linear-gradient(180deg,#4A1C1C,#3A1515)!important;border:1px solid #C25555!important;}
 .kb-card.kb-prazo-hoje.kb-retorno,.kb-card.kb-prazo-atraso.kb-retorno{border-left-width:4px!important;}
 .kb-prazo-hoje .kb-retorno-faixa,.kb-prazo-atraso .kb-retorno-faixa{color:#FFFFFF;}
+.kb-card.kb-retorno-dia{background:linear-gradient(180deg,#0E3A20,#0A2C18)!important;border:1px solid #2E8B57!important;border-left:5px solid #7FD3A0!important;}
+.kb-retorno-dia .kb-retorno-faixa{color:#FFFFFF;}
+html[data-tema="claro"] .kb-card.kb-retorno-dia{background:#9ED9B3!important;border-color:#1E6B3D!important;border-left-color:#1E6B3D!important;}
+html[data-tema="claro"] .kb-retorno-dia .kb-retorno-faixa{color:#0F3D22;}
 .kb-card.kb-pix-estrela .kb-nome::before{content:'★ ';color:#F0CB72;}
 html[data-tema="claro"] .kb-card.kb-prazo-hoje,body.claro .kb-card.kb-prazo-hoje{background:#DDF3E4!important;border-color:#3FA56A!important;}
 html[data-tema="claro"] .kb-card.kb-prazo-atraso,body.claro .kb-card.kb-prazo-atraso{background:#FBE0DE!important;border-color:#C25555!important;}
@@ -1690,11 +1694,12 @@ html[data-tema="claro"] .kb-prazo-atraso .kb-retorno-faixa{color:#9B2C2C;}
     <!-- ===== CLIENTES PAGE ===== -->
     <div class="page" id="page-clientes">
       <!-- CARDS RESUMO -->
-      <div class="row r4" style="margin-bottom:16px;">
+      <div class="row r5" style="margin-bottom:16px;">
         <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms" id="cc-total-clientes-label">maior orçamento de cada paciente</div></div>
         <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">pacientes em aberto (novos e recompras)</div></div>
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
+        <div class="mc" id="cc-na-aval-card" title=""><div class="ml">Fechou na avaliação</div><div class="mv green" id="cc-na-aval">—</div><div class="ms" id="cc-na-aval-sub">—</div></div>
       </div>
 
       <!-- DIVISÃO PRINCIPAL DA ABA CLIENTES -->
@@ -9255,6 +9260,25 @@ function renderClientesPage(){
   // % do valor orçado que virou venda (valorF / totalOrcado)
   const pctValor=totalOrcado>0?(valorF/totalOrcado*100):0;
   const elValSub=document.getElementById('cc-valor-fechado-sub');
+  // (16/11/2026) Lucas: fechou na avaliação x fechou depois. Avaliação = data do orçamento;
+  // fechamento = data de aprovação. Mesmo dia = na avaliação. Vale o primeiro aprovado de cada paciente.
+  try{
+    let naAval=0,depois=0,somaDias=0;const porAv={};
+    filtered.forEach(r=>{
+      const ap=(r._orcamentosPeriodo||[]).filter(o=>o.status==='Aprovado'&&o.data&&(o.fechData||o.data))
+        .sort((a,b)=>String(a.fechData||a.data).localeCompare(String(b.fechData||b.data)))[0];
+      if(!ap)return;
+      const d0=String(ap.data).slice(0,10),d1=String(ap.fechData||ap.data).slice(0,10);
+      const dias=Math.max(0,Math.round((new Date(d1+'T12:00')-new Date(d0+'T12:00'))/864e5));
+      const av=String(ap.avaliador||'Sem avaliador').trim().split(/\s+/)[0];
+      porAv[av]=porAv[av]||{na:0,dep:0};
+      if(dias===0){naAval++;porAv[av].na++;}else{depois++;somaDias+=dias;porAv[av].dep++;}
+    });
+    const tot=naAval+depois;
+    document.getElementById('cc-na-aval').textContent=tot?naAval+' de '+tot:'—';
+    document.getElementById('cc-na-aval-sub').textContent=tot?(Math.round(naAval/tot*100)+'% na hora · '+depois+' depois'+(depois?' (média '+(somaDias/depois).toFixed(1).replace('.',',')+' dias)':'')):'sem fechamentos no período';
+    document.getElementById('cc-na-aval-card').title='Por avaliador (na avaliação / depois):\n'+Object.entries(porAv).sort((a,b)=>(b[1].na+b[1].dep)-(a[1].na+a[1].dep)).map(([n,v])=>n+': '+v.na+' / '+v.dep).join('\n');
+  }catch(e){console.warn('[CLIENTES] fechou na avaliação',e);}
   elValSub.textContent='de receita · '+pctValor.toFixed(1)+'%';
   elValSub.title=fmt(valorF)+' de '+fmt(totalOrcado)+' orçados converteram em venda ('+pctValor.toFixed(1)+'%)';
   document.getElementById('clientes-tbody').innerHTML=pagina.length>0?pagina.map(r=>{
@@ -20689,7 +20713,7 @@ const KB_QUADROS={
       if(!it.fechou){
         const px=_kbOrcPrazo(it,col);const hj=new Date(new Date().toDateString());
         if(px){if(px.ate<hj)cls.push('kb-prazo-atraso');else if(+px.ate===+hj)cls.push('kb-prazo-hoje');}
-        const r=_fupRetorno(it);if(r&&r.data)cls.push('kb-retorno');
+        const r=_fupRetorno(it);if(r&&r.data){cls.push('kb-retorno');if(+new Date(r.data+'T00:00')===+hj){cls.length=0;cls.push('kb-retorno','kb-retorno-dia');}}
         if(_fupPrioridade(it))cls.push(cls.some(c=>c.startsWith('kb-prazo'))?'kb-pix-estrela':'kb-pix'+(typeof temaAtual==='function'&&temaAtual()==='claro'?' kb-pix-claro':''));
       }
       return cls.join(' ');
