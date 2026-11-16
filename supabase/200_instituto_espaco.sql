@@ -84,18 +84,18 @@ $$;
 -- ------------------------------------------------------------
 drop policy if exists espaco_conversas on public.conversas;
 create policy espaco_conversas on public.conversas as restrictive for all to authenticated
-  using (numero_clinica_id <> all ((select public.numeros_fora_do_meu_espaco())))
-  with check (numero_clinica_id <> all ((select public.numeros_fora_do_meu_espaco())));
+  using (numero_clinica_id <> all ((select public.numeros_fora_do_meu_espaco())::text[]))
+  with check (numero_clinica_id <> all ((select public.numeros_fora_do_meu_espaco())::text[]));
 
 drop policy if exists espaco_mensagens on public.mensagens;
 create policy espaco_mensagens on public.mensagens as restrictive for all to authenticated
-  using (conversa_id <> all ((select public.conversas_fora_do_meu_espaco())))
-  with check (conversa_id <> all ((select public.conversas_fora_do_meu_espaco())));
+  using (conversa_id <> all ((select public.conversas_fora_do_meu_espaco())::uuid[]))
+  with check (conversa_id <> all ((select public.conversas_fora_do_meu_espaco())::uuid[]));
 
 drop policy if exists espaco_whatsapp_numeros on public.whatsapp_numeros;
 create policy espaco_whatsapp_numeros on public.whatsapp_numeros as restrictive for all to authenticated
-  using (espaco = any ((select public.meus_espacos())))
-  with check (espaco = any ((select public.meus_espacos())));
+  using (espaco = any ((select public.meus_espacos())::text[]))
+  with check (espaco = any ((select public.meus_espacos())::text[]));
 
 -- ------------------------------------------------------------
 -- 4. Funil do Instituto
