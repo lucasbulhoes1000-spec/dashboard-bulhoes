@@ -15673,15 +15673,16 @@ async function waCarregarEquipe(){
 }
 async function waCarregarTags(){
   try{
-    const [tags,ct]=await Promise.all([_waRest('wa_tags?select=id,nome,cor&order=nome'),_waRest('conversa_tags?select=conversa_id,tag_id')]);
-    _wa.tags=tags||[];_wa.convTags={};
+    // (16/11/2026, SQL 201) cada espaço só usa as tags dele; sem a coluna espaco, tudo é da clínica
+    const [tags,ct]=await Promise.all([_waRest('wa_tags?select=id,nome,cor,espaco&order=nome').catch(()=>_waRest('wa_tags?select=id,nome,cor&order=nome')),_waRest('conversa_tags?select=conversa_id,tag_id')]);
+    _wa.tags=(tags||[]).filter(t=>(t.espaco||'clinica')===window._espaco);_wa.convTags={};
     (ct||[]).forEach(x=>{(_wa.convTags[x.conversa_id]=_wa.convTags[x.conversa_id]||new Set()).add(x.tag_id);});
   }catch(e){_wa.tags=[];_wa.convTags={};} // SQL 013 ainda não aplicado
   waPreencherFiltros();
   if(currentPage==='conversas'){waRenderLista();waRenderPainel();}
 }
 async function waCarregarRapidas(){
-  try{_wa.rapidas=(await _waRest('respostas_rapidas?select=id,atalho,texto,partes&order=atalho'))||[];}catch(e){_wa.rapidas=[];}
+  try{_wa.rapidas=((await _waRest('respostas_rapidas?select=id,atalho,texto,partes,espaco&order=atalho').catch(()=>_waRest('respostas_rapidas?select=id,atalho,texto,partes&order=atalho')))||[]).filter(r=>(r.espaco||'clinica')===window._espaco);}catch(e){_wa.rapidas=[];}
 }
 function waAtualizarBadge(){
   const total=_wa.conversas.reduce((s,c)=>s+(c.nao_lidas>0&&_waConexaoVisivel(c)&&!c.oculta_em?1:0),0);
@@ -16037,9 +16038,9 @@ async function waPorTag(v){
   if(v==='_nova'){
     const nome=(window.prompt('Nome da nova tag:')||'').trim();if(!nome)return;
     try{
-      const r=await _waRest('wa_tags?select=id,nome,cor',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({nome})});
+      const r=await _waRest('wa_tags?select=id,nome,cor',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(window._espaco==='instituto'?{nome,espaco:'instituto'}:{nome})});
       const t=r&&r[0];if(!t)return;_wa.tags.push(t);_wa.tags.sort((a,b)=>a.nome.localeCompare(b.nome));tagId=t.id;waPreencherFiltros();
-    }catch(e){showToast('error','Não foi possível criar a tag',/duplicate|unique/i.test(e.message)?'Já existe uma tag com esse nome.':e.message);return;}
+    }catch(e){showToast('error','Não foi possível criar a tag',/duplicate|unique/i.test(e.message)?'Já existe uma tag com esse nome'+(window._espaco==='instituto'?' (na clínica ou no Instituto). Use outro nome.':'.'):e.message);return;}
   }
   (_wa.convTags[c.id]=_wa.convTags[c.id]||new Set()).add(tagId);waRenderPainel();waRenderLista();
   try{await _waRest('conversa_tags',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal,resolution=ignore-duplicates'},body:JSON.stringify({conversa_id:c.id,tag_id:tagId})});}
@@ -16167,9 +16168,9 @@ async function waSalvarRapida(id){
   if(!texto){showToast('error','Escreva o texto da resposta');return;}
   try{
     if(id)await _waRest('respostas_rapidas?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(partes?{atalho,texto,partes,atualizada_em:new Date().toISOString()}:{atalho,texto,atualizada_em:new Date().toISOString()})});
-    else await _waRest('respostas_rapidas',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({atalho,texto})});
+    else await _waRest('respostas_rapidas',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(window._espaco==='instituto'?{atalho,texto,espaco:'instituto'}:{atalho,texto})});
     await waCarregarRapidas();waRenderGerenciarRapidas();
-  }catch(e){showToast('error','Não foi possível salvar',/duplicate|unique/i.test(e.message)?'Já existe esse atalho.':e.message);}
+  }catch(e){showToast('error','Não foi possível salvar',/duplicate|unique/i.test(e.message)?'Já existe esse atalho'+(window._espaco==='instituto'?' (na clínica ou no Instituto). Use outro.':'.'):e.message);}
 }
 async function waApagarRapida(id){
   const r=_wa.rapidas.find(x=>x.id===id);if(!r)return;
@@ -19125,6 +19126,7 @@ function trocarEspaco(e){
     const p=document.getElementById('wa-painel');if(p)p.innerHTML='';
     const w=document.getElementById('wa-wrap');if(w)w.classList.remove('painel-aberto');
     _instAplicarEquipe();_waRotuloConexoes();
+    if(_wa.iniciado){waCarregarTags();waCarregarRapidas();}
     if(_wa.iniciado)waCarregarConversas(true);else waAtualizarBadge();
   }catch(x){}
   irParaPagina(e==='instituto'?'inst-dashboard':'inicio');
