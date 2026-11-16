@@ -832,6 +832,12 @@ tbody tr:hover td{background:#0D1A33;}
 .sskb-ord{display:flex;gap:2px}.sskb-ord .wa-btn{padding:2px 7px}
 .sskb-fixa{font-size:11px;color:#8C98B1;white-space:nowrap;min-width:110px}
 .sskb-n{font-size:11px;color:#66738F;min-width:22px;text-align:right}
+/* (16/11/2026) Instituto: seletor de espaço e menu próprio (SQL 200) */
+.esp-sel{display:inline-flex;border:1px solid #A18B6C;border-radius:999px;overflow:hidden;margin-left:14px;flex-shrink:0}
+.esp-sel button{background:transparent;border:0;color:#C3CBDB;font-size:12px;padding:5px 12px;cursor:pointer}
+.esp-sel button.ativo{background:#A18B6C;color:#fff}
+body:not(.esp-instituto) .nav-inst{display:none!important}
+body.esp-instituto .sidebar .nav-item:not(.nav-inst),body.esp-instituto .sidebar .nav-section:not(.nav-inst){display:none!important}
 @media (max-width:768px){.sskb-col{flex-basis:78vw}.sskb-acoes{margin-left:0;width:100%}.sskb-acoes input{flex:1}.sskb-dupla{flex-direction:column;gap:0}}
 
 .dp-card{background:#0D1A33;border:0.5px solid #2A3D66;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:12px;}
@@ -1298,6 +1304,16 @@ body{letter-spacing:-.1px;}
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg></span>
       <span class="nav-label">Mensagens em Massa</span>
     </div>
+    <div class="nav-section nav-inst">Instituto</div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-funil',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg></span>
+      <span class="nav-label">Funil comercial</span>
+    </div>
+    <div class="nav-item nav-inst" onclick="switchPage('conversas',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/></svg></span>
+      <span class="nav-label">Conversas</span>
+      <span class="wa-nav-badge" id="wa-nav-badge-inst" style="display:none"></span>
+    </div>
     <div class="nav-section">Gestão</div>
     <div class="nav-item" onclick="switchPage('gerenciar',this);setTimeout(()=>renderLista('origens'),50);">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg></span>
@@ -1332,6 +1348,7 @@ body{letter-spacing:-.1px;}
   <div class="topbar">
     <button id="hamburger-mobile" onclick="toggleMobileSidebar()" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#EEF1F7;padding:4px 8px 4px 0;flex-shrink:0;" title="Menu">☰</button>
     <span class="topbar-title" id="topbar-title">Início</span>
+    <div class="esp-sel" id="esp-sel" style="display:none" title="Trocar de espaço"><button data-e="clinica" class="ativo" onclick="trocarEspaco('clinica')">Clínica</button><button data-e="instituto" onclick="trocarEspaco('instituto')">Instituto</button></div>
     <div class="topbar-right">
       <span class="last-update" id="last-update"></span>
       <button class="btn-top" onclick="abrirNotificacoesCelular()" title="Notificações do Lume" aria-label="Notificações"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
@@ -1991,6 +2008,7 @@ body{letter-spacing:-.1px;}
       </div>
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
+    <div class="page" id="page-inst-funil"><div class="au-wrap" id="if-conteudo"></div></div>
     <div class="page" id="page-disparos"><div class="au-wrap" id="dp-conteudo"></div></div>
     <div class="page" id="page-social-selling">
       <div class="dash-tabs ss-tabs">
@@ -3346,7 +3364,8 @@ function iniciarAutoRefreshDados(){
 // comporta exatamente igual ao menu, mesmo que a lógica de algum item mude
 // no futuro.
 function irParaPagina(page) {
-  const el = document.querySelector(`.nav-item[onclick*="switchPage('${page}'"]`);
+  const els = [...document.querySelectorAll(`.nav-item[onclick*="switchPage('${page}'"]`)];
+  const el = els.find(e=>e.offsetParent!==null) || els[0];
   if (el) el.click();
 }
 
@@ -3601,6 +3620,7 @@ function _aplicarSoTrafego(){
 }
 function verificarAcessoPagina(page){
   if(window._soTrafego&&page!=='trafego-pago')return false;
+  if(page==='inst-funil'&&!_temEspaco('instituto'))return false;
   const email=usuarioAtualEmail();
   const liberar=(area,titulo)=>{pedirSenhaArea(area,titulo).then(ok=>{if(ok){_acessoDesbloqueado[page]=true;irParaPagina(page);}});return false;};
   // Gerenciar: TODO MUNDO precisa da senha, mesmo Lucas/Larissa/Gabi — pedido explícito do usuário.
@@ -3630,12 +3650,13 @@ function switchPage(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   const titles={inicio:'Início',dashboard:'Dashboard','trafego-pago':'Tráfego Pago',leads:'Leads',clientes:'Clientes',pacientes:'Pacientes',conversas:'Conversas',automacoes:'Automações',agente:'Agente de IA',disparos:'Mensagens em Massa','social-selling':'Social Selling',gerenciar:'Gerenciar',financeiro:'Financeiro',comissoes:'Comissões',estoque:'Estoque',calendario:'Calendário Sazonal','rel-indicacoes':'Indicações e NPS','rel-origem':'Métricas de Origem','rel-orcamentos':'Orçamentos Fechados'};
-  document.getElementById('topbar-title').textContent=titles[page]||page;
+  document.getElementById('topbar-title').textContent=page==='inst-funil'?'Funil comercial · Instituto':(_espacoInst()&&page==='conversas'?'Conversas · Instituto':(titles[page]||page));
   if(page==='inicio') carregarInicio();
   else if(page==='leads') renderLeads();
   else if(page==='clientes') renderClientes();
   else if(page==='pacientes') renderPacientesPage();
   else if(page==='conversas') abrirConversas();
+  else if(page==='inst-funil') abrirInstFunil();
   else if(page==='automacoes') abrirAutomacoes();
   else if(page==='agente') abrirAgente();
   else if(page==='disparos') abrirDisparos();
@@ -3681,6 +3702,7 @@ async function reloadCurrent(){
   const textoOriginal=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
+    if(currentPage==='inst-funil'){await abrirInstFunil(true);return;}
     if(currentPage==='social-selling'){
       if(_ss.aba==='painel')await loadSocial();else{_ss.clinChave='';await abrirSocialSelling();}
       return;
@@ -14494,6 +14516,7 @@ async function fazerLogout(){
 
 function iniciarApp(){
   try{_aplicarSoTrafego();_carregarPapel();}catch(e){}
+  try{_carregarEspacos();}catch(e){}
   // volta para a tela em que a pessoa estava (ex.: depois de trocar o tema)
   try{const v=JSON.parse(sessionStorage.getItem('bulhoes_voltar')||'null');sessionStorage.removeItem('bulhoes_voltar');
     if(v&&v.pagina&&v.pagina!=='inicio')setTimeout(()=>{try{
@@ -15593,8 +15616,9 @@ async function waCarregarConversas(silencioso){
   try{
     // (09/11/2026) ordem pela última atividade de verdade (paciente, equipe ou IA): automação não sobe a conversa
     let lista;
-    try{lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_atividade_em.desc.nullslast&limit=400');}
-    catch(e){lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)&order=ultima_mensagem_em.desc.nullslast&limit=400');}
+    const fe=_waFiltroEspaco();
+    try{lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)'+fe+'&order=ultima_atividade_em.desc.nullslast&limit=400');}
+    catch(e){lista=await _waRest('conversas?select=*,pacientes(nome,etapa,origem)'+fe+'&order=ultima_mensagem_em.desc.nullslast&limit=400');}
     _wa.conversas=lista||[];_wa.carregou=true;
     if(!window._lumeLinks)carregarLinksLeads().then(()=>{try{if(_wa.atual&&currentPage==='conversas')waRenderPainel();}catch(e){}});
     if(_wa.atual){const n=_wa.conversas.find(c=>c.id===_wa.atual.id);if(n)_wa.atual=n;}
@@ -15615,6 +15639,7 @@ async function waCarregarEquipe(){
     try{_wa.equipeLista=(await _waRest('equipe?select=email,nome&ativo=is.true'))||[];}catch(e2){_wa.equipeLista=[];}
   }
   _wa.equipeLista.forEach(p=>{_wa.equipe[p.email]=p.nome;});
+  _wa.equipeListaClinica=_wa.equipeLista;if(window._espaco==='instituto')_instAplicarEquipe();
   waPreencherFiltros();
 }
 async function waCarregarTags(){
@@ -15631,8 +15656,8 @@ async function waCarregarRapidas(){
 }
 function waAtualizarBadge(){
   const total=_wa.conversas.reduce((s,c)=>s+(c.nao_lidas>0&&_waConexaoVisivel(c)&&!c.oculta_em?1:0),0);
-  const el=document.getElementById('wa-nav-badge');
-  if(el){el.textContent=total>99?'99+':String(total);el.style.display=total?'inline-block':'none';}
+  ['wa-nav-badge','wa-nav-badge-inst'].forEach(id=>{const el=document.getElementById(id);
+  if(el){el.textContent=total>99?'99+':String(total);el.style.display=total?'inline-block':'none';}});
 }
 
 // ---------- lista ----------
@@ -16649,7 +16674,7 @@ function _waAoMudarConversa(p){
 }
 function _waAvisarNova(c){
   if(currentPage==='conversas'&&document.visibilityState==='visible')return;
-  if(!_waConexaoVisivel(c))return; // número que a pessoa não acompanha (ex.: Instituto) não avisa
+  if(!_waConexaoVisivel(c)&&!(window._espaco==='instituto'&&_waConexaoVisivelClinica(c)))return; // número que a pessoa não acompanha não avisa (no Instituto, a clínica continua avisando)
   showToast('success','💬 '+_waNome(c),c.ultima_mensagem_texto||'Nova mensagem no WhatsApp');
 }
 function waLigarTempoReal(){
@@ -18316,6 +18341,10 @@ function _waConexoesSel(){
 const WA_NUMEROS_FORA_CLINICA=['431996333326052']; // Instituto Bulhões (13) 4042-7082
 function _waForaClinica(id){return WA_NUMEROS_FORA_CLINICA.includes(String(id||''));}
 function _waConexaoVisivel(c){
+  if(window._espaco==='instituto')return c.canal!=='instagram'&&_waForaClinica(c.numero_clinica_id);
+  return _waConexaoVisivelClinica(c);
+}
+function _waConexaoVisivelClinica(c){
   const sel=_waConexoesSel();if(!sel.length)return !_waForaClinica(c.numero_clinica_id);
   if(c.canal==='instagram')return sel.includes('_ig')||sel.includes(c.numero_clinica_id);
   return sel.includes(c.numero_clinica_id);
@@ -18326,12 +18355,14 @@ function _waConexoesOpcoes(){
 }
 function _waRotuloConexoes(){
   const b=document.getElementById('wa-btn-conexoes');if(!b)return;
+  if(window._espaco==='instituto'){b.textContent='📱 Instituto · (13) 4042-7082';return;}
   const sel=_waConexoesSel(),ops=_waConexoesOpcoes();
   const val=sel.filter(v=>ops.some(o=>o[0]===v));
   b.textContent=!val.length?'📱 Todas da clínica':val.length===1?(ops.find(o=>o[0]===val[0])[1]):'📱 '+val.length+' conexões';
 }
 function waEscolherConexoes(ev){
   ev.stopPropagation();_clFecharPop();
+  if(window._espaco==='instituto'){showToast('success','Central do Instituto','Aqui aparece só o WhatsApp do Instituto, (13) 4042-7082.');return;}
   const sel=_waConexoesSel(),ops=_waConexoesOpcoes();
   const m=document.createElement('div');m.className='cl-menu';m.style.minWidth='240px';
   m.innerHTML='<div style="font-size:11px;color:#8C98B1;padding:6px 10px">Quais números aparecem na sua lista</div>'+
@@ -18480,7 +18511,7 @@ function waRenderCabecalho(){
     '<div class="wa-cab-acoes">'+
       '<button class="cl-ib sem-borda" title="'+(concluida?'Reabrir conversa':'Concluir atendimento')+'" onclick="waMudarStatus(\''+(concluida?'aberta':'encerrada')+'\')">'+_clIc(concluida?'sort':'check')+'</button>'+
       '<button class="cl-ib sem-borda" title="Atribuir a…" onclick="waMenuAtribuir(event)">'+_clIc('users')+'</button>'+
-      (c.canal==='instagram'?'':'<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="'+(c.robo_ligado?'Robô (Agente de IA) ligado nesta conversa: clique para desligar':'Robô (Agente de IA) desligado nesta conversa: clique para ligar')+'" onclick="waRoboAlternar()"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>')+
+      (c.canal==='instagram'||window._espaco==='instituto'?'':'<span class="cl-robo'+(c.robo_ligado?' ligado':'')+'" title="'+(c.robo_ligado?'Robô (Agente de IA) ligado nesta conversa: clique para desligar':'Robô (Agente de IA) desligado nesta conversa: clique para ligar')+'" onclick="waRoboAlternar()"><span class="bola">'+_clIc('bot')+'</span><span class="trilho"></span></span>')+
       '<button class="cl-primario" title="Estado da conversa" onclick="waMenuEstado(event)">'+_clIc('chat')+_clIc('down')+'</button>'+
       '<button class="cl-ib sem-borda" title="Mais opções" onclick="waMenuMais(event)">'+_clIc('more')+'</button>'+
     '</div>';
@@ -18513,12 +18544,15 @@ function waMenuMais(ev){
   m.innerHTML='<button onclick="_clFecharPop();waMarcarNaoLida()">'+_clIc('chat')+' Marcar como não lida</button>'+
     (igc?'<button onclick="_clFecharPop();waIgIgnorar()">'+_clIc('x')+' Ignorar contato (não entra mais no CRM)</button>':'')+
     '<button onclick="_clFecharPop();waAlternarPainel()">'+_clIc('geral')+' Dados do contato</button>'+
-    '<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
+    (window._espaco==='instituto'
+      ?'<button onclick="_clFecharPop();_wa.atual&&(_instCardDaConversa(_wa.atual)?instCardAbrir(_instCardDaConversa(_wa.atual).id):instCardDaConversaAtual())">'+_clIc('funil')+' Card no funil do Instituto</button>'+
+       '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'
+      :'<button onclick="_clFecharPop();waAbrirCard()">'+_clIc('pessoa')+' Abrir card no CRM</button>'+
     (_wa.atual&&_wa.atual.canal!=='instagram'?'<button onclick="_clFecharPop();waAbrirAgendar()">'+_clIc('clock')+' Agendar no Clinicorp</button>':'')+
     '<button onclick="_clFecharPop();waSeqAbrir()">'+_clIc('play')+' Sequências ativas</button>'+
     '<button onclick="_clFecharPop();waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
     (_wa.agente&&_wa.agente.resumos?'<button onclick="_clFecharPop();waResumirIA()">'+_clIc('bot')+' Resumir com IA</button>':'')+
-    (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':'')+
+    (_wa.agente&&_wa.agente.assistente_virtual?'<button onclick="_clFecharPop();waSugerirResposta()">'+_clIc('bot')+' Sugerir resposta</button>':''))+
     (_wa.atual?'<div class="sep"></div>'+(_wa.atual.oculta_em?'<button onclick="_clFecharPop();waOcultarConversa(null,false)">'+_clIc('sort')+' Voltar para a lista</button>'
       :'<button onclick="_clFecharPop();waOcultarConversa(null,true)" style="color:#E07A7A">'+_clIc('x')+' Apagar conversa</button>'):'');
   _clPosicionar(m,ev.currentTarget,true);
@@ -18747,6 +18781,7 @@ function waRenderPainel(){
   if(!el)return;
   if(!c){el.innerHTML='';return;}
   if(!document.getElementById('wa-wrap').classList.contains('painel-aberto'))return;
+  if(window._espaco==='instituto'&&c.canal!=='instagram'){el.innerHTML=_instPainelConversa(c);return;}
   const aba=_wa.painelAba||'geral';
   const L=_waLead(c);
   const nome=_waNome(c);
@@ -19015,6 +19050,410 @@ function abrirConversas(){
   waRenderLista();
   if(!_wa.conversas.length)waCarregarConversas();
   if(_wa.atual){waRenderChatBase();waRenderMsgs(true);waRecarregarMsgsAtual();}
+}
+
+// =====================================================================
+// INSTITUTO (16/11/2026, SQL 200): espaço separado dentro da Lume.
+//   • Seletor Clínica | Instituto no topo, só para quem tem os dois espaços
+//     (equipe.espacos). Quem só tem a clínica não vê nada disto.
+//   • Central do Instituto: só o WhatsApp (13) 4042-7082, sem robô, sem
+//     Clinicorp e sem as sequências da clínica.
+//   • Funil do processo comercial: Lead → Aplicação → Qualificado (SDR) →
+//     Call agendada → Call realizada (closer) → Proposta → Venda (+ Perdido).
+//     Cada mudança de etapa vira histórico (instituto_eventos) para medir
+//     conversão por canal.
+// =====================================================================
+window._espaco='clinica';
+var _meusEspacos=['clinica'];
+function _espacoInst(){return window._espaco==='instituto';}
+function _temEspaco(e){return (_meusEspacos||['clinica']).includes(e);}
+function _espChave(){return 'lume_espaco_'+String(usuarioAtualEmail()||'').toLowerCase();}
+function _waFiltroEspaco(){return _espacoInst()?'&numero_clinica_id=in.('+WA_NUMEROS_FORA_CLINICA.join(',')+')':'';}
+async function _carregarEspacos(){
+  if(!_sbAccessToken){setTimeout(_carregarEspacos,1500);return;}
+  try{
+    const r=await _waRest('rpc/meus_espacos',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    _meusEspacos=Array.isArray(r)&&r.length?r:['clinica'];
+  }catch(e){_meusEspacos=['clinica'];} // sem o SQL 200 rodado, tudo fica como antes
+  const ambos=_temEspaco('clinica')&&_temEspaco('instituto');
+  const sel=document.getElementById('esp-sel');if(sel)sel.style.display=ambos?'':'none';
+  let quer='clinica';try{quer=localStorage.getItem(_espChave())||'clinica';}catch(e){}
+  if(!_temEspaco('clinica')&&_temEspaco('instituto'))quer='instituto';
+  if(!_temEspaco(quer))quer='clinica';
+  if(quer!==window._espaco)trocarEspaco(quer);
+  else document.querySelectorAll('#esp-sel button').forEach(b=>b.classList.toggle('ativo',b.dataset.e===quer));
+}
+function trocarEspaco(e){
+  if(!_temEspaco(e)||window._espaco===e)return;
+  window._espaco=e;
+  try{localStorage.setItem(_espChave(),e);}catch(x){}
+  document.body.classList.toggle('esp-instituto',e==='instituto');
+  document.querySelectorAll('#esp-sel button').forEach(b=>b.classList.toggle('ativo',b.dataset.e===e));
+  // Central: outra lista de conversas, outra equipe
+  try{
+    _wa.atual=null;_wa.numeroFiltro='';
+    const chat=document.getElementById('wa-chat');if(chat)chat.innerHTML=_waChatVazioHtml();
+    const p=document.getElementById('wa-painel');if(p)p.innerHTML='';
+    const w=document.getElementById('wa-wrap');if(w)w.classList.remove('painel-aberto');
+    _instAplicarEquipe();_waRotuloConexoes();
+    if(_wa.iniciado)waCarregarConversas(true);else waAtualizarBadge();
+  }catch(x){}
+  irParaPagina(e==='instituto'?'inst-funil':'inicio');
+}
+function _waChatVazioHtml(){
+  return '<div class="wa-vazio"><div style="font-size:34px">💬</div>Escolha uma conversa para ver as mensagens e responder.<br><span style="font-size:11px">'+
+    (_espacoInst()?'WhatsApp do Instituto: (13) 4042-7082':'Número da clínica: (13) 99630-0176')+'</span></div>';
+}
+// quem pode ser atendente, SDR e closer no Instituto
+async function _instCarregarEquipe(){
+  if(_inst.equipe)return _inst.equipe;
+  try{_inst.equipe=(await _waRest('rpc/equipe_do_espaco',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_espaco:'instituto'})}))||[];}
+  catch(e){_inst.equipe=[];}
+  _inst.equipe.forEach(p=>{try{_wa.equipe[p.email]=p.nome;}catch(x){}});
+  return _inst.equipe;
+}
+function _instAplicarEquipe(){
+  if(!_espacoInst()){if(_wa.equipeListaClinica)_wa.equipeLista=_wa.equipeListaClinica;return;}
+  _instCarregarEquipe().then(l=>{if(_espacoInst()){_wa.equipeLista=l.map(p=>({email:p.email,nome:p.nome}));try{if(_wa.atual){waRenderPainel();}}catch(x){}}});
+}
+
+// ---------- funil ----------
+const INST_ETAPAS=[
+  ['lead','Lead','#8C98B1','normal'],
+  ['aplicacao','Aplicação','#6FA8FF','normal'],
+  ['qualificado','Qualificado (SDR)','#A18B6C','normal'],
+  ['call_agendada','Call agendada','#CCBCA6','normal'],
+  ['call_realizada','Call realizada','#E2BE6A','normal'],
+  ['proposta','Proposta','#D4AF5A','normal'],
+  ['venda','Venda','#7FD3A0','resultado'],
+  ['perdido','Perdido','#E07A7A','fora']];
+const INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
+const INST_ORIGENS=[['aplicacao','Funil de aplicação'],['social_selling','Social selling'],['organico','Orgânico (bio e stories)'],['outro','Outro']];
+const INST_ORIGEM_NOME=Object.fromEntries(INST_ORIGENS);
+const INST_PLATAFORMAS=[['eduzz','Eduzz'],['hotmart','Hotmart'],['outra','Outra']];
+var _inst={linhas:[],eventos:[],conversas:[],carregado:false,busca:'',origem:'',periodo:'mes',equipe:null};
+
+function _instTel(t){return String(t||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');}
+function _instMoeda(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:2});}
+function _instRotulo(l){return l.nome||(l.instagram?'@'+l.instagram:'')||(l.telefone?_instFoneFmt(l.telefone):'Sem nome');}
+function _instFoneFmt(t){const d=_instTel(t);if(d.length===11)return '('+d.slice(0,2)+') '+d.slice(2,7)+'-'+d.slice(7);if(d.length===10)return '('+d.slice(0,2)+') '+d.slice(2,6)+'-'+d.slice(6);return d;}
+function _instDias(l){return l.etapa_em?Math.floor((Date.now()-Date.parse(l.etapa_em))/864e5):0;}
+function _instTempo(l){const d=_instDias(l);if(d>0)return d+'d';const h=Math.floor((Date.now()-Date.parse(l.etapa_em||Date.now()))/36e5);return h>0?h+'h':'agora';}
+function _instTipo(k){const e=INST_ETAPAS.find(x=>x[0]===k);return e?e[3]:'normal';}
+function _instNomeEquipe(email){if(!email)return '';const p=(_inst.equipe||[]).find(x=>x.email===email);return p?p.nome:(_wa.equipe&&_wa.equipe[email])||email.split('@')[0];}
+function _instDataLocal(iso){if(!iso)return '';const d=new Date(iso);const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes());}
+function _instCallFmt(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+async function _instBuscarTudo(caminho){
+  let out=[],de=0;
+  for(;;){
+    const r=await fetch(SUPABASE_URL+'/rest/v1/'+caminho,{headers:{Range:de+'-'+(de+999),'Range-Unit':'items'}});
+    if(!r.ok)throw new Error('Supabase '+r.status+': '+(await r.text()).slice(0,160));
+    const j=await r.json();out=out.concat(j);if(j.length<1000)break;de+=1000;
+  }
+  return out;
+}
+async function _instCarregar(){
+  const [linhas,eventos,conversas]=await Promise.all([
+    _instBuscarTudo('instituto_leads?select=*&order=etapa_em.desc,id.desc'),
+    _instBuscarTudo('instituto_eventos?select=lead_id,para,em&order=em'),
+    _waRest('conversas?select=id,telefone,nome_perfil,nome_contato,criada_em,ultima_mensagem_em,oculta_em&canal=eq.whatsapp&numero_clinica_id=in.('+WA_NUMEROS_FORA_CLINICA.join(',')+')&order=criada_em.desc&limit=2000').catch(()=>[]),
+    _instCarregarEquipe()]);
+  _inst.linhas=linhas;_inst.eventos=eventos;_inst.conversas=conversas||[];_inst.carregado=true;
+}
+async function abrirInstFunil(forcar){
+  const el=document.getElementById('if-conteudo');if(!el)return;
+  if(!_temEspaco('instituto')){el.innerHTML='<div class="au-vazio">Você não tem acesso ao Instituto.</div>';return;}
+  if(!_inst.carregado||forcar){
+    if(!_inst.carregado)el.innerHTML='<div class="au-vazio">Carregando o funil…</div>';
+    try{await _instCarregar();}
+    catch(e){el.innerHTML='<div class="au-vazio">Não deu para carregar o funil: '+_waEsc(e.message)+(/instituto_leads|42P01|PGRST/.test(e.message)?'<br><span style="font-size:11px">Falta rodar o SQL 200 no Supabase.</span>':'')+'</div>';return;}
+  }
+  instKanban();
+}
+function _instSemCard(){
+  const ids=new Set(_inst.linhas.map(l=>l.conversa_id).filter(Boolean));
+  const tels=new Set(_inst.linhas.map(l=>_instTel(l.telefone)).filter(Boolean));
+  return _inst.conversas.filter(c=>!c.oculta_em&&!ids.has(c.id)&&!tels.has(_instTel(c.telefone)));
+}
+function _instPeriodoIni(){
+  const h=new Date();
+  if(_inst.periodo==='mes')return new Date(h.getFullYear(),h.getMonth(),1).toISOString();
+  if(_inst.periodo==='30')return new Date(Date.now()-30*864e5).toISOString();
+  return '';
+}
+// conversão por canal: dos cards que entraram no período, quantos chegaram a cada etapa (pelo histórico)
+function _instPorOrigem(){
+  const ini=_instPeriodoIni();
+  const coorte=_inst.linhas.filter(l=>!ini||String(l.criado_em)>=ini);
+  const chegou={};_inst.eventos.forEach(e=>{(chegou[e.lead_id]=chegou[e.lead_id]||new Set()).add(e.para);});
+  const ordem=INST_ETAPAS.map(e=>e[0]);
+  const alcancou=(l,k)=>{const s=chegou[l.id];if(s&&s.has(k))return true;const i=ordem.indexOf(l.etapa);return l.etapa!=='perdido'&&i>=ordem.indexOf(k);};
+  const grupos=INST_ORIGENS.map(o=>o[0]).concat(['']);
+  return grupos.map(o=>{
+    const ls=coorte.filter(l=>(l.origem||'')===o);
+    const qual=ls.filter(l=>alcancou(l,'qualificado')).length;
+    const calls=ls.filter(l=>alcancou(l,'call_realizada')).length;
+    const vendas=ls.filter(l=>l.etapa==='venda');
+    return {o,leads:ls.length,qual,calls,vendas:vendas.length,valor:vendas.reduce((s,l)=>s+Number(l.valor_venda||0),0)};
+  }).filter(g=>g.leads);
+}
+function instKanban(){
+  const el=document.getElementById('if-conteudo');if(!el)return;
+  const b=_inst.busca.trim().toLowerCase(),bn=b.replace(/\D/g,'');
+  const cards=_inst.linhas.filter(l=>INST_ETAPA_NOME[l.etapa])
+    .filter(l=>!_inst.origem||(_inst.origem==='_sem'?!l.origem:l.origem===_inst.origem))
+    .filter(l=>!b||[l.nome,l.instagram,l.email,l.obs].some(x=>String(x||'').toLowerCase().includes(b))||(bn&&_instTel(l.telefone).includes(bn)));
+  const mesIni=(()=>{const h=new Date();return new Date(h.getFullYear(),h.getMonth(),1).toISOString();})();
+  const ativos=cards.filter(l=>_instTipo(l.etapa)==='normal').length;
+  const parado=l=>_instTipo(l.etapa)==='normal'&&_instDias(l)>=3;
+  const parados=cards.filter(parado).length;
+  const agora=new Date().toISOString();
+  const calls=cards.filter(l=>l.etapa==='call_agendada');
+  const callsAtrasadas=calls.filter(l=>l.call_em&&l.call_em<agora).length;
+  const vendasMes=_inst.linhas.filter(l=>l.etapa==='venda'&&String(l.etapa_em)>=mesIni);
+  const valorMes=vendasMes.reduce((s,l)=>s+Number(l.valor_venda||0),0);
+  const semOrigem=_inst.linhas.filter(l=>!l.origem&&l.etapa!=='perdido').length;
+  const semCard=_instSemCard();
+  const stat=(t,v,c)=>'<div class="sskb-stat"><div>'+t+'</div><b style="color:'+(c||'#EEF1F7')+'">'+v+'</b></div>';
+  const tag=(t,cls)=>'<span class="sskb-tag'+(cls?' '+cls:'')+'">'+t+'</span>';
+  const card=l=>{
+    const pd=parado(l);
+    const sub=l.instagram&&l.nome?'@'+l.instagram:(l.telefone&&(l.nome||l.instagram)?_instFoneFmt(l.telefone):'');
+    return '<div class="sskb-card'+(pd?' parado':'')+'" draggable="true" ondragstart="event.dataTransfer.setData(\'text/plain\',\''+l.id+'\');this.classList.add(\'arrastando\')" ondragend="this.classList.remove(\'arrastando\')" onclick="instCardAbrir('+l.id+')">'+
+      '<div class="sskb-l1"><span class="sskb-nome">'+_waEsc(_instRotulo(l))+'</span><span class="sskb-t" title="tempo nesta etapa">'+_instTempo(l)+'</span></div>'+
+      (sub?'<div class="sskb-ig">'+_waEsc(sub)+'</div>':'')+
+      '<div class="sskb-l3">'+
+        (l.origem?tag(_waEsc(INST_ORIGEM_NOME[l.origem]||l.origem)):tag('sem origem','ouro'))+
+        (l.sdr_email?tag('SDR '+_waEsc(_instNomeEquipe(l.sdr_email).split(' ')[0])):'')+
+        (l.closer_email?tag('Closer '+_waEsc(_instNomeEquipe(l.closer_email).split(' ')[0])):'')+
+        (l.conversa_id?tag('💬'):'')+
+        (l.etapa==='call_agendada'&&l.call_em?tag('📅 '+_instCallFmt(l.call_em),l.call_em<agora?'ouro':''):'')+
+        (l.etapa==='proposta'&&l.valor_proposta?tag(_instMoeda(l.valor_proposta)):'')+
+        (l.etapa==='venda'&&l.valor_venda?tag(_instMoeda(l.valor_venda),'verde'):'')+
+        (l.etapa==='perdido'&&l.motivo_perda?tag(_waEsc(String(l.motivo_perda).slice(0,30))):'')+
+        (pd?tag('parado','ouro'):'')+'</div></div>';
+  };
+  const po=_instPorOrigem();
+  const pct=(a,b2)=>b2?Math.round(a*100/b2)+'%':'–';
+  el.innerHTML=
+    '<div class="sskb-topo">'+
+      stat('Ativos no funil',ativos)+stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
+      stat('Calls agendadas',calls.length+(callsAtrasadas?' · '+callsAtrasadas+' passou da hora':''),callsAtrasadas?'#E2BE6A':'#CCBCA6')+
+      stat('Vendas no mês',vendasMes.length+(valorMes?' · '+_instMoeda(valorMes):''),'#7FD3A0')+
+      '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar nome, @, telefone" value="'+_waEsc(_inst.busca)+'" oninput="_inst.busca=this.value;clearTimeout(_inst.tk);_inst.tk=setTimeout(()=>{instKanban();const i=document.querySelector(\'#if-conteudo .sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
+        '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.origem=this.value;instKanban()"><option value="">Todas as origens</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(_inst.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'<option value="_sem"'+(_inst.origem==='_sem'?' selected':'')+'>Sem origem</option></select>'+
+        '<button class="wa-btn primario" onclick="instCardAbrir(null)">+ Novo card</button></div>'+
+    '</div>'+
+    (semCard.length?'<div class="au-bloco" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:12.5px;color:#EEF1F7"><b>'+semCard.length+(semCard.length===1?' conversa':' conversas')+'</b> do WhatsApp do Instituto ainda sem card no funil.</div><button class="wa-btn" onclick="instSemCardAbrir()">Ver e criar cards</button></div>':'')+
+    (semOrigem?'<div class="au-dica" style="margin:-4px 0 10px">'+semOrigem+(semOrigem===1?' card está':' cards estão')+' sem origem. Sem ela, a conversão e o custo por canal ficam incompletos.</div>':'')+
+    '<div class="sskb-quadro">'+INST_ETAPAS.map(([k,nome,cor,tipo])=>{
+      const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>k==='call_agendada'?String(a.call_em||'9').localeCompare(String(b2.call_em||'9')):String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
+      const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.valor_venda||0),0):k==='proposta'?cs.reduce((s,l)=>s+Number(l.valor_proposta||0),0):0;
+      return '<div class="sskb-col'+(tipo==='fora'?' fora':'')+'" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="instSoltar(event,this,\''+k+'\')">'+
+        '<div class="sskb-cab" style="border-color:'+cor+';cursor:default"><div>'+_waEsc(nome)+'</div><small>'+cs.length+' '+(cs.length===1?'card':'cards')+(tot?' · '+_instMoeda(tot):'')+'</small></div>'+
+        '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">Arraste um card para cá</div>')+'</div></div>';
+    }).join('')+'</div>'+
+    '<div class="au-bloco" style="margin-top:12px"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Conversão por canal <select class="dp-in" style="height:28px;width:auto;font-size:12px" onchange="_inst.periodo=this.value;instKanban()">'+[['mes','Entraram este mês'],['30','Entraram nos últimos 30 dias'],['tudo','Desde o início']].map(p=>'<option value="'+p[0]+'"'+(_inst.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select></h4>'+
+      (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Calls feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
+        po.map(g=>'<tr style="border-top:1px solid #1E2E52;color:#EEF1F7"><td style="padding:6px">'+_waEsc(g.o?INST_ORIGEM_NOME[g.o]:'Sem origem')+'</td><td>'+g.leads+'</td><td>'+g.qual+' <small style="color:#8C98B1">'+pct(g.qual,g.leads)+'</small></td><td>'+g.calls+' <small style="color:#8C98B1">'+pct(g.calls,g.leads)+'</small></td><td>'+g.vendas+'</td><td>'+pct(g.vendas,g.leads)+'</td><td>'+(g.valor?_instMoeda(g.valor):'–')+'</td></tr>').join('')+'</table></div>'
+        :'<div class="au-dica">Nenhum card entrou neste período.</div>')+
+      '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>'+
+    '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Call agendada</b> o card pede a data e a hora da call; em <b>Venda</b>, o valor; em <b>Perdido</b>, o motivo. A venda ainda é marcada à mão: quando a Eduzz e a Hotmart estiverem ligadas, ela entra sozinha.</div>';
+}
+function instSoltar(ev,el,k){
+  ev.preventDefault();el.classList.remove('sobre');
+  const id=+ev.dataTransfer.getData('text/plain');if(id)instMover(id,k);
+}
+function _instFaltaPara(l,etapa){
+  if(etapa==='call_agendada'&&!l.call_em)return 'call';
+  if(etapa==='venda'&&!(Number(l.valor_venda)>0))return 'venda';
+  if(etapa==='perdido'&&!l.motivo_perda)return 'perdido';
+  return '';
+}
+async function _instPatch(id,corpo){
+  const r=await _waRest('instituto_leads?id=eq.'+id,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+  const l=_inst.linhas.find(x=>x.id===id);if(l&&r&&r[0])Object.assign(l,r[0]);
+  return l;
+}
+async function instMover(id,etapa){
+  const l=_inst.linhas.find(x=>x.id===id);if(!l||l.etapa===etapa)return;
+  if(_instFaltaPara(l,etapa)){instCardAbrir(id,etapa);return;}
+  const antes=[l.etapa,l.etapa_em];l.etapa=etapa;l.etapa_em=new Date().toISOString();_instRedesenhar();
+  try{await _instPatch(id,{etapa});_inst.eventos.push({lead_id:id,para:etapa,em:new Date().toISOString()});_instRedesenhar();}
+  catch(e){l.etapa=antes[0];l.etapa_em=antes[1];_instRedesenhar();showToast('error','Não moveu o card',_waEsc(e.message));}
+}
+function _instRedesenhar(){
+  if(currentPage==='inst-funil')instKanban();
+  try{if(currentPage==='conversas'&&_wa.atual)waRenderPainel();}catch(e){}
+}
+function instCardFechar(){const m=document.getElementById('if-modal');if(m)m.remove();}
+function instCardAbrir(id,etapaNova,base){
+  instCardFechar();
+  const l=id?_inst.linhas.find(x=>x.id===id):Object.assign({etapa:'lead'},base||{});if(!l)return;
+  const novo=!id;const et=etapaNova||l.etapa||'lead';
+  const eq=_inst.equipe||[];
+  const campo=(rot,html,extra)=>'<label class="sskb-campo"'+(extra||'')+'><span>'+rot+'</span>'+html+'</label>';
+  const selEq=(idc,v)=>'<select id="'+idc+'" class="dp-in"><option value="">Ninguém</option>'+eq.map(p=>'<option value="'+_waEsc(p.email)+'"'+(p.email===v?' selected':'')+'>'+_waEsc(p.nome)+'</option>').join('')+(v&&!eq.some(p=>p.email===v)?'<option value="'+_waEsc(v)+'" selected>'+_waEsc(_instNomeEquipe(v))+'</option>':'')+'</select>';
+  const aviso={call:'Para ir para <b>Call agendada</b>, coloque a data e a hora da call.',venda:'Para ir para <b>Venda</b>, coloque o valor vendido.',perdido:'Para ir para <b>Perdido</b>, escreva o motivo.'}[_instFaltaPara(l,et)]||'';
+  const conv=l.conversa_id||(_inst.conversas.find(c=>_instTel(c.telefone)&&_instTel(c.telefone)===_instTel(l.telefone))||{}).id||'';
+  const m=document.createElement('div');m.id='if-modal';m.className='sskb-fundo';
+  m.onclick=e=>{if(e.target===m)instCardFechar();};
+  m.innerHTML='<div class="sskb-modal" style="width:520px">'+
+    '<div class="sskb-mcab"><b>'+(novo?'Novo card':_waEsc(_instRotulo(l)))+'</b><button class="wa-btn" onclick="instCardFechar()">✕</button></div>'+
+    (aviso?'<div class="au-dica" style="margin:0 0 8px">'+aviso+'</div>':'')+
+    campo('Nome','<input id="if-nome" class="dp-in" maxlength="200" value="'+_waEsc(l.nome||'')+'">')+
+    '<div class="sskb-dupla">'+campo('Telefone (WhatsApp)','<input id="if-tel" class="dp-in" type="tel" placeholder="(13) 99999-9999" value="'+_waEsc(l.telefone?_instFoneFmt(l.telefone):'')+'">')+
+      campo('Instagram','<input id="if-ig" class="dp-in" placeholder="@usuario" value="'+_waEsc(l.instagram?'@'+l.instagram:'')+'">')+'</div>'+
+    '<div class="sskb-dupla">'+campo('E-mail','<input id="if-email" class="dp-in" type="email" value="'+_waEsc(l.email||'')+'">')+
+      campo('Origem','<select id="if-origem" class="dp-in"><option value="">Selecione…</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(l.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>')+'</div>'+
+    '<div class="sskb-dupla">'+campo('Etapa','<select id="if-etapa" class="dp-in" onchange="_instCamposEtapa()">'+INST_ETAPAS.map(e=>'<option value="'+e[0]+'"'+(e[0]===et?' selected':'')+'>'+e[1]+'</option>').join('')+'</select>')+
+      campo('Data e hora da call','<input id="if-call" class="dp-in" type="datetime-local" value="'+_waEsc(_instDataLocal(l.call_em))+'">')+'</div>'+
+    '<div class="sskb-dupla">'+campo('SDR',selEq('if-sdr',l.sdr_email||''))+campo('Closer',selEq('if-closer',l.closer_email||''))+'</div>'+
+    '<div class="sskb-dupla" id="if-valores">'+campo('Valor da proposta (R$)','<input id="if-vprop" class="dp-in" type="number" min="0" step="0.01" value="'+_waEsc(l.valor_proposta!=null?l.valor_proposta:'')+'">')+
+      campo('Valor vendido (R$)','<input id="if-vvenda" class="dp-in" type="number" min="0" step="0.01" value="'+_waEsc(l.valor_venda!=null?l.valor_venda:'')+'">')+'</div>'+
+    campo('Plataforma da venda','<select id="if-plat" class="dp-in"><option value="">Selecione…</option>'+INST_PLATAFORMAS.map(p=>'<option value="'+p[0]+'"'+(l.plataforma===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select>',' id="if-plat-w"')+
+    campo('Motivo da perda','<input id="if-motivo" class="dp-in" maxlength="500" value="'+_waEsc(l.motivo_perda||'')+'">',' id="if-motivo-w"')+
+    campo('Observações','<textarea id="if-obs" class="dp-in" style="height:80px;padding:8px" maxlength="16000">'+_waEsc(l.obs||'')+'</textarea>')+
+    (!novo?'<div style="font-size:11px;color:#66738F;margin:4px 0">Na etapa há '+_instTempo(l)+' · entrou em '+new Date(l.criado_em).toLocaleDateString('pt-BR')+(l.criado_por?' por '+_waEsc(_instNomeEquipe(l.criado_por)):'')+'</div>':'')+
+    '<div class="sskb-mbotoes">'+
+      (conv?'<button class="wa-btn" onclick="instAbrirConversa(\''+conv+'\')">💬 Abrir conversa</button>':'')+
+      (!novo&&_waEhGestao()?'<button class="wa-btn" style="color:#E07A7A" onclick="instCardApagar('+l.id+')">Apagar card</button>':'')+
+      '<span style="flex:1"></span><button class="wa-btn primario" id="if-salvar" onclick="instCardSalvar('+(id||'null')+')">Salvar</button></div></div>';
+  m.dataset.conversa=novo&&base&&base.conversa_id?base.conversa_id:'';
+  document.body.appendChild(m);
+  _instCamposEtapa();
+  const foco={call:'if-call',venda:'if-vvenda',perdido:'if-motivo'}[_instFaltaPara(l,et)]||(novo?'if-nome':'');
+  const f=foco&&document.getElementById(foco);if(f)f.focus();
+}
+function _instCamposEtapa(){
+  const et=(document.getElementById('if-etapa')||{}).value;
+  const mostra=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none';};
+  mostra('if-motivo-w',et==='perdido');
+  mostra('if-plat-w',et==='venda'||!!(document.getElementById('if-plat')||{}).value);
+}
+async function instCardSalvar(id){
+  const v=x=>String((document.getElementById(x)||{}).value||'').trim();
+  const num=x=>{const s=v(x);if(!s)return null;const n=Number(s.replace(',','.'));return isFinite(n)&&n>=0?Math.round(n*100)/100:NaN;};
+  const tel=v('if-tel').replace(/\D/g,'');
+  const call=v('if-call');
+  const corpo={nome:v('if-nome')||null,telefone:tel||null,instagram:v('if-ig').replace(/^@/,'')||null,email:v('if-email').toLowerCase()||null,
+    origem:v('if-origem')||null,etapa:v('if-etapa')||'lead',sdr_email:v('if-sdr')||null,closer_email:v('if-closer')||null,
+    call_em:call?new Date(call).toISOString():null,valor_proposta:num('if-vprop'),valor_venda:num('if-vvenda'),
+    plataforma:v('if-plat')||null,motivo_perda:v('if-motivo')||null,obs:v('if-obs')||null};
+  if(!corpo.nome&&!corpo.telefone&&!corpo.instagram){showToast('error','Falta identificar a pessoa','Coloque pelo menos o nome, o telefone ou o Instagram.');return;}
+  if(tel&&(tel.length<10||tel.length>13)){showToast('error','Telefone incompleto','Coloque com DDD.');return;}
+  if(Number.isNaN(corpo.valor_proposta)||Number.isNaN(corpo.valor_venda)){showToast('error','Valor inválido','Use só números, por exemplo 11980.');return;}
+  const falta=_instFaltaPara(corpo,corpo.etapa);
+  if(falta){showToast('error',{call:'Falta a data da call',venda:'Falta o valor vendido',perdido:'Falta o motivo da perda'}[falta],'');return;}
+  if(corpo.etapa!=='perdido')corpo.motivo_perda=null;
+  const m=document.getElementById('if-modal');
+  const btn=document.getElementById('if-salvar');if(btn)btn.disabled=true;
+  try{
+    if(id){
+      const l=_inst.linhas.find(x=>x.id===id);const mudou=l&&l.etapa!==corpo.etapa;
+      await _instPatch(id,corpo);
+      if(mudou)_inst.eventos.push({lead_id:id,para:corpo.etapa,em:new Date().toISOString()});
+    }else{
+      if(m&&m.dataset.conversa)corpo.conversa_id=m.dataset.conversa;
+      const r=await _waRest('instituto_leads',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+      if(r&&r[0]){_inst.linhas.unshift(r[0]);_inst.eventos.push({lead_id:r[0].id,para:r[0].etapa,em:r[0].criado_em});}
+    }
+    instCardFechar();_instRedesenhar();showToast('success',id?'Card salvo':'Card criado','');
+  }catch(e){
+    if(btn)btn.disabled=false;
+    showToast('error','Não salvou',/23505|instituto_leads_conversa/.test(e.message)?'Esta conversa já tem um card no funil.':_waEsc(e.message));
+  }
+}
+async function instCardApagar(id){
+  const l=_inst.linhas.find(x=>x.id===id);if(!l)return;
+  if(!confirm('Apagar o card de '+_instRotulo(l)+' do funil do Instituto?\n\nO histórico de etapas dele também some. Para tirar do funil sem perder a medição, prefira mover para Perdido.'))return;
+  try{
+    await _waRest('instituto_leads?id=eq.'+id,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+    _inst.linhas=_inst.linhas.filter(x=>x.id!==id);_inst.eventos=_inst.eventos.filter(e=>e.lead_id!==id);
+    instCardFechar();_instRedesenhar();showToast('success','Card apagado','');
+  }catch(e){showToast('error','Não apagou',/403|42501|row-level/i.test(e.message)?'Só a gestão apaga cards.':_waEsc(e.message));}
+}
+async function instAbrirConversa(cid){
+  instCardFechar();
+  const nav=[...document.querySelectorAll('.nav-item.nav-inst')].find(n=>String(n.getAttribute('onclick')||'').includes("'conversas'"));
+  switchPage('conversas',nav||document.createElement('div'));
+  for(let i=0;i<30;i++){if(_wa.conversas.find(c=>c.id===cid)){waAbrir(cid);return;}await new Promise(r=>setTimeout(r,300));}
+  showToast('error','Conversa não encontrada na lista','Procure pelo nome na Central.');
+}
+// conversas do WhatsApp do Instituto que ainda não têm card
+function instSemCardAbrir(){
+  instCardFechar();
+  const lista=_instSemCard();
+  const m=document.createElement('div');m.id='if-modal';m.className='sskb-fundo';
+  m.onclick=e=>{if(e.target===m)instCardFechar();};
+  m.innerHTML='<div class="sskb-modal" style="width:560px"><div class="sskb-mcab"><b>Conversas sem card · '+lista.length+'</b><button class="wa-btn" onclick="instCardFechar()">✕</button></div>'+
+    '<div class="au-dica" style="margin:0 0 8px">Desmarque quem não é lead (aluna, fornecedor, equipe). Os marcados entram em <b>Lead</b>, ligados à conversa. Depois, preencha a origem de cada um.</div>'+
+    '<div style="max-height:50vh;overflow:auto">'+lista.map(c=>'<label style="display:flex;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid #1E2E52;font-size:12.5px;color:#EEF1F7;cursor:pointer"><input type="checkbox" class="if-sc" value="'+c.id+'" checked><span style="flex:1">'+_waEsc(c.nome_contato||c.nome_perfil||_instFoneFmt(c.telefone))+'</span><span style="color:#8C98B1;font-size:11px">'+_waEsc(_instFoneFmt(c.telefone))+' · '+new Date(c.ultima_mensagem_em||c.criada_em).toLocaleDateString('pt-BR')+'</span></label>').join('')+'</div>'+
+    '<div class="sskb-mbotoes"><button class="wa-btn" onclick="document.querySelectorAll(\'.if-sc\').forEach(x=>x.checked=!x.checked)">Inverter seleção</button><span style="flex:1"></span><button class="wa-btn primario" id="if-salvar" onclick="instCriarDasConversas()">Criar cards em Lead</button></div></div>';
+  document.body.appendChild(m);
+}
+async function instCriarDasConversas(){
+  const ids=[...document.querySelectorAll('.if-sc:checked')].map(x=>x.value);
+  if(!ids.length){instCardFechar();return;}
+  const corpo=ids.map(id=>{const c=_inst.conversas.find(x=>x.id===id)||{};return {nome:c.nome_contato||c.nome_perfil||null,telefone:_instTel(c.telefone)||null,conversa_id:id,etapa:'lead'};});
+  const btn=document.getElementById('if-salvar');if(btn){btn.disabled=true;btn.textContent='Criando…';}
+  try{
+    const r=await _waRest('instituto_leads',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(corpo)});
+    (r||[]).forEach(l=>{_inst.linhas.unshift(l);_inst.eventos.push({lead_id:l.id,para:l.etapa,em:l.criado_em});});
+    instCardFechar();_instRedesenhar();showToast('success',(r||[]).length+' cards criados em Lead','Agora preencha a origem de cada um.');
+  }catch(e){if(btn){btn.disabled=false;btn.textContent='Criar cards em Lead';}showToast('error','Não criou os cards',_waEsc(e.message));}
+}
+
+// ---------- painel lateral da conversa (Central do Instituto) ----------
+function _instCardDaConversa(c){
+  return _inst.linhas.find(l=>l.conversa_id===c.id)||_inst.linhas.find(l=>_instTel(l.telefone)&&_instTel(l.telefone)===_instTel(c.telefone));
+}
+function _instPainelConversa(c){
+  const nome=_waNome(c);
+  const opt=(v,t,sel)=>'<option value="'+_waEsc(v)+'"'+(v===sel?' selected':'')+'>'+_waEsc(t)+'</option>';
+  const atendOpts='<option value="">Sem atendente</option>'+(_wa.equipeLista||[]).map(p=>opt(p.email,p.nome,c.atribuida_a||'')).join('')+
+    (c.atribuida_a&&!(_wa.equipeLista||[]).some(p=>p.email===c.atribuida_a)?opt(c.atribuida_a,_waNomeEquipe(c.atribuida_a),c.atribuida_a):'');
+  let funil;
+  if(!_inst.carregado){
+    funil='<div class="au-dica">Carregando o funil…</div>';
+    _instCarregar().then(()=>{if(_wa.atual&&_wa.atual.id===c.id)waRenderPainel();}).catch(()=>{});
+  }else{
+    const l=_instCardDaConversa(c);
+    funil=l
+      ?'<div class="cl-campo">'+_clIc('funil')+'<span>Etapa:</span><select onchange="instMover('+l.id+',this.value)">'+INST_ETAPAS.map(e=>opt(e[0],e[1],l.etapa)).join('')+'</select></div>'+
+       '<div class="cl-campo">'+_clIc('mega')+'<span>Origem:</span><select onchange="instMudarOrigem('+l.id+',this.value)">'+opt('','Selecione…',l.origem||'')+INST_ORIGENS.map(o=>opt(o[0],o[1],l.origem||'')).join('')+'</select></div>'+
+       (l.call_em?'<div style="font-size:11.5px;color:#CCBCA6;padding:2px 2px 4px">📅 Call: '+_instCallFmt(l.call_em)+'</div>':'')+
+       '<button class="wa-btn" style="align-self:stretch;margin:2px 0 6px" onclick="instCardAbrir('+l.id+')">Abrir card do funil</button>'
+      :'<button class="wa-btn primario" style="align-self:stretch;margin:2px 0 6px" onclick="instCardDaConversaAtual()">+ Criar card no funil do Instituto</button>';
+  }
+  const ids=_wa.convTags[c.id];
+  const tags=(_wa.tags||[]).filter(t=>ids&&ids.has(t.id)).map(t=>'<span class="cl-tag" style="background:'+_waEsc(t.cor)+'26;border-color:'+_waEsc(t.cor)+';color:#EEF1F7">'+_clIc('tag')+'<span>'+_waEsc(t.nome)+'</span><b class="x" title="Tirar tag" onclick="waTirarTag('+t.id+')">×</b></span>').join('');
+  const corpo=
+    '<div class="cl-perfil">'+_clAvatar(c,nome).replace('<span class="selo"','<span style="display:none" class="selo"')+
+      '<button class="cl-ib editar" title="Editar o nome" onclick="waEditarNome()">'+_clIc('edit')+'</button>'+
+      '<div id="wa-nome-perfil" style="font-size:13px;color:#EEF1F7;margin-top:4px">'+_waEsc(nome)+'</div>'+
+      '<div style="font-size:12px;color:#EEF1F7">'+_waEsc('55'+c.telefone)+'</div>'+
+    '</div>'+
+    '<div class="cl-linha-num"><span class="q"></span><b>'+_waEsc(_waApelidoNumero(c.numero_clinica_id))+'</b><span style="color:#CCBCA6">Instituto</span></div>'+
+    '<button class="cl-link" style="align-self:center;display:flex;gap:5px;align-items:center;color:#EEF1F7" onclick="waGaleria()">'+_clIc('img')+' Imagens, vídeos e arquivos</button>'+
+    '<div class="cl-campo">'+_clIc('pessoa')+'<span>Atribuído a:</span><select onchange="waAtribuir(this.value||null)">'+atendOpts+'</select></div>'+
+    '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Funil do Instituto</span></div>'+funil+'</div>'+
+    '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Observações</span><span style="font-size:11px;color:#8C98B1" id="cl-obs-n">('+String(c.observacoes||'').length+'/16000)</span></div>'+
+      '<textarea class="cl-obs" id="cl-obs" maxlength="16000" placeholder="Digite aqui..." oninput="document.getElementById(\'cl-obs-n\').textContent=\'(\'+this.value.length+\'/16000)\'" onblur="waSalvarObsConversa(this.value)">'+_waEsc(c.observacoes||'')+'</textarea></div>'+
+    '<div class="cl-bloco"><div class="cl-bloco-tit"><span>Tags do contato <button class="cl-ib" style="width:22px;height:22px;margin-left:4px" title="Adicionar tag" onclick="waMenuTags(event)">'+_clIc('plus')+'</button></span></div><div class="cl-tags">'+(tags||'<span style="font-size:11px;color:#66738F">Nenhuma tag</span>')+'</div></div>';
+  return '<div class="cl-pcab">Dados do contato<button class="cl-ib sem-borda" onclick="waAlternarPainel(false)">'+_clIc('x')+'</button></div><div class="cl-pcorpo">'+corpo+'</div>';
+}
+function instCardDaConversaAtual(){
+  const c=_wa.atual;if(!c)return;
+  instCardAbrir(null,null,{nome:_waNome(c),telefone:_instTel(c.telefone),conversa_id:c.id});
+}
+async function instMudarOrigem(id,origem){
+  const l=_inst.linhas.find(x=>x.id===id);if(!l)return;
+  const antes=l.origem;l.origem=origem||null;
+  try{await _instPatch(id,{origem:origem||null});showToast('success','Origem salva','');}
+  catch(e){l.origem=antes;showToast('error','Não salvou a origem',_waEsc(e.message));}
+  _instRedesenhar();
 }
 
 </script>
