@@ -93,12 +93,14 @@ async function tokenDoNumero(phoneNumberId: string): Promise<string> {
 
 // ---------- Instagram ----------
 const _paginas = new Map<string, string>();
+const _paginaId = new Map<string, string>(); // (16/11/2026) ig_id → page_id (a API com login do Facebook envia pela Página)
 async function tokenDaPaginaIg(igId: string): Promise<string> {
   if (_paginas.has(igId)) return _paginas.get(igId)!;
   if (!IG_TOKEN) throw new Error("falta o segredo IG_TOKEN (chave do Instagram)");
   const c = await bancoJson(`/rest/v1/instagram_contas?ig_id=eq.${encodeURIComponent(igId)}&select=page_id`);
   const page = c?.[0]?.page_id;
   if (!page) throw new Error("conta do Instagram sem Página cadastrada (rode instagram_configurar)");
+  _paginaId.set(igId, String(page));
   const r = await meta(`/${page}?fields=access_token`, undefined, IG_TOKEN);
   const t = r.ok ? String(r.j?.access_token ?? "") : "";
   if (!t) throw new Error("não consegui a chave da Página: " + erroMeta(r.j));
@@ -107,10 +109,11 @@ async function tokenDaPaginaIg(igId: string): Promise<string> {
 }
 async function enviarIg(req: Request, quem: { email: string }, c: any, message: any, tipo: string, textoRegistro: string, extra?: { caminho: string; mime: string; nome: string }) {
   const tk = await tokenDaPaginaIg(c.numero_clinica_id);
+  const remetente = _paginaId.get(String(c.numero_clinica_id)) ?? "me";
   // depois de 24 h (até 7 dias) a resposta sai com a etiqueta de atendimento humano
   const ult = c.ultima_recebida_em ? Date.parse(c.ultima_recebida_em) : 0;
   const humano = Date.now() - ult >= JANELA_MS;
-  const r = await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, message, ...(humano ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}) }, tk);
+  const r = await meta(`/${remetente}/messages`, { recipient: { id: c.wa_id }, message, ...(humano ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}) }, tk);
   const reg = (status: string, mid: string | null, erro: string | null, bruto: unknown) => extra
     ? bancoJson("/rest/v1/rpc/wa_registrar_enviada_midia", { method: "POST", body: JSON.stringify({ p_conversa: c.id, p_wa_message_id: mid, p_tipo: tipo, p_texto: textoRegistro, p_autor: quem.email, p_status: status, p_erro: erro, p_bruto: bruto, p_caminho: extra.caminho, p_mime: extra.mime, p_nome: extra.nome }) })
     : registrar(c, mid, tipo, textoRegistro, quem.email, status, erro, bruto);
@@ -356,7 +359,7 @@ export async function handler(req: Request): Promise<Response> {
         const ult = await bancoJson(`/rest/v1/mensagens?conversa_id=eq.${c.id}&direcao=eq.recebida&select=wa_message_id&order=enviada_em.desc&limit=1`);
         const wamid = ult?.[0]?.wa_message_id;
         if (c.canal === "instagram") {
-          try { await meta(`/${c.numero_clinica_id}/messages`, { recipient: { id: c.wa_id }, sender_action: "mark_seen" }, await tokenDaPaginaIg(c.numero_clinica_id)); } catch (_) { /* segue */ }
+          try { const tkv = await tokenDaPaginaIg(c.numero_clinica_id); await meta(`/${_paginaId.get(String(c.numero_clinica_id)) ?? "me"}/messages`, { recipient: { id: c.wa_id }, sender_action: "mark_seen" }, tkv); } catch (_) { /* segue */ }
         } else if (wamid) await meta(`/${c.numero_clinica_id}/messages`, { messaging_product: "whatsapp", status: "read", message_id: wamid }, await tokenDoNumero(c.numero_clinica_id));
         await banco(`/rest/v1/conversas?id=eq.${c.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ nao_lidas: 0 }) });
         return resposta(req, { ok: true });
