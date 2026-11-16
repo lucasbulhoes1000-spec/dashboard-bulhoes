@@ -20441,6 +20441,7 @@ const KB_QUADROS={
       {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
       {id:'atendimento',nome:'Em atendimento',dica:'A SDR já falou com o lead e a conversa teve mensagem nas últimas 24 h'},
       ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
+      {id:'cadmensal',nome:'Cadência mensal',dica:'Passou 30 dias do FUP 2 meses sem agendar (entrou há mais de 90 dias): sai dos follow-ups e fica para a cadência mensal'},
       {id:'agendou',nome:'Agendou',solta:true},
       {id:'faltou',nome:'Faltou/desmarcou',solta:true},
       ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
@@ -20481,6 +20482,8 @@ const KB_QUADROS={
       const sdr=_kbEnvioSDR(it);
       if(sdr instanceof Date&&_kbConversaViva(it)!==false)return 'atendimento';
       if(!it.t0)return 'novo';
+      // (16/11/2026, Lucas) 30 dias depois do FUP 2 meses (90 dias da entrada) sai dos FUPs: Cadência mensal
+      if(Date.now()-it.t0.getTime()>90*864e5)return 'cadmensal';
       const env=_kbEnvios(it.t0,KB_CAD_LEAD);let col='novo';
       env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
       return col;
