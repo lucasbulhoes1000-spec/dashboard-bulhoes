@@ -381,6 +381,22 @@ export async function handler(req: Request): Promise<Response> {
         if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
         return resposta(req, { ok: true, id: r.j?.id, status: r.j?.status, categoria: r.j?.category });
       }
+      case "editar_modelo": {
+        // (16/11/2026) Só gestão: edita o corpo de um modelo aprovado (volta para a análise da Meta).
+        // { numero, id, corpo, exemplos: [], botoes?: ["Confirmar"] }
+        if (quem.papel !== "gestao") return resposta(req, { ok: false, erro: "só a gestão edita modelos" }, 403);
+        const id = String(dados.id ?? "").replace(/\D/g, "");
+        const corpo = String(dados.corpo ?? "").trim();
+        if (!id || !corpo) return resposta(req, { ok: false, erro: "id e corpo são obrigatórios" }, 400);
+        const exemplos: string[] = Array.isArray(dados.exemplos) ? dados.exemplos.map(String) : [];
+        const components: any[] = [{ type: "BODY", text: corpo, ...(exemplos.length ? { example: { body_text: [exemplos] } } : {}) }];
+        const botoes: string[] = Array.isArray(dados.botoes) ? dados.botoes.map(String).filter(Boolean) : [];
+        if (botoes.length) components.push({ type: "BUTTONS", buttons: botoes.map((t) => ({ type: "QUICK_REPLY", text: t.slice(0, 25) })) });
+        const ce = await contaDoNumero(dados.numero);
+        const r = await meta(`/${id}`, { components }, ce.token);
+        if (!r.ok) return resposta(req, { ok: false, erro: erroMeta(r.j) }, 502);
+        return resposta(req, { ok: true, resultado: r.j });
+      }
       case "status_modelos": {
         // situação de alguns modelos (aprovado, em análise, recusado e o motivo)
         const nomes: string[] = Array.isArray(dados.nomes) ? dados.nomes.map(String) : [];
