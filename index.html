@@ -20397,6 +20397,30 @@ async function _kbCarregarRespostas(itens){
     }
   }finally{_kb.carregandoResp=false;}
 }
+// telefones com conversa viva (lead escreveu ou alguém da equipe mandou nas últimas 24 h; automação não conta)
+async function _kbCarregarVivas(){
+  if(_kb.carregandoVivas||(_kb.vivasEm&&Date.now()-_kb.vivasEm<120000))return;
+  _kb.carregandoVivas=true;
+  try{
+    const desde=encodeURIComponent(new Date(Date.now()-864e5).toISOString());
+    const set=new Set();
+    const rec=await _waRest('conversas?select=telefone&ultima_recebida_em=gte.'+desde+'&limit=5000')||[];
+    rec.forEach(c=>{const t=normalizePhone(c.telefone);if(t)set.add(t);});
+    const env=await _waRest('mensagens?select=conversa_id&direcao=eq.enviada&autor_email=like.*%40*&enviada_em=gte.'+desde+'&limit=5000')||[];
+    const ids=[...new Set(env.map(m=>m.conversa_id))];
+    for(let i=0;i<ids.length;i+=150){
+      const cs=await _waRest('conversas?select=telefone&id=in.('+ids.slice(i,i+150).join(',')+')')||[];
+      cs.forEach(c=>{const t=normalizePhone(c.telefone);if(t)set.add(t);});
+    }
+    const primeira=!_kb.vivas;_kb.vivas=set;_kb.vivasEm=Date.now();
+    if(primeira)try{if(_kb.modo.leads==='kanban'&&document.getElementById('page-leads')?.classList.contains('active'))kbRender('leads');}catch(e){}
+  }catch(e){}finally{_kb.carregandoVivas=false;}
+}
+function _kbConversaViva(it){
+  _kbCarregarVivas();
+  if(!_kb.vivas)return undefined; // ainda carregando: mantém como estava
+  return !!(it.ph&&_kb.vivas.has(it.ph));
+}
 function _kbEnvioSDR(it){
   if(!it.t0||!_kb.mensagensDesde||it.t0<_kb.mensagensDesde)return undefined;
   return _kb.env[it.ph+'|'+it.t0.toISOString()];
@@ -20415,7 +20439,7 @@ const KB_QUADROS={
     lista:()=>{const tb=document.getElementById('leads-tbody');return [tb&&tb.closest('.table-card'),document.getElementById('leads-pagination')];},
     colunas:()=>[
       {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
-      {id:'atendimento',nome:'Em atendimento',dica:'A SDR já mandou mensagem pelo CRM'},
+      {id:'atendimento',nome:'Em atendimento',dica:'A SDR já falou com o lead e a conversa teve mensagem nas últimas 24 h'},
       ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
       {id:'agendou',nome:'Agendou',solta:true},
       {id:'faltou',nome:'Faltou/desmarcou',solta:true},
@@ -20451,8 +20475,11 @@ const KB_QUADROS={
         return col;
       }
       // Em atendimento = a SDR já mandou mensagem pelo CRM (resposta do lead sozinha não move)
+      // (16/11/2026, pedido do Lucas) Em atendimento = conversa viva: a SDR já falou com o lead E houve
+      // mensagem do lead ou da equipe nas últimas 24 h. Esfriou sem agendar = volta para a cadência de FUP
+      // (contada da entrada, igual às automações, que continuam enviando enquanto a etapa for Lead).
       const sdr=_kbEnvioSDR(it);
-      if(sdr instanceof Date)return 'atendimento';
+      if(sdr instanceof Date&&_kbConversaViva(it)!==false)return 'atendimento';
       if(!it.t0)return 'novo';
       const env=_kbEnvios(it.t0,KB_CAD_LEAD);let col='novo';
       env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
