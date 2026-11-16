@@ -1696,18 +1696,13 @@ html[data-tema="claro"] .kb-prazo-atraso .kb-retorno-faixa{color:#9B2C2C;}
       <!-- CARDS RESUMO -->
       <div class="row r5" style="margin-bottom:16px;">
         <div class="mc"><div class="ml">Total orçado</div><div class="mv ta" id="cc-total-clientes">—</div><div class="ms" id="cc-total-clientes-label">maior orçamento de cada paciente</div></div>
-        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">pacientes em aberto (novos e recompras)</div></div>
+        <div class="mc"><div class="ml">Não fechados</div><div class="mv" id="cc-total-abertos">—</div><div class="ms" id="cc-total-abertos-label">pacientes em aberto</div></div>
         <div class="mc"><div class="ml">Fechados</div><div class="mv green" id="cc-total-fechados">—</div><div class="ms" id="cc-total-fechados-sub" title="">contratos</div></div>
         <div class="mc"><div class="ml">Valor total fechado</div><div class="mv green" id="cc-valor-fechado">—</div><div class="ms" id="cc-valor-fechado-sub" title="">de receita</div></div>
         <div class="mc" id="cc-na-aval-card" title=""><div class="ml">Fechou na avaliação</div><div class="mv green" id="cc-na-aval">—</div><div class="ms" id="cc-na-aval-sub">—</div></div>
       </div>
 
-      <!-- DIVISÃO PRINCIPAL DA ABA CLIENTES -->
-      <div style="display:flex;gap:8px;margin:0 0 12px 0;align-items:center;">
-        <button id="clientes-tab-todos" onclick="setTipoOrcamentoClientes('todos')" style="border:0.5px solid #D4AF5A;background:#B08A3E;color:#FFFFFF;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">Todos</button>
-        <button id="clientes-tab-novo" onclick="setTipoOrcamentoClientes('novo')" style="border:0.5px solid #2A3D66;background:#0D1A33;color:#E2BE6A;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">👤 Novos pacientes</button>
-        <button id="clientes-tab-recompra" onclick="setTipoOrcamentoClientes('recompra')" style="border:0.5px solid #2A3D66;background:#0D1A33;color:#E2BE6A;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;">↻ Recompras</button>
-      </div>
+      <!-- (16/11/2026) Lucas: novos e recompras juntos, sem separar (a recompra tem selo no card) -->
 
       <div class="search-bar">
         <input class="search-input" type="text" placeholder="Buscar por nome ou telefone..." id="clientes-search" oninput="filterClientesTable()">
@@ -9104,7 +9099,7 @@ function setTipoOrcamentoClientes(tipo){
   const lblTotal=document.getElementById('cc-total-clientes-label');
   const lblAbertos=document.getElementById('cc-total-abertos-label');
   if(lblTotal)lblTotal.textContent=_clientesTipoOrcamento==='recompra'?'maior orçamento de cada recompra':'maior orçamento de cada paciente';
-  if(lblAbertos)lblAbertos.textContent=_clientesTipoOrcamento==='recompra'?'recompras em aberto':_clientesTipoOrcamento==='novo'?'novos pacientes em aberto':'pacientes em aberto (novos e recompras)';
+  if(lblAbertos)lblAbertos.textContent='pacientes em aberto';
 
   filterClientesTable();
 }
