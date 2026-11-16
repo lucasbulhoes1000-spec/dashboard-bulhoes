@@ -20712,8 +20712,9 @@ const KB_QUADROS={
     titulo:'Em Fluxo',
     lista:()=>[document.getElementById('fluxo-cards')],
     colunas:()=>[
-      {id:'boasvindas',nome:'Boas-vindas (fechou hoje)',dica:'Fechou hoje: mensagem de boas-vindas da recepção e do financeiro. Amanhã o card passa sozinho para Em tratamento'},
-      {id:'tratamento',nome:'Em tratamento',dica:'Fechou antes de hoje e ainda não terminou a parte clínica. Mostra quem está sem consulta marcada no Clinicorp'},
+      {id:'boasvindas',nome:'Boas-vindas (fechou hoje)',dica:'Fechou hoje: mensagem de boas-vindas da recepção e do financeiro. Amanhã o card passa sozinho para Aguardando início'},
+      {id:'aguardando',nome:'Aguardando início',dica:'Fechou, mas nenhuma etapa foi marcada ainda. Confira se a primeira consulta está marcada'},
+      {id:'tratamento',nome:'Em tratamento',dica:'Pelo menos uma etapa marcada. Mostra quem está sem consulta marcada no Clinicorp'},
       {id:'parado',nome:'Parado (sem retorno)',dica:'Não voltou para o retorno ou não responde. Arraste para cá; arraste de volta quando retomar'},
       {id:'posvenda',nome:'Pós-venda e NPS',dica:'Terminou a parte clínica: enviar o pós-venda e a pesquisa NPS. Arraste para Concluído quando os dois forem enviados'},
       {id:'concluido',nome:'Concluído (últimos 30 dias)',dica:'Pós-venda e NPS enviados. Os mais antigos ficam na aba Concluídos'}
@@ -20740,13 +20741,13 @@ const KB_QUADROS={
       if(p.concluido)return 'concluido';
       if(typeof clinicoConcluido==='function'&&clinicoConcluido(p))return 'posvenda';
       if(p.parado)return 'parado';
-      if(it.feitas===0&&p.dataInicio===new Date().toISOString().slice(0,10))return 'boasvindas';
-      return 'tratamento';
+      if(it.feitas>0)return 'tratamento';
+      return p.dataInicio===new Date().toISOString().slice(0,10)?'boasvindas':'aguardando';
     },
     soltar:(it,col)=>{
       const idx=_fluxoPacientes.indexOf(it.p);if(idx<0)return false;const p=it.p;
       if(col==='parado'){if(p.parado)return false;marcarParadoFluxo(idx);return !!p.parado;}
-      if((col==='tratamento'||col==='boasvindas')&&p.parado){retomarFluxo(idx);return true;}
+      if(['tratamento','boasvindas','aguardando'].includes(col)&&p.parado){retomarFluxo(idx);return true;}
       if(col==='concluido'){
         if(!clinicoConcluido(p)){showToast('error','Ainda falta a parte clínica','Abra o card e marque as etapas feitas. Quando todas estiverem marcadas, ele vai para Pós-venda e NPS.');return false;}
         if(!confirm('Concluir '+(p.nome||'o paciente')+'?\nIsso marca o pós-venda e o NPS como enviados.'))return false;
@@ -20770,7 +20771,7 @@ const KB_QUADROS={
       if(col==='posvenda'){
         ag+='<div class="kb-linha"><span class="kb-tag'+(it.p.posVendaEnviado?' ok':'')+'">pós-venda '+(it.p.posVendaEnviado?'✓':'pendente')+'</span><span class="kb-tag'+(it.p.npsEnviado?' ok':'')+'">NPS '+(it.p.npsEnviado?'✓':'pendente')+'</span></div>';
       }
-      if(col==='tratamento'||col==='boasvindas'){
+      if(col==='tratamento'||col==='boasvindas'||col==='aguardando'){
         if(_kb.agenda){
           const a=(it.ph&&_kb.agenda[it.ph])||(_kb.agendaNome&&_kb.nn&&String(it.nome).trim().includes(' ')&&_kb.agendaNome[_kb.nn(it.nome)]);
           ag+=a?'<div class="kb-agenda">'+_kbIcAgenda+new Date(a.data+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+(a.hora?' '+a.hora:'')+'</div>'
@@ -20784,7 +20785,7 @@ const KB_QUADROS={
         ${ag}`;
     },
     abrir:(it)=>abrirFluxoPaciente(it.p),
-    aviso:()=>'Clique no card para abrir o paciente aqui mesmo: marque as etapas, o pós-venda e o NPS sem sair do quadro. O card anda sozinho: fechou hoje fica em Boas-vindas; a partir de amanhã vai para Em tratamento; com todas as etapas marcadas, para Pós-venda e NPS. Arraste para Parado quando o paciente não voltar, e de Pós-venda para Concluído quando enviar as duas mensagens.'
+    aviso:()=>'Clique no card para abrir o paciente aqui mesmo: marque as etapas, o pós-venda e o NPS sem sair do quadro. O card anda sozinho: fechou hoje fica em Boas-vindas; a partir de amanhã vai para Aguardando início; com a primeira etapa marcada, para Em tratamento; com todas as etapas marcadas, para Pós-venda e NPS. Arraste para Parado quando o paciente não voltar, e de Pós-venda para Concluído quando enviar as duas mensagens.'
   },
   pacientes:{
     titulo:'Pacientes',
