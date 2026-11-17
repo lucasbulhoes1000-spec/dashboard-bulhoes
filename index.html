@@ -1329,6 +1329,11 @@ html[data-tema="claro"] .kb-prazo-atraso .kb-retorno-faixa{color:#9B2C2C;}
       <span class="nav-label">Tráfego Pago</span>
     </div>
     <div class="nav-section nav-inst">CRM</div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-funil',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg></span>
+      <span class="nav-label">Funil comercial</span>
+      <span class="wa-nav-badge" id="inst-nav-badge" style="display:none"></span>
+    </div>
     <div class="nav-item nav-inst" onclick="switchPage('conversas',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/></svg></span>
       <span class="nav-label">Mensagens</span>
@@ -19238,6 +19243,37 @@ async function _carregarEspacos(){
   if(!_temEspaco(quer))quer='clinica';
   if(quer!==window._espaco)trocarEspaco(quer);
   else document.querySelectorAll('#esp-sel button').forEach(b=>b.classList.toggle('ativo',b.dataset.e===quer));
+  if(_temEspaco('instituto'))_instLigarTempoReal();
+}
+// (17/11) aplicação nova: aviso na hora para quem é do Instituto (meta: ligar em até 30 min)
+function _instLigarTempoReal(){
+  if(!_sb||_inst.canal)return;
+  try{
+    _inst.canal=_sb.channel('instituto-funil')
+      .on('postgres_changes',{event:'*',schema:'public',table:'instituto_leads'},ev=>{
+        const n=ev.new||{};const o=ev.old||{};
+        if(ev.eventType==='DELETE'){_inst.linhas=_inst.linhas.filter(x=>x.id!==o.id);}
+        else if(n.id){const i=_inst.linhas.findIndex(x=>x.id===n.id);if(i>=0)_inst.linhas[i]=Object.assign(_inst.linhas[i],n);else if(_inst.carregado)_inst.linhas.unshift(n);}
+        const nova=n.aplicou_em&&n.aplicou_em!==o.aplicou_em&&Date.now()-Date.parse(n.aplicou_em)<5*6e4&&n.oferta_sugerida!=='nenhuma';
+        if(nova)_instAvisarAplicacao(n);
+        _instBadge();
+        if(currentPage==='inst-funil'&&!document.getElementById('if-modal'))instKanban();
+      })
+      .subscribe(st=>{if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){setTimeout(()=>{try{_sb.removeChannel(_inst.canal);}catch(e){}_inst.canal=null;_instLigarTempoReal();},15000);}});
+  }catch(e){}
+  if(!_inst.carregado)_instCarregar().then(_instBadge).catch(()=>{});
+}
+function _instAvisarAplicacao(n){
+  const tit='🤎 Nova aplicação no Instituto: '+(n.nome||'sem nome');
+  const corpo='Oferta sugerida: '+(INST_OFERTA_NOME[n.oferta_sugerida]||'SDR decide')+'. Ligar em até 30 minutos.';
+  try{tocarBeepNotificacao();}catch(e){}
+  showToast('success',_waEsc(tit),_waEsc(corpo),true);
+  if(('Notification' in window)&&Notification.permission==='granted'){try{new Notification(tit,{body:corpo,requireInteraction:true});}catch(e){}}
+}
+function _instBadge(){
+  const el=document.getElementById('inst-nav-badge');if(!el)return;
+  const n=(_inst.linhas||[]).filter(l=>l.etapa==='aplicacao').length;
+  el.textContent=n>99?'99+':String(n);el.style.display=n?'inline-block':'none';
 }
 function trocarEspaco(e){
   if(!_temEspaco(e)||window._espaco===e)return;
@@ -19278,7 +19314,7 @@ function _instAplicarEquipe(){
 
 // ---------- páginas do Instituto (16/11/2026: estrutura pronta, cada uma vai ser modelada) ----------
 // O funil comercial fica guardado e fora do menu até o processo comercial ser fechado (decisão do Lucas).
-var INST_FUNIL_LIGADO=false;
+var INST_FUNIL_LIGADO=true; // (17/11) aplicação aprovada: o funil recebe as aplicações (SQL 203)
 var INST_TITULOS={'inst-funil':'Funil comercial','inst-dashboard':'Dashboard','inst-trafego':'Tráfego Pago','inst-automacoes':'Automações','inst-agente':'Agentes de IA','inst-social':'Social Selling','inst-disparos':'Mensagens em Massa'};
 const INST_EM_BREVE={
   'inst-trafego':['Os anúncios do Instituto, separados dos da clínica.',['Definir quais campanhas e qual conta de anúncios são do Instituto (hoje elas ficam na conta "CA - LARISSA BULHÕES").']],
@@ -19328,12 +19364,31 @@ const INST_ETAPAS=[
   ['call_realizada','Call realizada','#E2BE6A','normal'],
   ['proposta','Proposta','#D4AF5A','normal'],
   ['venda','Venda','#7FD3A0','resultado'],
-  ['perdido','Perdido','#E07A7A','fora']];
+  ['perdido','Perdido','#E07A7A','fora'],
+  ['nutricao','Sem perfil agora','#8C98B1','fora']];
 const INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
-const INST_ORIGENS=[['aplicacao','Funil de aplicação'],['social_selling','Social selling'],['organico','Orgânico (bio e stories)'],['outro','Outro']];
-const INST_ORIGEM_NOME=Object.fromEntries(INST_ORIGENS);
+const INST_ORIGENS=[['anuncio','Anúncio'],['organico','Orgânico (bio, stories, Close Friends)'],['social_selling','Social selling'],['outro','Outro']];
+const INST_ORIGEM_NOME=Object.assign({aplicacao:'Aplicação (antigo)'},Object.fromEntries(INST_ORIGENS));
+const INST_PRODUTOS=[['expert','Expert em Lentes'],['presencial','Presencial']];
+const INST_PRODUTO_NOME=Object.fromEntries(INST_PRODUTOS);
+const INST_OFERTA_NOME={expert:'Expert',presencial:'Presencial',nenhuma:'Sem perfil agora',sdr:'SDR decide'};
+// respostas da aplicação (texto aprovado em 17/11, projeto: claude/aplicacao-e-obrigado.md)
+const INST_RESP={
+  momento:['Momento profissional',{recem_formado:'Recém-formada(o)',dono_clinica:'Dona(o) de clínica ou consultório',clinica_popular:'Trabalha em clínicas populares',clinica_parceiro:'Trabalha em clínicas de parceiros',estudante:'Estudante'}],
+  desafios:['Maior desafio',{comecar:'Quer começar',tecnica:'Melhorar a técnica',naturalidade:'Casos não ficam naturais',captacao:'Captação de pacientes'}],
+  cobra:['Cobra por arcada superior',{nao_faz:'Ainda não faz lentes',ate_1000:'Até R$ 1.000','1000_2500':'R$ 1.000 a R$ 2.500','2500_4000':'R$ 2.500 a R$ 4.000','4000_5000':'R$ 4.000 a R$ 5.000','5000_mais':'Acima de R$ 5.000'}],
+  casos_mes:['Casos por mês',null],
+  santos:['Pode ir a Santos',{sim:'Sim',nao:'Não'}],
+  investimento:['Investimento',{avista:'Sim, à vista',parcelado:'Sim, parcelado',organizar:'Precisa se organizar',nao:'Não no momento'}]};
+function _instRespHtml(r){
+  if(!r)return '';
+  return Object.keys(INST_RESP).map(k=>{const [rot,mapa]=INST_RESP[k];let v=r[k];if(v==null||v==='')return '';
+    v=Array.isArray(v)?v.map(x=>mapa&&mapa[x]||x).join(', '):(mapa&&mapa[v]||String(v));
+    return '<div style="display:flex;gap:8px;font-size:12px;padding:3px 0"><span style="color:#8C98B1;min-width:150px">'+_waEsc(rot)+'</span><span style="color:#EEF1F7">'+_waEsc(v)+'</span></div>';}).join('');
+}
+function _instMinAplicou(l){return l.aplicou_em?Math.floor((Date.now()-Date.parse(l.aplicou_em))/6e4):null;}
 const INST_PLATAFORMAS=[['eduzz','Eduzz'],['hotmart','Hotmart'],['outra','Outra']];
-var _inst={linhas:[],eventos:[],conversas:[],carregado:false,busca:'',origem:'',periodo:'mes',equipe:null};
+var _inst={linhas:[],eventos:[],conversas:[],carregado:false,busca:'',origem:'',produto:'',periodo:'mes',equipe:null};
 
 function _instTel(t){return String(t||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');}
 function _instMoeda(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -19362,6 +19417,7 @@ async function _instCarregar(){
     _waRest('conversas?select=id,telefone,nome_perfil,nome_contato,criada_em,ultima_mensagem_em,oculta_em&canal=eq.whatsapp&numero_clinica_id=in.('+WA_NUMEROS_FORA_CLINICA.join(',')+')&order=criada_em.desc&limit=2000').catch(()=>[]),
     _instCarregarEquipe()]);
   _inst.linhas=linhas;_inst.eventos=eventos;_inst.conversas=conversas||[];_inst.carregado=true;
+  try{_instBadge();}catch(e){}
 }
 async function abrirInstFunil(forcar){
   const el=document.getElementById('if-conteudo');if(!el)return;
@@ -19391,7 +19447,7 @@ function _instPorOrigem(){
   const chegou={};_inst.eventos.forEach(e=>{(chegou[e.lead_id]=chegou[e.lead_id]||new Set()).add(e.para);});
   const ordem=INST_ETAPAS.map(e=>e[0]);
   const alcancou=(l,k)=>{const s=chegou[l.id];if(s&&s.has(k))return true;const i=ordem.indexOf(l.etapa);return l.etapa!=='perdido'&&i>=ordem.indexOf(k);};
-  const grupos=INST_ORIGENS.map(o=>o[0]).concat(['']);
+  const grupos=INST_ORIGENS.map(o=>o[0]).concat(['aplicacao','']);
   return grupos.map(o=>{
     const ls=coorte.filter(l=>(l.origem||'')===o);
     const qual=ls.filter(l=>alcancou(l,'qualificado')).length;
@@ -19405,6 +19461,7 @@ function instKanban(){
   const b=_inst.busca.trim().toLowerCase(),bn=b.replace(/\D/g,'');
   const cards=_inst.linhas.filter(l=>INST_ETAPA_NOME[l.etapa])
     .filter(l=>!_inst.origem||(_inst.origem==='_sem'?!l.origem:l.origem===_inst.origem))
+    .filter(l=>!_inst.produto||(l.produto||l.oferta_sugerida)===_inst.produto)
     .filter(l=>!b||[l.nome,l.instagram,l.email,l.obs].some(x=>String(x||'').toLowerCase().includes(b))||(bn&&_instTel(l.telefone).includes(bn)));
   const mesIni=(()=>{const h=new Date();return new Date(h.getFullYear(),h.getMonth(),1).toISOString();})();
   const ativos=cards.filter(l=>_instTipo(l.etapa)==='normal').length;
@@ -19429,6 +19486,8 @@ function instKanban(){
         (l.origem?tag(_waEsc(INST_ORIGEM_NOME[l.origem]||l.origem)):tag('sem origem','ouro'))+
         (l.sdr_email?tag('SDR '+_waEsc(_instNomeEquipe(l.sdr_email).split(' ')[0])):'')+
         (l.closer_email?tag('Closer '+_waEsc(_instNomeEquipe(l.closer_email).split(' ')[0])):'')+
+        (l.produto?tag(_waEsc(INST_PRODUTO_NOME[l.produto]),'verde'):l.oferta_sugerida?tag('sugere: '+_waEsc(INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida)):'')+
+        (l.etapa==='aplicacao'&&_instMinAplicou(l)!=null?tag('⏱ '+(_instMinAplicou(l)<60?_instMinAplicou(l)+' min':Math.floor(_instMinAplicou(l)/60)+' h'),_instMinAplicou(l)>30?'ouro':''):'')+
         (l.conversa_id?tag('💬'):'')+
         (l.etapa==='call_agendada'&&l.call_em?tag('📅 '+_instCallFmt(l.call_em),l.call_em<agora?'ouro':''):'')+
         (l.etapa==='proposta'&&l.valor_proposta?tag(_instMoeda(l.valor_proposta)):'')+
@@ -19440,11 +19499,14 @@ function instKanban(){
   const pct=(a,b2)=>b2?Math.round(a*100/b2)+'%':'–';
   el.innerHTML=
     '<div class="sskb-topo">'+
-      stat('Ativos no funil',ativos)+stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
+      stat('Ativos no funil',ativos)+
+      (()=>{const ap=cards.filter(l=>l.etapa==='aplicacao');const at=ap.filter(l=>(_instMinAplicou(l)||0)>30).length;return stat('Aplicações sem contato',ap.length+(at?' · '+at+' há +30 min':''),at?'#E2BE6A':'#6FA8FF');})()+
+      stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
       stat('Calls agendadas',calls.length+(callsAtrasadas?' · '+callsAtrasadas+' passou da hora':''),callsAtrasadas?'#E2BE6A':'#CCBCA6')+
       stat('Vendas no mês',vendasMes.length+(valorMes?' · '+_instMoeda(valorMes):''),'#7FD3A0')+
       '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar nome, @, telefone" value="'+_waEsc(_inst.busca)+'" oninput="_inst.busca=this.value;clearTimeout(_inst.tk);_inst.tk=setTimeout(()=>{instKanban();const i=document.querySelector(\'#if-conteudo .sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.origem=this.value;instKanban()"><option value="">Todas as origens</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(_inst.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'<option value="_sem"'+(_inst.origem==='_sem'?' selected':'')+'>Sem origem</option></select>'+
+        '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.produto=this.value;instKanban()"><option value="">Os dois produtos</option>'+INST_PRODUTOS.map(o=>'<option value="'+o[0]+'"'+(_inst.produto===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'+
         '<button class="wa-btn primario" onclick="instCardAbrir(null)">+ Novo card</button></div>'+
     '</div>'+
     (semCard.length?'<div class="au-bloco" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:12.5px;color:#EEF1F7"><b>'+semCard.length+(semCard.length===1?' conversa':' conversas')+'</b> do WhatsApp do Instituto ainda sem card no funil.</div><button class="wa-btn" onclick="instSemCardAbrir()">Ver e criar cards</button></div>':'')+
@@ -19509,6 +19571,10 @@ function instCardAbrir(id,etapaNova,base){
       campo('Instagram','<input id="if-ig" class="dp-in" placeholder="@usuario" value="'+_waEsc(l.instagram?'@'+l.instagram:'')+'">')+'</div>'+
     '<div class="sskb-dupla">'+campo('E-mail','<input id="if-email" class="dp-in" type="email" value="'+_waEsc(l.email||'')+'">')+
       campo('Origem','<select id="if-origem" class="dp-in"><option value="">Selecione…</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(l.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>')+'</div>'+
+    '<div class="sskb-dupla">'+campo('Produto','<select id="if-produto" class="dp-in"><option value="">'+(l.oferta_sugerida&&INST_PRODUTO_NOME[l.oferta_sugerida]?'Sugerido: '+INST_PRODUTO_NOME[l.oferta_sugerida]:'Selecione…')+'</option>'+INST_PRODUTOS.map(o=>'<option value="'+o[0]+'"'+(l.produto===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>')+
+      campo('Oferta sugerida pela aplicação','<div class="dp-in" style="display:flex;align-items:center;color:#C3CBDB">'+_waEsc(l.oferta_sugerida?INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida:'Sem aplicação')+'</div>')+'</div>'+
+    (l.respostas?'<div class="au-bloco" style="margin:4px 0 8px;padding:10px 12px"><div style="font-size:12px;font-weight:600;color:#EEF1F7;margin-bottom:4px">Respostas da aplicação'+(l.aplicou_em?' · '+new Date(l.aplicou_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'</div>'+_instRespHtml(l.respostas)+
+      ((l.porta||l.utm)?'<div style="font-size:11px;color:#8C98B1;margin-top:4px">Entrou por: '+_waEsc([l.porta,l.utm&&l.utm.utm_source,l.utm&&l.utm.utm_campaign,l.utm&&l.utm.utm_content].filter(Boolean).join(' · '))+'</div>':'')+'</div>':'')+
     '<div class="sskb-dupla">'+campo('Etapa','<select id="if-etapa" class="dp-in" onchange="_instCamposEtapa()">'+INST_ETAPAS.map(e=>'<option value="'+e[0]+'"'+(e[0]===et?' selected':'')+'>'+e[1]+'</option>').join('')+'</select>')+
       campo('Data e hora da call','<input id="if-call" class="dp-in" type="datetime-local" value="'+_waEsc(_instDataLocal(l.call_em))+'">')+'</div>'+
     '<div class="sskb-dupla">'+campo('SDR',selEq('if-sdr',l.sdr_email||''))+campo('Closer',selEq('if-closer',l.closer_email||''))+'</div>'+
@@ -19542,7 +19608,7 @@ async function instCardSalvar(id){
   const corpo={nome:v('if-nome')||null,telefone:tel||null,instagram:v('if-ig').replace(/^@/,'')||null,email:v('if-email').toLowerCase()||null,
     origem:v('if-origem')||null,etapa:v('if-etapa')||'lead',sdr_email:v('if-sdr')||null,closer_email:v('if-closer')||null,
     call_em:call?new Date(call).toISOString():null,valor_proposta:num('if-vprop'),valor_venda:num('if-vvenda'),
-    plataforma:v('if-plat')||null,motivo_perda:v('if-motivo')||null,obs:v('if-obs')||null};
+    plataforma:v('if-plat')||null,produto:v('if-produto')||null,motivo_perda:v('if-motivo')||null,obs:v('if-obs')||null};
   if(!corpo.nome&&!corpo.telefone&&!corpo.instagram){showToast('error','Falta identificar a pessoa','Coloque pelo menos o nome, o telefone ou o Instagram.');return;}
   if(tel&&(tel.length<10||tel.length>13)){showToast('error','Telefone incompleto','Coloque com DDD.');return;}
   if(Number.isNaN(corpo.valor_proposta)||Number.isNaN(corpo.valor_venda)){showToast('error','Valor inválido','Use só números, por exemplo 11980.');return;}
