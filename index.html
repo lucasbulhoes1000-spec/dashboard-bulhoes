@@ -18204,7 +18204,7 @@ function dpMenuRapidos(ev){
 function _dpRapidos(){
   if(window._espaco!=='instituto')return DP_RAPIDOS;
   const n=k=>(typeof INST_ETAPA_NOME!=='undefined'&&INST_ETAPA_NOME[k])||k;
-  return [['inst_classificar','Cards em '+n('classificar'),{etapas:[n('classificar')]}],['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('qualificado')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('call_realizada'),n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
+  return [['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('qualificado')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('call_realizada'),n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
 }
 function dpAplicarRapido(k){const r=_dpRapidos().find(x=>x[0]===k);if(!r)return;_dp.f=Object.assign({},JSON.parse(JSON.stringify(r[2])));_dp.pag=0;dpFiltrar();dpRenderPagina();}
 function dpMenuFiltro(ev,k){
@@ -19399,7 +19399,6 @@ async function instDashboard(el,forcar){
 
 // ---------- funil ----------
 var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
-  ['classificar','Classificar','#B79CFF','fora','leads'], // temporária: conversas antigas do WhatsApp para o Lucas classificar 1 a 1
   ['lead','Contato sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
   ['qualificado','Qualificado','#A18B6C','normal','leads'],
@@ -19415,9 +19414,9 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
 // colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
 var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
 // colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
-var INST_FIXAS={classificar:'Coluna temporária das conversas antigas',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',call_realizada:'Pede o produto',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_FIXAS={lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',call_realizada:'Pede o produto',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
 var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
-var INST_FORA=['perdido','estudante','descarte','classificar','aluno','interesse_modelo'];
+var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
 function _instEl(){return document.getElementById(currentPage==='inst-oport'?'if-conteudo-op':'if-conteudo');}
 var INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
@@ -19430,7 +19429,7 @@ function _instAplicarColunas(cols){
 async function instCarregarColunas(){
   try{const r=await _waRest('configuracoes?chave=eq.inst_colunas&select=valor');const v=r&&r[0]&&r[0].valor;
     if(Array.isArray(v)&&v.length){
-      const cols=v.filter(c=>c&&c.k).map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
+      const cols=v.filter(c=>c&&c.k&&c.k!=='classificar').map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
       _instAplicarColunas(cols);}}catch(e){}
 }
 async function _instSalvarColunas(cols){
