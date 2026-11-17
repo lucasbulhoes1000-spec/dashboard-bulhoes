@@ -19362,6 +19362,7 @@ async function instDashboard(el,forcar){
 
 // ---------- funil ----------
 const INST_ETAPAS=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
+  ['classificar','Classificar','#B79CFF','fora','leads'], // temporária: conversas antigas do WhatsApp para o Lucas classificar 1 a 1
   ['lead','Contato sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
   ['qualificado','Qualificado','#A18B6C','normal','leads'],
@@ -19370,9 +19371,10 @@ const INST_ETAPAS=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e O
   ['proposta','Follow-up','#D4AF5A','normal','oport'],
   ['venda','Venda','#7FD3A0','resultado','oport'],
   ['perdido','Perdido','#E07A7A','fora','oport'],
+  ['aluno','Alunos','#5FB98A','fora','oport'], // quem já é aluno (grupos das turmas e Mentoria)
   ['estudante','Estudantes','#8C98B1','fora','leads'],
   ['descarte','Descarte','#66738F','fora','leads']];
-const INST_FORA=['perdido','estudante','descarte'];
+const INST_FORA=['perdido','estudante','descarte','classificar','aluno'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
 function _instEl(){return document.getElementById(currentPage==='inst-oport'?'if-conteudo-op':'if-conteudo');}
 const INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
