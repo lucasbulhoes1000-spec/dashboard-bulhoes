@@ -19579,6 +19579,8 @@ function _instPeriodoIni(){
   return '';
 }
 // conversão por canal: dos cards que entraram no período, quantos chegaram a cada etapa (pelo histórico)
+// (17/11) Lucas: a tabela de conversão por canal fica escondida por enquanto (os cards antigos distorcem as taxas)
+var INST_MOSTRAR_CONVERSAO=false;
 function _instPorOrigem(){
   const ini=_instPeriodoIni();
   const coorte=_inst.linhas.filter(l=>!ini||String(l.criado_em)>=ini);
@@ -19635,7 +19637,7 @@ function instKanban(){
         ((l.etapa==='perdido'||l.etapa==='descarte')&&l.motivo_perda?tag(_waEsc(String(l.motivo_perda).slice(0,30))):'')+
         (pd?tag('parado','ouro'):'')+'</div></div>';
   };
-  const po=_instPorOrigem();
+  const po=INST_MOSTRAR_CONVERSAO?_instPorOrigem():[];
   const pct=(a,b2)=>b2?Math.round(a*100/b2)+'%':'–';
   el.innerHTML=
     '<div class="sskb-topo">'+
@@ -19665,11 +19667,11 @@ function instKanban(){
         '<div class="sskb-cab" style="border-color:'+cor+';cursor:default"><div>'+_waEsc(nome)+'</div><small>'+cs.length+' '+(cs.length===1?'card':'cards')+(tot?' · '+_instMoeda(tot):'')+'</small></div>'+
         '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">Arraste um card para cá</div>')+'</div></div>';
     }).join('')+'</div>'+
-    '<div class="au-bloco" style="margin-top:12px"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Conversão por canal <select class="dp-in" style="height:28px;width:auto;font-size:12px" onchange="_inst.periodo=this.value;instKanban()">'+[['mes','Entraram este mês'],['30','Entraram nos últimos 30 dias'],['tudo','Desde o início']].map(p=>'<option value="'+p[0]+'"'+(_inst.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select></h4>'+
+    (INST_MOSTRAR_CONVERSAO?'<div class="au-bloco" style="margin-top:12px"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Conversão por canal <select class="dp-in" style="height:28px;width:auto;font-size:12px" onchange="_inst.periodo=this.value;instKanban()">'+[['mes','Entraram este mês'],['30','Entraram nos últimos 30 dias'],['tudo','Desde o início']].map(p=>'<option value="'+p[0]+'"'+(_inst.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select></h4>'+
       (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Ofertas feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
         po.map(g=>'<tr style="border-top:1px solid #1E2E52;color:#EEF1F7"><td style="padding:6px">'+_waEsc(g.o?INST_ORIGEM_NOME[g.o]:'Sem origem')+'</td><td>'+g.leads+'</td><td>'+g.qual+' <small style="color:#8C98B1">'+pct(g.qual,g.leads)+'</small></td><td>'+g.calls+' <small style="color:#8C98B1">'+pct(g.calls,g.leads)+'</small></td><td>'+g.vendas+'</td><td>'+pct(g.vendas,g.leads)+'</td><td>'+(g.valor?_instMoeda(g.valor):'–')+'</td></tr>').join('')+'</table></div>'
         :'<div class="au-dica">Nenhum card entrou neste período.</div>')+
-      '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>'+
+      '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>:'')+
     '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Call agendada</b> o card pede a data e a hora da call; em <b>Venda</b>, o valor; em <b>Perdido</b>, o motivo. A venda ainda é marcada à mão: quando a Eduzz e a Hotmart estiverem ligadas, ela entra sozinha.</div>';
 }
 function instSoltar(ev,el,k){
