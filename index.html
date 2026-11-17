@@ -19671,7 +19671,7 @@ function instKanban(){
       (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Ofertas feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
         po.map(g=>'<tr style="border-top:1px solid #1E2E52;color:#EEF1F7"><td style="padding:6px">'+_waEsc(g.o?INST_ORIGEM_NOME[g.o]:'Sem origem')+'</td><td>'+g.leads+'</td><td>'+g.qual+' <small style="color:#8C98B1">'+pct(g.qual,g.leads)+'</small></td><td>'+g.calls+' <small style="color:#8C98B1">'+pct(g.calls,g.leads)+'</small></td><td>'+g.vendas+'</td><td>'+pct(g.vendas,g.leads)+'</td><td>'+(g.valor?_instMoeda(g.valor):'–')+'</td></tr>').join('')+'</table></div>'
         :'<div class="au-dica">Nenhum card entrou neste período.</div>')+
-      '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>:'')+
+      '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>':'')+
     '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Call agendada</b> o card pede a data e a hora da call; em <b>Venda</b>, o valor; em <b>Perdido</b>, o motivo. A venda ainda é marcada à mão: quando a Eduzz e a Hotmart estiverem ligadas, ela entra sozinha.</div>';
 }
 function instSoltar(ev,el,k){
