@@ -19361,7 +19361,7 @@ async function instDashboard(el,forcar){
 }
 
 // ---------- funil ----------
-const INST_ETAPAS=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
+var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
   ['classificar','Classificar','#B79CFF','fora','leads'], // temporária: conversas antigas do WhatsApp para o Lucas classificar 1 a 1
   ['lead','Contato sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
@@ -19372,12 +19372,77 @@ const INST_ETAPAS=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e O
   ['venda','Venda','#7FD3A0','resultado','oport'],
   ['perdido','Perdido','#E07A7A','fora','oport'],
   ['aluno','Alunos','#5FB98A','fora','oport'], // quem já é aluno (grupos das turmas e Mentoria)
+  ['interesse_modelo','Interesse modelo','#B79CFF','fora','leads'], // quer ser paciente modelo (não é dentista)
   ['estudante','Estudantes','#8C98B1','fora','leads'],
   ['descarte','Descarte','#66738F','fora','leads']];
-const INST_FORA=['perdido','estudante','descarte','classificar','aluno'];
+// colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
+var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
+// colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
+var INST_FIXAS={classificar:'Coluna temporária das conversas antigas',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',call_realizada:'Pede o produto',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
+var INST_FORA=['perdido','estudante','descarte','classificar','aluno','interesse_modelo'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
 function _instEl(){return document.getElementById(currentPage==='inst-oport'?'if-conteudo-op':'if-conteudo');}
-const INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
+var INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
+function _instAplicarColunas(cols){
+  INST_ETAPAS=cols.map(x=>x.slice());
+  Object.keys(INST_FIXAS).forEach(k=>{if(!INST_ETAPAS.some(e=>e[0]===k)){const p=INST_ETAPAS_PADRAO.find(e=>e[0]===k);if(p)INST_ETAPAS.push(p.slice());}});
+  INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
+  INST_FORA=INST_ETAPAS.filter(e=>e[3]==='fora'||e[0]==='perdido').map(e=>e[0]);
+}
+async function instCarregarColunas(){
+  try{const r=await _waRest('configuracoes?chave=eq.inst_colunas&select=valor');const v=r&&r[0]&&r[0].valor;
+    if(Array.isArray(v)&&v.length){
+      const cols=v.filter(c=>c&&c.k).map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
+      _instAplicarColunas(cols);}}catch(e){}
+}
+async function _instSalvarColunas(cols){
+  await _waRest('configuracoes?on_conflict=chave',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({chave:'inst_colunas',valor:cols.map(([k,nome,cor,tipo,quadro])=>({k,nome,cor,tipo,quadro}))})});
+  _instAplicarColunas(cols);
+}
+function instColunasEditar(){
+  _inst.edCols=INST_ETAPAS.filter(e=>e[4]===_instQuadro()).map(x=>x.slice());_inst.edQ=_instQuadro();
+  const m=document.createElement('div');m.id='if-colmodal';m.className='sskb-fundo';m.onclick=e=>{if(e.target===m)m.remove();};
+  m.innerHTML='<div class="sskb-modal" style="width:640px"><div class="sskb-mcab"><b>Colunas de '+(_inst.edQ==='oport'?'Oportunidades':'Leads')+'</b><button class="wa-btn" onclick="document.getElementById(\'if-colmodal\').remove()">✕</button></div><div id="if-cols"></div>'+
+    '<div class="sskb-mbotoes"><button class="wa-btn" onclick="instColAdd()">+ Nova coluna</button><span style="flex:1"></span><button class="wa-btn primario" onclick="instColSalvar()">Salvar</button></div>'+
+    '<div class="au-dica" style="margin-top:8px">A ordem aqui é a ordem do quadro. <b>Fora das contas</b>: o card fica guardado e não entra nos números do funil. As colunas com 🔒 têm regra automática: mudam de nome, cor e lugar, mas não podem ser apagadas. Para apagar uma coluna, mova os cards dela antes.</div></div>';
+  document.body.appendChild(m);instColRender();
+}
+function instColRender(){
+  const el=document.getElementById('if-cols');if(!el)return;
+  const qtd=k=>_inst.linhas.filter(l=>l.etapa===k).length;const c=_inst.edCols;
+  el.innerHTML=c.map(([k,nome,cor,tipo],i)=>{
+    const fixa=INST_FIXAS[k];const n=qtd(k);
+    return '<div class="sskb-colrow">'+
+      '<div class="sskb-ord"><button class="wa-btn" '+(i?'':'disabled')+' onclick="instColMover('+i+',-1)">↑</button><button class="wa-btn" '+(i<c.length-1?'':'disabled')+' onclick="instColMover('+i+',1)">↓</button></div>'+
+      '<input type="color" value="'+_waEsc(cor)+'" onchange="_inst.edCols['+i+'][2]=this.value" style="width:34px;height:32px;border:none;background:none;padding:0">'+
+      '<input class="dp-in" style="height:32px;flex:1;min-width:120px" value="'+_waEsc(nome)+'" maxlength="40" oninput="_inst.edCols['+i+'][1]=this.value">'+
+      (fixa?'<span class="sskb-fixa" title="'+_waEsc(fixa)+'">🔒 '+_waEsc(INST_TIPOS_COL[tipo]||'Em andamento')+'</span>':
+        '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.edCols['+i+'][3]=this.value">'+['normal','fora'].map(t=>'<option value="'+t+'"'+(t===tipo?' selected':'')+'>'+INST_TIPOS_COL[t]+'</option>').join('')+'</select>')+
+      '<span class="sskb-n">'+n+'</span>'+
+      (fixa?'<span style="width:34px"></span>':'<button class="wa-btn" title="'+(n?'Mova os '+n+' card(s) antes de apagar':'Apagar coluna')+'" '+(n?'disabled':'')+' onclick="instColApagar('+i+')">🗑</button>')+
+    '</div>';}).join('');
+}
+function instColMover(i,d){const c=_inst.edCols;const j=i+d;if(j<0||j>=c.length)return;[c[i],c[j]]=[c[j],c[i]];instColRender();}
+function instColApagar(i){_inst.edCols.splice(i,1);instColRender();}
+function instColAdd(){
+  const k='c_'+Date.now().toString(36);
+  _inst.edCols.push([k,'Nova coluna','#6FA8FF','normal',_inst.edQ]);instColRender();
+  const ins=document.querySelectorAll('#if-cols .sskb-colrow input.dp-in');const el=ins[ins.length-1];if(el){el.focus();el.select();}
+}
+async function instColSalvar(){
+  const Q=_inst.edQ;
+  const doQuadro=_inst.edCols.map(([k,n,c,t])=>[k,String(n||'').trim().slice(0,40),c,t,Q]);
+  if(doQuadro.some(c=>!c[1])){showToast('error','Toda coluna precisa de nome','');return;}
+  const nomes=doQuadro.map(c=>c[1].toLowerCase());if(new Set(nomes).size!==nomes.length){showToast('error','Tem duas colunas com o mesmo nome','');return;}
+  const sumiu=INST_ETAPAS.filter(e=>e[4]===Q&&!doQuadro.some(c=>c[0]===e[0])&&_inst.linhas.some(l=>l.etapa===e[0]));
+  if(sumiu.length){showToast('error','Coluna com cards','Mova os cards de "'+sumiu[0][1]+'" antes de apagar.');return;}
+  const outro=INST_ETAPAS.filter(e=>e[4]!==Q);
+  const cols=Q==='leads'?doQuadro.concat(outro):outro.concat(doQuadro);
+  try{await _instSalvarColunas(cols);const m=document.getElementById('if-colmodal');if(m)m.remove();instKanban();showToast('success','Colunas salvas','');}
+  catch(e){showToast('error','Não salvou',/403|42501|row-level/i.test(e.message)?'Só a gestão muda as colunas.':e.message);}
+}
 const INST_ORIGENS=[['anuncio','Anúncio'],['organico','Orgânico (bio, stories, Close Friends)'],['social_selling','Social selling'],['outro','Outro']];
 const INST_ORIGEM_NOME=Object.assign({aplicacao:'Aplicação (antigo)'},Object.fromEntries(INST_ORIGENS));
 const INST_PRODUTOS=[['expert','Expert em Lentes'],['presencial','Presencial']];
@@ -19453,6 +19518,7 @@ async function _instCarregar(){
     _instBuscarTudo('instituto_eventos?select=lead_id,para,em&order=em'),
     _waRest('conversas?select=id,telefone,nome_perfil,nome_contato,criada_em,ultima_mensagem_em,oculta_em&canal=eq.whatsapp&numero_clinica_id=in.('+WA_NUMEROS_FORA_CLINICA.join(',')+')&order=criada_em.desc&limit=2000').catch(()=>[]),
     _instCarregarEquipe()]);
+  await instCarregarColunas();
   _inst.linhas=linhas;_inst.eventos=eventos;_inst.conversas=conversas||[];_inst.carregado=true;
   try{_instBadge();}catch(e){}
 }
@@ -19549,6 +19615,7 @@ function instKanban(){
       '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar nome, @, telefone" value="'+_waEsc(_inst.busca)+'" oninput="_inst.busca=this.value;clearTimeout(_inst.tk);_inst.tk=setTimeout(()=>{instKanban();const i=document.querySelector(\'#\'+(currentPage===\'inst-oport\'?\'if-conteudo-op\':\'if-conteudo\')+\' .sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.origem=this.value;instKanban()"><option value="">Todas as origens</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(_inst.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'<option value="_sem"'+(_inst.origem==='_sem'?' selected':'')+'>Sem origem</option></select>'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.produto=this.value;instKanban()"><option value="">Os dois produtos</option>'+INST_PRODUTOS.map(o=>'<option value="'+o[0]+'"'+(_inst.produto===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'+
+        '<button class="wa-btn" onclick="instColunasEditar()" title="Renomear, reordenar, criar ou apagar colunas">⚙ Colunas</button>'+
         '<button class="wa-btn primario" onclick="instCardAbrir(null)">+ Novo card</button></div>'+
     '</div>'+
     (semCard.length?'<div class="au-bloco" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:12.5px;color:#EEF1F7"><b>'+semCard.length+(semCard.length===1?' conversa':' conversas')+'</b> do WhatsApp do Instituto ainda sem card no funil.</div><button class="wa-btn" onclick="instSemCardAbrir()">Ver e criar cards</button></div>':'')+
