@@ -19295,7 +19295,10 @@ function _instLigarTempoReal(){
       .on('postgres_changes',{event:'*',schema:'public',table:'instituto_leads'},ev=>{
         const n=ev.new||{};const o=ev.old||{};
         if(ev.eventType==='DELETE'){_inst.linhas=_inst.linhas.filter(x=>x.id!==o.id);}
-        else if(n.id){const i=_inst.linhas.findIndex(x=>x.id===n.id);if(i>=0)_inst.linhas[i]=Object.assign(_inst.linhas[i],n);else if(_inst.carregado)_inst.linhas.unshift(n);}
+        else if(n.id){const i=_inst.linhas.findIndex(x=>x.id===n.id);
+          const voltou=i>=0&&_inst.linhas[i].etapa==='base_antiga'&&n.etapa==='lead';
+          if(i>=0)_inst.linhas[i]=Object.assign(_inst.linhas[i],n);else if(_inst.carregado)_inst.linhas.unshift(n);
+          if(voltou){try{tocarBeepNotificacao();}catch(e){}showToast('success','🤎 '+_waEsc(n.nome||_instFoneFmt(n.telefone))+' voltou a falar','Saiu da Base antiga e foi para Lead sem aplicação.',true);}}
         const nova=n.aplicou_em&&n.aplicou_em!==o.aplicou_em&&Date.now()-Date.parse(n.aplicou_em)<5*6e4&&n.oferta_sugerida!=='nenhuma';
         if(nova)_instAvisarAplicacao(n);
         _instBadge();
@@ -19399,6 +19402,7 @@ async function instDashboard(el,forcar){
 
 // ---------- funil ----------
 var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
+  ['base_antiga','Base antiga de leads','#66738F','fora','leads'], // (17/11) contatos antigos do WhatsApp; quem volta a falar vai sozinho para Lead sem aplicação (SQL 209)
   ['lead','Lead sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
   ['qualificado','Lead qualificado','#A18B6C','normal','leads'],
@@ -19413,9 +19417,9 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
 // colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
 var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
 // colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
-var INST_FIXAS={lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_FIXAS={base_antiga:'Quem daqui manda mensagem de novo vai sozinho para Lead sem aplicação',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
 var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
-var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo'];
+var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo','base_antiga'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
 function _instEl(){return document.getElementById(currentPage==='inst-oport'?'if-conteudo-op':'if-conteudo');}
 var INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
@@ -19527,6 +19531,8 @@ function _instMinAplicou(l){return l.aplicou_em?Math.floor((Date.now()-Date.pars
 const INST_PLATAFORMAS=[['eduzz','Eduzz'],['hotmart','Hotmart'],['outra','Outra']];
 var _inst={linhas:[],eventos:[],conversas:[],carregado:false,busca:'',origem:'',produto:'',periodo:'mes',equipe:null};
 
+// (17/11) card criado nas últimas 48 h (lead que acabou de chegar)
+function _instNovo(l){const t=Date.parse(l.criado_em||'');return l.etapa!=='base_antiga'&&!isNaN(t)&&Date.now()-t<48*36e5;}
 function _instTel(t){return String(t||'').replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');}
 function _instMoeda(v){return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:2});}
 function _instRotulo(l){return l.nome||(l.instagram?'@'+l.instagram:'')||(l.telefone?_instFoneFmt(l.telefone):'Sem nome');}
@@ -19624,6 +19630,7 @@ function instKanban(){
       '<div class="sskb-l1"><span class="sskb-nome">'+_waEsc(_instRotulo(l))+'</span><span class="sskb-t" title="tempo nesta etapa">'+_instTempo(l)+'</span></div>'+
       (sub?'<div class="sskb-ig">'+_waEsc(sub)+'</div>':'')+
       '<div class="sskb-l3">'+
+        (_instNovo(l)?tag('🆕 Novo','verde'):'')+
         (l.origem?tag(_waEsc(INST_ORIGEM_NOME[l.origem]||l.origem)):tag('sem origem','ouro'))+
         (l.sdr_email?tag('SDR '+_waEsc(_instNomeEquipe(l.sdr_email).split(' ')[0])):'')+
         (l.closer_email?tag('Closer '+_waEsc(_instNomeEquipe(l.closer_email).split(' ')[0])):'')+
