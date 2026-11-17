@@ -20,7 +20,7 @@ drop trigger if exists instituto_leads_followup on public.instituto_leads;
 create trigger instituto_leads_followup before insert or update of etapa on public.instituto_leads
   for each row execute function public.instituto_leads_followup();
 
--- cards que já estão em Follow-up: data da oferta tirada do resumo da leitura do WhatsApp
+-- cards que já estão em Follow-up (todos antigos): vão para Cadência mensal, com a data da oferta tirada do resumo da leitura do WhatsApp
 -- ("Recebeu material 28/10" etc.); sem data no resumo, fica a data em que entraram em Follow-up
 update public.instituto_leads l
    set oferta_em = coalesce(
@@ -31,7 +31,7 @@ update public.instituto_leads l
             from regexp_match(l.obs, '([0-3][0-9])/([01][0-9])') m
            where m is not null and m[2]::int between 1 and 12 and m[1]::int between 1 and 31),
          l.etapa_em),
-       fup_etapa = coalesce(l.fup_etapa, '1. Agradecimento')
+       fup_etapa = 'Cadência mensal'  -- (17/11, Lucas) os follow-ups antigos vão todos para Cadência mensal
  where l.etapa = 'proposta' and l.oferta_em is null;
 
 select count(*) filter (where etapa = 'proposta') as em_follow_up, count(oferta_em) as com_data_da_oferta from public.instituto_leads;

@@ -18204,7 +18204,7 @@ function dpMenuRapidos(ev){
 function _dpRapidos(){
   if(window._espaco!=='instituto')return DP_RAPIDOS;
   const n=k=>(typeof INST_ETAPA_NOME!=='undefined'&&INST_ETAPA_NOME[k])||k;
-  return [['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('qualificado')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
+  return [['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('base_antiga')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
 }
 function dpAplicarRapido(k){const r=_dpRapidos().find(x=>x[0]===k);if(!r)return;_dp.f=Object.assign({},JSON.parse(JSON.stringify(r[2])));_dp.pag=0;dpFiltrar();dpRenderPagina();}
 function dpMenuFiltro(ev,k){
@@ -19405,7 +19405,6 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
   ['base_antiga','Cadência mensal','#66738F','fora','leads'], // (17/11) contatos antigos do WhatsApp; quem volta a falar vai sozinho para Lead sem aplicação (SQL 209)
   ['lead','Lead sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
-  ['qualificado','Lead qualificado','#A18B6C','normal','leads'],
   ['call_agendada','Call agendada','#CCBCA6','normal','leads'],
   ['faltou','Faltou a call','#E08A7E','normal','leads'],
   ['proposta','Follow-up','#D4AF5A','normal','oport'],
@@ -19418,7 +19417,7 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
 // colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
 var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
 // colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
-var INST_FIXAS={base_antiga:'Cadência mensal: quem daqui manda mensagem de novo volta sozinho para Novo lead',faltou:'Faltantes 1 a 3 contam daqui',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_FIXAS={base_antiga:'Cadência mensal: quem daqui manda mensagem de novo volta sozinho para Novo lead',faltou:'Faltantes 1 a 3 contam daqui',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
 var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
 var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo','base_antiga'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
@@ -19430,10 +19429,21 @@ function _instAplicarColunas(cols){
   INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
   INST_FORA=INST_ETAPAS.filter(e=>e[3]==='fora'||e[0]==='perdido').map(e=>e[0]);
 }
+// (17/11) nomes das colunas dos quadros do Instituto (configuracoes.inst_kb_nomes = {coluna: nome})
+var INST_KB_NOMES={};
+async function instCarregarNomesKb(){try{const r=await _waRest('configuracoes?chave=eq.inst_kb_nomes&select=valor');const v=r&&r[0]&&r[0].valor;if(v&&typeof v==='object')INST_KB_NOMES=v;}catch(e){}}
+async function instSalvarNomeKb(col,nome,q){
+  const antes=Object.assign({},INST_KB_NOMES);INST_KB_NOMES[col]=nome;
+  try{kbRender(q);}catch(e){}
+  try{await _waRest('configuracoes?on_conflict=chave',{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({chave:'inst_kb_nomes',valor:INST_KB_NOMES})});}
+  catch(e){INST_KB_NOMES=antes;try{kbRender(q);}catch(x){}showToast('error','Não salvou o nome',/403|42501|row-level/i.test(e.message)?'Só a gestão muda as colunas.':e.message);}
+}
+function _kbN(id,padrao){return Object.prototype.hasOwnProperty.call(INST_KB_NOMES,id)?INST_KB_NOMES[id]:padrao;}
 async function instCarregarColunas(){
+  await instCarregarNomesKb();
   try{const r=await _waRest('configuracoes?chave=eq.inst_colunas&select=valor');const v=r&&r[0]&&r[0].valor;
     if(Array.isArray(v)&&v.length){
-      const cols=v.filter(c=>c&&c.k&&c.k!=='classificar'&&c.k!=='call_realizada').map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
+      const cols=v.filter(c=>c&&c.k&&!['classificar','call_realizada','qualificado'].includes(c.k)).map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
       _instAplicarColunas(cols);}}catch(e){}
 }
 async function _instSalvarColunas(cols){
@@ -21280,7 +21290,8 @@ function kbRender(q){
     return `<section class="kb-col${c.cad?' cad':''}${c.solta?' solta':''}" data-q="${q}" data-col="${_kbEsc(c.id)}"
         ondragover="kbSobre(event)" ondragleave="kbSaiu(event)" ondrop="kbSoltou(event)">
       <header class="kb-cab" title="${_kbEsc(c.dica||'')}">
-        <div class="kb-tit"><span>${_kbEsc(c.nome)}</span><b>${l.length}</b>${exp(c.id,l.length)}</div>
+        <div class="kb-tit">${cfg.renomear?`<span class="kb-renomear" title="Clique para dar nome à coluna" style="cursor:text" onclick="event.stopPropagation();kbRenomear('${q}','${_kbEsc(c.id).replace(/'/g,"\\'")}')">${c.nome?_kbEsc(c.nome):'<i style="opacity:.55;font-weight:500">✎ sem nome</i>'}</span>`:`<span>${_kbEsc(c.nome)}</span>`}<b>${l.length}</b>${exp(c.id,l.length)}</div>
+        ${cfg.renomear&&c.tempo?'<div class="kb-met fraco">'+_kbEsc(c.tempo)+'</div>':''}
         ${soma>0?'<div class="kb-soma">'+fmt(soma)+'</div>':''}
         ${mm?'<div class="kb-met'+(mm.fraco?' fraco':'')+(mm.alerta?' alerta':'')+'" title="'+_kbEsc(mm.det||'')+'">'+_kbEsc(mm.txt)+'</div>':(c.cad&&q==='leads'?'<div class="kb-met fraco">sem histórico ainda</div>':'')}
       </header>
@@ -21318,6 +21329,14 @@ function kbRender(q){
     const falta=itens.some(it=>it.t0&&(_kb.mensagensDesde===undefined||(_kb.mensagensDesde&&it.t0>=_kb.mensagensDesde&&_kb.resp[it.ph+'|'+it.t0.toISOString()]===undefined)));
     if(falta&&Date.now()-(_kb.respTentativa||0)>60000){_kb.respTentativa=Date.now();_kbCarregarRespostas(itens).then(()=>{if(_kb.modo.leads==='kanban')kbRender('leads');});}
   }
+}
+// (17/11) Instituto: o nome de cada coluna do quadro é editável (o processo é o da clínica, os nomes não)
+function kbRenomear(q,col){
+  const cfg=KB_QUADROS[q];if(!cfg||!cfg.renomear)return;
+  const atual=(cfg.colunas().find(c=>c.id===col)||{}).nome||'';
+  const novo=prompt('Nome da coluna (deixe vazio para ficar sem nome):',atual);
+  if(novo===null)return;
+  cfg.renomear(col,String(novo).trim().slice(0,40));
 }
 function kbMais(q,col){_kb.limite[q+'|'+col]=(_kb.limite[q+'|'+col]||KB_LIMITE)+KB_LIMITE;kbRender(q);}
 function kbAbrir(q,i){const it=(_kb.itens[q]||[])[i];const cfg=KB_QUADROS[q];if(it&&cfg&&cfg.abrir)cfg.abrir(it);}
@@ -21385,8 +21404,9 @@ function _kbInstItens(Q){
     .map(l=>{const t0=(l.etapa==='lead'&&l.etapa_em?new Date(l.etapa_em):null)||(l.criado_em?new Date(l.criado_em):null); /* lead que voltou da Cadência mensal recomeça a contagem */const tEv=l.etapa_em?new Date(l.etapa_em):t0;
       return {l,id:l.id,ph:normalizePhone(l.telefone)||'',nome:_instRotulo(l),t0,tEv,conv:_kbInstConversa(l)};});
 }
+function _kbInstTempo(min,de){if(min<1440)return (min/60)+' h depois '+de;const d=Math.round(min/1440);return d===1?'1 dia depois '+de:(d>=60?Math.round(d/30)+' meses depois '+de:d+' dias depois '+de);}
 function _kbInstExtras(Q,fixas){
-  return INST_ETAPAS.filter(e=>e[4]===Q&&!fixas.includes(e[0])).map(e=>({id:e[0],nome:e[1],solta:true,vazia:true}));
+  return INST_ETAPAS.filter(e=>e[4]===Q&&!fixas.includes(e[0])).map(e=>({id:e[0],nome:_kbN((Q==='oport'?'op:':'')+e[0],e[1]),solta:true,vazia:true}));
 }
 function _kbInstTags(l){
   const tag=(t,c)=>'<span class="kb-tag'+(c?' '+c:'')+'">'+t+'</span>';
@@ -21417,16 +21437,15 @@ KB_QUADROS.inst_leads={
   colunas:()=>{
     const n=k=>INST_ETAPA_NOME[k]||k;
     return [
-      {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
-      {id:'aplicacao',nome:n('aplicacao'),solta:true,dica:'Preencheu a aplicação da bio: ligar em até 30 minutos'},
-      {id:'atendimento',nome:'Em atendimento',dica:'A SDR já falou com o lead e a conversa teve mensagem nas últimas 24 h'},
-      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
-      {id:'cadmensal',nome:'Cadência mensal',solta:true,dica:'Base antiga e quem passou 90 dias da entrada sem avançar. Quem daqui manda mensagem volta sozinho para Novo lead'},
-      {id:'qualificado',nome:n('qualificado'),solta:true},
-      {id:'call_agendada',nome:n('call_agendada'),solta:true,dica:'Pede data e hora da call'},
-      {id:'faltou',nome:n('faltou'),solta:true,dica:'Não apareceu na call'},
-      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
-      ..._kbInstExtras('leads',['lead','base_antiga','aplicacao','qualificado','call_agendada','faltou'])
+      {id:'novo',nome:_kbN('novo','Novo lead'),dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
+      {id:'aplicacao',nome:_kbN('aplicacao',n('aplicacao')),solta:true,dica:'Preencheu a aplicação da bio: ligar em até 30 minutos'},
+      {id:'atendimento',nome:_kbN('atendimento','Em atendimento'),dica:'A SDR já falou com o lead e a conversa teve mensagem nas últimas 24 h'},
+      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:_kbN(c.id,''),tempo:_kbInstTempo(c.min,'da entrada'),cad:true,grupo:'fup'})),
+      {id:'cadmensal',nome:_kbN('cadmensal','Cadência mensal'),solta:true,dica:'Base antiga e quem passou 90 dias da entrada sem avançar. Quem daqui manda mensagem volta sozinho para Novo lead'},
+      {id:'call_agendada',nome:_kbN('call_agendada',n('call_agendada')),solta:true,dica:'Pede data e hora da call'},
+      {id:'faltou',nome:_kbN('faltou',n('faltou')),solta:true,dica:'Não apareceu na call'},
+      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:_kbN(c.id,''),tempo:_kbInstTempo(c.min,'da falta'),cad:true,grupo:'falt'})),
+      ..._kbInstExtras('leads',['lead','base_antiga','aplicacao','call_agendada','faltou'])
     ];
   },
   itens:()=>{if(!_kbInstMsgs.carregado&&!_kbInstMsgs.carregando)_kbInstCarregarMsgs();return _kbInstItens('leads');},
@@ -21458,6 +21477,7 @@ KB_QUADROS.inst_leads={
       prox+'<div class="kb-linha">'+_kbInstTags(l)+(col==='call_agendada'?'':resp)+'</div>'+_kbInstBotoes(l);
   },
   abrir:(it)=>instCardAbrir(it.id),
+  renomear:(col,nome)=>instSalvarNomeKb(col,nome,'inst_leads'),
   soltar:(it,col)=>{
     let etapa=col;
     if(_KB_INST_LEAD_AUTO.includes(col)&&col!=='cadmensal'){
@@ -21483,11 +21503,11 @@ KB_QUADROS.inst_oport={
   titulo:'Oportunidades do Instituto',
   lista:()=>[],
   colunas:()=>[
-    ...KB_ORC_ETAPAS.filter(e=>e.envio).map(e=>({id:e.id,nome:e.id,solta:true,dica:e.dica||''})),
-    {id:'Cadência mensal',nome:'Cadência mensal',solta:true,dica:'Terminou a sequência ou recebeu a oferta há mais de 30 dias: conteúdo mensal e campanhas'},
-    {id:'venda',nome:INST_ETAPA_NOME.venda||'Venda',solta:true},
-    {id:'perdido',nome:INST_ETAPA_NOME.perdido||'Perdido',solta:true,vazia:true},
-    {id:'aluno',nome:INST_ETAPA_NOME.aluno||'Alunos',solta:true},
+    ...KB_ORC_ETAPAS.filter(e=>e.envio).map(e=>({id:e.id,nome:_kbN('op:'+e.id,''),tempo:e.dia?(e.dia===1?'1 dia depois da oferta':e.dia+' dias depois da oferta'):'no dia da oferta',solta:true})),
+    {id:'Cadência mensal',nome:_kbN('op:Cadência mensal','Cadência mensal'),solta:true,dica:'Terminou a sequência ou recebeu a oferta há mais de 30 dias: conteúdo mensal e campanhas'},
+    {id:'venda',nome:_kbN('op:venda',INST_ETAPA_NOME.venda||'Venda'),solta:true},
+    {id:'perdido',nome:_kbN('op:perdido',INST_ETAPA_NOME.perdido||'Perdido'),solta:true,vazia:true},
+    {id:'aluno',nome:_kbN('op:aluno',INST_ETAPA_NOME.aluno||'Alunos'),solta:true},
     ..._kbInstExtras('oport',['proposta','venda','perdido','aluno'])
   ],
   itens:()=>_kbInstItens('oport'),
@@ -21518,6 +21538,7 @@ KB_QUADROS.inst_oport={
       '<div class="kb-linha">'+_kbInstTags(l)+'</div>'+_kbInstBotoes(l);
   },
   abrir:(it)=>instCardAbrir(it.id),
+  renomear:(col,nome)=>instSalvarNomeKb('op:'+col,nome,'inst_oport'),
   soltar:(it,col)=>{
     const l=it.l;
     if(_KB_INST_FUP.includes(col)||col==='Cadência mensal'){
