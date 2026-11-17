@@ -19629,7 +19629,8 @@ function instKanban(){
         (l.closer_email?tag('Closer '+_waEsc(_instNomeEquipe(l.closer_email).split(' ')[0])):'')+
         (l.produto?tag(_waEsc(INST_PRODUTO_NOME[l.produto]),'verde'):l.oferta_sugerida?tag('sugere: '+_waEsc(INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida)):'')+
         (l.etapa==='aplicacao'&&_instMinAplicou(l)!=null?tag('⏱ '+(_instMinAplicou(l)<60?_instMinAplicou(l)+' min':Math.floor(_instMinAplicou(l)/60)+' h'),_instMinAplicou(l)>30?'ouro':''):'')+
-        (l.telefone?'<button class="sskb-tag" style="cursor:pointer;border-color:#25D366;color:#7FD3A0" title="Chamar no WhatsApp do Instituto" onclick="event.stopPropagation();instChamar('+l.id+')">💬 WhatsApp</button>':'')+
+        (l.telefone?'<button class="sskb-tag" style="cursor:pointer" title="Abrir a conversa na Central do Instituto" onclick="event.stopPropagation();instChamar('+l.id+')">💬 Central</button>'+
+          '<a class="sskb-tag" style="cursor:pointer;border-color:#25D366;color:#7FD3A0;text-decoration:none" title="Abrir no WhatsApp" href="'+_instWaMe(l.telefone)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a>':'')+
         (l.etapa==='call_agendada'&&l.call_em?tag('📅 '+_instCallFmt(l.call_em),l.call_em<agora?'ouro':''):'')+
         (l.etapa==='proposta'&&l.valor_proposta?tag(_instMoeda(l.valor_proposta)):'')+
         (l.etapa==='venda'&&l.valor_venda?tag(_instMoeda(l.valor_venda),'verde'):'')+
@@ -19733,7 +19734,8 @@ function instCardAbrir(id,etapaNova,base){
     campo('Observações','<textarea id="if-obs" class="dp-in" style="height:80px;padding:8px" maxlength="16000">'+_waEsc(l.obs||'')+'</textarea>')+
     (!novo?'<div style="font-size:11px;color:#66738F;margin:4px 0">Na etapa há '+_instTempo(l)+' · entrou em '+new Date(l.criado_em).toLocaleDateString('pt-BR')+(l.criado_por?' por '+_waEsc(_instNomeEquipe(l.criado_por)):'')+'</div>':'')+
     '<div class="sskb-mbotoes">'+
-      (conv?'<button class="wa-btn" onclick="instAbrirConversa(\''+conv+'\')">💬 Abrir conversa</button>':(!novo&&l.telefone?'<button class="wa-btn" onclick="instChamar('+l.id+')">💬 Chamar no WhatsApp</button>':''))+
+      (conv?'<button class="wa-btn" onclick="instAbrirConversa(\''+conv+'\')">💬 Abrir conversa</button>':(!novo&&l.telefone?'<button class="wa-btn" onclick="instChamar('+l.id+')">💬 Central</button>':''))+
+      (!novo&&l.telefone?'<a class="wa-btn" style="text-decoration:none;border-color:#25D366;color:#7FD3A0" href="'+_instWaMe(l.telefone)+'" target="_blank" rel="noopener">WhatsApp</a>':'')+
       (!novo&&_waEhGestao()?'<button class="wa-btn" style="color:#E07A7A" onclick="instCardApagar('+l.id+')">Apagar card</button>':'')+
       '<span style="flex:1"></span><button class="wa-btn primario" id="if-salvar" onclick="instCardSalvar('+(id||'null')+')">Salvar</button></div></div>';
   m.dataset.conversa=novo&&base&&base.conversa_id?base.conversa_id:'';
@@ -19798,6 +19800,8 @@ async function instAbrirConversa(cid){
   for(let i=0;i<30;i++){if(_wa.conversas.find(c=>c.id===cid)){waAbrir(cid);return;}await new Promise(r=>setTimeout(r,300));}
   showToast('error','Conversa não encontrada na lista','Procure pelo nome na Central.');
 }
+// (17/11) link direto para o WhatsApp (app ou WhatsApp Web)
+function _instWaMe(t){const d=_instTel(t);return d?'https://wa.me/55'+d:'#';}
 // (17/11) chamar no WhatsApp do Instituto: abre a conversa que já existe ou começa uma nova (com modelo, porque a janela de 24 h está fechada)
 async function instChamar(id){
   const l=_inst.linhas.find(x=>x.id===id);if(!l||!l.telefone)return;
