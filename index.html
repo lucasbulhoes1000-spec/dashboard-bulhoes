@@ -19395,6 +19395,32 @@ function _instRespHtml(r){
     v=Array.isArray(v)?v.map(x=>mapa&&mapa[x]||x).join(', '):(mapa&&mapa[v]||String(v));
     return '<div style="display:flex;gap:8px;font-size:12px;padding:3px 0"><span style="color:#8C98B1;min-width:150px">'+_waEsc(rot)+'</span><span style="color:#EEF1F7">'+_waEsc(v)+'</span></div>';}).join('');
 }
+// (17/11, SQL 205) qualificação no card: as mesmas perguntas da aplicação, preenchidas pela SDR na conversa
+function _instQualifHtml(l){
+  const r=l.respostas||{};
+  const sel=(k)=>{const [rot,mapa]=INST_RESP[k];return '<label class="sskb-campo"><span>'+rot+'</span><select id="if-q-'+k+'" class="dp-in"><option value="">Não sei ainda</option>'+Object.keys(mapa).map(v=>'<option value="'+v+'"'+(r[k]===v?' selected':'')+'>'+_waEsc(mapa[v])+'</option>').join('')+'</select></label>';};
+  const des=(INST_RESP.desafios[1]);const marc=Array.isArray(r.desafios)?r.desafios:[];
+  const origem=l.aplicou_em?'Respondido na aplicação em '+new Date(l.aplicou_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+(r.preenchido_por==='sdr'?' · ajustado pela SDR':''):(r.preenchido_por==='sdr'?'Preenchido pela SDR':'Sem aplicação: a SDR preenche durante a conversa');
+  return '<div class="au-bloco" style="margin:4px 0 8px;padding:10px 12px"><div style="font-size:12px;font-weight:600;color:#EEF1F7">Qualificação</div><div style="font-size:11px;color:#8C98B1;margin:2px 0 8px">'+_waEsc(origem)+'. A oferta sugerida é calculada pela regra da aplicação.</div>'+
+    '<div class="sskb-dupla">'+sel('momento')+sel('cobra')+'</div>'+
+    '<div class="sskb-dupla">'+sel('santos')+sel('investimento')+'</div>'+
+    '<div class="sskb-dupla"><label class="sskb-campo"><span>Casos por mês</span><input id="if-q-casos_mes" class="dp-in" type="number" min="0" max="999" value="'+_waEsc(r.casos_mes!=null?r.casos_mes:'')+'"></label>'+
+      '<div class="sskb-campo"><span>Maior desafio</span><div style="display:flex;flex-wrap:wrap;gap:4px 10px;padding-top:4px">'+Object.keys(des).map(v=>'<label style="font-size:12px;color:#EEF1F7;display:flex;gap:4px;align-items:center"><input type="checkbox" class="if-q-des" value="'+v+'"'+(marc.includes(v)?' checked':'')+'>'+_waEsc(des[v])+'</label>').join('')+'</div></div></div>'+
+    ((l.porta||l.utm)?'<div style="font-size:11px;color:#8C98B1;margin-top:4px">Entrou por: '+_waEsc([l.porta,l.utm&&l.utm.utm_source,l.utm&&l.utm.utm_campaign,l.utm&&l.utm.utm_content].filter(Boolean).join(' · '))+'</div>':'')+
+  '</div>';
+}
+function _instQualifLer(l){
+  const g=id=>{const e=document.getElementById(id);return e?String(e.value||'').trim():'';};
+  const novo={};['momento','cobra','santos','investimento'].forEach(k=>{const v=g('if-q-'+k);if(v)novo[k]=v;});
+  const c=g('if-q-casos_mes');if(/^\d{1,3}$/.test(c))novo.casos_mes=+c;
+  const d=[...document.querySelectorAll('.if-q-des:checked')].map(x=>x.value);if(d.length)novo.desafios=d;
+  const antes=l&&l.respostas||{};
+  const chaves=['momento','cobra','santos','investimento','casos_mes','desafios'];
+  const mudou=chaves.some(k=>JSON.stringify(antes[k]??null)!==JSON.stringify(novo[k]??null));
+  if(!mudou)return undefined;
+  if(!Object.keys(novo).length)return antes&&Object.keys(antes).length?null:undefined;
+  return Object.assign({},novo,{preenchido_por:'sdr'});
+}
 function _instMinAplicou(l){return l.aplicou_em?Math.floor((Date.now()-Date.parse(l.aplicou_em))/6e4):null;}
 const INST_PLATAFORMAS=[['eduzz','Eduzz'],['hotmart','Hotmart'],['outra','Outra']];
 var _inst={linhas:[],eventos:[],conversas:[],carregado:false,busca:'',origem:'',produto:'',periodo:'mes',equipe:null};
@@ -19587,9 +19613,8 @@ function instCardAbrir(id,etapaNova,base){
     '<div class="sskb-dupla">'+campo('E-mail','<input id="if-email" class="dp-in" type="email" value="'+_waEsc(l.email||'')+'">')+
       campo('Origem','<select id="if-origem" class="dp-in"><option value="">Selecione…</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(l.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>')+'</div>'+
     '<div class="sskb-dupla">'+campo('Produto','<select id="if-produto" class="dp-in"><option value="">'+(l.oferta_sugerida&&INST_PRODUTO_NOME[l.oferta_sugerida]?'Sugerido: '+INST_PRODUTO_NOME[l.oferta_sugerida]:'Selecione…')+'</option>'+INST_PRODUTOS.map(o=>'<option value="'+o[0]+'"'+(l.produto===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>')+
-      campo('Oferta sugerida pela aplicação','<div class="dp-in" style="display:flex;align-items:center;color:#C3CBDB">'+_waEsc(l.oferta_sugerida?INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida:'Sem aplicação')+'</div>')+'</div>'+
-    (l.respostas?'<div class="au-bloco" style="margin:4px 0 8px;padding:10px 12px"><div style="font-size:12px;font-weight:600;color:#EEF1F7;margin-bottom:4px">Respostas da aplicação'+(l.aplicou_em?' · '+new Date(l.aplicou_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'</div>'+_instRespHtml(l.respostas)+
-      ((l.porta||l.utm)?'<div style="font-size:11px;color:#8C98B1;margin-top:4px">Entrou por: '+_waEsc([l.porta,l.utm&&l.utm.utm_source,l.utm&&l.utm.utm_campaign,l.utm&&l.utm.utm_content].filter(Boolean).join(' · '))+'</div>':'')+'</div>':'')+
+      campo('Oferta sugerida','<div class="dp-in" style="display:flex;align-items:center;color:#C3CBDB">'+_waEsc(l.oferta_sugerida?INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida:'Responda a qualificação abaixo')+'</div>')+'</div>'+
+    _instQualifHtml(l)+
     '<div class="sskb-dupla">'+campo('Etapa','<select id="if-etapa" class="dp-in" onchange="_instCamposEtapa()">'+INST_ETAPAS.map(e=>'<option value="'+e[0]+'"'+(e[0]===et?' selected':'')+'>'+e[1]+'</option>').join('')+'</select>')+
       campo('Data e hora da call','<input id="if-call" class="dp-in" type="datetime-local" value="'+_waEsc(_instDataLocal(l.call_em))+'">')+'</div>'+
     '<div class="sskb-dupla">'+campo('SDR',selEq('if-sdr',l.sdr_email||''))+campo('Closer',selEq('if-closer',l.closer_email||''))+'</div>'+
@@ -19626,6 +19651,7 @@ async function instCardSalvar(id){
     plataforma:v('if-plat')||null,produto:v('if-produto')||null,motivo_perda:v('if-motivo')||null,obs:v('if-obs')||null};
   if(!corpo.nome&&!corpo.telefone&&!corpo.instagram){showToast('error','Falta identificar a pessoa','Coloque pelo menos o nome, o telefone ou o Instagram.');return;}
   if(tel&&(tel.length<10||tel.length>13)){showToast('error','Telefone incompleto','Coloque com DDD.');return;}
+  {const lq=id?_inst.linhas.find(x=>x.id===id):null;const rq=_instQualifLer(lq);if(rq!==undefined)corpo.respostas=rq;}
   if(Number.isNaN(corpo.valor_proposta)||Number.isNaN(corpo.valor_venda)){showToast('error','Valor inválido','Use só números, por exemplo 11980.');return;}
   const falta=_instFaltaPara(corpo,corpo.etapa);
   if(falta){showToast('error',{produto:'Escolha o produto',call:'Falta a data da call',venda:'Falta o valor vendido',perdido:'Falta o motivo da perda'}[falta],'');return;}
