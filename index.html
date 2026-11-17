@@ -18204,7 +18204,7 @@ function dpMenuRapidos(ev){
 function _dpRapidos(){
   if(window._espaco!=='instituto')return DP_RAPIDOS;
   const n=k=>(typeof INST_ETAPA_NOME!=='undefined'&&INST_ETAPA_NOME[k])||k;
-  return [['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('qualificado')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('call_realizada'),n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
+  return [['inst_leads','Leads que ainda não receberam oferta',{etapas:[n('lead'),n('aplicacao'),n('qualificado')]}],['inst_oferta','Receberam a oferta e não fecharam',{etapas:[n('proposta')]}],['inst_perdidos','Perdidos',{etapas:[n('perdido')]}],['inst_alunos','Alunos',{etapas:[n('aluno')]}],['inst_modelo','Interesse em ser paciente modelo',{etapas:[n('interesse_modelo')]}]];
 }
 function dpAplicarRapido(k){const r=_dpRapidos().find(x=>x[0]===k);if(!r)return;_dp.f=Object.assign({},JSON.parse(JSON.stringify(r[2])));_dp.pag=0;dpFiltrar();dpRenderPagina();}
 function dpMenuFiltro(ev,k){
@@ -19399,11 +19399,10 @@ async function instDashboard(el,forcar){
 
 // ---------- funil ----------
 var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
-  ['lead','Contato sem aplicação','#8C98B1','normal','leads'],
+  ['lead','Lead sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
-  ['qualificado','Qualificado','#A18B6C','normal','leads'],
+  ['qualificado','Lead qualificado','#A18B6C','normal','leads'],
   ['call_agendada','Call agendada','#CCBCA6','normal','leads'],
-  ['call_realizada','Oferta feita','#E2BE6A','normal','oport'],
   ['proposta','Follow-up','#D4AF5A','normal','oport'],
   ['venda','Venda','#7FD3A0','resultado','oport'],
   ['perdido','Perdido','#E07A7A','fora','oport'],
@@ -19414,7 +19413,7 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
 // colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
 var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
 // colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
-var INST_FIXAS={lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',call_realizada:'Pede o produto',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_FIXAS={lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
 var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
 var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
@@ -19429,7 +19428,7 @@ function _instAplicarColunas(cols){
 async function instCarregarColunas(){
   try{const r=await _waRest('configuracoes?chave=eq.inst_colunas&select=valor');const v=r&&r[0]&&r[0].valor;
     if(Array.isArray(v)&&v.length){
-      const cols=v.filter(c=>c&&c.k&&c.k!=='classificar').map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
+      const cols=v.filter(c=>c&&c.k&&c.k!=='classificar'&&c.k!=='call_realizada').map(c=>[c.k,c.nome||c.k,c.cor||'#8C98B1',c.tipo||'normal',c.quadro==='oport'?'oport':'leads']);
       _instAplicarColunas(cols);}}catch(e){}
 }
 async function _instSalvarColunas(cols){
@@ -19590,7 +19589,7 @@ function _instPorOrigem(){
   return grupos.map(o=>{
     const ls=coorte.filter(l=>(l.origem||'')===o);
     const qual=ls.filter(l=>alcancou(l,'qualificado')).length;
-    const calls=ls.filter(l=>alcancou(l,'call_realizada')).length;
+    const calls=ls.filter(l=>alcancou(l,'proposta')||(chegou[l.id]&&chegou[l.id].has('call_realizada'))).length; // (17/11) Oferta feita virou Follow-up
     const vendas=ls.filter(l=>l.etapa==='venda');
     return {o,leads:ls.length,qual,calls,vendas:vendas.length,valor:vendas.reduce((s,l)=>s+Number(l.valor_venda||0),0)};
   }).filter(g=>g.leads);
@@ -19868,7 +19867,7 @@ function instImportarAbrir(){
     '<div class="au-dica" style="margin:0 0 8px">Suba um CSV ou cole as linhas da planilha. Colunas reconhecidas: <b>nome</b>, <b>telefone</b> (ou WhatsApp), <b>instagram</b> e <b>e-mail</b>. Quem já tem card (mesmo telefone) não é duplicado.</div>'+
     '<input type="file" accept=".csv,.txt" class="dp-in" style="height:auto;padding:6px" onchange="const f=this.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{document.getElementById(\'if-imp-txt\').value=e.target.result;instImportarPrevia();};r.readAsText(f);">'+
     '<textarea id="if-imp-txt" class="dp-in" style="height:140px;padding:8px;margin-top:8px" placeholder="nome,telefone,instagram&#10;Dra. Ana,13999998888,@draana" oninput="clearTimeout(window._ifImpT);window._ifImpT=setTimeout(instImportarPrevia,300)"></textarea>'+
-    '<div class="sskb-dupla" style="margin-top:8px"><label class="sskb-campo"><span>Coluna de entrada</span><select id="if-imp-etapa" class="dp-in">'+INST_ETAPAS.filter(e=>e[4]===Q).map(e=>'<option value="'+e[0]+'"'+(e[0]===(Q==='leads'?'lead':'call_realizada')?' selected':'')+'>'+_waEsc(e[1])+'</option>').join('')+'</select></label>'+
+    '<div class="sskb-dupla" style="margin-top:8px"><label class="sskb-campo"><span>Coluna de entrada</span><select id="if-imp-etapa" class="dp-in">'+INST_ETAPAS.filter(e=>e[4]===Q).map(e=>'<option value="'+e[0]+'"'+(e[0]===(Q==='leads'?'lead':'proposta')?' selected':'')+'>'+_waEsc(e[1])+'</option>').join('')+'</select></label>'+
     '<label class="sskb-campo"><span>Origem</span><select id="if-imp-origem" class="dp-in"><option value="">Sem origem</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'">'+o[1]+'</option>').join('')+'</select></label></div>'+
     '<input id="if-imp-obs" class="dp-in" style="margin-top:8px" maxlength="200" placeholder="Observação para todos (opcional, ex.: lista do Close Friends)">'+
     '<div id="if-imp-prev" style="font-size:12px;color:#C3CBDB;margin-top:8px"></div>'+
