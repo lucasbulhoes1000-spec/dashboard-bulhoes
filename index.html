@@ -16833,7 +16833,7 @@ function _waAoMudarConversa(p){
 }
 function _waAvisarNova(c){
   if(currentPage==='conversas'&&document.visibilityState==='visible')return;
-  if(!_waConexaoVisivel(c)&&!(window._espaco==='instituto'&&_waConexaoVisivelClinica(c)))return; // número que a pessoa não acompanha não avisa (no Instituto, a clínica continua avisando)
+  if(!_waConexaoVisivel(c))return; // (17/11) só avisa conversa do espaço aberto: no Instituto, mensagem da clínica não aparece na tela (atrapalhava)
   showToast('success','💬 '+_waNome(c),c.ultima_mensagem_texto||'Nova mensagem no WhatsApp');
 }
 function waLigarTempoReal(){
