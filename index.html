@@ -19402,11 +19402,12 @@ async function instDashboard(el,forcar){
 
 // ---------- funil ----------
 var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
-  ['base_antiga','Base antiga de leads','#66738F','fora','leads'], // (17/11) contatos antigos do WhatsApp; quem volta a falar vai sozinho para Lead sem aplicação (SQL 209)
+  ['base_antiga','Cadência mensal','#66738F','fora','leads'], // (17/11) contatos antigos do WhatsApp; quem volta a falar vai sozinho para Lead sem aplicação (SQL 209)
   ['lead','Lead sem aplicação','#8C98B1','normal','leads'],
   ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
   ['qualificado','Lead qualificado','#A18B6C','normal','leads'],
   ['call_agendada','Call agendada','#CCBCA6','normal','leads'],
+  ['faltou','Faltou a call','#E08A7E','normal','leads'],
   ['proposta','Follow-up','#D4AF5A','normal','oport'],
   ['venda','Venda','#7FD3A0','resultado','oport'],
   ['perdido','Perdido','#E07A7A','fora','oport'],
@@ -19417,7 +19418,7 @@ var INST_ETAPAS_PADRAO=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR
 // colunas editáveis pelo CRM (configuracoes.inst_colunas): [k, nome, cor, tipo, quadro]
 var INST_ETAPAS=INST_ETAPAS_PADRAO.map(x=>x.slice());
 // colunas com regra automática (aplicação, gatilho do WhatsApp, metas): podem mudar nome, cor e lugar, mas não podem ser apagadas
-var INST_FIXAS={base_antiga:'Quem daqui manda mensagem de novo vai sozinho para Lead sem aplicação',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
+var INST_FIXAS={base_antiga:'Cadência mensal: quem daqui manda mensagem de novo volta sozinho para Novo lead',faltou:'Faltantes 1 a 3 contam daqui',lead:'Conversa nova do WhatsApp entra aqui',aplicacao:'A aplicação da bio cai aqui',qualificado:'Pede o produto',call_agendada:'Pede data e hora da call',proposta:'Pede o produto',venda:'Pede o valor vendido',perdido:'Pede o motivo',aluno:'Quem já é aluno',estudante:'A aplicação manda estudantes para cá',descarte:'A aplicação manda quem não tem condição para cá'};
 var INST_TIPOS_COL={normal:'Em andamento',resultado:'Resultado',fora:'Fora das contas'};
 var INST_FORA=['perdido','estudante','descarte','aluno','interesse_modelo','base_antiga'];
 function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
@@ -19667,19 +19668,14 @@ function instKanban(){
     '</div>'+
     (semCard.length?'<div class="au-bloco" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:12.5px;color:#EEF1F7"><b>'+semCard.length+(semCard.length===1?' conversa':' conversas')+'</b> do WhatsApp do Instituto ainda sem card no funil.</div><button class="wa-btn" onclick="instSemCardAbrir()">Ver e criar cards</button></div>':'')+
     (semOrigem?'<div class="au-dica" style="margin:-4px 0 10px">'+semOrigem+(semOrigem===1?' card está':' cards estão')+' sem origem. Sem ela, a conversão e o custo por canal ficam incompletos.</div>':'')+
-    '<div class="sskb-quadro">'+etapasQ.map(([k,nome,cor,tipo])=>{
-      const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>k==='call_agendada'?String(a.call_em||'9').localeCompare(String(b2.call_em||'9')):String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
-      const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.valor_venda||0),0):k==='proposta'?cs.reduce((s,l)=>s+Number(l.valor_proposta||0),0):0;
-      return '<div class="sskb-col'+(tipo==='fora'?' fora':'')+'" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="instSoltar(event,this,\''+k+'\')">'+
-        '<div class="sskb-cab" style="border-color:'+cor+';cursor:default"><div>'+_waEsc(nome)+'</div><small>'+cs.length+' '+(cs.length===1?'card':'cards')+(tot?' · '+_instMoeda(tot):'')+'</small></div>'+
-        '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">Arraste um card para cá</div>')+'</div></div>';
-    }).join('')+'</div>'+
+    '<div id="kb-'+(Q==='leads'?'inst_leads':'inst_oport')+'" class="kb-quadro" style="display:block"></div>'+
     (INST_MOSTRAR_CONVERSAO?'<div class="au-bloco" style="margin-top:12px"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Conversão por canal <select class="dp-in" style="height:28px;width:auto;font-size:12px" onchange="_inst.periodo=this.value;instKanban()">'+[['mes','Entraram este mês'],['30','Entraram nos últimos 30 dias'],['tudo','Desde o início']].map(p=>'<option value="'+p[0]+'"'+(_inst.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select></h4>'+
       (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Ofertas feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
         po.map(g=>'<tr style="border-top:1px solid #1E2E52;color:#EEF1F7"><td style="padding:6px">'+_waEsc(g.o?INST_ORIGEM_NOME[g.o]:'Sem origem')+'</td><td>'+g.leads+'</td><td>'+g.qual+' <small style="color:#8C98B1">'+pct(g.qual,g.leads)+'</small></td><td>'+g.calls+' <small style="color:#8C98B1">'+pct(g.calls,g.leads)+'</small></td><td>'+g.vendas+'</td><td>'+pct(g.vendas,g.leads)+'</td><td>'+(g.valor?_instMoeda(g.valor):'–')+'</td></tr>').join('')+'</table></div>'
         :'<div class="au-dica">Nenhum card entrou neste período.</div>')+
       '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>':'')+
     '<div class="au-dica" style="margin-top:8px">Arraste os cards entre as colunas (no celular, toque no card e troque a etapa). Em <b>Call agendada</b> o card pede a data e a hora da call; em <b>Venda</b>, o valor; em <b>Perdido</b>, o motivo. A venda ainda é marcada à mão: quando a Eduzz e a Hotmart estiverem ligadas, ela entra sozinha.</div>';
+  try{_kb.modo[Q==='leads'?'inst_leads':'inst_oport']='kanban';kbRender(Q==='leads'?'inst_leads':'inst_oport');}catch(er){console.warn('[KANBAN instituto]',er);}
 }
 function instSoltar(ev,el,k){
   ev.preventDefault();el.classList.remove('sobre');
@@ -20777,6 +20773,7 @@ function kbExportar(q,colId,ev){
   if(ev)ev.stopPropagation();
   const cfg=KB_QUADROS[q];const info=(_kb.cols[q]||{})[colId];
   if(!cfg||!info)return;
+  if(cfg.exportar){cfg.exportar(info);return;} // (17/11) Instituto: leva para Mensagens em massa
   const l=info.itens;
   const norm=t=>{let d=String(t||'').replace(/\D/g,'');if(d.startsWith('55')&&(d.length===12||d.length===13))d=d.slice(2);return d;};
   const esc=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
@@ -21348,6 +21345,196 @@ function kbSoltou(ev){
   const ok=cfg.soltar(it,col.dataset.col);
   if(ok)kbRender(a.q);
 }
+
+// =====================================================================
+// (17/11/2026) Instituto: mesmo quadro da clínica (pedido do Lucas: "o processo vai ser o mesmo")
+//   Leads = quadro de Leads da clínica (Novo lead, Em atendimento, FUP 2h a 2 meses, Cadência mensal,
+//           Faltou e Faltantes 1 a 3), com as etapas próprias do Instituto (Aplicou, Lead qualificado,
+//           Call agendada, Interesse modelo, Estudantes, Descarte).
+//   Oportunidades = quadro de Clientes da clínica (1. Agradecimento a 7. Despedida, Cadência mensal),
+//           contado da data da oferta, mais Venda, Perdido e Alunos.
+//   O card guarda a etapa (instituto_leads.etapa); as colunas automáticas saem do tempo e das mensagens.
+// =====================================================================
+const _kbInstMsgs={carregado:false,carregando:false,por:{}};
+async function _kbInstCarregarMsgs(){
+  if(_kbInstMsgs.carregando)return;_kbInstMsgs.carregando=true;
+  try{
+    const ids=(_inst.conversas||[]).map(c=>c.id);const por={};
+    for(let i=0;i<ids.length;i+=120){
+      const r=await _waRest('mensagens?select=conversa_id,direcao,enviada_em,autor_email&conversa_id=in.('+ids.slice(i,i+120).join(',')+')&order=enviada_em&limit=20000')||[];
+      r.forEach(m=>{const o=por[m.conversa_id]=por[m.conversa_id]||{rec:[],eq:[]};const t=new Date(m.enviada_em);if(isNaN(t))return;
+        if(m.direcao==='recebida')o.rec.push(t);else if(/@/.test(m.autor_email||''))o.eq.push(t);});
+    }
+    _kbInstMsgs.por=por;_kbInstMsgs.carregado=true;
+  }catch(e){}finally{_kbInstMsgs.carregando=false;}
+  try{if(currentPage==='inst-funil')kbRender('inst_leads');}catch(e){}
+}
+function _kbInstConversa(l){
+  const cs=_inst.conversas||[];
+  return (l.conversa_id&&cs.find(c=>c.id===l.conversa_id))||(_instTel(l.telefone)&&cs.find(c=>_instTel(c.telefone)===_instTel(l.telefone)))||null;
+}
+function _kbInstMsgDe(it){const c=it.conv;return c?(_kbInstMsgs.por[c.id]||{rec:[],eq:[]}):{rec:[],eq:[]};}
+function _kbInstResposta(it){if(!_kbInstMsgs.carregado)return undefined;const t=it.t0;return _kbInstMsgDe(it).rec.find(d=>!t||d>=t)||null;}
+function _kbInstEnvioSDR(it){if(!_kbInstMsgs.carregado)return undefined;const t=it.t0;return _kbInstMsgDe(it).eq.find(d=>!t||d>=t)||null;}
+function _kbInstViva(it){
+  const m=_kbInstMsgDe(it);const lim=Date.now()-864e5;
+  return m.rec.some(d=>d.getTime()>=lim)||m.eq.some(d=>d.getTime()>=lim)||(it.conv&&it.conv.ultima_mensagem_em&&Date.parse(it.conv.ultima_mensagem_em)>=lim&&m.eq.length>0);
+}
+function _kbInstItens(Q){
+  return _instCardsFiltrados().filter(l=>{const e=INST_ETAPAS.find(x=>x[0]===l.etapa);return e?e[4]===Q:Q==='leads';})
+    .map(l=>{const t0=(l.etapa==='lead'&&l.etapa_em?new Date(l.etapa_em):null)||(l.criado_em?new Date(l.criado_em):null); /* lead que voltou da Cadência mensal recomeça a contagem */const tEv=l.etapa_em?new Date(l.etapa_em):t0;
+      return {l,id:l.id,ph:normalizePhone(l.telefone)||'',nome:_instRotulo(l),t0,tEv,conv:_kbInstConversa(l)};});
+}
+function _kbInstExtras(Q,fixas){
+  return INST_ETAPAS.filter(e=>e[4]===Q&&!fixas.includes(e[0])).map(e=>({id:e[0],nome:e[1],solta:true,vazia:true}));
+}
+function _kbInstTags(l){
+  const tag=(t,c)=>'<span class="kb-tag'+(c?' '+c:'')+'">'+t+'</span>';
+  return (_instNovo(l)?tag('🆕 Novo','ok'):'')+
+    (l.produto?tag(_waEsc(INST_PRODUTO_NOME[l.produto]||l.produto)):l.oferta_sugerida?tag('sugere: '+_waEsc(INST_OFERTA_NOME[l.oferta_sugerida]||l.oferta_sugerida)):'')+
+    (l.sdr_email?tag('SDR '+_waEsc(_instNomeEquipe(l.sdr_email).split(' ')[0])):'')+
+    (l.closer_email?tag('Closer '+_waEsc(_instNomeEquipe(l.closer_email).split(' ')[0])):'')+
+    (l.etapa==='call_agendada'&&l.call_em?tag('📅 '+_instCallFmt(l.call_em),l.call_em<new Date().toISOString()?'atraso':'hoje'):'')+
+    ((l.etapa==='perdido'||l.etapa==='descarte')&&l.motivo_perda?tag(_waEsc(String(l.motivo_perda).slice(0,30))):'');
+}
+function _kbInstBotoes(l){
+  if(!l.telefone)return '';
+  return '<div class="kb-linha"><span class="kb-tag" style="cursor:pointer" onclick="event.stopPropagation();instChamar('+l.id+')">💬 Central</span> '+
+    '<a class="kb-tag" style="cursor:pointer;text-decoration:none;color:#7FD3A0" href="'+_instWaMe(l.telefone)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">WhatsApp</a></div>';
+}
+function _kbInstSelecionarParaDisparo(info){
+  const phs=[...new Set((info.itens||[]).map(it=>it.ph).filter(Boolean))];
+  if(!phs.length){showToast('error','Nenhum contato com telefone nesta coluna','');return;}
+  window._instDispSel=phs;
+  const nav=[...document.querySelectorAll('.nav-item.nav-inst')].find(n=>String(n.getAttribute('onclick')||'').includes("'disparos'"));
+  switchPage('disparos',nav||document.createElement('div'));
+}
+const _KB_INST_LEAD_AUTO=['novo','atendimento','cadmensal'].concat(KB_CAD_LEAD.map(c=>c.id));
+KB_QUADROS.inst_leads={
+  titulo:'Leads do Instituto',
+  grupos:{fup:'Follow-ups (FUP 2h a 2 meses)',falt:'Faltantes 1 a 3'},
+  lista:()=>[],
+  colunas:()=>{
+    const n=k=>INST_ETAPA_NOME[k]||k;
+    return [
+      {id:'novo',nome:'Novo lead',dica:'Entrou e ainda não chegou a hora do primeiro follow-up'},
+      {id:'aplicacao',nome:n('aplicacao'),solta:true,dica:'Preencheu a aplicação da bio: ligar em até 30 minutos'},
+      {id:'atendimento',nome:'Em atendimento',dica:'A SDR já falou com o lead e a conversa teve mensagem nas últimas 24 h'},
+      ...KB_CAD_LEAD.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'fup'})),
+      {id:'cadmensal',nome:'Cadência mensal',solta:true,dica:'Base antiga e quem passou 90 dias da entrada sem avançar. Quem daqui manda mensagem volta sozinho para Novo lead'},
+      {id:'qualificado',nome:n('qualificado'),solta:true},
+      {id:'call_agendada',nome:n('call_agendada'),solta:true,dica:'Pede data e hora da call'},
+      {id:'faltou',nome:n('faltou'),solta:true,dica:'Não apareceu na call'},
+      ...KB_CAD_FALTA.map(c=>({id:c.id,nome:c.nome,cad:true,grupo:'falt'})),
+      ..._kbInstExtras('leads',['lead','base_antiga','aplicacao','qualificado','call_agendada','faltou'])
+    ];
+  },
+  itens:()=>{if(!_kbInstMsgs.carregado&&!_kbInstMsgs.carregando)_kbInstCarregarMsgs();return _kbInstItens('leads');},
+  coluna:(it)=>{
+    const k=it.l.etapa;
+    if(k==='base_antiga')return 'cadmensal';
+    if(k==='faltou'){if(!it.tEv)return 'faltou';const env=_kbEnvios(it.tEv,KB_CAD_FALTA);let col='faltou';env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_FALTA[i].id;});return col;}
+    if(k!=='lead')return k;
+    const sdr=_kbInstEnvioSDR(it);
+    if(sdr instanceof Date&&_kbInstViva(it))return 'atendimento';
+    if(!it.t0)return 'novo';
+    if(Date.now()-it.t0.getTime()>90*864e5)return 'cadmensal';
+    const env=_kbEnvios(it.t0,KB_CAD_LEAD);let col='novo';
+    env.forEach((d,i)=>{if(d.getTime()<=Date.now())col=KB_CAD_LEAD[i].id;});
+    return col;
+  },
+  ordenar:(l,col)=>l.slice().sort((a,b)=>col==='call_agendada'?String(a.l.call_em||'9').localeCompare(String(b.l.call_em||'9')):(b.t0||0)-(a.t0||0)),
+  card:(it,col)=>{
+    const l=it.l;const r=_kbInstResposta(it);const sd=_kbInstEnvioSDR(it);
+    const resp=(r instanceof Date?'<span class="kb-tag ok">lead respondeu '+_kbTempo(r)+'</span>':'')+(sd instanceof Date?' <span class="kb-tag">SDR '+_kbTempo(sd)+'</span>':'');
+    let prox='';
+    if(!(r instanceof Date)&&it.t0&&l.etapa==='lead'&&(col==='novo'||KB_CAD_LEAD.some(c=>c.id===col))){
+      const env=_kbEnvios(it.t0,KB_CAD_LEAD);const k=env.findIndex(d=>d.getTime()>Date.now());
+      if(k>=0)prox='<div class="kb-linha"><span>próximo: '+KB_CAD_LEAD[k].nome+' '+env[k].toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+env[k].toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
+    }
+    const org=l.origem?_waEsc(INST_ORIGEM_NOME[l.origem]||l.origem):'<span style="color:#E2BE6A">sem origem</span>';
+    return '<div class="kb-nome">'+_waEsc(it.nome)+'</div>'+
+      '<div class="kb-linha"><span>'+org+'</span><span>entrou '+(_kbTempo(it.t0)||'—')+'</span></div>'+
+      prox+'<div class="kb-linha">'+_kbInstTags(l)+(col==='call_agendada'?'':resp)+'</div>'+_kbInstBotoes(l);
+  },
+  abrir:(it)=>instCardAbrir(it.id),
+  soltar:(it,col)=>{
+    let etapa=col;
+    if(_KB_INST_LEAD_AUTO.includes(col)&&col!=='cadmensal'){
+      if(it.l.etapa==='lead'){showToast('error','Essa coluna anda sozinha','Novo lead, Em atendimento e os FUPs mudam pelo tempo e pelas mensagens.');return false;}
+      etapa='lead';
+    }else if(col==='cadmensal')etapa='base_antiga';
+    else if(col==='faltou'||KB_CAD_FALTA.some(c=>c.id===col))etapa='faltou';
+    if(it.l.etapa===etapa)return false;
+    instMover(it.id,etapa);return false;
+  },
+  exportar:_kbInstSelecionarParaDisparo,
+  aviso:()=>'Mesmo processo da clínica: Novo lead, Em atendimento e os FUPs andam sozinhos pelo horário de entrada (dias úteis, das 11h às 17h) e pelas mensagens da Central do Instituto. Arraste para Aplicou, Lead qualificado, Call agendada, Faltou, Cadência mensal ou Descarte. O botão de exportar da coluna leva os contatos para Mensagens em massa.'
+};
+// ---- Oportunidades = Clientes da clínica, contado da data da oferta ----
+function _kbInstOfertaBase(l){const t=Date.parse(l.oferta_em||l.etapa_em||l.criado_em||'');return isNaN(t)?null:new Date(t);}
+function _kbInstPrazo(it,col){
+  const e=KB_ORC_ETAPAS.find(x=>x.id===col);if(!e||!e.envio)return null;
+  const b=_kbInstOfertaBase(it.l);if(!b)return null;
+  return {nome:col,ate:new Date(b.getFullYear(),b.getMonth(),b.getDate()+e.dia)};
+}
+const _KB_INST_FUP=KB_ORC_ETAPAS.filter(e=>e.envio).map(e=>e.id);
+KB_QUADROS.inst_oport={
+  titulo:'Oportunidades do Instituto',
+  lista:()=>[],
+  colunas:()=>[
+    ...KB_ORC_ETAPAS.filter(e=>e.envio).map(e=>({id:e.id,nome:e.id,solta:true,dica:e.dica||''})),
+    {id:'Cadência mensal',nome:'Cadência mensal',solta:true,dica:'Terminou a sequência ou recebeu a oferta há mais de 30 dias: conteúdo mensal e campanhas'},
+    {id:'venda',nome:INST_ETAPA_NOME.venda||'Venda',solta:true},
+    {id:'perdido',nome:INST_ETAPA_NOME.perdido||'Perdido',solta:true,vazia:true},
+    {id:'aluno',nome:INST_ETAPA_NOME.aluno||'Alunos',solta:true},
+    ..._kbInstExtras('oport',['proposta','venda','perdido','aluno'])
+  ],
+  itens:()=>_kbInstItens('oport'),
+  coluna:(it)=>{
+    const l=it.l;if(l.etapa!=='proposta')return l.etapa;
+    if(l.fup_etapa==='Cadência mensal')return 'Cadência mensal';
+    const b=_kbInstOfertaBase(l);
+    if(b&&Date.now()-b.getTime()>30*864e5)return 'Cadência mensal';
+    return _KB_INST_FUP.includes(l.fup_etapa)?l.fup_etapa:_KB_INST_FUP[0];
+  },
+  ordenar:(l,col)=>l.slice().sort((a,b)=>{const pa=_kbInstPrazo(a,col),pb=_kbInstPrazo(b,col);return (pa?pa.ate.getTime():9e15)-(pb?pb.ate.getTime():9e15);}),
+  classeCard:(it,col)=>{const px=_kbInstPrazo(it,col);const hj=new Date(new Date().toDateString());if(!px)return '';return px.ate<hj?'kb-prazo-atraso':(+px.ate===+hj?'kb-prazo-hoje':'');},
+  valor:(it)=>it.l.etapa==='venda'?Number(it.l.valor_venda||0):Number(it.l.valor_proposta||0),
+  metricas:(cols,todos,porCol)=>{
+    const m={};const hoje=new Date(new Date().toDateString());
+    cols.forEach(c=>{let at=0,hj=0;(porCol[c.id]||[]).forEach(it=>{const px=_kbInstPrazo(it,c.id);if(!px)return;if(px.ate<hoje)at++;else if(+px.ate===+hoje)hj++;});
+      const p=[];if(hj)p.push(hj+' para hoje');if(at)p.push(at+' atrasado'+(at>1?'s':''));
+      m[c.id]=p.length?{txt:p.join(' · '),det:'Prazo da mensagem desta etapa, contado da data da oferta',alerta:at>0}:null;});
+    return m;
+  },
+  card:(it,col)=>{
+    const l=it.l;const hoje=new Date(new Date().toDateString());
+    const px=_kbInstPrazo(it,col);const b=_kbInstOfertaBase(l);
+    const v=l.etapa==='venda'?l.valor_venda:l.valor_proposta;
+    return '<div class="kb-nome">'+_waEsc(it.nome)+'</div>'+
+      '<div class="kb-linha">'+(Number(v)>0?'<b class="kb-valor'+(l.etapa==='venda'?' ok':'')+'">'+_instMoeda(v)+'</b>':'')+(b&&l.etapa==='proposta'?'<span>oferta '+b.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span>':'')+'</div>'+
+      (px?'<div class="kb-linha"><span class="kb-tag '+(px.ate<hoje?'atraso':(+px.ate===+hoje?'hoje':''))+'">mandar até '+px.ate.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+'</span></div>':'')+
+      '<div class="kb-linha">'+_kbInstTags(l)+'</div>'+_kbInstBotoes(l);
+  },
+  abrir:(it)=>instCardAbrir(it.id),
+  soltar:(it,col)=>{
+    const l=it.l;
+    if(_KB_INST_FUP.includes(col)||col==='Cadência mensal'){
+      if(!l.produto){instCardAbrir(l.id,'proposta');showToast('error','Escolha o produto','Para entrar no follow-up, o card precisa do produto.');return false;}
+      const antes={etapa:l.etapa,fup_etapa:l.fup_etapa};
+      const corpo={etapa:'proposta',fup_etapa:col};if(!l.oferta_em&&l.etapa!=='proposta')corpo.oferta_em=new Date().toISOString();
+      Object.assign(l,corpo);if(antes.etapa!=='proposta')l.etapa_em=new Date().toISOString();
+      _instPatch(l.id,corpo).then(()=>{if(antes.etapa!=='proposta')_inst.eventos.push({lead_id:l.id,para:'proposta',em:new Date().toISOString()});_instRedesenhar();})
+        .catch(e=>{Object.assign(l,antes);_instRedesenhar();showToast('error','Não moveu o card',/fup_etapa|oferta_em/.test(e.message)?'Falta rodar o SQL 210 na Supabase.':_waEsc(e.message));});
+      return true;
+    }
+    if(l.etapa===col)return false;
+    instMover(l.id,col);return false;
+  },
+  exportar:_kbInstSelecionarParaDisparo,
+  aviso:()=>'Mesmo processo de Clientes da clínica: o card fica na etapa da mensagem que vai ser mandada, e o prazo conta da data da oferta. Verde = mandar hoje, vermelho = atrasado. Passou 30 dias da oferta sem fechar, vai para Cadência mensal.'
+};
 
 // liga o Kanban nas telas, sem mexer na lógica das tabelas
 (function kbLigar(){
