@@ -1334,6 +1334,10 @@ html[data-tema="claro"] .kb-prazo-atraso .kb-retorno-faixa{color:#9B2C2C;}
       <span class="nav-label">Leads</span>
       <span class="wa-nav-badge" id="inst-nav-badge" style="display:none"></span>
     </div>
+    <div class="nav-item nav-inst" onclick="switchPage('inst-oport',this)">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V4h8v3"/><path d="M3 12h18"/></svg></span>
+      <span class="nav-label">Oportunidades</span>
+    </div>
     <div class="nav-item nav-inst" onclick="switchPage('conversas',this)">
       <span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.4A8.5 8.5 0 1 1 21 11.5z"/></svg></span>
       <span class="nav-label">Mensagens</span>
@@ -2046,6 +2050,7 @@ html[data-tema="claro"] .kb-prazo-atraso .kb-retorno-faixa{color:#9B2C2C;}
       <input type="file" id="wa-arquivo" style="display:none" accept="image/jpeg,image/png,video/mp4,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onchange="waArquivoEscolhido(this)">
     </div>
     <div class="page" id="page-inst-funil"><div class="au-wrap" id="if-conteudo"></div></div>
+    <div class="page" id="page-inst-oport"><div class="au-wrap" id="if-conteudo-op"></div></div>
     <div class="page" id="page-inst-dashboard"><div class="au-wrap" id="ip-dashboard"></div></div>
     <div class="page" id="page-inst-trafego"><div class="au-wrap" id="ip-trafego"></div></div>
     <div class="page" id="page-inst-automacoes"><div class="au-wrap" id="ip-automacoes"></div></div>
@@ -3699,7 +3704,7 @@ function switchPage(page,el){
   else if(page==='clientes') renderClientes();
   else if(page==='pacientes') renderPacientesPage();
   else if(page==='conversas') abrirConversas();
-  else if(page==='inst-funil') abrirInstFunil();
+  else if(page==='inst-funil'||page==='inst-oport') abrirInstFunil();
   else if(/^inst-/.test(page)) abrirInstPagina(page);
   else if(page==='automacoes') abrirAutomacoes();
   else if(page==='agente') abrirAgente();
@@ -3746,7 +3751,7 @@ async function reloadCurrent(){
   const textoOriginal=btn?btn.innerHTML:null;
   if(btn){btn.disabled=true;btn.textContent='Atualizando…';}
   try{
-    if(currentPage==='inst-funil'){await abrirInstFunil(true);return;}
+    if(currentPage==='inst-funil'||currentPage==='inst-oport'){await abrirInstFunil(true);return;}
     if(/^inst-/.test(currentPage)){await abrirInstPagina(currentPage,true);return;}
     if(currentPage==='social-selling'){
       if(_ss.aba==='painel')await loadSocial();else{_ss.clinChave='';await abrirSocialSelling();}
@@ -19257,7 +19262,7 @@ function _instLigarTempoReal(){
         const nova=n.aplicou_em&&n.aplicou_em!==o.aplicou_em&&Date.now()-Date.parse(n.aplicou_em)<5*6e4&&n.oferta_sugerida!=='nenhuma';
         if(nova)_instAvisarAplicacao(n);
         _instBadge();
-        if(currentPage==='inst-funil'&&!document.getElementById('if-modal'))instKanban();
+        if((currentPage==='inst-funil'||currentPage==='inst-oport')&&!document.getElementById('if-modal'))instKanban();
       })
       .subscribe(st=>{if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){setTimeout(()=>{try{_sb.removeChannel(_inst.canal);}catch(e){}_inst.canal=null;_instLigarTempoReal();},15000);}});
   }catch(e){}
@@ -19315,7 +19320,7 @@ function _instAplicarEquipe(){
 // ---------- páginas do Instituto (16/11/2026: estrutura pronta, cada uma vai ser modelada) ----------
 // O funil comercial fica guardado e fora do menu até o processo comercial ser fechado (decisão do Lucas).
 var INST_FUNIL_LIGADO=true; // (17/11) aplicação aprovada: o funil recebe as aplicações (SQL 203)
-var INST_TITULOS={'inst-funil':'Leads','inst-dashboard':'Dashboard','inst-trafego':'Tráfego Pago','inst-automacoes':'Automações','inst-agente':'Agentes de IA','inst-social':'Social Selling','inst-disparos':'Mensagens em Massa'};
+var INST_TITULOS={'inst-funil':'Leads','inst-oport':'Oportunidades','inst-dashboard':'Dashboard','inst-trafego':'Tráfego Pago','inst-automacoes':'Automações','inst-agente':'Agentes de IA','inst-social':'Social Selling','inst-disparos':'Mensagens em Massa'};
 const INST_EM_BREVE={
   'inst-trafego':['Os anúncios do Instituto, separados dos da clínica.',['Definir quais campanhas e qual conta de anúncios são do Instituto (hoje elas ficam na conta "CA - LARISSA BULHÕES").']],
   'inst-automacoes':['Follow-ups e sequências do Instituto, pelo WhatsApp (13) 4042-7082.',['Cadência de follow-up de quem não agenda e de quem não fecha (processo comercial).','Cartão do Instituto na Meta, para as mensagens por modelo saírem.']],
@@ -19356,16 +19361,20 @@ async function instDashboard(el,forcar){
 }
 
 // ---------- funil ----------
-const INST_ETAPAS=[
-  ['lead','Lead','#8C98B1','normal'],
-  ['aplicacao','Aplicação','#6FA8FF','normal'],
-  ['qualificado','Qualificado (SDR)','#A18B6C','normal'],
-  ['call_agendada','Call agendada','#CCBCA6','normal'],
-  ['call_realizada','Call realizada','#E2BE6A','normal'],
-  ['proposta','Proposta','#D4AF5A','normal'],
-  ['venda','Venda','#7FD3A0','resultado'],
-  ['perdido','Perdido','#E07A7A','fora'],
-  ['nutricao','Sem perfil agora','#8C98B1','fora']];
+const INST_ETAPAS=[ // (17/11) [chave, nome, cor, tipo, quadro]: Leads (SDR) e Oportunidades (depois da oferta)
+  ['lead','Contato sem aplicação','#8C98B1','normal','leads'],
+  ['aplicacao','Aplicou: aguardando contato','#6FA8FF','normal','leads'],
+  ['qualificado','Qualificado','#A18B6C','normal','leads'],
+  ['call_agendada','Call agendada','#CCBCA6','normal','leads'],
+  ['call_realizada','Oferta feita','#E2BE6A','normal','oport'],
+  ['proposta','Follow-up','#D4AF5A','normal','oport'],
+  ['venda','Venda','#7FD3A0','resultado','oport'],
+  ['perdido','Perdido','#E07A7A','fora','oport'],
+  ['estudante','Estudantes','#8C98B1','fora','leads'],
+  ['descarte','Descarte','#66738F','fora','leads']];
+const INST_FORA=['perdido','estudante','descarte'];
+function _instQuadro(){return currentPage==='inst-oport'?'oport':'leads';}
+function _instEl(){return document.getElementById(currentPage==='inst-oport'?'if-conteudo-op':'if-conteudo');}
 const INST_ETAPA_NOME=Object.fromEntries(INST_ETAPAS.map(e=>[e[0],e[1]]));
 const INST_ORIGENS=[['anuncio','Anúncio'],['organico','Orgânico (bio, stories, Close Friends)'],['social_selling','Social selling'],['outro','Outro']];
 const INST_ORIGEM_NOME=Object.assign({aplicacao:'Aplicação (antigo)'},Object.fromEntries(INST_ORIGENS));
@@ -19420,7 +19429,7 @@ async function _instCarregar(){
   try{_instBadge();}catch(e){}
 }
 async function abrirInstFunil(forcar){
-  const el=document.getElementById('if-conteudo');if(!el)return;
+  const el=_instEl();if(!el)return;
   if(!_temEspaco('instituto')){el.innerHTML='<div class="au-vazio">Você não tem acesso ao Instituto.</div>';return;}
   if(!_inst.carregado||forcar){
     if(!_inst.carregado)el.innerHTML='<div class="au-vazio">Carregando o funil…</div>';
@@ -19446,7 +19455,7 @@ function _instPorOrigem(){
   const coorte=_inst.linhas.filter(l=>!ini||String(l.criado_em)>=ini);
   const chegou={};_inst.eventos.forEach(e=>{(chegou[e.lead_id]=chegou[e.lead_id]||new Set()).add(e.para);});
   const ordem=INST_ETAPAS.map(e=>e[0]);
-  const alcancou=(l,k)=>{const s=chegou[l.id];if(s&&s.has(k))return true;const i=ordem.indexOf(l.etapa);return l.etapa!=='perdido'&&i>=ordem.indexOf(k);};
+  const alcancou=(l,k)=>{const s=chegou[l.id];if(s&&s.has(k))return true;const i=ordem.indexOf(l.etapa);return !INST_FORA.includes(l.etapa)&&i>=ordem.indexOf(k);};
   const grupos=INST_ORIGENS.map(o=>o[0]).concat(['aplicacao','']);
   return grupos.map(o=>{
     const ls=coorte.filter(l=>(l.origem||'')===o);
@@ -19457,23 +19466,24 @@ function _instPorOrigem(){
   }).filter(g=>g.leads);
 }
 function instKanban(){
-  const el=document.getElementById('if-conteudo');if(!el)return;
+  const el=_instEl();if(!el)return;const Q=_instQuadro();
+  const etapasQ=INST_ETAPAS.filter(e=>e[4]===Q);
   const b=_inst.busca.trim().toLowerCase(),bn=b.replace(/\D/g,'');
   const cards=_inst.linhas.filter(l=>INST_ETAPA_NOME[l.etapa])
     .filter(l=>!_inst.origem||(_inst.origem==='_sem'?!l.origem:l.origem===_inst.origem))
     .filter(l=>!_inst.produto||(l.produto||l.oferta_sugerida)===_inst.produto)
     .filter(l=>!b||[l.nome,l.instagram,l.email,l.obs].some(x=>String(x||'').toLowerCase().includes(b))||(bn&&_instTel(l.telefone).includes(bn)));
   const mesIni=(()=>{const h=new Date();return new Date(h.getFullYear(),h.getMonth(),1).toISOString();})();
-  const ativos=cards.filter(l=>_instTipo(l.etapa)==='normal').length;
+  const ativos=cards.filter(l=>_instTipo(l.etapa)==='normal'&&INST_ETAPAS.some(e=>e[0]===l.etapa&&e[4]===Q)).length;
   const parado=l=>_instTipo(l.etapa)==='normal'&&_instDias(l)>=3;
-  const parados=cards.filter(parado).length;
+  const parados=cards.filter(l=>parado(l)&&INST_ETAPAS.some(e=>e[0]===l.etapa&&e[4]===Q)).length;
   const agora=new Date().toISOString();
   const calls=cards.filter(l=>l.etapa==='call_agendada');
   const callsAtrasadas=calls.filter(l=>l.call_em&&l.call_em<agora).length;
   const vendasMes=_inst.linhas.filter(l=>l.etapa==='venda'&&String(l.etapa_em)>=mesIni);
   const valorMes=vendasMes.reduce((s,l)=>s+Number(l.valor_venda||0),0);
-  const semOrigem=_inst.linhas.filter(l=>!l.origem&&l.etapa!=='perdido').length;
-  const semCard=_instSemCard();
+  const semOrigem=Q==='leads'?_inst.linhas.filter(l=>!l.origem&&!INST_FORA.includes(l.etapa)).length:0;
+  const semCard=Q==='leads'?_instSemCard():[];
   const stat=(t,v,c)=>'<div class="sskb-stat"><div>'+t+'</div><b style="color:'+(c||'#EEF1F7')+'">'+v+'</b></div>';
   const tag=(t,cls)=>'<span class="sskb-tag'+(cls?' '+cls:'')+'">'+t+'</span>';
   const card=l=>{
@@ -19492,26 +19502,30 @@ function instKanban(){
         (l.etapa==='call_agendada'&&l.call_em?tag('📅 '+_instCallFmt(l.call_em),l.call_em<agora?'ouro':''):'')+
         (l.etapa==='proposta'&&l.valor_proposta?tag(_instMoeda(l.valor_proposta)):'')+
         (l.etapa==='venda'&&l.valor_venda?tag(_instMoeda(l.valor_venda),'verde'):'')+
-        (l.etapa==='perdido'&&l.motivo_perda?tag(_waEsc(String(l.motivo_perda).slice(0,30))):'')+
+        ((l.etapa==='perdido'||l.etapa==='descarte')&&l.motivo_perda?tag(_waEsc(String(l.motivo_perda).slice(0,30))):'')+
         (pd?tag('parado','ouro'):'')+'</div></div>';
   };
   const po=_instPorOrigem();
   const pct=(a,b2)=>b2?Math.round(a*100/b2)+'%':'–';
   el.innerHTML=
     '<div class="sskb-topo">'+
-      stat('Ativos no funil',ativos)+
-      (()=>{const ap=cards.filter(l=>l.etapa==='aplicacao');const at=ap.filter(l=>(_instMinAplicou(l)||0)>30).length;return stat('Aplicações sem contato',ap.length+(at?' · '+at+' há +30 min':''),at?'#E2BE6A':'#6FA8FF');})()+
-      stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
-      stat('Calls agendadas',calls.length+(callsAtrasadas?' · '+callsAtrasadas+' passou da hora':''),callsAtrasadas?'#E2BE6A':'#CCBCA6')+
-      stat('Vendas no mês',vendasMes.length+(valorMes?' · '+_instMoeda(valorMes):''),'#7FD3A0')+
-      '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar nome, @, telefone" value="'+_waEsc(_inst.busca)+'" oninput="_inst.busca=this.value;clearTimeout(_inst.tk);_inst.tk=setTimeout(()=>{instKanban();const i=document.querySelector(\'#if-conteudo .sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
+      (Q==='leads'
+        ?stat('Ativos em Leads',ativos)+
+         (()=>{const ap=cards.filter(l=>l.etapa==='aplicacao');const at=ap.filter(l=>(_instMinAplicou(l)||0)>30).length;return stat('Aplicações sem contato',ap.length+(at?' · '+at+' há +30 min':''),at?'#E2BE6A':'#6FA8FF');})()+
+         stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
+         stat('Calls agendadas',calls.length+(callsAtrasadas?' · '+callsAtrasadas+' passou da hora':''),callsAtrasadas?'#E2BE6A':'#CCBCA6')
+        :stat('Em negociação',ativos)+
+         (()=>{const fu=cards.filter(l=>l.etapa==='call_realizada'||l.etapa==='proposta');const v=fu.reduce((a,l)=>a+Number(l.valor_proposta||0),0);return stat('Valor em proposta',v?_instMoeda(v):'–','#CCBCA6');})()+
+         stat('Parados há 3+ dias',parados,parados?'#E2BE6A':'')+
+         stat('Vendas no mês',vendasMes.length+(valorMes?' · '+_instMoeda(valorMes):''),'#7FD3A0'))+
+      '<div class="sskb-acoes"><input class="dp-in" style="height:32px;width:200px" placeholder="Buscar nome, @, telefone" value="'+_waEsc(_inst.busca)+'" oninput="_inst.busca=this.value;clearTimeout(_inst.tk);_inst.tk=setTimeout(()=>{instKanban();const i=document.querySelector(\'#\'+(currentPage===\'inst-oport\'?\'if-conteudo-op\':\'if-conteudo\')+\' .sskb-acoes input\');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},300)">'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.origem=this.value;instKanban()"><option value="">Todas as origens</option>'+INST_ORIGENS.map(o=>'<option value="'+o[0]+'"'+(_inst.origem===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'<option value="_sem"'+(_inst.origem==='_sem'?' selected':'')+'>Sem origem</option></select>'+
         '<select class="dp-in" style="height:32px;width:auto" onchange="_inst.produto=this.value;instKanban()"><option value="">Os dois produtos</option>'+INST_PRODUTOS.map(o=>'<option value="'+o[0]+'"'+(_inst.produto===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>'+
         '<button class="wa-btn primario" onclick="instCardAbrir(null)">+ Novo card</button></div>'+
     '</div>'+
     (semCard.length?'<div class="au-bloco" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px;font-size:12.5px;color:#EEF1F7"><b>'+semCard.length+(semCard.length===1?' conversa':' conversas')+'</b> do WhatsApp do Instituto ainda sem card no funil.</div><button class="wa-btn" onclick="instSemCardAbrir()">Ver e criar cards</button></div>':'')+
     (semOrigem?'<div class="au-dica" style="margin:-4px 0 10px">'+semOrigem+(semOrigem===1?' card está':' cards estão')+' sem origem. Sem ela, a conversão e o custo por canal ficam incompletos.</div>':'')+
-    '<div class="sskb-quadro">'+INST_ETAPAS.map(([k,nome,cor,tipo])=>{
+    '<div class="sskb-quadro">'+etapasQ.map(([k,nome,cor,tipo])=>{
       const cs=cards.filter(l=>l.etapa===k).sort((a,b2)=>k==='call_agendada'?String(a.call_em||'9').localeCompare(String(b2.call_em||'9')):String(b2.etapa_em||'').localeCompare(String(a.etapa_em||'')));
       const tot=k==='venda'?cs.reduce((s,l)=>s+Number(l.valor_venda||0),0):k==='proposta'?cs.reduce((s,l)=>s+Number(l.valor_proposta||0),0):0;
       return '<div class="sskb-col'+(tipo==='fora'?' fora':'')+'" ondragover="event.preventDefault();this.classList.add(\'sobre\')" ondragleave="this.classList.remove(\'sobre\')" ondrop="instSoltar(event,this,\''+k+'\')">'+
@@ -19519,7 +19533,7 @@ function instKanban(){
         '<div class="sskb-lista">'+(cs.length?cs.map(card).join(''):'<div class="sskb-vazio">Arraste um card para cá</div>')+'</div></div>';
     }).join('')+'</div>'+
     '<div class="au-bloco" style="margin-top:12px"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">Conversão por canal <select class="dp-in" style="height:28px;width:auto;font-size:12px" onchange="_inst.periodo=this.value;instKanban()">'+[['mes','Entraram este mês'],['30','Entraram nos últimos 30 dias'],['tudo','Desde o início']].map(p=>'<option value="'+p[0]+'"'+(_inst.periodo===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select></h4>'+
-      (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Calls feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
+      (po.length?'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="color:#8C98B1;text-align:left"><th style="padding:6px">Origem</th><th>Leads</th><th>Qualificados</th><th>Ofertas feitas</th><th>Vendas</th><th>Lead → venda</th><th>Valor vendido</th></tr>'+
         po.map(g=>'<tr style="border-top:1px solid #1E2E52;color:#EEF1F7"><td style="padding:6px">'+_waEsc(g.o?INST_ORIGEM_NOME[g.o]:'Sem origem')+'</td><td>'+g.leads+'</td><td>'+g.qual+' <small style="color:#8C98B1">'+pct(g.qual,g.leads)+'</small></td><td>'+g.calls+' <small style="color:#8C98B1">'+pct(g.calls,g.leads)+'</small></td><td>'+g.vendas+'</td><td>'+pct(g.vendas,g.leads)+'</td><td>'+(g.valor?_instMoeda(g.valor):'–')+'</td></tr>').join('')+'</table></div>'
         :'<div class="au-dica">Nenhum card entrou neste período.</div>')+
       '<div class="au-dica" style="margin-top:6px">Conta os cards pela data em que entraram no funil e pelo histórico de etapas. O custo por canal (CAC) entra quando o investimento dos anúncios do Instituto estiver ligado.</div></div>'+
@@ -19530,6 +19544,7 @@ function instSoltar(ev,el,k){
   const id=+ev.dataTransfer.getData('text/plain');if(id)instMover(id,k);
 }
 function _instFaltaPara(l,etapa){
+  if(['qualificado','call_agendada','call_realizada','proposta','venda'].includes(etapa)&&!l.produto)return 'produto';
   if(etapa==='call_agendada'&&!l.call_em)return 'call';
   if(etapa==='venda'&&!(Number(l.valor_venda)>0))return 'venda';
   if(etapa==='perdido'&&!l.motivo_perda)return 'perdido';
@@ -19548,7 +19563,7 @@ async function instMover(id,etapa){
   catch(e){l.etapa=antes[0];l.etapa_em=antes[1];_instRedesenhar();showToast('error','Não moveu o card',_waEsc(e.message));}
 }
 function _instRedesenhar(){
-  if(currentPage==='inst-funil')instKanban();
+  if(currentPage==='inst-funil'||currentPage==='inst-oport')instKanban();
   try{if(currentPage==='conversas'&&_wa.atual)waRenderPainel();}catch(e){}
 }
 function instCardFechar(){const m=document.getElementById('if-modal');if(m)m.remove();}
@@ -19559,7 +19574,7 @@ function instCardAbrir(id,etapaNova,base){
   const eq=_inst.equipe||[];
   const campo=(rot,html,extra)=>'<label class="sskb-campo"'+(extra||'')+'><span>'+rot+'</span>'+html+'</label>';
   const selEq=(idc,v)=>'<select id="'+idc+'" class="dp-in"><option value="">Ninguém</option>'+eq.map(p=>'<option value="'+_waEsc(p.email)+'"'+(p.email===v?' selected':'')+'>'+_waEsc(p.nome)+'</option>').join('')+(v&&!eq.some(p=>p.email===v)?'<option value="'+_waEsc(v)+'" selected>'+_waEsc(_instNomeEquipe(v))+'</option>':'')+'</select>';
-  const aviso={call:'Para ir para <b>Call agendada</b>, coloque a data e a hora da call.',venda:'Para ir para <b>Venda</b>, coloque o valor vendido.',perdido:'Para ir para <b>Perdido</b>, escreva o motivo.'}[_instFaltaPara(l,et)]||'';
+  const aviso={produto:'Para avançar além de <b>Aplicou</b>, escolha o <b>produto</b> (Expert em Lentes ou Presencial).',call:'Para ir para <b>Call agendada</b>, coloque a data e a hora da call.',venda:'Para ir para <b>Venda</b>, coloque o valor vendido.',perdido:'Para ir para <b>Perdido</b>, escreva o motivo.'}[_instFaltaPara(l,et)]||'';
   const conv=l.conversa_id||(_inst.conversas.find(c=>_instTel(c.telefone)&&_instTel(c.telefone)===_instTel(l.telefone))||{}).id||'';
   const m=document.createElement('div');m.id='if-modal';m.className='sskb-fundo';
   m.onclick=e=>{if(e.target===m)instCardFechar();};
@@ -19581,7 +19596,7 @@ function instCardAbrir(id,etapaNova,base){
     '<div class="sskb-dupla" id="if-valores">'+campo('Valor da proposta (R$)','<input id="if-vprop" class="dp-in" type="number" min="0" step="0.01" value="'+_waEsc(l.valor_proposta!=null?l.valor_proposta:'')+'">')+
       campo('Valor vendido (R$)','<input id="if-vvenda" class="dp-in" type="number" min="0" step="0.01" value="'+_waEsc(l.valor_venda!=null?l.valor_venda:'')+'">')+'</div>'+
     campo('Plataforma da venda','<select id="if-plat" class="dp-in"><option value="">Selecione…</option>'+INST_PLATAFORMAS.map(p=>'<option value="'+p[0]+'"'+(l.plataforma===p[0]?' selected':'')+'>'+p[1]+'</option>').join('')+'</select>',' id="if-plat-w"')+
-    campo('Motivo da perda','<input id="if-motivo" class="dp-in" maxlength="500" value="'+_waEsc(l.motivo_perda||'')+'">',' id="if-motivo-w"')+
+    campo('Motivo (perda ou descarte)','<input id="if-motivo" class="dp-in" maxlength="500" value="'+_waEsc(l.motivo_perda||'')+'">',' id="if-motivo-w"')+
     campo('Observações','<textarea id="if-obs" class="dp-in" style="height:80px;padding:8px" maxlength="16000">'+_waEsc(l.obs||'')+'</textarea>')+
     (!novo?'<div style="font-size:11px;color:#66738F;margin:4px 0">Na etapa há '+_instTempo(l)+' · entrou em '+new Date(l.criado_em).toLocaleDateString('pt-BR')+(l.criado_por?' por '+_waEsc(_instNomeEquipe(l.criado_por)):'')+'</div>':'')+
     '<div class="sskb-mbotoes">'+
@@ -19591,13 +19606,13 @@ function instCardAbrir(id,etapaNova,base){
   m.dataset.conversa=novo&&base&&base.conversa_id?base.conversa_id:'';
   document.body.appendChild(m);
   _instCamposEtapa();
-  const foco={call:'if-call',venda:'if-vvenda',perdido:'if-motivo'}[_instFaltaPara(l,et)]||(novo?'if-nome':'');
+  const foco={produto:'if-produto',call:'if-call',venda:'if-vvenda',perdido:'if-motivo'}[_instFaltaPara(l,et)]||(novo?'if-nome':'');
   const f=foco&&document.getElementById(foco);if(f)f.focus();
 }
 function _instCamposEtapa(){
   const et=(document.getElementById('if-etapa')||{}).value;
   const mostra=(id,on)=>{const e=document.getElementById(id);if(e)e.style.display=on?'':'none';};
-  mostra('if-motivo-w',et==='perdido');
+  mostra('if-motivo-w',et==='perdido'||et==='descarte');
   mostra('if-plat-w',et==='venda'||!!(document.getElementById('if-plat')||{}).value);
 }
 async function instCardSalvar(id){
@@ -19613,8 +19628,8 @@ async function instCardSalvar(id){
   if(tel&&(tel.length<10||tel.length>13)){showToast('error','Telefone incompleto','Coloque com DDD.');return;}
   if(Number.isNaN(corpo.valor_proposta)||Number.isNaN(corpo.valor_venda)){showToast('error','Valor inválido','Use só números, por exemplo 11980.');return;}
   const falta=_instFaltaPara(corpo,corpo.etapa);
-  if(falta){showToast('error',{call:'Falta a data da call',venda:'Falta o valor vendido',perdido:'Falta o motivo da perda'}[falta],'');return;}
-  if(corpo.etapa!=='perdido')corpo.motivo_perda=null;
+  if(falta){showToast('error',{produto:'Escolha o produto',call:'Falta a data da call',venda:'Falta o valor vendido',perdido:'Falta o motivo da perda'}[falta],'');return;}
+  if(corpo.etapa!=='perdido'&&corpo.etapa!=='descarte')corpo.motivo_perda=null;
   const m=document.getElementById('if-modal');
   const btn=document.getElementById('if-salvar');if(btn)btn.disabled=true;
   try{
