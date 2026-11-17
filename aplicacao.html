@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aplicação para dentistas | Instituto Bulhões</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#EFEFED">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gelo:#EFEFED;--areia:#CCBCA6;--bronze:#A18B6C;--bronze-esc:#86704F;
+  --tinta:#2A231C;--apoio:#6B5F51;--linha:#DDD4C7;--branco:#FFFFFF;--erro:#A1452F;
+  --raio:16px;--anim:.22s cubic-bezier(.2,.7,.2,1)
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Montserrat',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-weight:500;background:var(--gelo);color:var(--tinta);-webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh;min-height:100dvh}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--bronze);outline-offset:3px;border-radius:10px}
+
+/* topo fixo: marca, progresso e voltar */
+.topo{position:sticky;top:0;z-index:10;background:rgba(239,239,237,.94);backdrop-filter:saturate(1.2) blur(10px);-webkit-backdrop-filter:saturate(1.2) blur(10px)}
+.topo-in{max-width:600px;margin:0 auto;padding:14px 22px 0;display:grid;grid-template-columns:72px 1fr 72px;align-items:center}
+.voltar{justify-self:start;background:none;border:0;color:var(--apoio);font-size:14px;font-weight:600;padding:10px 8px 10px 0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity var(--anim)}
+.voltar.on{opacity:1;pointer-events:auto}
+.voltar:hover{color:var(--tinta)}
+.logo{justify-self:center;text-align:center;line-height:1.15}
+.logo b{display:block;font-size:15px;font-weight:800;letter-spacing:.02em}
+.logo small{display:block;font-size:11px;font-weight:600;color:var(--bronze);letter-spacing:.04em}
+.cont{justify-self:end;font-size:12px;font-weight:600;color:var(--apoio);font-variant-numeric:tabular-nums}
+.barra{max-width:600px;margin:12px auto 0;padding:0 22px}
+.barra div{height:4px;border-radius:4px;background:var(--linha);overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:var(--bronze);border-radius:4px;transition:width .45s cubic-bezier(.2,.7,.2,1)}
+
+/* conteúdo */
+main{max-width:600px;margin:0 auto;padding:28px 22px 140px}
+.tela{display:none}
+.tela.on{display:block;animation:entra .32s cubic-bezier(.2,.7,.2,1)}
+@keyframes entra{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.abertura{padding:4px 0 28px;margin-bottom:28px;border-bottom:1px solid var(--linha)}
+.abertura h1{font-size:clamp(29px,8vw,44px);text-wrap:balance;font-weight:800;line-height:1.06;letter-spacing:-.02em;margin-bottom:14px}
+.abertura h1 span{color:var(--bronze)}
+.abertura p{font-size:16px;line-height:1.6;color:var(--apoio);max-width:52ch}
+
+h2{font-size:clamp(23px,6.2vw,30px);font-weight:800;line-height:1.14;letter-spacing:-.015em;margin-bottom:8px;text-wrap:balance}
+h2:focus{outline:none}
+.dica{font-size:14px;color:var(--apoio);margin-bottom:22px}
+
+/* opções */
+.opcoes{display:grid;gap:10px}
+.op{position:relative;display:flex;align-items:center;gap:14px;width:100%;min-height:60px;text-align:left;background:var(--branco);border:1.5px solid var(--linha);border-radius:var(--raio);padding:14px 18px;font-size:16px;font-weight:600;line-height:1.3;cursor:pointer;transition:border-color var(--anim),background var(--anim),transform .12s ease;-webkit-tap-highlight-color:transparent}
+.op:hover{border-color:var(--areia)}
+.op:active{transform:scale(.985)}
+.op .m{flex:none;width:22px;height:22px;border:2px solid var(--areia);border-radius:50%;display:grid;place-items:center;transition:all var(--anim)}
+.op.multi .m{border-radius:7px}
+.op .m::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--branco);transform:scale(0);transition:transform var(--anim)}
+.op.multi .m::after{width:10px;height:5px;border-radius:0;background:none;border-left:2.5px solid var(--branco);border-bottom:2.5px solid var(--branco);transform:rotate(-45deg) translate(1px,-1px) scale(0)}
+.op.sel{border-color:var(--bronze);background:#F7F2EB}
+.op.sel .m{border-color:var(--bronze);background:var(--bronze)}
+.op.sel .m::after{transform:scale(1)}
+.op.multi.sel .m::after{transform:rotate(-45deg) translate(1px,-1px) scale(1)}
+
+/* campos */
+.campo{margin-bottom:18px}
+.campo label{display:block;font-size:14px;font-weight:700;margin-bottom:8px}
+.campo .ctrl{display:flex;align-items:center;background:var(--branco);border:1.5px solid var(--linha);border-radius:14px;transition:border-color var(--anim),box-shadow var(--anim)}
+.campo .ctrl:focus-within{border-color:var(--bronze);box-shadow:0 0 0 4px rgba(161,139,108,.16)}
+.campo .pre{padding-left:16px;font-size:17px;font-weight:600;color:var(--apoio)}
+.campo input{flex:1;min-width:0;min-height:56px;background:none;border:0;padding:0 16px;font-size:17px;outline:none}
+.campo .pre+input{padding-left:4px}
+.campo input::placeholder{color:#B3A898}
+.campo.invalido .ctrl{border-color:var(--erro)}
+.msg{font-size:13px;font-weight:600;color:var(--erro);min-height:18px;margin-top:6px}
+.campo.ok .ctrl{border-color:var(--areia)}
+.casos .ctrl{max-width:180px}
+.casos input{font-size:22px;font-weight:700}
+
+/* rodapé de ação (zona do polegar) */
+.acao{position:fixed;left:0;right:0;bottom:0;z-index:9;background:linear-gradient(to top,var(--gelo) 70%,rgba(239,239,237,0));padding:18px 22px calc(18px + env(safe-area-inset-bottom))}
+.acao-in{max-width:600px;margin:0 auto}
+.btn{display:block;width:100%;min-height:58px;background:var(--tinta);color:var(--gelo);border:0;border-radius:999px;padding:16px 22px;font-size:16px;font-weight:700;letter-spacing:.01em;cursor:pointer;text-align:center;text-decoration:none;transition:background var(--anim),opacity var(--anim),transform .12s ease}
+.btn:hover{background:#3A3127}
+.btn:active{transform:scale(.99)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.ouro{background:var(--bronze);color:var(--branco)}
+.btn.ouro:hover{background:var(--bronze-esc)}
+.btn.linha{background:transparent;color:var(--tinta);border:1.5px solid var(--areia)}
+
+.confianca{display:flex;align-items:center;gap:10px;margin-top:30px;font-size:13px;line-height:1.45;color:var(--apoio)}
+.confianca svg{flex:none}
+.oculto{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.aviso{background:#F7F2EB;border:1px dashed var(--bronze);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--apoio);margin-top:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* obrigado: confirmação sóbria */
+.status{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--bronze-esc);letter-spacing:.01em;margin-bottom:16px}
+.status i{width:20px;height:20px;border-radius:50%;background:var(--bronze);display:grid;place-items:center}
+.status i::after{content:'';width:8px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.obrigado h2{font-size:clamp(26px,7vw,36px);margin-bottom:12px}
+.obrigado .sub{font-size:16px;line-height:1.6;color:var(--apoio);max-width:52ch;margin-bottom:30px}
+.passos{list-style:none;counter-reset:p;border-top:1px solid var(--linha);margin-bottom:34px}
+.passos li{counter-increment:p;display:grid;grid-template-columns:36px 1fr;gap:4px 14px;padding:18px 0;border-bottom:1px solid var(--linha)}
+.passos li::before{content:counter(p);grid-row:span 2;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--areia);display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--bronze-esc)}
+.passos b{font-size:16px;font-weight:700;line-height:1.35}
+.passos span{font-size:14px;color:var(--apoio);line-height:1.5}
+.passos strong{white-space:nowrap;color:var(--tinta)}
+.secao-t{font-size:13px;font-weight:700;color:var(--apoio);margin-bottom:12px}
+.video{aspect-ratio:9/16;max-height:62vh;width:100%;max-width:380px;background:linear-gradient(165deg,#E7DFD3,var(--areia));border-radius:18px;display:grid;place-items:center;align-content:center;gap:14px;color:var(--tinta);font-size:14px;font-weight:600;text-align:center;padding:20px;overflow:hidden;margin-bottom:34px}
+.video iframe{width:100%;height:100%;border:0}
+.contato{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;background:var(--branco);border:1.5px solid var(--linha);border-radius:18px;padding:20px 22px;margin-bottom:14px}
+.contato h3{font-size:17px;font-weight:800;letter-spacing:-.01em;margin-bottom:2px}
+.contato p{font-size:14px;color:var(--apoio)}
+.contato .btn{width:auto;min-height:50px;padding:13px 22px;font-size:15px}
+.extra{font-size:14px;color:var(--apoio);margin-top:8px}
+.extra a{color:var(--tinta);font-weight:700}
+.flutua{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--tinta);color:var(--gelo);text-decoration:none;border-radius:999px;padding:13px 18px;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgba(42,35,28,.18);display:none}
+.flutua.on{display:block}
+
+@media (min-width:720px){
+  main{padding:52px 22px 80px}
+  .abertura{padding-bottom:34px;margin-bottom:34px}
+  .acao{position:static;background:none;padding:28px 0 0}
+  .acao-in{max-width:none}
+  .btn{display:inline-block;width:auto;min-width:220px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="topo-in">
+    <button class="voltar" id="voltar" type="button" aria-label="Voltar para a pergunta anterior">‹ Voltar</button>
+    <div class="logo"><b>Instituto Bulhões</b><small>Método Bulhões</small></div>
+    <span class="cont" id="cont" aria-live="polite">1 de 7</span>
+  </div>
+  <div class="barra" aria-hidden="true"><div><i id="barra"></i></div></div>
+</header>
+
+<main id="app">
+  <!-- 1 -->
+  <section class="tela on" data-tela="momento" data-passo="1" aria-labelledby="q1">
+    <div class="abertura">
+      <!-- TEXTO NOVO, AGUARDA APROVAÇÃO: título e frase de explicação -->
+      <h1>Uma leitura do seu<br><span>momento com as lentes.</span></h1>
+      <p>Suas respostas montam um retrato do seu momento profissional hoje. A equipe da Dra. Larissa lê cada uma antes de falar com você, para indicar o caminho de formação que faz sentido para a sua realidade.</p>
+    </div>
+    <h2 id="q1">Qual é o seu momento profissional?</h2>
+    <p class="dica">Escolha uma opção.</p>
+    <div class="opcoes" role="radiogroup" aria-labelledby="q1" data-campo="momento" data-tipo="um">
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="recem_formado"><span class="m"></span>Recém-formada(o)</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="dono_clinica"><span class="m"></span>Dona(o) de clínica ou consultório</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="clinica_popular"><span class="m"></span>Trabalho em clínicas populares</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="clinica_parceiro"><span class="m"></span>Trabalho em clínicas de parceiros</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="estudante"><span class="m"></span>Estudante</button>
+    </div>
+    <!-- TEXTO NOVO, AGUARDA APROVAÇÃO: linha de confiança -->
+    <p class="confianca"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2.5" stroke="#A18B6C" stroke-width="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10" stroke="#A18B6C" stroke-width="2"/></svg>Suas respostas ficam só com a equipe do Instituto Bulhões.</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="tela" data-tela="desafios" data-passo="2" aria-labelledby="q2">
+    <h2 id="q2">Qual é o seu maior desafio com as lentes em resina hoje?</h2>
+    <p class="dica">Pode marcar mais de uma.</p>
+    <div class="opcoes" role="group" aria-labelledby="q2" data-campo="desafios" data-tipo="varios">
+      <button class="op multi" type="button" role="checkbox" aria-checked="false" data-v="comecar"><span class="m"></span>Quero começar</button>
+      <button class="op multi" type="button" role="checkbox" aria-checked="false" data-v="tecnica"><span class="m"></span>Melhorar a técnica</button>
+      <button class="op multi" type="button" role="checkbox" aria-checked="false" data-v="naturalidade"><span class="m"></span>Meus casos não ficam naturais</button>
+      <button class="op multi" type="button" role="checkbox" aria-checked="false" data-v="captacao"><span class="m"></span>Captação de pacientes</button>
+    </div>
+    <div class="acao"><div class="acao-in"><button class="btn" type="button" id="ok-desafios" disabled>Continuar</button></div></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="tela" data-tela="cobra" data-passo="3" aria-labelledby="q3">
+    <h2 id="q3">Quanto você cobra hoje por um caso de lentes em resina na arcada superior?</h2>
+    <p class="dica">Escolha uma opção.</p>
+    <div class="opcoes" role="radiogroup" aria-labelledby="q3" data-campo="cobra" data-tipo="um">
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="nao_faz"><span class="m"></span>Ainda não faço lentes</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="ate_1000"><span class="m"></span>Até R$ 1.000</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="1000_2500"><span class="m"></span>De R$ 1.000 a R$ 2.500</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="2500_4000"><span class="m"></span>De R$ 2.500 a R$ 4.000</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="4000_5000"><span class="m"></span>De R$ 4.000 a R$ 5.000</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="5000_mais"><span class="m"></span>Acima de R$ 5.000</button>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="tela" data-tela="casos" data-passo="4" aria-labelledby="q4">
+    <h2 id="q4">Quantos casos de lentes em resina você faz por mês?</h2>
+    <p class="dica">Só o número. Coloque 0 se ainda não faz.</p>
+    <div class="campo casos" id="c-casos">
+      <label for="casos" class="sr">Casos por mês</label>
+      <div class="ctrl"><input id="casos" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" placeholder="0" autocomplete="off" enterkeyhint="next" aria-describedby="m-casos"></div>
+      <div class="msg" id="m-casos" aria-live="polite"></div>
+    </div>
+    <div class="acao"><div class="acao-in"><button class="btn" type="button" id="ok-casos" disabled>Continuar</button></div></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="tela" data-tela="santos" data-passo="5" aria-labelledby="q5">
+    <h2 id="q5">Os treinamentos presenciais acontecem em Santos e exigem a sua presença. Você tem disponibilidade?</h2>
+    <p class="dica">Escolha uma opção.</p>
+    <div class="opcoes" role="radiogroup" aria-labelledby="q5" data-campo="santos" data-tipo="um">
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="sim"><span class="m"></span>Sim, consigo estar em Santos</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="nao"><span class="m"></span>Não consigo</button>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="tela" data-tela="investimento" data-passo="6" aria-labelledby="q6">
+    <h2 id="q6">As formações do Instituto Bulhões começam em R$ 5.500. Hoje você está em condição de investir na sua formação em lentes?</h2>
+    <p class="dica">Escolha uma opção.</p>
+    <div class="opcoes" role="radiogroup" aria-labelledby="q6" data-campo="investimento" data-tipo="um">
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="avista"><span class="m"></span>Sim, à vista</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="parcelado"><span class="m"></span>Sim, parcelado</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="organizar"><span class="m"></span>Preciso me organizar, mas quero</button>
+      <button class="op" type="button" role="radio" aria-checked="false" data-v="nao"><span class="m"></span>Não no momento</button>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="tela" data-tela="dados" data-passo="7" aria-labelledby="q7">
+    <h2 id="q7">Seus dados</h2>
+    <p class="dica">Para a nossa equipe falar com você.</p>
+    <form id="form-dados" novalidate>
+      <div class="campo" id="c-nome">
+        <label for="nome">Nome completo</label>
+        <div class="ctrl"><input id="nome" type="text" autocomplete="name" autocapitalize="words" enterkeyhint="next" maxlength="200" aria-describedby="m-nome"></div>
+        <div class="msg" id="m-nome" aria-live="polite"></div>
+      </div>
+      <div class="campo" id="c-whatsapp">
+        <label for="whatsapp">WhatsApp com DDD</label>
+        <div class="ctrl"><input id="whatsapp" type="tel" inputmode="tel" autocomplete="tel-national" enterkeyhint="next" placeholder="(13) 99999-9999" maxlength="16" aria-describedby="m-whatsapp"></div>
+        <div class="msg" id="m-whatsapp" aria-live="polite"></div>
+      </div>
+      <div class="campo" id="c-instagram">
+        <label for="instagram">Instagram</label>
+        <div class="ctrl"><span class="pre" aria-hidden="true">@</span><input id="instagram" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="seuperfil" maxlength="100" aria-describedby="m-instagram"></div>
+        <div class="msg" id="m-instagram" aria-live="polite"></div>
+      </div>
+      <div class="oculto" aria-hidden="true"><label for="site">Site</label><input id="site" tabindex="-1" autocomplete="off"></div>
+      <div class="msg" id="erro-dados" aria-live="assertive"></div>
+      <div class="acao"><div class="acao-in"><button class="btn ouro" type="submit" id="enviar">Enviar aplicação</button></div></div>
+    </form>
+  </section>
+
+  <!-- Obrigado -->
+  <section class="tela obrigado" data-tela="obrigado" aria-labelledby="t-ok">
+    <div class="status"><i aria-hidden="true"></i>Aplicação recebida</div>
+    <!-- TEXTO NOVO, AGUARDA APROVAÇÃO: título personalizado -->
+    <h2 id="t-ok"><span id="ok-nome">Pronto</span>, sua aplicação está com a nossa equipe.</h2>
+    <p class="sub">Em até 30 minutos, dentro do horário comercial, nossa equipe liga para você.</p>
+
+    <!-- TEXTO NOVO, AGUARDA APROVAÇÃO: próximos passos (baseados no roteiro aprovado do vídeo) -->
+    <ol class="passos" aria-label="Próximos passos">
+      <li><b>Leitura das suas respostas</b><span>A equipe lê a sua aplicação com atenção.</span></li>
+      <li><b>Ligação em até 30 minutos</b><span>Dentro do horário comercial, no número <strong id="ok-tel">que você informou</strong>.</span></li>
+      <li><b>O caminho certo para você</b><span>Na conversa, entendemos o seu momento e indicamos a formação que faz sentido.</span></li>
+    </ol>
+
+    <!-- TEXTO NOVO, AGUARDA APROVAÇÃO: título do vídeo -->
+    <p class="secao-t">Uma mensagem da Dra. Larissa</p>
+    <!-- VIDEO_URL: quando o vídeo da Dra. Larissa estiver pronto, preencher VIDEO_URL no script -->
+    <div class="video" id="video"><svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="27" fill="rgba(255,255,255,.55)" stroke="#A18B6C"/><path d="M23 19l14 9-14 9z" fill="#2A231C"/></svg><span>Vídeo da Dra. Larissa</span></div>
+
+    <div class="contato">
+      <div><h3>Quer adiantar?</h3><p>Chame a gente agora.</p></div>
+      <a class="btn" id="wa-adiantar" target="_blank" rel="noopener">Chamar no WhatsApp</a>
+    </div>
+    <p class="extra" id="bloco-conteudo">Enquanto isso, <a id="link-conteudo" target="_blank" rel="noopener">veja o conteúdo técnico da Dra. Larissa</a>.</p>
+  </section>
+</main>
+<a class="flutua" id="flutua" target="_blank" rel="noopener">Falar com o Instituto</a>
+
+<script>
+(function(){
+  'use strict';
+  var SUPABASE_URL='https://gcxuikfjyajlmqbqlyca.supabase.co';
+  var SUPABASE_KEY='sb_publishable_OMTsAJNgLiM3wQfZrU3Q3Q_g5mvMuEc';
+  var PORTA='bio';
+  var WA_NUMERO='551340427082';
+  var WA_TEXTO='Oi! Acabei de enviar minha aplicação para o Instituto Bulhões.';
+  var VIDEO_URL='';      // pendente: link do vídeo da Dra. Larissa
+  var CONTEUDO_URL='';   // pendente: link do conteúdo técnico da Dra. Larissa
+  // Só envia de verdade no domínio publicado. Fora dele é prévia.
+  var HOSTS_REAIS=/(^|\.)vercel\.app$|(^|\.)institutobulhoes\.com\.br$/i;
+  var ENVIO_ATIVO=HOSTS_REAIS.test(location.hostname);
+  var TOTAL=7;
+
+  var $=function(id){return document.getElementById(id);};
+  var telas=[].slice.call(document.querySelectorAll('.tela'));
+  var ordem=telas.map(function(t){return t.getAttribute('data-tela');});
+  var atual=0, historico=[], avancando=false;
+  var R={momento:null,desafios:[],cobra:null,casos_mes:null,santos:null,investimento:null};
+
+  var qs=new URLSearchParams(location.search), utm={};
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){var v=qs.get(k);if(v)utm[k]=v.slice(0,200);});
+
+  var waLink='https://wa.me/'+WA_NUMERO+'?text='+encodeURIComponent(WA_TEXTO);
+  $('wa-adiantar').href=waLink; $('flutua').href=waLink;
+  if(CONTEUDO_URL){$('link-conteudo').href=CONTEUDO_URL;}else{$('bloco-conteudo').style.display='none';}
+  if(VIDEO_URL){$('video').innerHTML='<iframe src="'+VIDEO_URL.replace(/"/g,'')+'" title="Vídeo da Dra. Larissa" allow="autoplay; fullscreen" allowfullscreen></iframe>';}
+
+  var desktop=!!(window.matchMedia&&window.matchMedia('(hover:hover) and (pointer:fine)').matches);
+
+  function mostrar(i,semHistorico){
+    if(!semHistorico&&i!==atual)historico.push(atual);
+    telas[atual].classList.remove('on');
+    atual=i; var t=telas[atual]; t.classList.add('on');
+    var fim=ordem[atual]==='obrigado';
+    var p=parseInt(t.getAttribute('data-passo')||'0',10);
+    $('barra').style.width=(fim?100:((p-1)/TOTAL)*100)+'%';
+    $('cont').textContent=fim?'Enviada':p+' de '+TOTAL;
+    $('voltar').classList.toggle('on',historico.length>0&&!fim);
+    if(!fim)$('flutua').classList.remove('on');
+    window.scrollTo(0,0);
+    var h=t.querySelector('h2'); if(h)h.setAttribute('tabindex','-1');
+    var foco=t.querySelector('input:not([tabindex="-1"])');
+    if(foco&&desktop){setTimeout(function(){foco.focus();},60);}
+    else if(h&&atual>0){try{h.focus({preventScroll:true});}catch(e){}}
+    avancando=false;
+  }
+  function proxima(){mostrar(atual+1);}
+  // botão flutuante só aparece quando o bloco de WhatsApp sai da tela
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(es){var e=es[0];
+      $('flutua').classList.toggle('on',ordem[atual]==='obrigado'&&!e.isIntersecting&&e.boundingClientRect.top>0);
+    }).observe($('wa-adiantar'));
+  }
+  $('voltar').addEventListener('click',function(){if(historico.length)mostrar(historico.pop(),true);});
+
+  // opções: seleção, avanço automático na escolha única
+  [].slice.call(document.querySelectorAll('.opcoes')).forEach(function(grupo){
+    var campo=grupo.getAttribute('data-campo'), tipo=grupo.getAttribute('data-tipo');
+    grupo.addEventListener('click',function(ev){
+      var b=ev.target.closest('.op'); if(!b||avancando)return;
+      var v=b.getAttribute('data-v');
+      if(tipo==='um'){
+        [].slice.call(grupo.children).forEach(function(x){var s=x===b;x.classList.toggle('sel',s);x.setAttribute('aria-checked',s);});
+        R[campo]=v; avancando=true;
+        setTimeout(proxima,260);
+      }else{
+        var on=b.classList.toggle('sel'); b.setAttribute('aria-checked',on);
+        var i=R[campo].indexOf(v);
+        if(i>=0)R[campo].splice(i,1);else R[campo].push(v);
+        $('ok-desafios').disabled=R[campo].length===0;
+      }
+    });
+  });
+  $('ok-desafios').addEventListener('click',function(){if(R.desafios.length)proxima();});
+
+  // atalhos de teclado no computador: 1 a 6 escolhem, Enter continua
+  document.addEventListener('keydown',function(e){
+    var t=telas[atual]; if(e.target.tagName==='INPUT'||e.metaKey||e.ctrlKey||e.altKey)return;
+    var ops=t.querySelectorAll('.op'); var n=parseInt(e.key,10);
+    if(ops.length&&n>=1&&n<=ops.length){ops[n-1].click();e.preventDefault();}
+    else if(e.key==='Enter'&&e.target.tagName!=='BUTTON'){var b=t.querySelector('.acao .btn:not(:disabled)');if(b&&b.type==='button'){b.click();e.preventDefault();}}
+  });
+
+  // validação gentil: erro só depois de sair do campo ou tentar avançar
+  function marcar(id,msg){var c=$('c-'+id),m=$('m-'+id),inp=$(id);
+    c.classList.toggle('invalido',!!msg); c.classList.toggle('ok',!msg&&!!inp.value.trim());
+    m.textContent=msg||''; inp.setAttribute('aria-invalid',msg?'true':'false');}
+
+  // casos por mês
+  var inCasos=$('casos');
+  inCasos.addEventListener('input',function(){
+    inCasos.value=inCasos.value.replace(/\D/g,'').slice(0,3);
+    $('ok-casos').disabled=inCasos.value==='';
+    if($('c-casos').classList.contains('invalido'))marcar('casos','');
+  });
+  function okCasos(){
+    var v=inCasos.value.trim();
+    if(!/^\d{1,3}$/.test(v)){marcar('casos','Digite só o número. Coloque 0 se ainda não faz.');return;}
+    marcar('casos',''); R.casos_mes=String(parseInt(v,10)); proxima();
+  }
+  $('ok-casos').addEventListener('click',okCasos);
+  inCasos.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();okCasos();}});
+
+  // máscara do WhatsApp
+  var inWa=$('whatsapp');
+  inWa.addEventListener('input',function(){
+    var d=inWa.value.replace(/\D/g,'');
+    if(d.length>11&&d.indexOf('55')===0)d=d.slice(2);
+    d=d.slice(0,11);
+    var f=d;
+    if(d.length>2)f='('+d.slice(0,2)+') '+d.slice(2);
+    if(d.length>6)f='('+d.slice(0,2)+') '+d.slice(2,d.length-4)+'-'+d.slice(-4);
+    inWa.value=f;
+    if($('c-whatsapp').classList.contains('invalido')&&/^\d{10,11}$/.test(d))marcar('whatsapp','');
+  });
+  // Instagram: o @ já fica fixo
+  var inIg=$('instagram');
+  inIg.addEventListener('input',function(){inIg.value=inIg.value.replace(/^@+/,'').replace(/\s/g,'');});
+
+  function erroNome(v){return (v.length<2||v.split(/\s+/).length<2)?'Escreva o seu nome e sobrenome.':'';}
+  function erroWa(d){return /^\d{10,11}$/.test(d)?'':'Confira o número com DDD, por exemplo (13) 99999-9999.';}
+  function erroIg(v){return v.length>101?'Confira o seu Instagram.':'';}
+  $('nome').addEventListener('blur',function(){if(this.value.trim())marcar('nome',erroNome(this.value.trim()));});
+  inWa.addEventListener('blur',function(){if(this.value.trim())marcar('whatsapp',erroWa(this.value.replace(/\D/g,'')));});
+  $('nome').addEventListener('input',function(){if($('c-nome').classList.contains('invalido')&&!erroNome(this.value.trim()))marcar('nome','');});
+  $('nome').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();inWa.focus();}});
+  inWa.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();inIg.focus();}});
+
+  function personalizar(p){
+    var primeiro=(p.nome||'').split(' ')[0]; if(primeiro)$('ok-nome').textContent=primeiro;
+    var d=p.whatsapp||''; if(/^\d{10,11}$/.test(d))$('ok-tel').textContent='('+d.slice(0,2)+') '+d.slice(2,d.length-4)+'-'+d.slice(-4);
+  }
+  function montarPayload(){
+    var ig=inIg.value.trim().replace(/^@+/,'');
+    var p={
+      nome:$('nome').value.trim().replace(/\s+/g,' '),
+      whatsapp:inWa.value.replace(/\D/g,''),
+      instagram:ig?'@'+ig:'',
+      momento:R.momento, desafios:R.desafios.slice(), cobra:R.cobra,
+      casos_mes:R.casos_mes, santos:R.santos, investimento:R.investimento,
+      porta:PORTA, site:$('site').value
+    };
+    Object.keys(utm).forEach(function(k){p[k]=utm[k];});
+    return p;
+  }
+  function validar(p){
+    if(!p.momento||!p.desafios.length||!p.cobra||p.casos_mes===null||!p.santos||!p.investimento)return 'Faltou responder alguma pergunta. Use o Voltar para conferir.';
+    return '';
+  }
+
+  $('form-dados').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var erro=$('erro-dados'), btn=$('enviar'), p=montarPayload();
+    var e1=erroNome(p.nome), e2=erroWa(p.whatsapp), e3=erroIg(p.instagram);
+    marcar('nome',e1); marcar('whatsapp',e2); marcar('instagram',e3);
+    if(e1||e2||e3){$(e1?'nome':e2?'whatsapp':'instagram').focus();return;}
+    var msg=validar(p); erro.textContent=msg; if(msg)return;
+    if(!ENVIO_ATIVO){
+      var av=document.createElement('div');av.className='aviso';
+      av.textContent='Prévia: o envio está desativado fora do site publicado. Nada foi gravado. Mostrando a página de obrigado.';
+      $('form-dados').appendChild(av);
+      try{console.log('Payload da prévia',p);}catch(e){}
+      setTimeout(function(){personalizar(p); mostrar(ordem.indexOf('obrigado'));},1200);
+      return;
+    }
+    btn.disabled=true; btn.textContent='Enviando...';
+    fetch(SUPABASE_URL+'/rest/v1/rpc/instituto_aplicar',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY},
+      body:JSON.stringify({p:p})
+    }).then(function(r){
+      if(!r.ok)return r.json().catch(function(){return {};}).then(function(j){throw new Error(j&&j.message||'erro');});
+      return r.json();
+    }).then(function(){
+      personalizar(p); mostrar(ordem.indexOf('obrigado'));
+    }).catch(function(e){
+      btn.disabled=false; btn.textContent='Enviar aplicação';
+      var m=String(e&&e.message||'');
+      if(/WhatsApp/i.test(m)){marcar('whatsapp',erroWa(''));inWa.focus();}
+      else if(/nome/i.test(m)){marcar('nome','Confira o seu nome.');}
+      else erro.textContent='Não conseguimos enviar agora. Tente de novo ou chame a gente no WhatsApp.';
+    });
+  });
+
+  mostrar(0,true);
+  window.__aplicacao={montarPayload:montarPayload,validar:validar,R:R};
+})();
+</script>
+</body>
+</html>
